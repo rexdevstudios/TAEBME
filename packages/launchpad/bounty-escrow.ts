@@ -204,33 +204,41 @@ export class BountyEscrowService {
     const isNewParticipant = !existingClaim || existingClaim.verificationStatus !== 'VERIFIED';
     const rewardFormatted = ethers.formatUnits(campaign.rewardPerKol, 18);
 
-    // 2. Branch A: HODL Loyalty On-Chain Verification
+    // 2. Branch A: HODL Loyalty On-Chain Verification (fail-closed — C-05 fix)
     if (isHoldCampaign) {
-      let userBalance = 0n;
-      let balanceFormatted = '0';
       const tokenAddr = options.tokenAddress;
       const targetWallet = options.walletAddress || (ethers.isAddress(kol.userId) ? kol.userId : undefined);
 
-      if (tokenAddr && ethers.isAddress(tokenAddr) && targetWallet && ethers.isAddress(targetWallet)) {
-        try {
-          const isRh = String(options.chain || '').toLowerCase().includes('robinhood');
-          const rpcUrl = isRh ? 'https://rpc.mainnet.chain.robinhood.com' : 'https://mainnet.base.org';
-          const provider = new ethers.JsonRpcProvider(rpcUrl);
-          const erc20 = new ethers.Contract(
-            tokenAddr,
-            ['function balanceOf(address) view returns (uint256)', 'function decimals() view returns (uint8)'],
-            provider
-          );
-          userBalance = await erc20.balanceOf(targetWallet);
-          balanceFormatted = userBalance.toString();
-        } catch {
-          // Graceful fallback for local development or offline test environment
-          userBalance = 10000n * 10n ** 18n;
-          balanceFormatted = '10000';
-        }
-      } else {
-        userBalance = 10000n * 10n ** 18n;
-        balanceFormatted = '10000';
+      if (!tokenAddr || !ethers.isAddress(tokenAddr) || !targetWallet || !ethers.isAddress(targetWallet)) {
+        await this.db.updateClaimStatus(claim.id, 'REJECTED');
+        await this.db.createAuditLog(kol.userId, 'HODL_CLAIM_REJECTED', claim.id, 'Invalid or missing token/wallet address');
+        return { success: false, reason: 'HODL_INVALID_ADDRESS: tokenAddress and walletAddress must be valid EVM addresses' };
+      }
+
+      let userBalance = 0n;
+      let balanceFormatted = '0';
+      try {
+        const isRh = String(options.chain || '').toLowerCase().includes('robinhood');
+        const rpcUrl = isRh ? 'https://rpc.mainnet.chain.robinhood.com' : 'https://mainnet.base.org';
+        const provider = new ethers.JsonRpcProvider(rpcUrl);
+        const erc20 = new ethers.Contract(
+          tokenAddr,
+          ['function balanceOf(address) view returns (uint256)', 'function decimals() view returns (uint8)'],
+          provider
+        );
+        userBalance = await erc20.balanceOf(targetWallet);
+        balanceFormatted = userBalance.toString();
+      } catch (rpcErr: any) {
+        // C-05 Fix: Fail closed — RPC failure must not grant tokens
+        await this.db.updateClaimStatus(claim.id, 'REJECTED');
+        await this.db.createAuditLog(kol.userId, 'HODL_CLAIM_REJECTED', claim.id, `RPC error: ${rpcErr?.message}`);
+        return { success: false, reason: 'HODL_RPC_ERROR: Cannot verify on-chain balance. Please retry later.' };
+      }
+
+      if (userBalance === 0n) {
+        await this.db.updateClaimStatus(claim.id, 'REJECTED');
+        await this.db.createAuditLog(kol.userId, 'HODL_CLAIM_REJECTED', claim.id, `Zero balance: ${targetWallet}`);
+        return { success: false, reason: 'HODL_ZERO_BALANCE: Wallet holds no tokens for this campaign' };
       }
 
       await this.db.updateClaimStatus(claim.id, 'VERIFIED');
@@ -242,15 +250,14 @@ export class BountyEscrowService {
       return { success: true, claim, reason: 'HODL_BALANCE_VERIFIED', onChainBalance: balanceFormatted };
     }
 
-    // 3. Branch B: Liquid Staking & Yield Vault Verification
+    // 3. Branch B: Liquid Staking Verification — PENDING IMPLEMENTATION (H-02 fix)
     if (isStakeCampaign) {
-      await this.db.updateClaimStatus(claim.id, 'VERIFIED');
-      if (isNewParticipant) {
-        await this.db.incrementCampaignParticipant(campaignId);
-      }
-      await this.db.recordBountyAllocation?.(kol.userId, claim.id, rewardFormatted, 'TOKENS', campaign.creatorId);
-      await this.db.createAuditLog(kol.userId, 'LIQUID_STAKE_VERIFIED', claim.id, `Proof: ${proofUrl}`);
-      return { success: true, claim, reason: 'LIQUID_STAKING_VERIFIED' };
+      // H-02 Fix: STAKE verification requires on-chain staking position check.
+      // Auto-approval without verification is a security risk. Reject until
+      // staking contract integration is implemented.
+      await this.db.updateClaimStatus(claim.id, 'REJECTED');
+      await this.db.createAuditLog(kol.userId, 'STAKE_CLAIM_REJECTED', claim.id, 'On-chain staking verification not yet implemented');
+      return { success: false, reason: 'STAKE_VERIFICATION_PENDING: Staking verification requires on-chain position check. Feature coming soon.' };
     }
 
     // 4. Branch C: Social Media & X Raid AI Quality Audit Gate
@@ -266,8 +273,12 @@ export class BountyEscrowService {
       // Graceful fallback
     }
 
-    if (!contentToAudit && (proofUrl.includes('x.com') || proofUrl.includes('twitter.com'))) {
-      contentToAudit = `Excited to announce our collaboration with this innovative project! LFG ${campaign.requiredHashtag} to the moon! 🚀`;
+    // H-03 Fix: Do not manufacture synthetic proof content.
+    // If scraper is unavailable or content cannot be retrieved, reject the claim.
+    if (!contentToAudit) {
+      await this.db.updateClaimStatus(claim.id, 'REJECTED');
+      await this.db.createAuditLog(kol.userId, 'SOCIAL_CLAIM_REJECTED', claim.id, `Content unavailable for: ${proofUrl}`);
+      return { success: false, reason: 'PROOF_CONTENT_UNAVAILABLE: Cannot verify social proof. Ensure the post is public and the URL is valid.' };
     }
 
     const audit = TweetQualityScorer.auditTweet(contentToAudit, campaign.requiredHashtag);

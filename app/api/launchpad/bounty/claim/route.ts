@@ -4,6 +4,7 @@ import { BountyEscrowService, BountyClaimItem } from '@packages/launchpad/bounty
 import { FirecrawlScraperService } from '@packages/intelligence/firecrawl-scraper';
 import { BountyCampaign, BountyClaim, KolProfile } from '@packages/shared/types/domain';
 import { defaultBountyDbAdapter, defaultKolDbAdapter, getDbPool } from '@packages/shared/db-pool';
+import { authenticateSession } from '@packages/auth/session';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -92,17 +93,31 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    // C-04 Fix: Require authenticated session for claim submission.
+    // This binds the claim to the authenticated wallet, preventing identity spoofing.
+    const session = await authenticateSession(req);
+    if (!session) {
+      const res: ApiResponse<null> = {
+        success: false,
+        error: { code: 'UNAUTHORIZED', message: 'Valid SIWE session required to submit a bounty claim.' },
+        timestamp: new Date().toISOString(),
+      };
+      return NextResponse.json(res, { status: 401 });
+    }
+
     const body = await req.json();
     const {
       campaignId,
       proofUrl,
-      walletAddress,
-      twitterHandle,
-      followersCount,
       claimType,
       tokenAddress,
       chain,
+      twitterHandle,
     } = body;
+
+    // C-04 Fix: walletAddress is derived from the authenticated session, not the request body.
+    // This prevents an attacker from claiming on behalf of another wallet.
+    const walletAddress = session.walletAddress;
 
     const finalProofUrl =
       proofUrl ||
@@ -112,24 +127,29 @@ export async function POST(req: NextRequest) {
         ? `vault-staking://${walletAddress}`
         : '');
 
-    if (!campaignId || !finalProofUrl || !walletAddress) {
+    if (!campaignId || !finalProofUrl) {
       const res: ApiResponse<null> = {
         success: false,
-        error: { code: 'INVALID_INPUT', message: 'campaignId, proofUrl, and walletAddress are required' },
+        error: { code: 'INVALID_INPUT', message: 'campaignId and proofUrl are required' },
         timestamp: new Date().toISOString(),
       };
       return NextResponse.json(res, { status: 400 });
     }
 
-    // Resolve official KOL profile from SSOT (or register if new)
+    // Resolve official KOL profile from SSOT (or register if new).
+    // C-04 Fix: followersCount is NOT accepted from the request body.
+    // It defaults to 0 and must be updated via a verified API integration only.
+    // C-04 Fix: twitterHandle is NOT accepted from the request body.
+    // Binding a Twitter/X identity requires Twitter OAuth verification — not self-assertion.
+    // twitterHandle from body is intentionally discarded here.
     let kol = await defaultKolDbAdapter.getKolProfile(walletAddress);
     if (!kol) {
       kol = await defaultKolDbAdapter.upsertKolProfile({
         userId: walletAddress,
-        twitterHandle: twitterHandle ? twitterHandle.replace('@', '') : undefined,
-        followersCount: Number(followersCount) || 1200,
-        trustScore: 85,
-        isVerified: true,
+        // twitterHandle omitted — requires Twitter OAuth verification before binding
+        followersCount: 0,   // Will be populated by verified Twitter API integration
+        trustScore: 50,      // Default neutral trust score; elevated by verified actions only
+        isVerified: false,   // Requires explicit verification step
       });
     }
 

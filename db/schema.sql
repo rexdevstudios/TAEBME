@@ -252,8 +252,11 @@ CREATE TABLE bounty_claims (
     kol_id UUID NOT NULL REFERENCES kol_profiles(id) ON DELETE CASCADE,
     proof_url TEXT NOT NULL,
     verification_status VARCHAR(50) NOT NULL DEFAULT 'PENDING', -- PENDING, VERIFIED, REJECTED, CLAIMED
+    tx_hash VARCHAR(66),                                          -- H-06: On-chain settlement tx hash (0x + 64 hex)
     claimed_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_bounty_claims_campaign_kol UNIQUE (campaign_id, kol_id), -- L-02: one claim per KOL per campaign
+    CONSTRAINT uq_bounty_claims_tx_hash UNIQUE (tx_hash)                   -- H-06: prevent double-settle
 );
 
 -- ----------------------------------------------------------------------------

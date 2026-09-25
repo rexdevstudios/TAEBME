@@ -26,12 +26,13 @@ const PUBLIC_API_PATHS = new Set([
   '/api/market/chart',    // Chart data is public read-only
   '/api/market/macro',    // DefiLlama macro TVL signal is public read-only
   '/api/launchpad/tokens', // Public active token list from Neon SSOT
-  '/api/launchpad/publish', // Public token launch publish (verified via on-chain contract state)
-  '/api/launchpad/graduate', // Public graduation trigger & DEX pair query
+  // NOTE: /api/launchpad/publish is PROTECTED — requires PUBLISH_LAUNCH capability (H-01 fix)
+  // NOTE: /api/launchpad/graduate POST is PROTECTED — requires GRADUATE_LAUNCH capability (C-01 fix)
+  // NOTE: /api/launchpad/bounty/settle is PROTECTED — requires auth session (C-02 fix)
+  // NOTE: /api/launchpad/bounty/claim POST is PROTECTED — requires auth session (C-04 fix)
+  // NOTE: /api/launchpad/bounty/verify-hodl is PROTECTED — requires auth session
+  '/api/launchpad/graduate', // GET (graduation status read) remains public; POST is guarded in handler
   '/api/launchpad/bounty', // Public bounty campaigns list from Neon SSOT
-  '/api/launchpad/bounty/claim', // Public bounty claim & Merkle proof evaluation
-  '/api/launchpad/bounty/settle', // Public on-chain claim settlement (verified via RPC tx receipt)
-  '/api/launchpad/bounty/verify-hodl', // Public HODL status & verification engine
   '/api/launchpad/curve-volatility', // Public curve slope parameters
   '/api/launchpad/keeper', // Keeper automation handles CRON_SECRET internally
   '/api/launchpad/webhook', // Webhook receiver handles signature/secret internally

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ApiResponse } from '@packages/shared/contracts/api-contracts';
 import { defaultDraftDbAdapter } from '@packages/shared/db-pool';
 import { DexPairFactoryService } from '@packages/launchpad/dex-pair-factory';
+import { requireCapability } from '@packages/auth/session';
 import { ethers } from 'ethers';
 
 export const dynamic = 'force-dynamic';
@@ -13,6 +14,10 @@ function isUuid(id?: string): boolean {
 
 export async function POST(req: NextRequest) {
   try {
+    // C-01 Fix: Graduate is an admin/indexer-only operation.
+    // Requires SUPER_ADMIN or LAUNCH_ADMIN role via RBAC.
+    await requireCapability(req, 'GRADUATE_LAUNCH');
+
     let body: any = {};
     try {
       body = await req.json();
@@ -98,12 +103,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(response, { status: 200 });
   } catch (err: any) {
     console.error('[POST /api/launchpad/graduate] Error:', err);
+    // requireCapability throws errors prefixed UNAUTHORIZED / RBAC_FORBIDDEN / AUTH_ACCOUNT_
+    const isUnauthorized = err?.message?.startsWith('UNAUTHORIZED');
+    const isForbidden = err?.message?.startsWith('RBAC_FORBIDDEN') || err?.message?.startsWith('AUTH_ACCOUNT_');
     const response: ApiResponse<null> = {
       success: false,
       error: { code: 'GRADUATION_FAILED', message: err?.message || 'Graduation trigger failed' },
       timestamp: new Date().toISOString(),
     };
-    return NextResponse.json(response, { status: 500 });
+    return NextResponse.json(response, { status: isUnauthorized ? 401 : isForbidden ? 403 : 500 });
   }
 }
 

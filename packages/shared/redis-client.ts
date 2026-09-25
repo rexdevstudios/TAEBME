@@ -75,6 +75,15 @@ export class UpstashRedisClient {
   }
 
   /**
+   * GETDEL — atomically GET a key and DELETE it in a single command.
+   * Use for one-time-consume semantics (e.g., SIWE nonce replay prevention).
+   * Returns the previous value, or null if key did not exist.
+   */
+  async getdel<T = string>(key: string): Promise<T | null> {
+    return this.executeCommand<T>(['GETDEL', key]);
+  }
+
+  /**
    * SET key value di Redis dengan optional TTL (dalam detik).
    */
   async set(key: string, value: string | number | object, ttlSeconds?: number): Promise<boolean> {

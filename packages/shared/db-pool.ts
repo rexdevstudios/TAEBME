@@ -1158,13 +1158,28 @@ export class PostgresBountyDbAdapter implements BountyDbAdapter {
     const pool = getDbPool();
     if (pool && isUuid(claimId)) {
       try {
-        await pool.query(
-          `UPDATE bounty_claims 
-           SET verification_status = 'CLAIMED', 
-               claimed_at = NOW()
-           WHERE id = $1`,
-          [claimId]
+        // H-06 Fix: Conditional UPDATE — persists tx_hash and guards settlement state.
+        // WHERE verification_status='VERIFIED' AND tx_hash IS NULL ensures:
+        //   • Only VERIFIED claims can transition to CLAIMED.
+        //   • Already-settled claims (tx_hash IS NOT NULL) cannot be re-settled.
+        //   • DB UNIQUE(tx_hash) constraint prevents same txHash being recorded twice.
+        //     This UPDATE activates that constraint by actually writing the value.
+        const updateRes = await pool.query(
+          `UPDATE bounty_claims
+           SET verification_status = 'CLAIMED',
+               claimed_at = NOW(),
+               tx_hash = $2
+           WHERE id = $1
+             AND verification_status = 'VERIFIED'
+             AND tx_hash IS NULL`,
+          [claimId, txHash]
         );
+
+        // rowCount = 0 means claim was already settled or state changed concurrently.
+        // Propagate as an error so the settle route returns 500 (better than silent success).
+        if ((updateRes.rowCount ?? 0) === 0) {
+          throw new Error(`SETTLEMENT_IDEMPOTENCY_VIOLATION: Claim ${claimId} was already settled or transitioned concurrently. No rows updated.`);
+        }
 
         for (const val of inMemoryClaims.values()) {
           if (val.id === claimId) {
@@ -1272,17 +1287,13 @@ export class PostgresBountyDbAdapter implements BountyDbAdapter {
       return fallbackClaims;
     }
 
-    // Default mock seed claims for testing / sandbox if none found
-    return [
-      {
-        walletAddress: '0x1111111111111111111111111111111111111111',
-        tokenAmount: 1000000000000000000000n,
-      },
-      {
-        walletAddress: '0x2222222222222222222222222222222222222222',
-        tokenAmount: 1000000000000000000000n,
-      },
-    ];
+    // H-05 Fix: Do not return hardcoded mock wallet addresses in any environment.
+    // Production DB failures throw above. Dev/test without DB returns empty list.
+    // Merkle trees built on fake seeds would corrupt on-chain claim verification.
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('[PostgresBountyDbAdapter] getVerifiedClaims: no DB and no in-memory claims. Returning empty list.');
+    }
+    return [];
   }
 }
 
