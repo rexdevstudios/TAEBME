@@ -3,23 +3,27 @@ import { SiweAuthService } from '@packages/auth/siwe';
 import { ApiResponse, WalletVerifyRequest, UserProfileResponse } from '@packages/shared/contracts/api-contracts';
 import { createSessionToken, resolveUserRoles } from '@packages/auth/session';
 import { upstashRedis } from '@packages/shared/redis-client';
+import { getSiweConfig, formatRedisKey } from '@packages/shared/env-config';
 
 export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as WalletVerifyRequest;
-    if (!body.walletAddress || !body.signature || !body.nonce) {
+    if (!body.walletAddress || !body.signature || !body.nonce || !body.message) {
       const response: ApiResponse<null> = {
         success: false,
-        error: { code: 'INVALID_INPUT', message: 'walletAddress, signature, and nonce are required' },
+        error: { code: 'INVALID_INPUT', message: 'walletAddress, signature, nonce, and message are required' },
         timestamp: new Date().toISOString(),
       };
       return NextResponse.json(response, { status: 400 });
     }
 
+    // Resolve authoritative SIWE config based on environment & validated Host header
+    const siweConfig = getSiweConfig(req.headers.get('host'));
+
     // C-03 Fix: Consume server-issued nonce to prevent replay attacks.
     // GETDEL atomically reads and deletes the nonce in one command — eliminates the
     // GET→check→DEL race window that permitted concurrent replay attacks.
-    const nonceKey = `siwe:nonce:${body.nonce}`;
+    const nonceKey = formatRedisKey(`siwe:nonce:${body.nonce}`);
     if (upstashRedis.isConfigured()) {
       // Atomic consume: returns stored value and deletes the key in one round-trip.
       // If two concurrent requests race on the same nonce, exactly one will receive
@@ -29,6 +33,16 @@ export async function POST(req: NextRequest) {
         const response: ApiResponse<null> = {
           success: false,
           error: { code: 'INVALID_NONCE', message: 'Nonce tidak valid, sudah kadaluarsa, atau sudah digunakan. Minta challenge baru.' },
+          timestamp: new Date().toISOString(),
+        };
+        return NextResponse.json(response, { status: 401 });
+      }
+
+      // Wallet binding: Nonce must have been issued to the same requesting wallet address
+      if (storedWallet.toLowerCase() !== body.walletAddress.toLowerCase()) {
+        const response: ApiResponse<null> = {
+          success: false,
+          error: { code: 'WALLET_MISMATCH', message: 'Nonce was issued for a different wallet address.' },
           timestamp: new Date().toISOString(),
         };
         return NextResponse.json(response, { status: 401 });
@@ -49,7 +63,25 @@ export async function POST(req: NextRequest) {
       console.warn('[DEV ONLY] SIWE nonce verification bypassed — Redis not configured. Set UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN.');
     }
 
-    const messageToVerify = body.message || `SIWE Authentication for rtrader.io\nNonce: ${body.nonce}\nURI: https://rtrader.io/auth/login`;
+    const messageToVerify = body.message;
+
+    // Validate SIWE message contents against authoritative environment config (domain, chainId, nonce, address, uri)
+    const validation = SiweAuthService.validateMessage(messageToVerify, {
+      domain: siweConfig.domain,
+      chainId: siweConfig.chainId,
+      nonce: body.nonce,
+      address: body.walletAddress,
+      uri: siweConfig.uri,
+    });
+
+    if (!validation.valid) {
+      const response: ApiResponse<null> = {
+        success: false,
+        error: { code: 'INVALID_SIWE_MESSAGE', message: validation.reason || 'SIWE message validation failed.' },
+        timestamp: new Date().toISOString(),
+      };
+      return NextResponse.json(response, { status: 400 });
+    }
 
     // Verify cryptographic ECDSA signature from MetaMask / Web3 provider
     let isValid = SiweAuthService.verifySignature(messageToVerify, body.signature, body.walletAddress);

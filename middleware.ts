@@ -16,7 +16,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
-// Routes that are publicly accessible without a session token
+// Routes that are publicly accessible without a session token for ALL HTTP methods
 const PUBLIC_API_PATHS = new Set([
   '/api/auth/challenge',
   '/api/auth/verify',
@@ -31,11 +31,15 @@ const PUBLIC_API_PATHS = new Set([
   // NOTE: /api/launchpad/bounty/settle is PROTECTED — requires auth session (C-02 fix)
   // NOTE: /api/launchpad/bounty/claim POST is PROTECTED — requires auth session (C-04 fix)
   // NOTE: /api/launchpad/bounty/verify-hodl is PROTECTED — requires auth session
-  '/api/launchpad/graduate', // GET (graduation status read) remains public; POST is guarded in handler
   '/api/launchpad/bounty', // Public bounty campaigns list from Neon SSOT
   '/api/launchpad/curve-volatility', // Public curve slope parameters
   '/api/launchpad/keeper', // Keeper automation handles CRON_SECRET internally
   '/api/launchpad/webhook', // Webhook receiver handles signature/secret internally
+]);
+
+// Routes that are publicly accessible ONLY for GET requests (mutating requests like POST require auth session)
+const PUBLIC_GET_ONLY_PATHS = new Set([
+  '/api/launchpad/graduate', // GET (graduation status read) is public; POST is protected
 ]);
 
 // Security headers applied to ALL responses
@@ -68,23 +72,84 @@ function extractBearerToken(req: NextRequest): string | null {
   return null;
 }
 
-function isValidSessionToken(token: string): boolean {
-  // Stateless validation: session tokens are structured as:
-  //   base64(<userId>:<walletAddress>:<issuedAt>:<signature>)
-  // For Edge middleware, we only validate format & presence.
-  // Full cryptographic verification happens in the API route handler (RBAC).
-  if (!token || token.length < 32) return false;
+function getSessionSecret(): string {
+  const rawSecret = process.env.MASTER_VAULT_KEY || process.env.SESSION_SECRET;
+  const appEnv = (process.env.APP_ENV || process.env.NEXT_PUBLIC_APP_ENV)?.toLowerCase()?.trim();
+
+  if (!rawSecret) {
+    if (process.env.NODE_ENV === 'production' && appEnv === 'production') {
+      throw new Error(
+        'FATAL_CONFIG_ERROR: Session secret (MASTER_VAULT_KEY or SESSION_SECRET) must be set in production.'
+      );
+    }
+    const envTag = appEnv || 'development';
+    return `rtrader-default-dev-secret-32bytes-hex-pad0011:${envTag}`;
+  }
+
+  // Cryptographically bind secret to active environment when configured to prevent cross-environment token replay
+  if (appEnv) {
+    return `${rawSecret}:${appEnv}`;
+  }
+  return rawSecret;
+}
+
+async function verifyHmacSignature(secret: string, payload: string, signatureHex: string): Promise<boolean> {
+  if (signatureHex.length !== 64) return false;
   try {
-    const decoded = Buffer.from(token, 'base64').toString('utf8');
-    const parts = decoded.split(':');
-    // Minimum: userId, wallet, issuedAt, signature = 4 parts
-    return parts.length >= 4 && parts[0].length > 0;
+    const encoder = new TextEncoder();
+    const keyData = encoder.encode(secret);
+    const key = await crypto.subtle.importKey(
+      'raw',
+      keyData,
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['verify']
+    );
+
+    const sigBytes = new Uint8Array(32);
+    for (let i = 0; i < 32; i++) {
+      const byte = parseInt(signatureHex.slice(i * 2, i * 2 + 2), 16);
+      if (isNaN(byte)) return false;
+      sigBytes[i] = byte;
+    }
+
+    const data = encoder.encode(payload);
+    return await crypto.subtle.verify('HMAC', key, sigBytes, data);
   } catch {
     return false;
   }
 }
 
-export function middleware(req: NextRequest) {
+async function isValidSessionToken(token: string): Promise<boolean> {
+  // Stateless cryptographic validation for Edge middleware:
+  // Session tokens are structured as: base64(<userId>:<walletAddress>:<issuedAt>:<nonce>:<hmacSha256>)
+  if (!token || token.length < 32) return false;
+  try {
+    const decoded = Buffer.from(token, 'base64').toString('utf8');
+    const parts = decoded.split(':');
+    // Session token structure: userId:walletAddress:issuedAt:nonce:hmacSignature = 5 parts
+    if (parts.length < 5) return false;
+    const [userId, walletAddress, issuedAtStr, nonce, sig] = parts;
+    if (!userId || !walletAddress || !issuedAtStr || !nonce || !sig) return false;
+
+    // Check issuedAt timestamp
+    const issuedAt = parseInt(issuedAtStr, 10);
+    if (isNaN(issuedAt) || issuedAt <= 0) return false;
+
+    // Check TTL (8 hours = 28,800,000 ms) and clock skew (60s grace)
+    const TOKEN_MAX_AGE_MS = 8 * 60 * 60 * 1000;
+    if (Date.now() - issuedAt > TOKEN_MAX_AGE_MS || issuedAt > Date.now() + 60000) return false;
+
+    // Cryptographic HMAC-SHA256 verification using Web Crypto API (Edge Runtime native)
+    const secret = getSessionSecret();
+    const payload = `${userId}:${walletAddress}:${issuedAtStr}:${nonce}`;
+    return await verifyHmacSignature(secret, payload, sig);
+  } catch {
+    return false;
+  }
+}
+
+export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // --- Apply security headers to ALL responses ---
@@ -92,15 +157,21 @@ export function middleware(req: NextRequest) {
 
   // --- API route protection ---
   if (pathname.startsWith('/api/')) {
-    // Allow public API paths through without session check
-    if (PUBLIC_API_PATHS.has(pathname)) {
+    // Check GET-only public paths first
+    if (PUBLIC_GET_ONLY_PATHS.has(pathname)) {
+      if (req.method === 'GET') {
+        return applySecurityHeaders(response);
+      }
+      // Non-GET methods (POST, PUT, DELETE) fall through to session check below
+    } else if (PUBLIC_API_PATHS.has(pathname)) {
+      // Allow general public API paths through without session check
       return applySecurityHeaders(response);
     }
 
     // Protected API routes require a valid session token
     const token = extractBearerToken(req);
 
-    if (!token || !isValidSessionToken(token)) {
+    if (!token || !(await isValidSessionToken(token))) {
       const errorResponse = NextResponse.json(
         {
           success: false,
