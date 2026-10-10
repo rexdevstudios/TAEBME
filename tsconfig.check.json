@@ -1,0 +1,30 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "skipLibCheck": true,
+    "skipDefaultLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@packages/*": ["packages/*"],
+      "@apps/*": ["apps/*"],
+      "@/*": ["*"]
+    }
+  },
+  "include": [
+    "app/**/*",
+    "apps/**/*",
+    "packages/**/*",
+    "src/modules/arc/**/*",
+    "src/modules/reconciliation/**/*",
+    "scripts/seed-db.ts",
+    "scripts/test-*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "sites",
+    "scripts/test-arc-simulation.ts"
+  ]
+}
