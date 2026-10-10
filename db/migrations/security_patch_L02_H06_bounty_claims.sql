@@ -66,7 +66,9 @@ ALTER TABLE bounty_claims
 DO $$
 BEGIN
   IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'uq_bounty_claims_campaign_kol'
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'uq_bounty_claims_campaign_kol'
+      AND conrelid = 'bounty_claims'::regclass
   ) THEN
     ALTER TABLE bounty_claims
       ADD CONSTRAINT uq_bounty_claims_campaign_kol UNIQUE (campaign_id, kol_id);
@@ -77,7 +79,9 @@ END $$;
 DO $$
 BEGIN
   IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'uq_bounty_claims_tx_hash'
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'uq_bounty_claims_tx_hash'
+      AND conrelid = 'bounty_claims'::regclass
   ) THEN
     ALTER TABLE bounty_claims
       ADD CONSTRAINT uq_bounty_claims_tx_hash UNIQUE (tx_hash);
