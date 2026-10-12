@@ -9,18 +9,56 @@
 //   - Memakai native global fetch (Node 18+ & Vercel Edge compatible).
 // ============================================================================
 
+import { getAppEnvironment } from './env-config';
+
 export interface RedisClientConfig {
   restUrl?: string;
   restToken?: string;
 }
 
 export class UpstashRedisClient {
-  private restUrl: string;
-  private restToken: string;
+  private configUrl?: string;
+  private configToken?: string;
 
   constructor(config?: RedisClientConfig) {
-    this.restUrl = config?.restUrl || process.env.UPSTASH_REDIS_REST_URL || '';
-    this.restToken = config?.restToken || process.env.UPSTASH_REDIS_REST_TOKEN || '';
+    this.configUrl = config?.restUrl;
+    this.configToken = config?.restToken;
+  }
+
+  get restUrl(): string {
+    if (this.configUrl) return this.configUrl;
+    const env = getAppEnvironment();
+
+    if (env === 'testnet') {
+      const testnetUrl = process.env.UPSTASH_REDIS_REST_URL_TESTNET?.trim();
+      return testnetUrl || '';
+    }
+
+    if (env === 'production') {
+      return process.env.UPSTASH_REDIS_REST_URL?.trim() || '';
+    }
+
+    // Dev / Test
+    const customUrl = process.env.UPSTASH_REDIS_REST_URL_TESTNET?.trim() || process.env.UPSTASH_REDIS_REST_URL?.trim();
+    return customUrl || '';
+  }
+
+  get restToken(): string {
+    if (this.configToken) return this.configToken;
+    const env = getAppEnvironment();
+
+    if (env === 'testnet') {
+      const testnetToken = process.env.UPSTASH_REDIS_REST_TOKEN_TESTNET?.trim();
+      return testnetToken || '';
+    }
+
+    if (env === 'production') {
+      return process.env.UPSTASH_REDIS_REST_TOKEN?.trim() || '';
+    }
+
+    // Dev / Test
+    const customToken = process.env.UPSTASH_REDIS_REST_TOKEN_TESTNET?.trim() || process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
+    return customToken || '';
   }
 
   /**
@@ -46,6 +84,7 @@ export class UpstashRedisClient {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(command),
+        signal: AbortSignal.timeout(2000),
       });
 
       if (!res.ok) {
@@ -72,6 +111,15 @@ export class UpstashRedisClient {
   async get<T = string>(key: string): Promise<T | null> {
     const res = await this.executeCommand<T>(['GET', key]);
     return res;
+  }
+
+  /**
+   * GETDEL — atomically GET a key and DELETE it in a single command.
+   * Use for one-time-consume semantics (e.g., SIWE nonce replay prevention).
+   * Returns the previous value, or null if key did not exist.
+   */
+  async getdel<T = string>(key: string): Promise<T | null> {
+    return this.executeCommand<T>(['GETDEL', key]);
   }
 
   /**

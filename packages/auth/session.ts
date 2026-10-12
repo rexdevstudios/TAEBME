@@ -15,20 +15,39 @@ import { ethers } from 'ethers';
 import { Role } from '../shared/types/domain';
 import { Capability, RbacGuard, UserContext } from './rbac-middleware';
 import { getDbPool, isDatabaseConfigured } from '../shared/db-pool';
+import { getAppEnvironment } from '../shared/env-config';
 
 const TOKEN_MAX_AGE_MS = 8 * 60 * 60 * 1000; // 8 hours TTL
 
 function getSessionSecret(): string {
-  const secret = process.env.MASTER_VAULT_KEY || process.env.SESSION_SECRET;
-  if (!secret) {
-    if (process.env.NODE_ENV === 'production') {
+  const masterKey = process.env.MASTER_VAULT_KEY?.trim();
+  const sessionSecret = process.env.SESSION_SECRET?.trim();
+  const rawSecret = masterKey || sessionSecret;
+
+  const appEnv = (process.env.APP_ENV || process.env.NEXT_PUBLIC_APP_ENV)?.toLowerCase()?.trim();
+  const isProductionLike = process.env.NODE_ENV === 'production' || appEnv === 'production' || appEnv === 'testnet';
+
+  if (!rawSecret) {
+    if (isProductionLike) {
       throw new Error(
-        'FATAL_CONFIG_ERROR: Session secret (MASTER_VAULT_KEY or SESSION_SECRET) must be set in production.'
+        'FATAL_CONFIG_ERROR: Session secret (MASTER_VAULT_KEY or SESSION_SECRET) must be set in production/testnet.'
       );
     }
-    return 'rtrader-default-dev-secret-32bytes-hex-pad0011';
+    const envTag = appEnv || 'development';
+    return `rtrader-default-dev-secret-32bytes-hex-pad0011:${envTag}`;
   }
-  return secret;
+
+  if (isProductionLike && rawSecret.length < 32) {
+    throw new Error(
+      'FATAL_CONFIG_ERROR: Session secret (MASTER_VAULT_KEY or SESSION_SECRET) must be at least 32 characters in production/testnet.'
+    );
+  }
+
+  // Cryptographically bind secret to active environment when configured to prevent cross-environment token replay
+  if (appEnv) {
+    return `${rawSecret}:${appEnv}`;
+  }
+  return rawSecret;
 }
 
 export interface DecodedSession {
@@ -122,6 +141,38 @@ export function verifySessionToken(token?: string | null): DecodedSession | null
 }
 
 /**
+ * Authoritatively returns and validates the configured platform admin public address.
+ *
+ * Security Invariants (AGENTS.md Invariant 3):
+ * 1. Must be a valid 42-character Ethereum public address (ethers.isAddress).
+ * 2. Strictly rejects 64-character private keys mistakenly provided in env.
+ * 3. In production, logs a structured warning if missing so administrators are aware.
+ */
+export function getConfiguredAdminWallet(): string | null {
+  const raw = process.env.ADMIN_WALLET_PUBLIC_ADDRESS?.trim();
+  if (!raw) {
+    if (process.env.NODE_ENV === 'production') {
+      console.warn('[ADMIN_CONFIG_WARNING] Running in production without configured ADMIN_WALLET_PUBLIC_ADDRESS. Admin access will rely exclusively on PostgreSQL user_roles table.');
+    }
+    return null;
+  }
+
+  // Reject private keys mistakenly configured as public address (64 hex characters or 66 with 0x)
+  const clean = raw.startsWith('0x') ? raw.slice(2) : raw;
+  if (clean.length === 64) {
+    console.error('[SECURITY_VIOLATION] ADMIN_WALLET_PUBLIC_ADDRESS appears to be a 64-character private key! AGENTS.md Invariant 3 violated. Admin address must be a public address only.');
+    return null;
+  }
+
+  if (!ethers.isAddress(raw)) {
+    console.error(`[CONFIG_ERROR] ADMIN_WALLET_PUBLIC_ADDRESS "${raw}" is not a valid Ethereum address.`);
+    return null;
+  }
+
+  return ethers.getAddress(raw).toLowerCase();
+}
+
+/**
  * Authoritatively resolves user roles from the single source of truth:
  * 1. ADMIN_WALLET_PUBLIC_ADDRESS check
  * 2. Non-production test admin allowlist
@@ -136,7 +187,7 @@ export async function resolveUserRoles(
   const normalizedLower = normalized.toLowerCase();
 
   // 1. Check configured platform admin wallet (Non-custodial public address)
-  const configuredAdmin = process.env.ADMIN_WALLET_PUBLIC_ADDRESS?.trim().toLowerCase();
+  const configuredAdmin = getConfiguredAdminWallet();
   if (configuredAdmin && normalizedLower === configuredAdmin) {
     return {
       roles: ['SUPER_ADMIN', 'SYSTEM_ADMIN', 'LAUNCH_ADMIN', 'RISK_ADMIN', 'TRADER', 'CREATOR'],
