@@ -25,6 +25,7 @@ import {
   defaultDraftDbAdapter,
   ensureUserEntity,
 } from '../packages/shared/db-pool';
+import { UserRiskLimits } from '../packages/shared/types/domain';
 
 let passedAssertions = 0;
 let failedAssertions = 0;
@@ -201,11 +202,12 @@ async function runWhiteboxSuite() {
   // ==========================================================================
   console.log('\n--- [SECTION 4: Trading Risk Gate Invariants & Decision Logic] ---');
 
-  const baseUserLimits = {
+  const baseUserLimits: UserRiskLimits = {
     maxOrderValueUsd: 5000,
-    dailyLossLimitUsd: 1000,
-    maxLeverage: 5,
+    maxDailyLossUsd: 1000,
+    currentDailyLossUsd: 0,
     maxOpenPositions: 3,
+    currentOpenPositions: 0,
   };
 
   // 4.1 Paper Trading Auto-Approval Invariant
@@ -218,6 +220,8 @@ async function runWhiteboxSuite() {
       quantity: 1,
       price: 3000,
       stage: 'PAPER',
+      maxSlippagePct: 1.0,
+      idempotencyKey: 'test-paper-auto-approval',
     },
     baseUserLimits,
     { planId: 'PRO', hasLiveTrading: true },
@@ -236,6 +240,8 @@ async function runWhiteboxSuite() {
       quantity: 0.1,
       price: 60000,
       stage: 'LIVE',
+      maxSlippagePct: 1.0,
+      idempotencyKey: 'test-live-unentitled',
     },
     baseUserLimits,
     { planId: 'FREE', hasLiveTrading: false }, // No live trading permission
@@ -260,13 +266,13 @@ async function runWhiteboxSuite() {
       quantity: 0.5,
       price: 3000,
       stage: 'LIVE',
+      maxSlippagePct: 1.0,
+      idempotencyKey: 'test-kill-switch-active',
     },
     baseUserLimits,
     { planId: 'ENTERPRISE', hasLiveTrading: true },
     [
       {
-        id: 'ks-1',
-        name: 'GLOBAL_EMERGENCY_STOP',
         isActive: true,
         scope: 'GLOBAL',
         reason: 'Circuit breaker triggered by extreme volatility',
@@ -288,6 +294,8 @@ async function runWhiteboxSuite() {
       quantity: 10, // 10 * 3000 = $30,000 > $5,000 limit
       price: 3000,
       stage: 'LIVE',
+      maxSlippagePct: 1.0,
+      idempotencyKey: 'test-order-exceeding-limit',
     },
     baseUserLimits,
     { planId: 'ENTERPRISE', hasLiveTrading: true },
