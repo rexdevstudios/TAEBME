@@ -1157,4 +1157,139 @@ describe('GAP-01: SIWE Domain & Chain ID Hardcoding Remediation Suite', () => {
       }
     });
   });
+
+  describe('7. Environment & Host Boundary Hardening (Phase 4S)', () => {
+    it('1. rejects unsupported non-empty APP_ENV with NODE_ENV=development', () => {
+      process.env.APP_ENV = 'staging-preview-custom';
+      process.env.NODE_ENV = 'development';
+      expect(() => getAppEnvironment()).toThrow(/SECURITY_MISCONFIGURATION/);
+    });
+
+    it('2. rejects unsupported non-empty APP_ENV with NODE_ENV=production', () => {
+      process.env.APP_ENV = 'unsupported-qa-cluster';
+      process.env.NODE_ENV = 'production';
+      expect(() => getAppEnvironment()).toThrow(/SECURITY_MISCONFIGURATION/);
+    });
+
+    it('3. rejects production hostname (rbtrade.fun) when environment is development', () => {
+      process.env.APP_ENV = 'development';
+      process.env.NODE_ENV = 'development';
+      expect(() => validateAndResolveHost('rbtrade.fun')).toThrow(/ENVIRONMENT_MISMATCH/);
+    });
+
+    it('4. rejects testnet hostname (testnet.rbtrade.fun) when environment is development', () => {
+      process.env.APP_ENV = 'development';
+      process.env.NODE_ENV = 'development';
+      expect(() => validateAndResolveHost('testnet.rbtrade.fun')).toThrow(/ENVIRONMENT_MISMATCH/);
+    });
+
+    it('5. resolves production hostname safely when APP_ENV is missing but NODE_ENV is production', () => {
+      delete process.env.APP_ENV;
+      delete process.env.NEXT_PUBLIC_APP_ENV;
+      process.env.NODE_ENV = 'production';
+      const resolved = validateAndResolveHost('rbtrade.fun');
+      expect(resolved.domain).toBe('rbtrade.fun');
+      expect(resolved.env).toBe('production');
+    });
+
+    it('6. retains valid production and testnet configurations', () => {
+      process.env.APP_ENV = 'production';
+      expect(getAppEnvironment()).toBe('production');
+      expect(validateAndResolveHost('rbtrade.fun').domain).toBe('rbtrade.fun');
+
+      process.env.APP_ENV = 'testnet';
+      expect(getAppEnvironment()).toBe('testnet');
+      expect(validateAndResolveHost('testnet.rbtrade.fun').domain).toBe('testnet.rbtrade.fun');
+    });
+
+    it('7. ensures localhost development flow remains fully functional', () => {
+      process.env.APP_ENV = 'development';
+      process.env.NODE_ENV = 'development';
+      const resolved = validateAndResolveHost('localhost:3000');
+      expect(resolved.domain).toBe('localhost:3000');
+      expect(resolved.env).toBe('development');
+    });
+
+    it('8. strictly rejects mock signature in production and testnet environments', async () => {
+      const mockSig = '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1b';
+
+      for (const envName of ['production', 'testnet'] as const) {
+        process.env.APP_ENV = envName;
+        process.env.SESSION_SECRET = 'valid-32-char-session-secret-string-here';
+        const domain = envName === 'production' ? 'rbtrade.fun' : 'testnet.rbtrade.fun';
+        const chainId = envName === 'production' ? 8453 : 84532;
+        const wallet = ethers.Wallet.createRandom();
+
+        const { challenge, messageText } = SiweAuthService.generateChallenge(
+          domain,
+          wallet.address,
+          `https://${domain}/auth/login`,
+          chainId
+        );
+
+        const spyConfig = spyOn(upstashRedis, 'isConfigured').mockReturnValue(true);
+        const spyGetdel = spyOn(upstashRedis, 'getdel').mockResolvedValue(wallet.address.toLowerCase());
+
+        try {
+          const req = new NextRequest(`https://${domain}/api/auth/verify`, {
+            method: 'POST',
+            headers: { host: domain, 'content-type': 'application/json' },
+            body: JSON.stringify({
+              walletAddress: wallet.address,
+              signature: mockSig,
+              nonce: challenge.nonce,
+              message: messageText,
+            }),
+          });
+
+          const res = await verifyHandler(req);
+          expect(res.status).toBe(401);
+          const json = await res.json();
+          expect(json.success).toBe(false);
+          expect(json.error.code).toBe('INVALID_SIGNATURE');
+        } finally {
+          spyConfig.mockRestore();
+          spyGetdel.mockRestore();
+        }
+      }
+    });
+
+    it('9. prevents invalid environment/host requests from consuming nonce or issuing session', async () => {
+      process.env.APP_ENV = 'development';
+      process.env.NODE_ENV = 'development';
+      const wallet = ethers.Wallet.createRandom();
+      const mockSig = '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1b';
+
+      // Request sent to production host while server is in development mode
+      const req = new NextRequest('https://rbtrade.fun/api/auth/verify', {
+        method: 'POST',
+        headers: { host: 'rbtrade.fun', 'content-type': 'application/json' },
+        body: JSON.stringify({
+          walletAddress: wallet.address,
+          signature: mockSig,
+          nonce: 'test-nonce-unconsumed',
+          message: 'some message',
+        }),
+      });
+
+      const spyGetdel = spyOn(upstashRedis, 'getdel');
+
+      try {
+        const res = await verifyHandler(req);
+        // validateAndResolveHost throws ENVIRONMENT_MISMATCH which route catches as 500 SERVER_ERROR
+        expect(res.status).toBe(500);
+        const json = await res.json();
+        expect(json.success).toBe(false);
+        expect(json.error.code).toBe('SERVER_ERROR');
+        // Nonce was NEVER touched / consumed
+        expect(spyGetdel).not.toHaveBeenCalled();
+      } finally {
+        spyGetdel.mockRestore();
+      }
+    });
+
+    it('10. environment variables and spies are reliably restored even after errors', () => {
+      expect(process.env).toEqual(originalEnv);
+    });
+  });
 });

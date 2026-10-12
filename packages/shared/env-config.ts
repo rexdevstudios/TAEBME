@@ -37,10 +37,13 @@ const ALLOWED_DOMAINS: Record<string, AppEnvironment> = {
  */
 export function getAppEnvironment(): AppEnvironment {
   const custom = (process.env.APP_ENV || process.env.NEXT_PUBLIC_APP_ENV)?.toLowerCase()?.trim();
-  if (custom === 'production' || custom === 'prod') return 'production';
-  if (custom === 'testnet' || custom === 'staging') return 'testnet';
-  if (custom === 'development' || custom === 'dev') return 'development';
-  if (custom === 'test') return 'test';
+  if (custom) {
+    if (custom === 'production' || custom === 'prod') return 'production';
+    if (custom === 'testnet' || custom === 'staging') return 'testnet';
+    if (custom === 'development' || custom === 'dev') return 'development';
+    if (custom === 'test') return 'test';
+    throw new Error(`SECURITY_MISCONFIGURATION: Unsupported application environment "${custom}".`);
+  }
 
   const nodeEnv = process.env.NODE_ENV?.toLowerCase()?.trim();
   if (nodeEnv === 'test') return 'test';
@@ -135,9 +138,10 @@ export function validateAndResolveHost(rawHost?: string | null): { domain: strin
     return { domain: config.domain, env: currentEnv };
   }
 
-  if ((currentEnv === 'production' && matchedEnv !== 'production') ||
-      (currentEnv === 'testnet' && matchedEnv !== 'testnet')) {
-    throw new Error(`ENVIRONMENT_MISMATCH: Host "${rawHost}" (${matchedEnv}) does not match active environment "${currentEnv}".`);
+  if (matchedEnv === 'production' || matchedEnv === 'testnet' || currentEnv === 'production' || currentEnv === 'testnet') {
+    if (currentEnv !== matchedEnv) {
+      throw new Error(`ENVIRONMENT_MISMATCH: Host "${rawHost}" (${matchedEnv}) does not match active environment "${currentEnv}".`);
+    }
   }
 
   return { domain: cleanHost, env: matchedEnv };
