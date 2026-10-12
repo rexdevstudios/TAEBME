@@ -419,30 +419,39 @@ describe('GAP-01: SIWE Domain & Chain ID Hardcoding Remediation Suite', () => {
       // 2. Wallet Sign
       const signature = await wallet.signMessage(messageToSign);
 
-      // 3. Verify
-      const verifyReq = new NextRequest('https://testnet.rbtrade.fun/api/auth/verify', {
-        method: 'POST',
-        headers: { 'host': 'testnet.rbtrade.fun', 'content-type': 'application/json' },
-        body: JSON.stringify({
-          walletAddress: wallet.address,
-          signature,
-          nonce,
-          message: messageToSign,
-        }),
-      });
+      // Mock Redis configured with the issued nonce
+      const spyConfig = spyOn(upstashRedis, 'isConfigured').mockReturnValue(true);
+      const spyGetdel = spyOn(upstashRedis, 'getdel').mockResolvedValue(wallet.address.toLowerCase());
 
-      const verifyRes = await verifyHandler(verifyReq);
-      expect(verifyRes.status).toBe(200);
+      try {
+        // 3. Verify
+        const verifyReq = new NextRequest('https://testnet.rbtrade.fun/api/auth/verify', {
+          method: 'POST',
+          headers: { 'host': 'testnet.rbtrade.fun', 'content-type': 'application/json' },
+          body: JSON.stringify({
+            walletAddress: wallet.address,
+            signature,
+            nonce,
+            message: messageToSign,
+          }),
+        });
 
-      const verifyJson = await verifyRes.json();
-      expect(verifyJson.success).toBe(true);
-      expect(verifyJson.data.primaryWallet).toBe(wallet.address);
-      expect(verifyJson.data.sessionToken).toBeDefined();
+        const verifyRes = await verifyHandler(verifyReq);
+        expect(verifyRes.status).toBe(200);
 
-      // Confirm session token decodes and verifies with HMAC
-      const decoded = verifySessionToken(verifyJson.data.sessionToken);
-      expect(decoded).not.toBeNull();
-      expect(decoded?.walletAddress.toLowerCase()).toBe(wallet.address.toLowerCase());
+        const verifyJson = await verifyRes.json();
+        expect(verifyJson.success).toBe(true);
+        expect(verifyJson.data.primaryWallet).toBe(wallet.address);
+        expect(verifyJson.data.sessionToken).toBeDefined();
+
+        // Confirm session token decodes and verifies with HMAC
+        const decoded = verifySessionToken(verifyJson.data.sessionToken);
+        expect(decoded).not.toBeNull();
+        expect(decoded?.walletAddress.toLowerCase()).toBe(wallet.address.toLowerCase());
+      } finally {
+        spyConfig.mockRestore();
+        spyGetdel.mockRestore();
+      }
     });
 
     it('POST /api/auth/verify rejects request with missing body.message with 400 INVALID_INPUT (SEC-03)', async () => {
@@ -658,6 +667,126 @@ describe('GAP-01: SIWE Domain & Chain ID Hardcoding Remediation Suite', () => {
       } finally {
         spyConfig.mockRestore();
         spyGetdel.mockRestore();
+      }
+    });
+
+    it('POST /api/auth/verify strictly rejects mock signature in testnet environment', async () => {
+      process.env.APP_ENV = 'testnet';
+      process.env.SESSION_SECRET = 'secure-testnet-session-secret-key-32bytes';
+      const wallet = ethers.Wallet.createRandom();
+
+      const { challenge, messageText } = SiweAuthService.generateChallenge(
+        'testnet.rbtrade.fun',
+        wallet.address,
+        'https://testnet.rbtrade.fun/auth/login',
+        84532
+      );
+      const mockSig = '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1b';
+
+      const spyConfig = spyOn(upstashRedis, 'isConfigured').mockReturnValue(true);
+      const spyGetdel = spyOn(upstashRedis, 'getdel').mockResolvedValue(wallet.address.toLowerCase());
+
+      try {
+        const verifyReq = new NextRequest('https://testnet.rbtrade.fun/api/auth/verify', {
+          method: 'POST',
+          headers: { 'host': 'testnet.rbtrade.fun', 'content-type': 'application/json' },
+          body: JSON.stringify({
+            walletAddress: wallet.address,
+            signature: mockSig,
+            nonce: challenge.nonce,
+            message: messageText,
+          }),
+        });
+
+        const verifyRes = await verifyHandler(verifyReq);
+        expect(verifyRes.status).toBe(401);
+
+        const verifyJson = await verifyRes.json();
+        expect(verifyJson.success).toBe(false);
+        expect(verifyJson.error.code).toBe('INVALID_SIGNATURE');
+      } finally {
+        spyConfig.mockRestore();
+        spyGetdel.mockRestore();
+      }
+    });
+
+    it('POST /api/auth/verify strictly rejects mock signature when APP_ENV=production even if NODE_ENV is development', async () => {
+      process.env.APP_ENV = 'production';
+      process.env.NODE_ENV = 'development'; // Inconsistent environment scenario
+      process.env.SESSION_SECRET = 'secure-prod-session-secret-key-32bytes';
+      const wallet = ethers.Wallet.createRandom();
+
+      const { challenge, messageText } = SiweAuthService.generateChallenge(
+        'rbtrade.fun',
+        wallet.address,
+        'https://rbtrade.fun/auth/login',
+        8453
+      );
+      const mockSig = '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1b';
+
+      const spyConfig = spyOn(upstashRedis, 'isConfigured').mockReturnValue(true);
+      const spyGetdel = spyOn(upstashRedis, 'getdel').mockResolvedValue(wallet.address.toLowerCase());
+
+      try {
+        const verifyReq = new NextRequest('https://rbtrade.fun/api/auth/verify', {
+          method: 'POST',
+          headers: { 'host': 'rbtrade.fun', 'content-type': 'application/json' },
+          body: JSON.stringify({
+            walletAddress: wallet.address,
+            signature: mockSig,
+            nonce: challenge.nonce,
+            message: messageText,
+          }),
+        });
+
+        const verifyRes = await verifyHandler(verifyReq);
+        expect(verifyRes.status).toBe(401);
+
+        const verifyJson = await verifyRes.json();
+        expect(verifyJson.success).toBe(false);
+        expect(verifyJson.error.code).toBe('INVALID_SIGNATURE');
+      } finally {
+        spyConfig.mockRestore();
+        spyGetdel.mockRestore();
+      }
+    });
+
+    it('POST /api/auth/verify returns 503 NONCE_VERIFICATION_UNAVAILABLE in testnet when Redis is unconfigured', async () => {
+      process.env.APP_ENV = 'testnet';
+      process.env.SESSION_SECRET = 'secure-testnet-session-secret-key-32bytes';
+      const wallet = ethers.Wallet.createRandom();
+
+      const { challenge, messageText } = SiweAuthService.generateChallenge(
+        'testnet.rbtrade.fun',
+        wallet.address,
+        'https://testnet.rbtrade.fun/auth/login',
+        84532
+      );
+      const signature = await wallet.signMessage(messageText);
+
+      // Explicitly unconfigured Redis
+      const spyConfig = spyOn(upstashRedis, 'isConfigured').mockReturnValue(false);
+
+      try {
+        const verifyReq = new NextRequest('https://testnet.rbtrade.fun/api/auth/verify', {
+          method: 'POST',
+          headers: { 'host': 'testnet.rbtrade.fun', 'content-type': 'application/json' },
+          body: JSON.stringify({
+            walletAddress: wallet.address,
+            signature,
+            nonce: challenge.nonce,
+            message: messageText,
+          }),
+        });
+
+        const verifyRes = await verifyHandler(verifyReq);
+        expect(verifyRes.status).toBe(503);
+
+        const verifyJson = await verifyRes.json();
+        expect(verifyJson.success).toBe(false);
+        expect(verifyJson.error.code).toBe('NONCE_VERIFICATION_UNAVAILABLE');
+      } finally {
+        spyConfig.mockRestore();
       }
     });
   });

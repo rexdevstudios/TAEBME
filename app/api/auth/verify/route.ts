@@ -3,7 +3,7 @@ import { SiweAuthService } from '@packages/auth/siwe';
 import { ApiResponse, WalletVerifyRequest, UserProfileResponse } from '@packages/shared/contracts/api-contracts';
 import { createSessionToken, resolveUserRoles } from '@packages/auth/session';
 import { upstashRedis } from '@packages/shared/redis-client';
-import { getSiweConfig, formatRedisKey } from '@packages/shared/env-config';
+import { getSiweConfig, formatRedisKey, getAppEnvironment } from '@packages/shared/env-config';
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,6 +19,31 @@ export async function POST(req: NextRequest) {
 
     // Resolve authoritative SIWE config based on environment & validated Host header
     const siweConfig = getSiweConfig(req.headers.get('host'));
+
+    // Determine production-like environment (production or testnet)
+    const appEnv = getAppEnvironment();
+    const isProductionLike = process.env.NODE_ENV === 'production' || appEnv === 'production' || appEnv === 'testnet';
+
+    const messageToVerify = body.message;
+
+    // Validate SIWE message contents against authoritative environment config (domain, chainId, nonce, address, uri)
+    // Validate early (syntax & parameters) before querying or consuming sidecar state.
+    const validation = SiweAuthService.validateMessage(messageToVerify, {
+      domain: siweConfig.domain,
+      chainId: siweConfig.chainId,
+      nonce: body.nonce,
+      address: body.walletAddress,
+      uri: siweConfig.uri,
+    });
+
+    if (!validation.valid) {
+      const response: ApiResponse<null> = {
+        success: false,
+        error: { code: 'INVALID_SIWE_MESSAGE', message: validation.reason || 'SIWE message validation failed.' },
+        timestamp: new Date().toISOString(),
+      };
+      return NextResponse.json(response, { status: 400 });
+    }
 
     // C-03 Fix: Consume server-issued nonce to prevent replay attacks.
     // GETDEL atomically reads and deletes the nonce in one command — eliminates the
@@ -50,8 +75,8 @@ export async function POST(req: NextRequest) {
       // storedWallet was atomically consumed — nonce is now permanently invalidated.
     } else {
       // Redis is not configured.
-      // Production MUST reject: nonce verification is a mandatory security control.
-      if (process.env.NODE_ENV === 'production') {
+      // Production and testnet MUST reject: nonce verification is a mandatory security control.
+      if (isProductionLike) {
         const response: ApiResponse<null> = {
           success: false,
           error: { code: 'NONCE_VERIFICATION_UNAVAILABLE', message: 'Auth service misconfigured. Please contact support.' },
@@ -59,35 +84,15 @@ export async function POST(req: NextRequest) {
         };
         return NextResponse.json(response, { status: 503 });
       }
-      // Development/test only: bypass with explicit warning. Never reaches production.
+      // Development/test only: bypass with explicit warning. Never reaches production or testnet.
       console.warn('[DEV ONLY] SIWE nonce verification bypassed — Redis not configured. Set UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN.');
-    }
-
-    const messageToVerify = body.message;
-
-    // Validate SIWE message contents against authoritative environment config (domain, chainId, nonce, address, uri)
-    const validation = SiweAuthService.validateMessage(messageToVerify, {
-      domain: siweConfig.domain,
-      chainId: siweConfig.chainId,
-      nonce: body.nonce,
-      address: body.walletAddress,
-      uri: siweConfig.uri,
-    });
-
-    if (!validation.valid) {
-      const response: ApiResponse<null> = {
-        success: false,
-        error: { code: 'INVALID_SIWE_MESSAGE', message: validation.reason || 'SIWE message validation failed.' },
-        timestamp: new Date().toISOString(),
-      };
-      return NextResponse.json(response, { status: 400 });
     }
 
     // Verify cryptographic ECDSA signature from MetaMask / Web3 provider
     let isValid = SiweAuthService.verifySignature(messageToVerify, body.signature, body.walletAddress);
 
-    // In local development/testing, also accept mock signature prefix
-    if (!isValid && process.env.NODE_ENV !== 'production' && body.signature.startsWith('0x1234567890abcdef')) {
+    // In local development/testing ONLY, accept mock signature prefix (strictly blocked on production and testnet)
+    if (!isValid && !isProductionLike && body.signature.startsWith('0x1234567890abcdef')) {
       isValid = true;
     }
 
