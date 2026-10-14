@@ -26,6 +26,7 @@ const ALLOWED_DOMAINS: Record<string, AppEnvironment> = {
   'www.rbtrade.fun': 'production',
   'testnet.rbtrade.fun': 'testnet',
   'staging.rbtrade.fun': 'testnet',
+  'rtrader-testnet.vercel.app': 'testnet',
   'rtrader-degen-platform.vercel.app': 'production',
   'localhost': 'development',
   '127.0.0.1': 'development',

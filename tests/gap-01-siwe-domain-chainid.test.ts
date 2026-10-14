@@ -1292,4 +1292,82 @@ describe('GAP-01: SIWE Domain & Chain ID Hardcoding Remediation Suite', () => {
       expect(process.env).toEqual(originalEnv);
     });
   });
+
+  describe('8. Vercel Testnet Hostname Compatibility (Phase 4W9)', () => {
+    it('1. exact hostname rtrader-testnet.vercel.app resolves to environment testnet', () => {
+      process.env.APP_ENV = 'testnet';
+      const resolved = validateAndResolveHost('rtrader-testnet.vercel.app');
+      expect(resolved.domain).toBe('rtrader-testnet.vercel.app');
+      expect(resolved.env).toBe('testnet');
+    });
+
+    it('2. SIWE configuration uses domain rtrader-testnet.vercel.app, URI, and chainId 84532', () => {
+      process.env.APP_ENV = 'testnet';
+      const siweConfig = getSiweConfig('rtrader-testnet.vercel.app');
+      expect(siweConfig.domain).toBe('rtrader-testnet.vercel.app');
+      expect(siweConfig.uri).toBe('https://rtrader-testnet.vercel.app/auth/login');
+      expect(siweConfig.chainId).toBe(84532);
+    });
+
+    it('3. rejects rtrader-testnet.vercel.app with ENVIRONMENT_MISMATCH when APP_ENV=production', () => {
+      process.env.APP_ENV = 'production';
+      process.env.NODE_ENV = 'production';
+      expect(() => validateAndResolveHost('rtrader-testnet.vercel.app')).toThrow(/ENVIRONMENT_MISMATCH/);
+    });
+
+    it('4. rejects arbitrary unrelated vercel.app hostname in testnet (anti-wildcard)', () => {
+      process.env.APP_ENV = 'testnet';
+      expect(() => validateAndResolveHost('arbitrary-testnet.vercel.app')).toThrow(/SECURITY_ERROR/);
+    });
+
+    it('5. rejects git branch preview hostname in testnet (anti-preview-bypass)', () => {
+      process.env.APP_ENV = 'testnet';
+      expect(() => validateAndResolveHost('rtrader-testnet-git-branch.vercel.app')).toThrow(/SECURITY_ERROR/);
+    });
+
+    it('6. rejects mock signature on rtrader-testnet.vercel.app in testnet environment', async () => {
+      process.env.APP_ENV = 'testnet';
+      process.env.SESSION_SECRET = 'valid-32-char-session-secret-string-here';
+      const domain = 'rtrader-testnet.vercel.app';
+      const chainId = 84532;
+      const wallet = ethers.Wallet.createRandom();
+      const mockSig = '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1b';
+
+      const { challenge, messageText } = SiweAuthService.generateChallenge(
+        domain,
+        wallet.address,
+        `https://${domain}/auth/login`,
+        chainId
+      );
+
+      const spyConfig = spyOn(upstashRedis, 'isConfigured').mockReturnValue(true);
+      const spyGetdel = spyOn(upstashRedis, 'getdel').mockResolvedValue(wallet.address.toLowerCase());
+
+      try {
+        const req = new NextRequest(`https://${domain}/api/auth/verify`, {
+          method: 'POST',
+          headers: { host: domain, 'content-type': 'application/json' },
+          body: JSON.stringify({
+            walletAddress: wallet.address,
+            signature: mockSig,
+            nonce: challenge.nonce,
+            message: messageText,
+          }),
+        });
+
+        const res = await verifyHandler(req);
+        expect(res.status).toBe(401);
+        const json = await res.json();
+        expect(json.success).toBe(false);
+        expect(json.error.code).toBe('INVALID_SIGNATURE');
+      } finally {
+        spyConfig.mockRestore();
+        spyGetdel.mockRestore();
+      }
+    });
+
+    it('7. environment variables and spies are reliably restored after Phase 4W9 tests', () => {
+      expect(process.env).toEqual(originalEnv);
+    });
+  });
 });
