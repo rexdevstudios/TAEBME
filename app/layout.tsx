@@ -3,8 +3,8 @@ import HeaderNav from './components/HeaderNav';
 import { AuthProvider } from './context/AuthContext';
 
 export const metadata = {
-  title: 'RTrader | Degen Launchpad, Trading Terminal & AI Agent Platform',
-  description: 'Decision-complete execution platform for crypto launchpads, Binance trading terminal, and proposal-only AI agents.',
+  title: 'PoolNet | Autonomous Social Liquidity & Bonding Curve on Base',
+  description: 'Fair-launch token launchpad with automated bonding curves, verified KOL deal rooms, and deterministic MEV risk gates on pndigi.site.',
 };
 
 export default function RootLayout({

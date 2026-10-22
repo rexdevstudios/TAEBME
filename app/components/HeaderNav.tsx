@@ -54,11 +54,30 @@ export default function HeaderNav() {
     <header className="header-nav">
       {/* Brand & Network Indicator */}
       <div className="flex-row items-center gap-md">
-        <Link href="/" className="terminal-text" style={{ fontSize: '18px', fontWeight: 900, letterSpacing: '-0.5px' }}>
-          RTRADER
+        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none' }}>
+          <div style={{
+            width: '28px',
+            height: '28px',
+            borderRadius: '6px',
+            background: 'linear-gradient(135deg, #0052FF 0%, #00F0FF 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 0 12px rgba(0, 82, 255, 0.4)'
+          }}>
+            <Rocket size={16} color="#FFFFFF" />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{ fontSize: '17px', fontWeight: 900, letterSpacing: '-0.5px', color: '#FFFFFF', lineHeight: 1.1 }}>
+              POOL<span style={{ color: '#00F0FF' }}>NET</span>
+            </span>
+            <span style={{ fontSize: '9px', fontWeight: 600, color: '#64748B', letterSpacing: '0.5px' }}>
+              BY PNDIGI
+            </span>
+          </div>
         </Link>
-        <span className="badge" style={{ backgroundColor: '#1A1E2F', border: '1px solid #334155', color: '#94A3B8', fontSize: '11px', padding: '2px 6px' }}>
-          v2.5
+        <span className="badge" style={{ backgroundColor: '#1A1E2F', border: '1px solid #334155', color: '#94A3B8', fontSize: '10px', padding: '2px 6px' }}>
+          v3.0
         </span>
         {(() => {
           const defaultHex = getDefaultBaseChainHex();

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from './context/AuthContext';
-import { Activity, ShieldAlert, Zap, Rocket, Terminal, Database, Server, Cpu, Lock, Network, Wallet, BrainCircuit } from 'lucide-react';
+import { Activity, ShieldAlert, Zap, Rocket, Terminal, Database, Server, Cpu, Lock, Network, Wallet, BrainCircuit, TrendingUp, Sparkles, CheckCircle2, ArrowRight, ShieldCheck, Users } from 'lucide-react';
 
 interface OverviewData {
   status: string;
@@ -72,21 +72,47 @@ export default function OverviewPage() {
   };
 
   // -------------------------
-  // GUEST VIEW (Landing Page)
+  // GUEST VIEW (Landing Page - PoolNet by PNDigi)
   // -------------------------
   if (!isConnected || userRole === 'GUEST') {
     return (
-      <div className="flex-col gap-lg items-center" style={{ marginTop: 'var(--space-3xl)' }}>
-        <div className="flex-col items-center gap-md" style={{ textAlign: 'center', maxWidth: '800px' }}>
-          <Terminal size={64} className="text-accent" style={{ filter: 'drop-shadow(var(--shadow-neon))' }} />
-          <h1 className="terminal-text" style={{ fontSize: '48px', margin: 0, fontWeight: 900 }}>
-            RTRADER PROTOCOL
+      <div className="flex-col gap-lg items-center" style={{ marginTop: 'var(--space-xl)', width: '100%', maxWidth: '1160px', margin: '0 auto', paddingBottom: '64px' }}>
+        
+        {/* Top Announcement Pill */}
+        <div style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '8px',
+          padding: '6px 16px',
+          borderRadius: '999px',
+          background: 'rgba(0, 82, 255, 0.12)',
+          border: '1px solid rgba(0, 82, 255, 0.3)',
+          marginBottom: '16px'
+        }}>
+          <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#00F0FF', boxShadow: '0 0 8px #00F0FF' }} />
+          <span style={{ fontSize: '13px', fontWeight: 600, color: '#93C5FD' }}>
+            Base Sepolia Testnet Active • Live at <strong style={{ color: '#FFFFFF' }}>pndigi.site</strong>
+          </span>
+        </div>
+
+        {/* Hero Section */}
+        <div className="flex-col items-center gap-md" style={{ textAlign: 'center', maxWidth: '880px' }}>
+          <h1 style={{
+            fontSize: '52px',
+            lineHeight: 1.15,
+            fontWeight: 900,
+            letterSpacing: '-1.5px',
+            margin: '0 0 16px 0',
+            color: '#FFFFFF'
+          }}>
+            The Autonomous Social Liquidity & <span className="text-gradient-cyan">Bonding Curve Engine</span> on Base
           </h1>
-          <p className="text-muted" style={{ fontSize: '18px', lineHeight: 1.6 }}>
-            Decision-complete execution platform for crypto launchpads, Binance trading terminal, and proposal-only AI agents. Connect your wallet via secure SIWE to begin.
+          <p style={{ fontSize: '19px', lineHeight: 1.6, color: '#94A3B8', margin: '0 0 24px 0', maxWidth: '720px' }}>
+            Launch fair token pools with automated liquidity graduation, syndicate with verified KOLs in Angel Deal Rooms, and trade with deterministic MEV risk protection.
           </p>
-          
-          <div className="flex-row gap-md" style={{ marginTop: 'var(--space-md)' }}>
+
+          {/* Dual CTAs & Wallet Auth */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px', justifyContent: 'center', alignItems: 'center' }}>
             <button
               onClick={async () => {
                 setConnectError(null);
@@ -96,40 +122,230 @@ export default function OverviewPage() {
                 }
               }}
               disabled={isConnecting}
-              className="btn-primary"
-              style={{ fontSize: '16px', padding: '12px 24px' }}
+              className="btn-web3-primary"
+              style={{ fontSize: '16px', padding: '14px 28px' }}
             >
               <Wallet size={20} />
-              {isConnecting ? 'Signing SIWE...' : 'Connect MetaMask'}
+              {isConnecting ? 'Signing SIWE Challenge...' : 'Connect Wallet & Launch'}
             </button>
-            <a href="/auth/login" className="btn-secondary" style={{ fontSize: '16px', padding: '12px 24px', textDecoration: 'none' }}>
-              <Lock size={20} /> Login Portal
+
+            <a href="/launchpad" className="btn-web3-secondary" style={{ fontSize: '16px', padding: '14px 24px' }}>
+              <Rocket size={18} color="#00F0FF" /> Explore Launchpad
+            </a>
+
+            <a href="/kol" className="btn-web3-secondary" style={{ fontSize: '16px', padding: '14px 24px' }}>
+              <Users size={18} color="#A78BFA" /> KOL Deal Rooms
             </a>
           </div>
+
           {connectError && (
-            <p className="text-destructive" style={{ marginTop: 'var(--space-sm)', fontWeight: 600 }}>
-              {connectError}
+            <p className="text-destructive" style={{ marginTop: '16px', fontWeight: 600, fontSize: '14px' }}>
+              ⚠️ {connectError}
             </p>
           )}
         </div>
 
-        <div className="grid-3" style={{ width: '100%', marginTop: 'var(--space-3xl)' }}>
-          <div className="card">
-            <Network size={32} className="text-accent" style={{ marginBottom: '16px' }} />
-            <h3 style={{ margin: '0 0 8px 0', fontSize: '18px' }}>Binance Trading Terminal</h3>
-            <p className="text-muted" style={{ margin: 0, fontSize: '14px' }}>Direct AES-256 API connection for lightning fast execution with max slippage caps.</p>
+        {/* Live Protocol Value Strip */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+          gap: '16px',
+          width: '100%',
+          marginTop: '48px',
+          marginBottom: '24px'
+        }}>
+          <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}>
+            <div style={{ fontSize: '24px', fontWeight: 900, color: '#00F0FF', marginBottom: '4px' }}>0 ETH</div>
+            <div style={{ fontSize: '13px', color: '#94A3B8', fontWeight: 500 }}>Initial Liquidity Required</div>
           </div>
-          <div className="card">
-            <Rocket size={32} className="text-accent" style={{ marginBottom: '16px' }} />
-            <h3 style={{ margin: '0 0 8px 0', fontSize: '18px' }}>Degen Launchpad</h3>
-            <p className="text-muted" style={{ margin: 0, fontSize: '14px' }}>Create and launch EVM tokens instantly. Controlled strictly by role-based gating.</p>
+          <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}>
+            <div style={{ fontSize: '24px', fontWeight: 900, color: '#22C55E', marginBottom: '4px' }}>100% Locked</div>
+            <div style={{ fontSize: '13px', color: '#94A3B8', fontWeight: 500 }}>Uniswap V3 LP Graduation</div>
           </div>
-          <div className="card">
-            <BrainCircuit size={32} className="text-accent" style={{ marginBottom: '16px' }} />
-            <h3 style={{ margin: '0 0 8px 0', fontSize: '18px' }}>AI Proposals</h3>
-            <p className="text-muted" style={{ margin: 0, fontSize: '14px' }}>AI Agent acts as an intelligence layer generating actionable trade and launch proposals.</p>
+          <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}>
+            <div style={{ fontSize: '24px', fontWeight: 900, color: '#A78BFA', marginBottom: '4px' }}>Sybil-Resistant</div>
+            <div style={{ fontSize: '13px', color: '#94A3B8', fontWeight: 500 }}>Verified KOL Proofs</div>
+          </div>
+          <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}>
+            <div style={{ fontSize: '24px', fontWeight: 900, color: '#F59E0B', marginBottom: '4px' }}>Non-Custodial</div>
+            <div style={{ fontSize: '13px', color: '#94A3B8', fontWeight: 500 }}>Deterministic Risk Gate</div>
           </div>
         </div>
+
+        {/* Interactive Bento Grid Feature Showcase */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+          gap: '24px',
+          width: '100%',
+          marginTop: '24px'
+        }}>
+          {/* Card 1: Bonding Curve Launchpad */}
+          <div className="glass-card" style={{ padding: '32px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{
+                width: '44px',
+                height: '44px',
+                borderRadius: '12px',
+                background: 'rgba(0, 82, 255, 0.15)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: '20px',
+                border: '1px solid rgba(0, 82, 255, 0.3)'
+              }}>
+                <TrendingUp size={22} color="#00F0FF" />
+              </div>
+              <h3 style={{ fontSize: '20px', fontWeight: 700, color: '#FFFFFF', margin: '0 0 10px 0' }}>
+                Mathematical Bonding Curves
+              </h3>
+              <p style={{ fontSize: '14px', lineHeight: 1.6, color: '#94A3B8', margin: 0 }}>
+                Instant dynamic pricing curve for newly created tokens on Base. No need to seed liquidity pools upfront—tokens graduate to Uniswap V3 automatically when target reserve is reached.
+              </p>
+            </div>
+            <div style={{ marginTop: '24px' }}>
+              <a href="/launchpad" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '14px', fontWeight: 600, color: '#00F0FF' }}>
+                Start a Token Pool <ArrowRight size={16} />
+              </a>
+            </div>
+          </div>
+
+          {/* Card 2: Angel Deal Rooms & KOL Hub */}
+          <div className="glass-card" style={{ padding: '32px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{
+                width: '44px',
+                height: '44px',
+                borderRadius: '12px',
+                background: 'rgba(168, 85, 247, 0.15)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: '20px',
+                border: '1px solid rgba(168, 85, 247, 0.3)'
+              }}>
+                <Users size={22} color="#C084FC" />
+              </div>
+              <h3 style={{ fontSize: '20px', fontWeight: 700, color: '#FFFFFF', margin: '0 0 10px 0' }}>
+                Angel Deal Rooms & KOL Syndicates
+              </h3>
+              <p style={{ fontSize: '14px', lineHeight: 1.6, color: '#94A3B8', margin: 0 }}>
+                Partner with verified Web3 influencers and syndicate capital before public launch. Automated on-chain escrow bounties validated by Twitter, Farcaster, and Lens reputation proofs.
+              </p>
+            </div>
+            <div style={{ marginTop: '24px' }}>
+              <a href="/kol" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '14px', fontWeight: 600, color: '#C084FC' }}>
+                Enter Deal Rooms <ArrowRight size={16} />
+              </a>
+            </div>
+          </div>
+
+          {/* Card 3: Deterministic MEV Shield & Risk Gate */}
+          <div className="glass-card" style={{ padding: '32px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{
+                width: '44px',
+                height: '44px',
+                borderRadius: '12px',
+                background: 'rgba(34, 197, 94, 0.15)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: '20px',
+                border: '1px solid rgba(34, 197, 94, 0.3)'
+              }}>
+                <ShieldCheck size={22} color="#22C55E" />
+              </div>
+              <h3 style={{ fontSize: '20px', fontWeight: 700, color: '#FFFFFF', margin: '0 0 10px 0' }}>
+                Deterministic Risk Gate & MEV Shield
+              </h3>
+              <p style={{ fontSize: '14px', lineHeight: 1.6, color: '#94A3B8', margin: 0 }}>
+                Execution orders pass through deterministic risk policies with strict slippage caps, preventing sandwich attacks and predatory MEV bots on Base and cross-chain routes.
+              </p>
+            </div>
+            <div style={{ marginTop: '24px' }}>
+              <a href="/trading" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '14px', fontWeight: 600, color: '#22C55E' }}>
+                Open Trading Terminal <ArrowRight size={16} />
+              </a>
+            </div>
+          </div>
+        </div>
+
+        {/* 3-Step Walkthrough Section */}
+        <div className="glass-card" style={{ width: '100%', marginTop: '36px', padding: '36px' }}>
+          <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#FFFFFF', margin: '0 0 24px 0', textAlign: 'center' }}>
+            How PoolNet Works in 3 Simple Steps
+          </h2>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+            gap: '24px'
+          }}>
+            <div style={{ display: 'flex', gap: '14px' }}>
+              <div style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                backgroundColor: '#0052FF',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 900,
+                color: '#FFFFFF',
+                flexShrink: 0
+              }}>1</div>
+              <div>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '16px', color: '#FFFFFF' }}>Connect via Web3 SIWE</h4>
+                <p style={{ margin: 0, fontSize: '13px', color: '#94A3B8', lineHeight: 1.5 }}>
+                  Sign in securely with MetaMask using EIP-4361 cryptographic challenge. No custodial passwords.
+                </p>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '14px' }}>
+              <div style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                backgroundColor: '#0052FF',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 900,
+                color: '#FFFFFF',
+                flexShrink: 0
+              }}>2</div>
+              <div>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '16px', color: '#FFFFFF' }}>Deploy Pool or Syndicate</h4>
+                <p style={{ margin: 0, fontSize: '13px', color: '#94A3B8', lineHeight: 1.5 }}>
+                  Define your token bonding curve or enter early angel dealrooms with verified KOLs.
+                </p>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '14px' }}>
+              <div style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                backgroundColor: '#0052FF',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 900,
+                color: '#FFFFFF',
+                flexShrink: 0
+              }}>3</div>
+              <div>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '16px', color: '#FFFFFF' }}>Trade & Auto-Graduate</h4>
+                <p style={{ margin: 0, fontSize: '13px', color: '#94A3B8', lineHeight: 1.5 }}>
+                  When the pool reaches the target reserve, liquidity locks permanently on Uniswap V3 DEX.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
     );
   }
