@@ -22,6 +22,10 @@ export interface EnvironmentConfig {
 }
 
 const ALLOWED_DOMAINS: Record<string, AppEnvironment> = {
+  'pndigi.site': 'production',
+  'www.pndigi.site': 'production',
+  'app.pndigi.site': 'production',
+  'testnet.pndigi.site': 'testnet',
   'rbtrade.fun': 'production',
   'www.rbtrade.fun': 'production',
   'testnet.rbtrade.fun': 'testnet',

@@ -71,7 +71,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refreshSession();
   }, [refreshSession]);
 
-  const disconnectWallet = useCallback(() => {
+  const disconnectWallet = useCallback(async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch (err) {
+      console.warn('[AuthContext] Failed to call logout endpoint:', err);
+    }
     document.cookie = 'rtrader_session=; path=/; max-age=0; SameSite=Strict';
     localStorage.removeItem('rtrader_role');
 
@@ -199,9 +204,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const handleAccountsChanged = (accounts: string[]) => {
         if (!accounts || accounts.length === 0) {
           disconnectWallet();
-        } else if (accounts[0].toLowerCase() !== walletAddress?.toLowerCase()) {
-          // Dynamic account switch requires fresh SIWE re-authentication
-          refreshSession();
+        } else if (walletAddress && accounts[0].toLowerCase() !== walletAddress.toLowerCase()) {
+          // Dynamic account switch in MetaMask: clear old session so user can cleanly SIWE authenticate with the new account
+          disconnectWallet();
         }
       };
 
