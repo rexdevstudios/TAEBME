@@ -21,6 +21,7 @@ const PUBLIC_API_PATHS = new Set([
   '/api/auth/challenge',
   '/api/auth/verify',
   '/api/auth/session',   // Session revalidation is public
+  '/api/auth/logout',    // Invalidate session cookie is public
   '/api/billing/plans',   // Read-only plan listing is public
   '/api/system/overview', // Health check is public
   '/api/market/chart',    // Chart data is public read-only
