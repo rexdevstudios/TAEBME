@@ -187,6 +187,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (typeof window !== 'undefined' && (window as any).ethereum) {
       const ethereum = (window as any).ethereum;
 
+      // Query initial chainId from provider if available
+      ethereum.request?.({ method: 'eth_chainId' })
+        .then((cId: string) => {
+          if (cId) setChainId(cId);
+        })
+        .catch(() => {
+          // ignore silent provider error
+        });
+
       const handleAccountsChanged = (accounts: string[]) => {
         if (!accounts || accounts.length === 0) {
           disconnectWallet();

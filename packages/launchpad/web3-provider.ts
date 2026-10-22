@@ -117,6 +117,48 @@ export async function getBrowserSigner(): Promise<ethers.JsonRpcSigner> {
 }
 
 /**
+ * Resolves the default Base chain hex based on active client/app environment.
+ * Priority aligns with packages/shared/env-config.ts SSOT:
+ * 1. Explicit chain override: NEXT_PUBLIC_DEFAULT_CHAIN_ID
+ * 2. Explicit environment override: NEXT_PUBLIC_APP_ENV || APP_ENV
+ * 3. Client hostname mapping (testnet domains, localhost)
+ * 4. Production fallback (Base Mainnet: 8453 / 0x2105)
+ */
+export function getDefaultBaseChainHex(): string {
+  // 1. Explicit chain ID setting has highest authority if specified
+  const explicitChain = process.env.NEXT_PUBLIC_DEFAULT_CHAIN_ID?.trim();
+  if (explicitChain === '84532') return SUPPORTED_BASE_CHAINS.BASE_SEPOLIA.hexChainId;
+  if (explicitChain === '8453') return SUPPORTED_BASE_CHAINS.BASE_MAINNET.hexChainId;
+
+  // 2. Explicit application environment
+  const appEnv = (process.env.NEXT_PUBLIC_APP_ENV || process.env.APP_ENV)?.toLowerCase()?.trim();
+  if (appEnv === 'testnet' || appEnv === 'staging') {
+    return SUPPORTED_BASE_CHAINS.BASE_SEPOLIA.hexChainId;
+  }
+  if (appEnv === 'production' || appEnv === 'prod') {
+    return SUPPORTED_BASE_CHAINS.BASE_MAINNET.hexChainId;
+  }
+
+  // 3. Client window hostname check
+  if (typeof window !== 'undefined' && window.location?.hostname) {
+    const hostname = window.location.hostname.toLowerCase();
+    if (
+      hostname === 'rtrader-testnet.vercel.app' ||
+      hostname === 'testnet.rbtrade.fun' ||
+      hostname === 'staging.rbtrade.fun' ||
+      hostname.includes('testnet') ||
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1'
+    ) {
+      return SUPPORTED_BASE_CHAINS.BASE_SEPOLIA.hexChainId;
+    }
+  }
+
+  // 4. Default production chain
+  return SUPPORTED_BASE_CHAINS.BASE_MAINNET.hexChainId;
+}
+
+/**
  * Reads current chainId from the connected browser wallet.
  */
 export async function getCurrentChainId(): Promise<number> {
@@ -130,8 +172,10 @@ export async function getCurrentChainId(): Promise<number> {
  * Prompts user to switch network via wallet_switchEthereumChain if necessary.
  */
 export async function ensureBaseNetwork(
-  targetHexChainId: string = '0x2105'
+  targetHexChainId?: string
 ): Promise<{ success: boolean; chainId?: number; error?: string }> {
+  const effectiveTargetHex = targetHexChainId || getDefaultBaseChainHex();
+
   if (typeof window === 'undefined' || !(window as any).ethereum) {
     return { success: false, error: 'Dompet Web3 tidak terdeteksi.' };
   }
@@ -139,12 +183,12 @@ export async function ensureBaseNetwork(
   const ethereum = (window as any).ethereum;
   const targetConfig =
     Object.values(SUPPORTED_BASE_CHAINS).find(
-      (c) => c.hexChainId.toLowerCase() === targetHexChainId.toLowerCase()
-    ) || SUPPORTED_BASE_CHAINS.BASE_MAINNET;
+      (c) => c.hexChainId.toLowerCase() === effectiveTargetHex.toLowerCase()
+    ) || (effectiveTargetHex.toLowerCase() === '0x14a34' ? SUPPORTED_BASE_CHAINS.BASE_SEPOLIA : SUPPORTED_BASE_CHAINS.BASE_MAINNET);
 
   try {
     const currentChainHex: string = await ethereum.request({ method: 'eth_chainId' });
-    if (currentChainHex && currentChainHex.toLowerCase() === targetHexChainId.toLowerCase()) {
+    if (currentChainHex && currentChainHex.toLowerCase() === effectiveTargetHex.toLowerCase()) {
       return { success: true, chainId: targetConfig.chainId };
     }
 
@@ -152,9 +196,8 @@ export async function ensureBaseNetwork(
     try {
       await ethereum.request({
         method: 'wallet_switchEthereumChain',
-        params: [{ chainId: targetHexChainId }],
+        params: [{ chainId: effectiveTargetHex }],
       });
-      return { success: true, chainId: targetConfig.chainId };
     } catch (switchErr: any) {
       // Error code 4902: Unrecognized chain, needs to be added
       if (switchErr?.code === 4902) {
@@ -170,18 +213,33 @@ export async function ensureBaseNetwork(
             },
           ],
         });
-        return { success: true, chainId: targetConfig.chainId };
-      }
-
-      // User rejected switch
-      if (switchErr?.code === 4001) {
+      } else if (switchErr?.code === 4001) {
+        // User rejected switch
         return {
           success: false,
           error: 'USER_REJECTED: Pengguna menolak perpindahan jaringan ke ' + targetConfig.name,
         };
+      } else {
+        throw switchErr;
       }
+    }
 
-      throw switchErr;
+    // Verify post-switch/add actual chain identity (Fail-Closed verification)
+    try {
+      const postSwitchChainHex: string = await ethereum.request({ method: 'eth_chainId' });
+      if (postSwitchChainHex && postSwitchChainHex.toLowerCase() === effectiveTargetHex.toLowerCase()) {
+        return { success: true, chainId: targetConfig.chainId };
+      }
+      return {
+        success: false,
+        error: `NETWORK_MISMATCH: Dompet masih terhubung ke jaringan ${postSwitchChainHex || 'tidak dikenal'}, bukan ${targetConfig.name} (${effectiveTargetHex}).`,
+      };
+    } catch {
+      // If querying chainId fails after switch, return success false
+      return {
+        success: false,
+        error: `Verifikasi jaringan gagal setelah permintaan pergantian ke ${targetConfig.name}.`,
+      };
     }
   } catch (err: any) {
     return { success: false, error: err?.message || 'Gagal mengubah jaringan dompet.' };
@@ -251,7 +309,7 @@ export function normalizeWeb3Error(error: any): string {
  */
 export function getExplorerUrl(
   hashOrAddress: string,
-  targetChainHex: string = '0x2105',
+  targetChainHex: string = getDefaultBaseChainHex(),
   type: 'tx' | 'address' = 'tx'
 ): string {
   const norm = targetChainHex.toLowerCase();

@@ -15,6 +15,10 @@ import {
   BrainCircuit,
   Award,
 } from 'lucide-react';
+import {
+  ensureBaseNetwork,
+  getDefaultBaseChainHex,
+} from '@packages/launchpad/web3-provider';
 
 export default function HeaderNav() {
   const pathname = usePathname();
@@ -24,6 +28,7 @@ export default function HeaderNav() {
     userRole,
     credits,
     isConnecting,
+    chainId,
     connectMetaMask,
     disconnectWallet,
   } = useAuth();
@@ -55,23 +60,69 @@ export default function HeaderNav() {
         <span className="badge" style={{ backgroundColor: '#1A1E2F', border: '1px solid #334155', color: '#94A3B8', fontSize: '11px', padding: '2px 6px' }}>
           v2.5
         </span>
-        <div
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '3px 8px',
-            borderRadius: '12px',
-            backgroundColor: 'rgba(34, 197, 94, 0.08)',
-            border: '1px solid rgba(34, 197, 94, 0.2)',
-            fontSize: '11px',
-            color: '#86EFAC',
-            fontWeight: 600,
-          }}
-        >
-          <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#22C55E' }} />
-          Base Mainnet
-        </div>
+        {(() => {
+          const defaultHex = getDefaultBaseChainHex();
+          const isExpectedSepolia = defaultHex.toLowerCase() === '0x14a34';
+          const targetName = isExpectedSepolia ? 'Base Sepolia' : 'Base Mainnet';
+
+          // Determine current wallet connection status
+          const currentHex = chainId?.toLowerCase();
+          const isOnExpected = currentHex ? currentHex === defaultHex.toLowerCase() : false;
+          const isConnectedOther = currentHex && !isOnExpected;
+
+          let badgeText = targetName;
+          let badgeColor = '#86EFAC';
+          let dotColor = '#22C55E';
+          let bg = 'rgba(34, 197, 94, 0.08)';
+          let border = 'rgba(34, 197, 94, 0.2)';
+
+          if (currentHex === '0x14a34') {
+            badgeText = 'Base Sepolia';
+          } else if (currentHex === '0x2105') {
+            badgeText = 'Base Mainnet';
+          } else if (currentHex === '0x1237') {
+            badgeText = 'Robinhood L2';
+          } else if (isConnectedOther) {
+            badgeText = 'Wrong Network';
+            badgeColor = '#FCA5A5';
+            dotColor = '#EF4444';
+            bg = 'rgba(239, 68, 68, 0.1)';
+            border = 'rgba(239, 68, 68, 0.3)';
+          }
+
+          const handleNetworkClick = async () => {
+            try {
+              await ensureBaseNetwork(defaultHex);
+            } catch (e) {
+              console.warn('[HeaderNav] Network switch failed:', e);
+            }
+          };
+
+          return (
+            <button
+              type="button"
+              onClick={handleNetworkClick}
+              title={`Target: ${targetName}. Klik untuk beralih jaringan di MetaMask.`}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '3px 8px',
+                borderRadius: '12px',
+                backgroundColor: bg,
+                border: `1px solid ${border}`,
+                fontSize: '11px',
+                color: badgeColor,
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: dotColor }} />
+              {badgeText}
+            </button>
+          );
+        })()}
       </div>
 
       {/* Dynamic Navigation Links */}

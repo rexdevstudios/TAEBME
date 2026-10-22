@@ -23,6 +23,7 @@ import {
 import {
   getContractConfiguration,
   ensureBaseNetwork,
+  getDefaultBaseChainHex,
   getBrowserSigner,
   getLaunchpadContract,
   normalizeWeb3Error,
@@ -349,8 +350,9 @@ export default function KolHubPage() {
         merkleProofData?.chain?.toLowerCase().includes('robinhood') ||
         selectedCamp?.title?.toLowerCase().includes('noir') ||
         merkleProofData?.tokenAddress?.toLowerCase() === '0xa5f832390447b050955d7b734a9a2fa861b4d3ab';
-      const targetChainHex = isRobinhood ? '0x1237' : '0x2105';
-      const chainName = isRobinhood ? 'Robinhood Chain L2' : 'Base';
+      const defaultBaseHex = getDefaultBaseChainHex();
+      const targetChainHex = isRobinhood ? '0x1237' : defaultBaseHex;
+      const chainName = isRobinhood ? 'Robinhood Chain L2' : (defaultBaseHex === '0x14a34' ? 'Base Sepolia' : 'Base');
       const explorerName = isRobinhood ? 'Blockscout' : 'BaseScan';
 
       const networkCheck = await ensureBaseNetwork(targetChainHex);

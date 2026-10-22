@@ -6,6 +6,7 @@ import { ethers } from 'ethers';
 import {
   getContractConfiguration,
   ensureBaseNetwork,
+  getDefaultBaseChainHex,
   getBrowserSigner,
   getLaunchpadContract,
   normalizeWeb3Error,
@@ -84,7 +85,8 @@ export const AngelDealRoomModal: React.FC<AngelDealRoomModalProps> = ({
       }
 
       // 2. Base Network Validation (Rule 8)
-      const networkCheck = await ensureBaseNetwork('0x2105');
+      const targetBaseHex = getDefaultBaseChainHex();
+      const networkCheck = await ensureBaseNetwork(targetBaseHex);
       if (!networkCheck.success) {
         setActionFeedback(`❌ ${networkCheck.error || 'Harap beralih ke jaringan Base'}`);
         return;

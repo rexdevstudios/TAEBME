@@ -9,6 +9,7 @@ import { ethers } from 'ethers';
 import {
   getContractConfiguration,
   ensureBaseNetwork,
+  getDefaultBaseChainHex,
   getBrowserSigner,
   getLaunchpadContract,
   normalizeWeb3Error,
@@ -150,9 +151,10 @@ export default function LaunchpadPage() {
 
       // 3. Multi-Chain Network Switching & Validation (Rule 8)
       const isRobinhood = selectedChain === 'robinhood';
-      const targetChainHex = isRobinhood ? '0x1237' : '0x2105';
-      const targetChainKey = isRobinhood ? 'robinhood-mainnet' : 'base-mainnet';
-      const chainName = isRobinhood ? 'Robinhood Chain L2' : 'Base';
+      const defaultBaseHex = getDefaultBaseChainHex();
+      const targetChainHex = isRobinhood ? '0x1237' : defaultBaseHex;
+      const targetChainKey = isRobinhood ? 'robinhood-mainnet' : (defaultBaseHex === '0x14a34' ? 'base-sepolia' : 'base-mainnet');
+      const chainName = isRobinhood ? 'Robinhood Chain L2' : (defaultBaseHex === '0x14a34' ? 'Base Sepolia' : 'Base');
       const explorerName = isRobinhood ? 'Blockscout' : 'BaseScan';
 
       const networkCheck = await ensureBaseNetwork(targetChainHex);
