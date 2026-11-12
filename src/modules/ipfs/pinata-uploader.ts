@@ -16,8 +16,8 @@ import * as fs from "fs";
 import * as path from "path";
 import axios from "axios";
 import FormData from "form-data";
-import { getConfig } from "../../config.ts";
-import { logger } from "../../logger.ts";
+import { getConfig } from "../../config";
+import { logger } from "../../logger";
 import type { TokenIdentity } from "../ai/gemini-brain.ts";
 
 const PINATA_BASE = "https://api.pinata.cloud";

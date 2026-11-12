@@ -1,7 +1,7 @@
 {
   "name": "Pump Hill Runner",
   "ticker": "PUMPRUN",
-  "contractAddress": "0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A",
+  "contractAddress": "0x7CE19E4F978009EB644c27946B47221b824C0bA3",
   "chain": "base",
   "sector": "VIRAL_MEME",
   "security": {
@@ -17,9 +17,9 @@
     "treasuryPct": 35
   },
   "links": {
-    "explorer": "https://basescan.org/token/0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A",
-    "buy": "https://app.doppler.lol/tokens/base/0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A",
-    "dexscreener": "https://dexscreener.com/base/0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A"
+    "explorer": "https://basescan.org/token/0x7CE19E4F978009EB644c27946B47221b824C0bA3",
+    "buy": "https://app.doppler.lol/tokens/base/0x7CE19E4F978009EB644c27946B47221b824C0bA3",
+    "dexscreener": "https://dexscreener.com/base/0x7CE19E4F978009EB644c27946B47221b824C0bA3"
   },
-  "generatedAt": "2026-09-20T22:49:47.335Z"
+  "generatedAt": "2026-10-24T17:55:34.469Z"
 }

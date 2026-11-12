@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { SiweAuthService } from '@packages/auth/siwe';
 import { rateLimiter } from '@packages/auth/rate-limiter';
 import { ApiResponse, WalletChallengeRequest, WalletChallengeResponse } from '@packages/shared/contracts/api-contracts';
-
-
+import { getSiweConfig } from '@packages/shared/env-config';
 
 export async function POST(req: NextRequest) {
   try {
@@ -30,11 +29,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(response, { status: 400 });
     }
 
+    const siweConfig = getSiweConfig(req.headers.get('host'));
+
     const challengeResult = SiweAuthService.generateChallenge(
-      'rtrader.io',
+      siweConfig.domain,
       body.walletAddress,
-      'https://rtrader.io/auth/login',
-      8453 // Base Chain ID
+      siweConfig.uri,
+      siweConfig.chainId
     );
 
     const data: WalletChallengeResponse = {

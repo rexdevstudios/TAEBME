@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ApiResponse } from '@packages/shared/contracts/api-contracts';
 import { defaultDraftDbAdapter, getDbPool } from '@packages/shared/db-pool';
 import { requireCapability } from '@packages/auth/session';
+import {
+  verifyEvmTransactionReceipt,
+  verifyEvmDeploymentAttribution,
+  getEvmPublicClient,
+} from '@/src/modules/reconciliation/evm-verifier';
 import { ethers } from 'ethers';
 
 export const dynamic = 'force-dynamic';
@@ -33,6 +38,15 @@ export async function POST(req: NextRequest) {
       const response: ApiResponse<null> = {
         success: false,
         error: { code: 'INVALID_CONTRACT_ADDRESS', message: 'contractAddress harus berupa alamat Ethereum/EVM yang sah.' },
+        timestamp: new Date().toISOString(),
+      };
+      return NextResponse.json(response, { status: 400 });
+    }
+
+    if (!txHash || typeof txHash !== 'string' || !/^0x[a-fA-F0-9]{64}$/.test(txHash)) {
+      const response: ApiResponse<null> = {
+        success: false,
+        error: { code: 'INVALID_TX_HASH', message: 'txHash 64-karakter hex yang valid diperlukan untuk verifikasi on-chain.' },
         timestamp: new Date().toISOString(),
       };
       return NextResponse.json(response, { status: 400 });
@@ -81,7 +95,57 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 3. Publish Launch Draft into PostgreSQL SSOT
+    // 3. On-chain EVM Verification: Verify transaction receipt, bytecode, and deployment attribution
+    const targetChain = chain || 'base-mainnet';
+    const receiptResult = await verifyEvmTransactionReceipt(txHash, targetChain);
+    if (receiptResult.status !== 'confirmed' || !receiptResult.receipt) {
+      const response: ApiResponse<null> = {
+        success: false,
+        error: {
+          code: 'INVALID_ONCHAIN_DEPLOYMENT',
+          message: `Verifikasi transaksi deployment on-chain gagal: ${receiptResult.reason || receiptResult.status}`,
+        },
+        timestamp: new Date().toISOString(),
+      };
+      return NextResponse.json(response, { status: 422 });
+    }
+
+    // Verify bytecode presence at contractAddress
+    const client = getEvmPublicClient(targetChain);
+    if (client) {
+      try {
+        const bytecode = await client.getBytecode({ address: contractAddress as `0x${string}` });
+        if (!bytecode || bytecode === '0x') {
+          const response: ApiResponse<null> = {
+            success: false,
+            error: {
+              code: 'INVALID_ONCHAIN_DEPLOYMENT',
+              message: `Tidak ada bytecode smart contract yang terdeteksi di alamat ${contractAddress} pada chain ${targetChain}.`,
+            },
+            timestamp: new Date().toISOString(),
+          };
+          return NextResponse.json(response, { status: 422 });
+        }
+      } catch (err: any) {
+        console.warn('[POST /api/launchpad/publish] Bytecode check warning:', err?.message);
+      }
+    }
+
+    // Verify deployment attribution
+    const attribution = await verifyEvmDeploymentAttribution(txHash, contractAddress, targetChain);
+    if (attribution.status !== 'confirmed') {
+      const response: ApiResponse<null> = {
+        success: false,
+        error: {
+          code: 'INVALID_ONCHAIN_DEPLOYMENT',
+          message: `Attribution deployment gagal: ${attribution.reason || 'Alamat kontrak tidak cocok dengan receipt atau event logs'}`,
+        },
+        timestamp: new Date().toISOString(),
+      };
+      return NextResponse.json(response, { status: 422 });
+    }
+
+    // 4. Publish Launch Draft into PostgreSQL SSOT
     if (!defaultDraftDbAdapter.publishLaunchDraft) {
       throw new Error('publishLaunchDraft adapter method not implemented.');
     }
@@ -89,7 +153,7 @@ export async function POST(req: NextRequest) {
     const result = await defaultDraftDbAdapter.publishLaunchDraft({
       draftId,
       contractAddress,
-      chain: chain || 'base-mainnet',
+      chain: targetChain,
       txHash,
       currentSupply,
       graduationThreshold: graduationThreshold ? Number(graduationThreshold) : undefined,

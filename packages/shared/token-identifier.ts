@@ -31,14 +31,14 @@ export interface NormalizedTokenIdentifier {
 export function normalizeChainName(chain?: string): SupportedChainId {
   if (!chain) return 'base';
   const c = chain.trim().toLowerCase();
-  if (c === 'sol' || c === 'solana' || c === '101') return 'solana';
-  if (c === 'eth' || c === 'ethereum' || c === '1') return 'ethereum';
-  if (c === 'base' || c === '8453') return 'base';
-  if (c === 'rh' || c === 'robinhood' || c === '46688' || c === '4663') return 'robinhood';
-  if (c === 'arc' || c === '5042') return 'arc';
-  if (c === 'clanker') return 'clanker';
-  if (c === 'arb' || c === 'arbitrum' || c === '42161') return 'arbitrum';
-  if (c === 'bsc' || c === 'binance' || c === '56') return 'bsc';
+  if (c === 'sol' || c === 'solana' || c === '101' || c.startsWith('solana') || c.startsWith('sol-')) return 'solana';
+  if (c === 'eth' || c === 'ethereum' || c === '1' || c.startsWith('ethereum') || c.startsWith('eth-')) return 'ethereum';
+  if (c === 'base' || c === '8453' || c.startsWith('base')) return 'base';
+  if (c === 'rh' || c === 'robinhood' || c === '46688' || c === '4663' || c.startsWith('robinhood') || c.startsWith('rh-')) return 'robinhood';
+  if (c === 'arc' || c === '5042' || c.startsWith('arc')) return 'arc';
+  if (c === 'clanker' || c.startsWith('clanker')) return 'clanker';
+  if (c === 'arb' || c === 'arbitrum' || c === '42161' || c.startsWith('arbitrum') || c.startsWith('arb-')) return 'arbitrum';
+  if (c === 'bsc' || c === 'binance' || c === '56' || c.startsWith('bsc') || c.startsWith('binance')) return 'bsc';
   return 'base';
 }
 

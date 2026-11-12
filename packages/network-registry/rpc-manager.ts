@@ -1,8 +1,91 @@
 import { EventEmitter } from 'events';
 
-export type RpcProviderType = 'DRPC' | 'ALCHEMY' | 'ANKR' | 'QUIKNODE' | 'CUSTOM';
+export type RpcProviderType = 'DRPC' | 'DRPC_NODECLOUD' | 'DRPC_NODECORE' | 'ALCHEMY' | 'ANKR' | 'QUIKNODE' | 'CUSTOM';
 export type RpcPurpose = 'PRIMARY' | 'FALLBACK' | 'ARCHIVE' | 'INDEXER' | 'TRANSACT';
 export type RpcHealthStatus = 'HEALTHY' | 'DEGRADED' | 'UNHEALTHY';
+
+export interface NetworkDefinition {
+  networkId: string;
+  chainId: number;
+  name: string;
+  aliases: string[];
+}
+
+export const KNOWN_NETWORKS: Record<string, NetworkDefinition> = {
+  'base-mainnet': {
+    networkId: 'base-mainnet',
+    chainId: 8453,
+    name: 'Base Mainnet',
+    aliases: ['base-mainnet', '8453', '0x2105', 'base'],
+  },
+  'base-sepolia': {
+    networkId: 'base-sepolia',
+    chainId: 84532,
+    name: 'Base Sepolia Testnet',
+    aliases: ['base-sepolia', '84532', '0x14a34', 'sepolia'],
+  },
+  'robinhood-mainnet': {
+    networkId: 'robinhood-mainnet',
+    chainId: 4663,
+    name: 'Robinhood Chain L2',
+    aliases: ['robinhood-mainnet', '4663', '0x1237', 'robinhood'],
+  },
+  'bsc-mainnet': {
+    networkId: 'bsc-mainnet',
+    chainId: 56,
+    name: 'BNB Smart Chain Mainnet',
+    aliases: ['bsc-mainnet', '56', '0x38', 'bsc'],
+  },
+  'bsc-testnet': {
+    networkId: 'bsc-testnet',
+    chainId: 97,
+    name: 'BNB Smart Chain Testnet',
+    aliases: ['bsc-testnet', '97', '0x61'],
+  },
+  'arbitrum-mainnet': {
+    networkId: 'arbitrum-mainnet',
+    chainId: 42161,
+    name: 'Arbitrum One',
+    aliases: ['arbitrum-mainnet', 'arbitrum', '42161', '0xa4b1'],
+  },
+  'polygon-mainnet': {
+    networkId: 'polygon-mainnet',
+    chainId: 137,
+    name: 'Polygon Mainnet',
+    aliases: ['polygon-mainnet', 'polygon', '137', '0x89'],
+  },
+  'optimism-mainnet': {
+    networkId: 'optimism-mainnet',
+    chainId: 10,
+    name: 'Optimism Mainnet',
+    aliases: ['optimism-mainnet', 'optimism', '10', '0xa'],
+  },
+  'arc-mainnet': {
+    networkId: 'arc-mainnet',
+    chainId: 5042,
+    name: 'Arc Mainnet',
+    aliases: ['arc-mainnet', 'arc', '5042', '0x13b2'],
+  },
+};
+
+export function resolveNetworkDefinition(rawChainOrAlias?: string | null): NetworkDefinition | null {
+  if (!rawChainOrAlias || typeof rawChainOrAlias !== 'string') return null;
+  const clean = rawChainOrAlias.toLowerCase().trim();
+  for (const def of Object.values(KNOWN_NETWORKS)) {
+    if (def.networkId === clean || def.aliases.includes(clean)) {
+      return def;
+    }
+  }
+  return null;
+}
+
+export function isCompatibleChainAlias(chainA: string, chainB: string): boolean {
+  if (chainA === chainB) return true;
+  const defA = resolveNetworkDefinition(chainA);
+  const defB = resolveNetworkDefinition(chainB);
+  if (defA && defB && defA.networkId === defB.networkId) return true;
+  return false;
+}
 
 export interface RpcEndpointConfig {
   id: string;

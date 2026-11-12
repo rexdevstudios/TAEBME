@@ -8,9 +8,11 @@ import { ethers } from 'ethers';
 
 export interface LaunchDraftDbAdapter {
   saveDraft(draft: any): Promise<string>;
+  getLaunchDraftById?(draftId: string): Promise<any | null>;
   saveWhitelist(launchDraftId: string, merkleRoot: string, maxAllocation: bigint): Promise<void>;
   createAuditLog(actorId: string, action: string, entityId?: string, reason?: string): Promise<void>;
-  getDrafts?(): Promise<any[]>;
+  getDrafts?(filter?: { creatorId?: string; creatorWallet?: string }): Promise<any[]>;
+  clearDrafts?(): void;
   getActiveTokenLaunches?(): Promise<any[]>;
   getTokenLaunchByAddress?(chain: string, address: string): Promise<any | null>;
   publishLaunchDraft?(params: {

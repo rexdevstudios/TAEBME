@@ -52,6 +52,14 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     batPath: "START_FLYWHEEL_WORKER.bat",
     logFile: path.join(LOGS_DIR, "flywheel-worker.log"),
   },
+  binanceExecution: {
+    id: "RTraderBinanceExecutionPlane",
+    name: "RTrader Binance Execution Plane Runner",
+    description: "Dedicated 24/7 Binance Order Dispatcher & Reconciliation Worker",
+    scriptPath: "apps/execution-plane/main.ts",
+    batPath: "START_EXECUTION_PLANE.bat",
+    logFile: path.join(LOGS_DIR, "execution-plane.log"),
+  },
 };
 
 /**

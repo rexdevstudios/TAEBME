@@ -2,7 +2,7 @@
    DEXSCREENER TOKEN INFO UPDATE — FORM STEP-BY-STEP SUBMISSION GUIDE
 ================================================================================
 Tautan Langsung Form (Otomatis Pre-fill Chain & Token Address):
-https://marketplace.dexscreener.com/product/token-info/order?chainId=base&tokenAddress=0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A
+https://marketplace.dexscreener.com/product/token-info/order?chainId=base&tokenAddress=0x7CE19E4F978009EB644c27946B47221b824C0bA3
 
 Catatan Penting:
 Form ini adalah layanan "Enhanced Token Info" resmi dari DexScreener ($299).
@@ -15,7 +15,7 @@ Jika Anda ingin jalur GRATIS, gunakan panduan BaseScan di bagian paling bawah.
 1. TOKEN IDENTITY (Paling Atas)
 --------------------------------------------------------------------------------
  • Chain         : Pilih "Base"
- • Token Address : 0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A
+ • Token Address : 0x7CE19E4F978009EB644c27946B47221b824C0bA3
  
  [INFO]: DexScreener akan otomatis mendeteksi nama dan simbol dari blockchain.
  TIDAK ADA kolom ketik nama atau pair address di form.
@@ -34,8 +34,8 @@ Pump Hill Runner ($PUMPRUN) - Autonomous Web3 Protocol on BASE. Features 0% trad
  DexScreener menyediakan kolom-kolom spesifik berikut:
  • Website   : https://pumprun-web3.pages.dev
  • Docs      : https://bankr.bot/agents/pumprun
- • X         : https://x.com/search?q=%24PUMPRUN
- • Telegram  : https://t.me/pumprun_portal
+ • X         : (Kosongkan jika belum dibuat)
+ • Telegram  : (Kosongkan jika belum dibuat)
  • Discord   : (Kosongkan jika belum ada)
  • TikTok/IG : (Kosongkan jika belum ada)
 
@@ -70,13 +70,13 @@ Pump Hill Runner ($PUMPRUN) - Autonomous Web3 Protocol on BASE. Features 0% trad
 --------------------------------------------------------------------------------
  • Centang kedua checkbox persetujuan syarat & ketentuan.
  • Klik tombol "Order Now" ($299, pembayaran via Crypto atau Kartu).
- • Halaman Chart Resmi: https://dexscreener.com/base/0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A
+ • Halaman Chart Resmi: https://dexscreener.com/base/0x7CE19E4F978009EB644c27946B47221b824C0bA3
 
 ================================================================================
  ALTERNATIF JALUR 100% GRATIS (TANPA BAYAR $299 KE DEXSCREENER):
 ================================================================================
 1. Update Token Profile di BaseScan (100% Gratis):
-   https://basescan.org/tokenupdate/0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A
+   https://basescan.org/tokenupdate/0x7CE19E4F978009EB644c27946B47221b824C0bA3
    -> Submit nama, website, ikon, dan sosial Anda di sana.
    -> Setelah diverifikasi oleh tim BaseScan, DexScreener & GeckoTerminal akan
       otomatis mengimpor metadata tersebut secara berkala tanpa biaya.

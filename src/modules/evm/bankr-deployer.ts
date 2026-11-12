@@ -15,8 +15,8 @@
  */
 import axios, { AxiosError } from "axios";
 import { HttpsProxyAgent } from "https-proxy-agent";
-import { getConfig } from "../../config.ts";
-import { logger } from "../../logger.ts";
+import { getConfig } from "../../config";
+import { logger } from "../../logger";
 import type { TokenIdentity } from "../ai/gemini-brain.ts";
 import type { UploadResult } from "../ipfs/pinata-uploader.ts";
 import type { DeployResult } from "../solana/pumpfun-deployer.ts";

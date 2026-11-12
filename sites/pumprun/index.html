@@ -20,7 +20,7 @@
 
   <!-- Progressive Web App (PWA) & Mobile Standalone Settings -->
   <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#bbf91f" />
+  <meta name="theme-color" content="#ff007a" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="$PUMPRUN" />
@@ -38,8 +38,8 @@
             mono: ['JetBrains Mono', 'monospace'],
           },
           colors: {
-            brandPrimary: '#bbf91f',
-            brandSecondary: '#10aff9',
+            brandPrimary: '#ff007a',
+            brandSecondary: '#ffb703',
           }
         }
       }
@@ -73,7 +73,7 @@
   <header class="sticky top-0 z-50 backdrop-blur-lg bg-gray-950/80 border-b border-gray-800/80">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <img src="https://gateway.pinata.cloud/ipfs/QmdiMA7WbFG93SNqizSZYNV5NG37iuPj87k8vaEMZaxp6Y" alt="Pump Hill Runner Logo" class="w-9 h-9 rounded-full ring-2 ring-brandPrimary/50" />
+        <img src="https://image.pollinations.ai/prompt/Pump%20Hill%20Runner%20crypto%20token%20logo?width=512&height=512&nologo=true" alt="Pump Hill Runner Logo" class="w-9 h-9 rounded-full ring-2 ring-brandPrimary/50" />
         <span class="font-extrabold tracking-wider text-lg text-white">$PUMPRUN</span>
         <span class="text-xs px-2 py-0.5 rounded-full bg-brandPrimary/20 text-brandPrimary font-mono border border-brandPrimary/30">Viral</span>
       </div>
@@ -92,7 +92,7 @@
         <button id="connect-wallet-btn" class="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-lg bg-gray-900 hover:bg-gray-800 text-gray-200 border border-gray-700 font-mono text-xs transition flex items-center gap-2 cursor-pointer" title="Connect Web3 Wallet">
           <span class="w-2 h-2 rounded-full bg-emerald-400"></span> <span id="wallet-label">Connect Wallet</span>
         </button>
-        <a href="https://app.doppler.lol/tokens/base/0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A" target="_blank" rel="noopener noreferrer" class="px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-lg bg-gradient-to-r from-brandPrimary to-brandSecondary text-black font-bold text-xs sm:text-sm shadow-lg shadow-brandPrimary/25 hover:opacity-90 transition whitespace-nowrap">
+        <a href="https://app.doppler.lol/tokens/base/0x7CE19E4F978009EB644c27946B47221b824C0bA3" target="_blank" rel="noopener noreferrer" class="px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-lg bg-gradient-to-r from-brandPrimary to-brandSecondary text-black font-bold text-xs sm:text-sm shadow-lg shadow-brandPrimary/25 hover:opacity-90 transition whitespace-nowrap">
           Buy $PUMPRUN
         </a>
       </div>
@@ -129,7 +129,7 @@
             <span class="text-emerald-400 font-semibold">0% BUY / 0% SELL TAX</span>
           </div>
           <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-            <input type="text" readonly value="0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A" id="ca-input" class="w-full bg-gray-950 px-3 py-2 rounded-lg text-xs font-mono text-gray-200 border border-gray-800 focus:outline-none focus:border-brandPrimary select-all" />
+            <input type="text" readonly value="0x7CE19E4F978009EB644c27946B47221b824C0bA3" id="ca-input" class="w-full bg-gray-950 px-3 py-2 rounded-lg text-xs font-mono text-gray-200 border border-gray-800 focus:outline-none focus:border-brandPrimary select-all" />
             <div class="flex items-center gap-2 w-full sm:w-auto">
               <button id="copy-ca-btn" class="flex-1 sm:flex-initial px-4 py-2 rounded-lg bg-brandPrimary text-black font-semibold text-xs hover:opacity-90 transition whitespace-nowrap cursor-pointer flex items-center justify-center gap-1.5">
                 <svg class="w-3.5 h-3.5 text-black" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
@@ -160,10 +160,10 @@
             <button type="button" id="open-docs-btn" class="flex items-center justify-center gap-2 p-2.5 rounded-lg bg-gray-950 hover:bg-gray-800 border border-gray-800 text-gray-200 transition cursor-pointer neo-btn">
               <span>📄 Docs</span>
             </button>
-            <a href="https://basescan.org/token/0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A" target="_blank" rel="noopener noreferrer" class="flex items-center justify-center gap-2 p-2.5 rounded-lg bg-gray-950 hover:bg-gray-800 border border-gray-800 text-gray-200 transition neo-btn">
+            <a href="https://basescan.org/token/0x7CE19E4F978009EB644c27946B47221b824C0bA3" target="_blank" rel="noopener noreferrer" class="flex items-center justify-center gap-2 p-2.5 rounded-lg bg-gray-950 hover:bg-gray-800 border border-gray-800 text-gray-200 transition neo-btn">
               <span>💻 Contract</span>
             </a>
-            <a href="https://app.doppler.lol/tokens/base/0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A" target="_blank" rel="noopener noreferrer" class="flex items-center justify-center gap-2 p-2.5 rounded-lg bg-gray-950 hover:bg-gray-800 border border-gray-800 text-gray-200 transition neo-btn">
+            <a href="https://app.doppler.lol/tokens/base/0x7CE19E4F978009EB644c27946B47221b824C0bA3" target="_blank" rel="noopener noreferrer" class="flex items-center justify-center gap-2 p-2.5 rounded-lg bg-gray-950 hover:bg-gray-800 border border-gray-800 text-gray-200 transition neo-btn">
               <span>⚡ dApp</span>
             </a>
             <a href="https://x.com/search?q=%24PUMPRUN" target="_blank" rel="noopener noreferrer" class="flex items-center justify-center gap-2 p-2.5 rounded-lg bg-gray-950 hover:bg-gray-800 border border-gray-800 text-gray-200 transition neo-btn">
@@ -179,10 +179,10 @@
         <div class="space-y-2">
           <div class="text-xs text-gray-400 font-mono uppercase tracking-wider">Trading Terminals & Sniper Routing</div>
           <div class="flex flex-wrap gap-2">
-            <a href="https://gmgn.ai/base/token/0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A" target="_blank" rel="noopener noreferrer" class="sniper-btn px-3 py-1.5 rounded-lg text-xs font-mono font-semibold bg-gray-900 hover:bg-gray-800 text-gray-200 border border-gray-700 transition flex items-center gap-1.5"><svg class="w-3 h-3 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m10 15 5-3-5-3v6Z"/></svg> GMGN</a>
-<a href="https://photon-base.tinyastro.io/en/lp/0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A" target="_blank" rel="noopener noreferrer" class="sniper-btn px-3 py-1.5 rounded-lg text-xs font-mono font-semibold bg-gray-900 hover:bg-gray-800 text-gray-200 border border-gray-700 transition flex items-center gap-1.5"><svg class="w-3 h-3 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m10 15 5-3-5-3v6Z"/></svg> Photon</a>
-<a href="https://t.me/BananaGunSniper_bot?start=0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A" target="_blank" rel="noopener noreferrer" class="sniper-btn px-3 py-1.5 rounded-lg text-xs font-mono font-semibold bg-gray-900 hover:bg-gray-800 text-gray-200 border border-gray-700 transition flex items-center gap-1.5"><svg class="w-3 h-3 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m10 15 5-3-5-3v6Z"/></svg> Banana Gun</a>
-<a href="https://t.me/MaestroSniperBot?start=0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A" target="_blank" rel="noopener noreferrer" class="sniper-btn px-3 py-1.5 rounded-lg text-xs font-mono font-semibold bg-gray-900 hover:bg-gray-800 text-gray-200 border border-gray-700 transition flex items-center gap-1.5"><svg class="w-3 h-3 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m10 15 5-3-5-3v6Z"/></svg> Maestro</a>
+            <a href="https://gmgn.ai/base/token/0x7CE19E4F978009EB644c27946B47221b824C0bA3" target="_blank" rel="noopener noreferrer" class="sniper-btn px-3 py-1.5 rounded-lg text-xs font-mono font-semibold bg-gray-900 hover:bg-gray-800 text-gray-200 border border-gray-700 transition flex items-center gap-1.5"><svg class="w-3 h-3 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m10 15 5-3-5-3v6Z"/></svg> GMGN</a>
+<a href="https://photon-base.tinyastro.io/en/lp/0x7CE19E4F978009EB644c27946B47221b824C0bA3" target="_blank" rel="noopener noreferrer" class="sniper-btn px-3 py-1.5 rounded-lg text-xs font-mono font-semibold bg-gray-900 hover:bg-gray-800 text-gray-200 border border-gray-700 transition flex items-center gap-1.5"><svg class="w-3 h-3 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m10 15 5-3-5-3v6Z"/></svg> Photon</a>
+<a href="https://t.me/BananaGunSniper_bot?start=0x7CE19E4F978009EB644c27946B47221b824C0bA3" target="_blank" rel="noopener noreferrer" class="sniper-btn px-3 py-1.5 rounded-lg text-xs font-mono font-semibold bg-gray-900 hover:bg-gray-800 text-gray-200 border border-gray-700 transition flex items-center gap-1.5"><svg class="w-3 h-3 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m10 15 5-3-5-3v6Z"/></svg> Banana Gun</a>
+<a href="https://t.me/MaestroSniperBot?start=0x7CE19E4F978009EB644c27946B47221b824C0bA3" target="_blank" rel="noopener noreferrer" class="sniper-btn px-3 py-1.5 rounded-lg text-xs font-mono font-semibold bg-gray-900 hover:bg-gray-800 text-gray-200 border border-gray-700 transition flex items-center gap-1.5"><svg class="w-3 h-3 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m10 15 5-3-5-3v6Z"/></svg> Maestro</a>
           </div>
         </div>
       </div>
@@ -198,7 +198,7 @@
           <div class="relative space-y-6">
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-3">
-                <img src="https://gateway.pinata.cloud/ipfs/QmdiMA7WbFG93SNqizSZYNV5NG37iuPj87k8vaEMZaxp6Y" alt="Pump Hill Runner" class="w-14 h-14 rounded-2xl ring-2 ring-brandPrimary/30 shadow-lg" />
+                <img src="https://image.pollinations.ai/prompt/Pump%20Hill%20Runner%20crypto%20token%20logo?width=512&height=512&nologo=true" alt="Pump Hill Runner" class="w-14 h-14 rounded-2xl ring-2 ring-brandPrimary/30 shadow-lg" />
                 <div>
                   <h3 class="font-black text-xl text-white">$PUMPRUN</h3>
                   <span class="text-xs text-gray-400">Base Mainnet L2</span>
@@ -230,7 +230,7 @@
               </div>
             </div>
 
-            <a href="https://basescan.org/token/0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A" target="_blank" rel="noopener noreferrer" class="block w-full text-center py-2.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs font-semibold transition border border-gray-700">
+            <a href="https://basescan.org/token/0x7CE19E4F978009EB644c27946B47221b824C0bA3" target="_blank" rel="noopener noreferrer" class="block w-full text-center py-2.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs font-semibold transition border border-gray-700">
               View Verified Contract on Explorer ↗
             </a>
           </div>
@@ -326,7 +326,7 @@
           <div id="swap-status-box" class="hidden p-3 rounded-lg bg-gray-950 border border-brandPrimary/40 text-xs font-mono text-center"></div>
 
           <!-- Execute Button -->
-          <a id="swap-execute-link" href="https://app.doppler.lol/tokens/base/0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A" target="_blank" rel="noopener noreferrer" class="block w-full text-center py-3.5 rounded-xl bg-gradient-to-r from-brandPrimary to-brandSecondary text-black font-extrabold text-sm shadow-lg shadow-brandPrimary/25 hover:opacity-95 transition cursor-pointer">
+          <a id="swap-execute-link" href="https://app.doppler.lol/tokens/base/0x7CE19E4F978009EB644c27946B47221b824C0bA3" target="_blank" rel="noopener noreferrer" class="block w-full text-center py-3.5 rounded-xl bg-gradient-to-r from-brandPrimary to-brandSecondary text-black font-extrabold text-sm shadow-lg shadow-brandPrimary/25 hover:opacity-95 transition cursor-pointer">
             Execute Swap on Liquidity Pool (DEX) ↗
           </a>
         </div>
@@ -343,37 +343,37 @@
       <div class="max-w-5xl mx-auto mb-3 flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 rounded-xl bg-gray-900/90 border border-gray-800 text-xs">
         <div class="flex items-center gap-2">
           <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-500/20 text-blue-400 border border-blue-500/30">Base Mainnet L2</span>
-          <span class="text-gray-400 font-mono select-all">0x814620...CBCA4A</span>
+          <span class="text-gray-400 font-mono select-all">0x7CE19E...4C0bA3</span>
           <button type="button" class="copy-ca-btn text-gray-400 hover:text-white transition cursor-pointer" title="Copy Contract Address">
             <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
           </button>
         </div>
         <div class="flex items-center gap-3">
-          <a href="https://dexscreener.com/base/0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A" target="_blank" rel="noopener noreferrer" class="text-brandPrimary hover:underline font-medium inline-flex items-center gap-1">
+          <a href="https://dexscreener.com/base/0x7CE19E4F978009EB644c27946B47221b824C0bA3" target="_blank" rel="noopener noreferrer" class="text-brandPrimary hover:underline font-medium inline-flex items-center gap-1">
             Open in DexScreener ↗
           </a>
-          <a href="https://app.doppler.lol/tokens/base/0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A" target="_blank" rel="noopener noreferrer" class="px-3 py-1 rounded bg-brandPrimary text-black font-bold hover:opacity-90 transition">
+          <a href="https://app.doppler.lol/tokens/base/0x7CE19E4F978009EB644c27946B47221b824C0bA3" target="_blank" rel="noopener noreferrer" class="px-3 py-1 rounded bg-brandPrimary text-black font-bold hover:opacity-90 transition">
             1-Click Swap
           </a>
         </div>
       </div>
 
       <div class="w-full h-[550px] rounded-2xl overflow-hidden border border-gray-800 bg-gray-950 shadow-2xl relative">
-        <iframe id="dexscreener-iframe" src="https://dexscreener.com/base/0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A?embed=1&theme=dark&trades=0&info=0" class="w-full h-full border-0"></iframe>
+        <iframe id="dexscreener-iframe" src="https://dexscreener.com/base/0x7CE19E4F978009EB644c27946B47221b824C0bA3?embed=1&theme=dark&trades=0&info=0" class="w-full h-full border-0"></iframe>
         <div id="dex-fallback-card" class="hidden absolute inset-0 bg-gray-950/95 flex flex-col items-center justify-center p-8 text-center backdrop-blur-md">
           <div class="w-14 h-14 rounded-full bg-brandPrimary/20 border border-brandPrimary/40 flex items-center justify-center text-brandPrimary mb-4">
             <svg class="w-7 h-7 text-brandPrimary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
           </div>
           <h3 class="text-xl font-bold text-white mb-2">Token Verified Live On-Chain: $PUMPRUN</h3>
           <p class="text-gray-400 text-sm max-w-lg mb-6 leading-relaxed">
-            Smart contract <code class="text-brandPrimary font-mono px-2 py-0.5 bg-gray-900 rounded border border-gray-800">0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A</code> is active and confirmed on Base Mainnet.<br>
+            Smart contract <code class="text-brandPrimary font-mono px-2 py-0.5 bg-gray-900 rounded border border-gray-800">0x7CE19E4F978009EB644c27946B47221b824C0bA3</code> is active and confirmed on Base Mainnet.<br>
             Decentralized AMM pool is awaiting initial swap volume to activate DexScreener candlestick charting.
           </p>
           <div class="flex items-center gap-3">
             <a href="#swap" class="px-5 py-2.5 rounded-xl bg-brandPrimary text-black font-extrabold text-xs hover:opacity-90 transition">
               Execute First Swap on Base ⚡
             </a>
-            <a href="https://basescan.org/token/0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A" target="_blank" rel="noopener noreferrer" class="px-5 py-2.5 rounded-xl bg-gray-900 border border-gray-700 text-white font-medium text-xs hover:bg-gray-800 transition">
+            <a href="https://basescan.org/token/0x7CE19E4F978009EB644c27946B47221b824C0bA3" target="_blank" rel="noopener noreferrer" class="px-5 py-2.5 rounded-xl bg-gray-900 border border-gray-700 text-white font-medium text-xs hover:bg-gray-800 transition">
               Inspect on Basescan ↗
             </a>
           </div>
@@ -395,7 +395,7 @@
             <svg class="w-3.5 h-3.5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
             <span>GOPLUS AUDIT: 100 / 100 SAFE</span>
           </span>
-          <a href="https://basescan.org/token/0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 rounded-lg bg-gray-900 hover:bg-gray-800 text-gray-300 border border-gray-700 transition flex items-center gap-1">
+          <a href="https://basescan.org/token/0x7CE19E4F978009EB644c27946B47221b824C0bA3" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 rounded-lg bg-gray-900 hover:bg-gray-800 text-gray-300 border border-gray-700 transition flex items-center gap-1">
             <span>Explorer</span>
             <svg class="w-3 h-3 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>
           </a>
@@ -413,7 +413,7 @@
               <svg class="w-3.5 h-3.5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
               <span id="lp-status-text">PERMANENTLY BURNT (0x0...dead)</span>
             </div>
-            <a href="https://basescan.org/token/0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A" target="_blank" rel="noopener noreferrer" class="text-xs text-brandPrimary hover:underline inline-flex items-center gap-0.5">Proof ↗</a>
+            <a href="https://basescan.org/token/0x7CE19E4F978009EB644c27946B47221b824C0bA3" target="_blank" rel="noopener noreferrer" class="text-xs text-brandPrimary hover:underline inline-flex items-center gap-0.5">Proof ↗</a>
           </div>
           <div class="text-gray-400 text-[11px]">LP tokens 100% verifiably burned on-chain. Zero developer withdrawal capability.</div>
         </div>
@@ -812,7 +812,7 @@
         </div>
 
         <!-- Fallback 1-Click Liquidity Pool Trade -->
-        <a id="wallet-fallback-swap" href="https://app.doppler.lol/tokens/base/0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A" target="_blank" rel="noopener noreferrer" class="flex items-center justify-between p-3 rounded-xl bg-brandPrimary/10 border border-brandPrimary/30 hover:bg-brandPrimary/20 transition text-sm text-brandPrimary font-semibold">
+        <a id="wallet-fallback-swap" href="https://app.doppler.lol/tokens/base/0x7CE19E4F978009EB644c27946B47221b824C0bA3" target="_blank" rel="noopener noreferrer" class="flex items-center justify-between p-3 rounded-xl bg-brandPrimary/10 border border-brandPrimary/30 hover:bg-brandPrimary/20 transition text-sm text-brandPrimary font-semibold">
           <span>Trade Directly on Liquidity Pool</span>
           <span>↗</span>
         </a>
@@ -825,9 +825,9 @@
   <footer class="border-t border-gray-900 bg-gray-950 py-10 relative z-10 text-center text-xs text-gray-500">
     <div class="max-w-7xl mx-auto px-4 space-y-4">
       <div class="flex flex-wrap items-center justify-center gap-4 sm:gap-6 font-medium text-gray-400">
-        <a href="https://basescan.org/token/0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A" target="_blank" rel="noopener noreferrer" class="hover:text-white transition">Basescan Explorer</a>
-        <a href="https://dexscreener.com/base/0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A" target="_blank" rel="noopener noreferrer" class="hover:text-white transition">DexScreener</a>
-        <a href="https://app.doppler.lol/tokens/base/0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A" target="_blank" rel="noopener noreferrer" class="hover:text-white transition">Doppler AMM (v4)</a>
+        <a href="https://basescan.org/token/0x7CE19E4F978009EB644c27946B47221b824C0bA3" target="_blank" rel="noopener noreferrer" class="hover:text-white transition">Basescan Explorer</a>
+        <a href="https://dexscreener.com/base/0x7CE19E4F978009EB644c27946B47221b824C0bA3" target="_blank" rel="noopener noreferrer" class="hover:text-white transition">DexScreener</a>
+        <a href="https://app.doppler.lol/tokens/base/0x7CE19E4F978009EB644c27946B47221b824C0bA3" target="_blank" rel="noopener noreferrer" class="hover:text-white transition">Doppler AMM (v4)</a>
         <a href="https://bankr.bot/agents/pumprun" target="_blank" rel="noopener noreferrer" class="hover:text-emerald-400 transition">Bankr Agent Portal ↗</a>
         <button id="download-banner-btn" class="px-3 py-1.5 rounded-lg bg-gray-900 hover:bg-gray-800 text-gray-300 text-xs font-mono border border-gray-700 transition inline-flex items-center gap-1.5 cursor-pointer"><svg class="w-3.5 h-3.5 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg><span>Download Banner</span></button>
       </div>
@@ -864,7 +864,7 @@
         </div>
         <div>
           <h3 class="font-bold text-brandPrimary text-base font-mono mb-1">4. Official Verification Channels</h3>
-          <p class="text-gray-300 font-mono text-xs">Contract: <code class="text-brandPrimary select-all">0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A</code><br/>Explorer: <a href="https://basescan.org/token/0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A" target="_blank" class="underline text-cyan-400">View on Block Explorer</a></p>
+          <p class="text-gray-300 font-mono text-xs">Contract: <code class="text-brandPrimary select-all">0x7CE19E4F978009EB644c27946B47221b824C0bA3</code><br/>Explorer: <a href="https://basescan.org/token/0x7CE19E4F978009EB644c27946B47221b824C0bA3" target="_blank" class="underline text-cyan-400">View on Block Explorer</a></p>
         </div>
       </div>
 

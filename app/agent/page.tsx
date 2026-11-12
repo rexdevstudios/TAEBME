@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
@@ -76,6 +76,14 @@ export default function AgentPage() {
             PROPOSAL-ONLY GUARANTEED
           </span>
         </div>
+      </div>
+
+      {/* Persistent Advisory Banner */}
+      <div className="advisory-banner" role="note" aria-label="AI advisory notice">
+        <ShieldAlert size={16} style={{ flexShrink: 0 }} />
+        <span>
+          <strong>Advisory Only — No Auto-Execution.</strong> AI proposals are recommendations only and require explicit human approval via the Trading Terminal. No trade is submitted or executed from this page.
+        </span>
       </div>
 
       <div className="grid-2">

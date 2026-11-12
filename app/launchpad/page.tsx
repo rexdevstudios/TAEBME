@@ -14,6 +14,7 @@ import {
   normalizeWeb3Error,
   getExplorerUrl,
 } from '@packages/launchpad/web3-provider';
+import { normalizeChainName } from '@packages/shared/token-identifier';
 
 export type LaunchModeType = 'BONDING_CURVE' | 'FAIR_LAUNCH' | 'WHITELIST_PRIVATE' | 'FIXED_PRICE' | 'COMMUNITY_PRELAUNCH';
 
@@ -80,7 +81,7 @@ export default function LaunchpadPage() {
           name: tokenName,
           ticker: tokenSymbol.toUpperCase(),
           description: `Launch draft for ${tokenName} on ${mode} (${selectedChain.toUpperCase()})`,
-          imageUrl: 'https://rtrader.io/token-default.png',
+          imageUrl: '/token-default.png',
           launchMode: mode,
           targetChain: selectedChain === 'base' ? 'base-mainnet' : `${selectedChain}-mainnet`,
           totalSupply: '1000000000',
@@ -769,13 +770,30 @@ export default function LaunchpadPage() {
               const raised = Number(token.raisedAmount || 0);
               const target = Number(token.graduationThreshold || 69000);
               const progressPct = Math.min(100, Math.round((raised / target) * 100));
-              const isRobinhood = String(token.chain || '').toLowerCase().includes('robinhood');
-              const tokenChainSlug = isRobinhood ? 'robinhood' : 'base';
+              const tokenChainSlug = normalizeChainName(token.chain);
               const portalUrl = `/token/${tokenChainSlug}/${token.contractAddress}`;
-              const explorerUrl = isRobinhood
-                ? `https://robinhoodchain.blockscout.com/address/${token.contractAddress}`
-                : `https://basescan.org/address/${token.contractAddress}`;
-              const explorerLabel = isRobinhood ? 'Blockscout ↗' : 'Basescan ↗';
+              const explorerUrl = (() => {
+                if (tokenChainSlug === 'solana') return `https://solscan.io/token/${token.contractAddress}`;
+                if (tokenChainSlug === 'ethereum') return `https://etherscan.io/token/${token.contractAddress}`;
+                if (tokenChainSlug === 'robinhood') return `https://robinhoodchain.blockscout.com/address/${token.contractAddress}`;
+                if (tokenChainSlug === 'arc') return `https://arcscan.io/token/${token.contractAddress}`;
+                if (tokenChainSlug === 'arbitrum') return `https://arbiscan.io/address/${token.contractAddress}`;
+                if (tokenChainSlug === 'bsc') return `https://bscscan.com/address/${token.contractAddress}`;
+                return `https://basescan.org/address/${token.contractAddress}`;
+              })();
+              const explorerLabel = tokenChainSlug === 'solana'
+                ? 'Solscan ↗'
+                : tokenChainSlug === 'robinhood'
+                ? 'Blockscout ↗'
+                : tokenChainSlug === 'ethereum'
+                ? 'Etherscan ↗'
+                : tokenChainSlug === 'arc'
+                ? 'Arcscan ↗'
+                : tokenChainSlug === 'arbitrum'
+                ? 'Arbiscan ↗'
+                : tokenChainSlug === 'bsc'
+                ? 'Bscscan ↗'
+                : 'Basescan ↗';
 
               return (
                 <div
@@ -822,7 +840,7 @@ export default function LaunchpadPage() {
                   <div style={{ fontSize: '11px', color: 'var(--color-muted)', marginBottom: '8px', fontFamily: 'var(--font-mono)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span>CA: {token.contractAddress.slice(0, 8)}...{token.contractAddress.slice(-6)}</span>
                     <a
-                      href={`https://gmgn.ai/${isRobinhood ? 'robinhood' : 'base'}/token/${token.contractAddress}`}
+                      href={`https://gmgn.ai/${tokenChainSlug === 'solana' ? 'sol' : tokenChainSlug}/token/${token.contractAddress}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       style={{

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ApiResponse, CreateLaunchDraftRequest } from '@packages/shared/contracts/api-contracts';
 import { LaunchDraftService } from '@packages/launchpad/launch-draft-service';
 import { defaultDraftDbAdapter } from '@packages/shared/db-pool';
-import { requireCapability } from '@packages/auth/session';
+import { requireCapability, authenticateSession } from '@packages/auth/session';
+import { RbacGuard } from '@packages/auth/rbac-middleware';
 
 export const dynamic = 'force-dynamic';
 
@@ -53,12 +54,50 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET() {
-  const drafts = await defaultDraftDbAdapter.getDrafts();
-  const response: ApiResponse<typeof drafts> = {
-    success: true,
-    data: drafts,
-    timestamp: new Date().toISOString(),
-  };
-  return NextResponse.json(response);
+export async function GET(req: NextRequest) {
+  try {
+    const session = await authenticateSession(req);
+    if (!session) {
+      return NextResponse.json(
+        { success: false, error: { code: 'UNAUTHORIZED', message: 'Valid cryptographic SIWE session token is required' } },
+        { status: 401 }
+      );
+    }
+
+    // Require capability CREATE_LAUNCH_DRAFT to view drafts
+    RbacGuard.authorize(session.user, 'CREATE_LAUNCH_DRAFT');
+
+    const isAdmin = session.user.roles.includes('SUPER_ADMIN') || session.user.roles.includes('LAUNCH_ADMIN');
+
+    // Ownership isolation: creators strictly isolated to their own drafts at database layer
+    const filter = isAdmin
+      ? undefined
+      : { creatorId: session.user.userId, creatorWallet: session.walletAddress };
+
+    const drafts = await defaultDraftDbAdapter.getDrafts(filter);
+    const response: ApiResponse<typeof drafts> = {
+      success: true,
+      data: drafts,
+      timestamp: new Date().toISOString(),
+    };
+    return NextResponse.json(response, { status: 200 });
+  } catch (error: any) {
+    const message = error?.message || 'Failed to retrieve launch drafts';
+    if (message.startsWith('UNAUTHORIZED')) {
+      return NextResponse.json(
+        { success: false, error: { code: 'UNAUTHORIZED', message } },
+        { status: 401 }
+      );
+    }
+    if (message.startsWith('RBAC_FORBIDDEN') || message.startsWith('AUTH_ACCOUNT_')) {
+      return NextResponse.json(
+        { success: false, error: { code: 'FORBIDDEN', message } },
+        { status: 403 }
+      );
+    }
+    return NextResponse.json(
+      { success: false, error: { code: 'SERVER_ERROR', message } },
+      { status: 500 }
+    );
+  }
 }

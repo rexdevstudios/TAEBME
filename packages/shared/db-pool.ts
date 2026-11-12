@@ -2,19 +2,93 @@
 // SERVERLESS-SAFE POSTGRESQL POOL & SSOT ADAPTERS (RTRADER PLATFORM)
 // ============================================================================
 
-import { Pool, QueryResult, QueryResultRow } from 'pg';
+import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 import crypto from 'crypto';
 import { ethers } from 'ethers';
 import { LaunchDraftDbAdapter } from '../launchpad/launch-draft-service';
 import { KolDbAdapter } from '../social/kol-service';
 import { BountyDbAdapter, BountyClaimItem } from '../launchpad/bounty-escrow';
-import { KolProfile, BountyCampaign, BountyClaim } from './types/domain';
+import { KolProfile, BountyCampaign, BountyClaim, UserGameFiProfile, QuestDefinition, QuestCompletion, NftItemRecord } from './types/domain';
 import { normalizeTokenIdentifier } from './token-identifier';
 import { DexPairFactoryService } from '../launchpad/dex-pair-factory';
+import { TrustEvidenceService } from '../social/trust-evidence-service';
+import { KillSwitchDbAdapter, KillSwitchRecord } from '../admin/kill-switch-manager';
+import {
+  ModularRpcManager,
+  DatabaseAdapter as RpcDatabaseAdapter,
+  RpcEndpointConfig,
+  RpcDomainConfig,
+  RpcHealthStatus,
+  AuditLogEntry as RpcAuditLogEntry,
+} from '../network-registry/rpc-manager';
+import { BinanceExecutionDbAdapter, TradeIntentRecord } from '../../apps/execution-plane/workers/binance-order-worker';
+import { ProposalDbAdapter, AgentProposalRecord } from '../agent/proposal-engine';
+import { DualControlDbAdapter, DualControlRequestRecord } from '../admin/dual-control';
+import { PlanId, BillingDbAdapter } from '../billing/subscriptions-engine';
+
+import { getAppEnvironment } from './env-config';
 
 declare global {
   // eslint-disable-next-line no-var
   var _rtraderPgPool: Pool | undefined;
+  // eslint-disable-next-line no-var
+  var _rtraderPgPoolUrl: string | undefined;
+}
+
+/**
+ * Returns authoritative PostgreSQL connection string for active environment.
+ * - APP_ENV=testnet -> requires DATABASE_URL_TESTNET. Fails closed if missing.
+ * - APP_ENV=production -> uses DATABASE_URL. Fails closed in production if missing.
+ * - DEV/TEST -> resolves DATABASE_URL_TESTNET || DATABASE_URL || null.
+ */
+export function getDatabaseConnectionString(): string | null {
+  const env = getAppEnvironment();
+
+  if (env === 'testnet') {
+    const testnetUrl = process.env.DATABASE_URL_TESTNET?.trim();
+    if (!testnetUrl || testnetUrl.includes('placeholder')) {
+      throw new Error(
+        'TESTNET_DATABASE_NOT_CONFIGURED: APP_ENV is set to "testnet", but DATABASE_URL_TESTNET environment variable is missing or unconfigured. Refusing to fall back to production database.'
+      );
+    }
+    return testnetUrl;
+  }
+
+  if (env === 'production') {
+    const prodUrl = process.env.DATABASE_URL?.trim();
+    if (!prodUrl || prodUrl.includes('placeholder')) {
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error(
+          'CRITICAL_CONFIG_ERROR: DATABASE_URL is not configured in production environment. Refusing to operate unbacked state.'
+        );
+      }
+      return null;
+    }
+    return prodUrl;
+  }
+
+  // Development & Test environments
+  const customUrl = process.env.DATABASE_URL_TESTNET?.trim() || process.env.DATABASE_URL?.trim();
+  if (customUrl && !customUrl.includes('placeholder')) {
+    return customUrl;
+  }
+
+  return null;
+}
+
+/**
+ * Reset singleton connection pool (useful for test fixture isolation).
+ */
+export function resetDbPool(): void {
+  if (global._rtraderPgPool) {
+    try {
+      global._rtraderPgPool.end();
+    } catch {
+      /* ignore */
+    }
+    global._rtraderPgPool = undefined;
+    global._rtraderPgPoolUrl = undefined;
+  }
 }
 
 /**
@@ -26,29 +100,109 @@ export function isUuid(str?: string): boolean {
 }
 
 /**
- * Returns true if a valid DATABASE_URL environment variable is provided.
+ * Returns true if a valid database connection string is provided for the active environment.
  */
 export function isDatabaseConfigured(): boolean {
-  const url = process.env.DATABASE_URL;
-  return typeof url === 'string' && url.trim().length > 0 && !url.includes('placeholder');
+  try {
+    const url = getDatabaseConnectionString();
+    return Boolean(url);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Resolves the TLS/SSL configuration for the PostgreSQL connection pool.
+ *
+ * Security model:
+ * - production/testnet: TLS is MANDATORY. rejectUnauthorized is always true.
+ *   DATABASE_SSL=false is forbidden in production/testnet and throws a hard error.
+ * - development/test: DATABASE_SSL=false disables TLS (for local non-TLS PostgreSQL).
+ *   If not explicitly disabled, TLS is still enabled with rejectUnauthorized: true.
+ *
+ * Why we strip ?sslmode from connectionString before Pool construction:
+ *   pg-connection-string's parse() runs on connectionString *after* merging explicit ssl
+ *   config (pg/lib/connection-parameters.js:60 — Object.assign({}, config, parse(cs))).
+ *   When ?sslmode=require is present, parse() produces { ssl: {} } which overwrites our
+ *   { rejectUnauthorized: true } with an empty object {}. Stripping sslmode from the URL
+ *   ensures our explicit ssl config is authoritative and never overwritten by the URL parser.
+ *   The original raw connectionString is preserved separately for the pool cache key.
+ *
+ * @returns [poolConnectionString, sslConfig]
+ */
+export function resolvePoolSslConfig(
+  rawConnectionString: string
+): [string, false | { rejectUnauthorized: boolean }] {
+  const env = getAppEnvironment();
+  const dbSslEnv = process.env.DATABASE_SSL?.toLowerCase()?.trim();
+
+  // In production/testnet: TLS is mandatory. Refuse to start if explicitly disabled.
+  if (env === 'production' || env === 'testnet') {
+    if (dbSslEnv === 'false') {
+      throw new Error(
+        `SECURITY_MISCONFIGURATION: DATABASE_SSL=false is forbidden in ${env} environment. ` +
+        `TLS certificate validation cannot be disabled in production or testnet. ` +
+        `Remove DATABASE_SSL=false from your environment configuration.`
+      );
+    }
+  }
+
+  // Strip SSL query params from the connection string so pg-connection-string's parse()
+  // does not overwrite our explicit ssl config object (see JSDoc above for full rationale).
+  let poolConnectionString = rawConnectionString;
+  try {
+    const parsed = new URL(rawConnectionString);
+    parsed.searchParams.delete('sslmode');
+    parsed.searchParams.delete('sslrootcert');
+    parsed.searchParams.delete('sslcert');
+    parsed.searchParams.delete('sslkey');
+    poolConnectionString = parsed.toString();
+  } catch {
+    // URL parse failed (e.g. non-standard connection string format); use as-is
+  }
+
+  // Development/test: allow disabling TLS for local PostgreSQL without TLS support
+  if ((env === 'development' || env === 'test') && dbSslEnv === 'false') {
+    return [poolConnectionString, false];
+  }
+
+  return [poolConnectionString, { rejectUnauthorized: true }];
 }
 
 /**
  * Returns singleton Pool instance for serverless environments.
  * - Enforces max: 5 connections to prevent exhausting Postgres serverless connection limits.
+ * - Enforces TLS certificate validation (rejectUnauthorized: true) in production and testnet.
  * - Throws in production if DATABASE_URL is missing.
- * - Returns null in dev/test when DATABASE_URL is omitted to allow graceful local mock fallback.
+ * - Throws in testnet if DATABASE_URL_TESTNET is missing (FAIL CLOSED).
+ * - Returns null in dev/test when DB URL is omitted to allow graceful local mock fallback.
  */
 export function getDbPool(): Pool | null {
-  if (isDatabaseConfigured()) {
-    if (!global._rtraderPgPool) {
+  const connectionString = getDatabaseConnectionString();
+
+  if (connectionString) {
+    if (!global._rtraderPgPool || global._rtraderPgPoolUrl !== connectionString) {
+      if (global._rtraderPgPool) {
+        try {
+          global._rtraderPgPool.end();
+        } catch {
+          /* ignore */
+        }
+      }
+
+      const [poolConnectionString, sslConfig] = resolvePoolSslConfig(connectionString);
+
       global._rtraderPgPool = new Pool({
-        connectionString: process.env.DATABASE_URL,
+        connectionString: poolConnectionString,
         max: 5,
         idleTimeoutMillis: 10000,
         connectionTimeoutMillis: 15000,
-        ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false },
+        ssl: sslConfig,
       });
+
+      // Cache key uses the ORIGINAL raw connectionString (with env params intact)
+      // so environment isolation and singleton reset continue to work correctly.
+      global._rtraderPgPoolUrl = connectionString;
 
       global._rtraderPgPool.on('error', (err) => {
         console.error('[Postgres SSOT Pool Error]:', err.message);
@@ -57,13 +211,125 @@ export function getDbPool(): Pool | null {
     return global._rtraderPgPool;
   }
 
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error(
-      'CRITICAL_CONFIG_ERROR: DATABASE_URL is not configured in production environment. Refusing to operate unbacked state.'
-    );
+  return null;
+}
+
+export interface WorkerDbPoolOptions {
+  connectionString?: string;
+  max?: number;
+  statementTimeoutMs?: number;
+  connectionTimeoutMs?: number;
+  idleTimeoutMs?: number;
+}
+
+/**
+ * Creates an isolated, dedicated PostgreSQL connection pool for Execution Plane workers.
+ *
+ * Technical Rationale for Worker Pool Sizing & Isolation:
+ * - Control Plane vs Execution Plane: Vercel serverless functions use getDbPool() (max: 5, fast recycle).
+ *   In contrast, execution-plane workers are long-running persistent services with continuous polling
+ *   and multi-step transaction lifecycles (dispatch, atomic claim, order fill recording, stale sweep).
+ * - Sizing (Default max: 6): Sized specifically for:
+ *   1. Dispatcher queue poller (1 connection)
+ *   2. Active execution transaction (1 connection during atomic write)
+ *   3. Periodic stale intent reconciler sweep (1 connection)
+ *   4. Kill switch & audit log synchronization (1 connection)
+ *   5. Headroom for concurrent sweep/reconciliation queries (2 connections)
+ *   Staying at max: 6 ensures sufficient throughput while preventing Neon compute connection exhaustion
+ *   or starving concurrent Vercel serverless lambdas.
+ * - Statement Timeout: Injects statement_timeout (default 10,000 ms) so hung locks or slow DB operations
+ *   fail closed instead of hanging the worker thread indefinitely.
+ * - Transaction Safety: Transactions (BEGIN ... COMMIT/ROLLBACK) release the client immediately in finally.
+ *   Transactions are NEVER held across external Binance HTTP requests.
+ */
+export function createWorkerDbPool(options?: WorkerDbPoolOptions): Pool {
+  const rawConnectionString = options?.connectionString || getDatabaseConnectionString();
+  if (!rawConnectionString) {
+    throw new Error('DATABASE_UNAVAILABLE: Connection string is missing for worker database pool.');
   }
 
-  return null;
+  const [poolConnectionString, sslConfig] = resolvePoolSslConfig(rawConnectionString);
+
+  const rawMax = options?.max ?? (process.env.WORKER_DB_POOL_MAX ? parseInt(process.env.WORKER_DB_POOL_MAX, 10) : 6);
+  if (typeof rawMax !== 'number' || Number.isNaN(rawMax) || !Number.isInteger(rawMax) || rawMax <= 0 || rawMax > 50) {
+    throw new Error(
+      `INVALID_WORKER_POOL_CONFIG: Pool size 'max' must be an integer between 1 and 50, but received ${rawMax}.`
+    );
+  }
+  const max = rawMax;
+
+  const rawStatementTimeout = options?.statementTimeoutMs ?? (process.env.WORKER_STATEMENT_TIMEOUT_MS ? parseInt(process.env.WORKER_STATEMENT_TIMEOUT_MS, 10) : 10000);
+  if (
+    typeof rawStatementTimeout !== 'number' ||
+    Number.isNaN(rawStatementTimeout) ||
+    !Number.isInteger(rawStatementTimeout) ||
+    rawStatementTimeout < 100 ||
+    rawStatementTimeout > 60000
+  ) {
+    throw new Error(
+      `INVALID_WORKER_POOL_CONFIG: 'statementTimeoutMs' must be an integer between 100 and 60000 ms, but received ${rawStatementTimeout}.`
+    );
+  }
+  const statementTimeoutMs = rawStatementTimeout;
+
+  const rawConnectionTimeout = options?.connectionTimeoutMs ?? 15000;
+  if (
+    typeof rawConnectionTimeout !== 'number' ||
+    Number.isNaN(rawConnectionTimeout) ||
+    !Number.isInteger(rawConnectionTimeout) ||
+    rawConnectionTimeout < 100 ||
+    rawConnectionTimeout > 60000
+  ) {
+    throw new Error(
+      `INVALID_WORKER_POOL_CONFIG: 'connectionTimeoutMs' must be an integer between 100 and 60000 ms, but received ${rawConnectionTimeout}.`
+    );
+  }
+  const connectionTimeoutMs = rawConnectionTimeout;
+
+  const rawIdleTimeout = options?.idleTimeoutMs ?? 30000;
+  if (
+    typeof rawIdleTimeout !== 'number' ||
+    Number.isNaN(rawIdleTimeout) ||
+    !Number.isInteger(rawIdleTimeout) ||
+    rawIdleTimeout < 1000 ||
+    rawIdleTimeout > 300000
+  ) {
+    throw new Error(
+      `INVALID_WORKER_POOL_CONFIG: 'idleTimeoutMs' must be an integer between 1000 and 300000 ms, but received ${rawIdleTimeout}.`
+    );
+  }
+  const idleTimeoutMs = rawIdleTimeout;
+
+  const pool = new Pool({
+    connectionString: poolConnectionString,
+    max,
+    idleTimeoutMillis: idleTimeoutMs,
+    connectionTimeoutMillis: connectionTimeoutMs,
+    ssl: sslConfig,
+    statement_timeout: statementTimeoutMs,
+  });
+
+  // Make pool.end() idempotent to protect against pg's 'Called end on pool more than once' exception
+  let isEndingOrEnded = false;
+  let endPromise: Promise<void> | null = null;
+  const originalEnd = pool.end.bind(pool);
+  pool.end = ((cb?: any) => {
+    if (isEndingOrEnded && endPromise) {
+      if (typeof cb === 'function') {
+        endPromise.then(() => cb(), (err) => cb(err));
+      }
+      return endPromise;
+    }
+    isEndingOrEnded = true;
+    endPromise = originalEnd(cb);
+    return endPromise;
+  }) as any;
+
+  pool.on('error', (err) => {
+    console.error('[Postgres Worker Dedicated Pool Error]:', err.message);
+  });
+
+  return pool;
 }
 
 /**
@@ -82,10 +348,13 @@ export async function query<R extends QueryResultRow = any>(
  * Ensures an actor or wallet address has an associated user and entity record.
  * Returns the valid UUID user_id.
  */
-export async function ensureUserEntity(pool: Pool, actorOrWallet: string): Promise<string> {
+export async function ensureUserEntity(pool: Pool | PoolClient | any, actorOrWallet: string): Promise<string> {
   if (isUuid(actorOrWallet)) {
     const existing = await pool.query('SELECT id FROM users WHERE id = $1', [actorOrWallet]);
     if (existing.rows.length > 0) return actorOrWallet;
+    await pool.query("INSERT INTO entities (id, type) VALUES ($1, 'USER') ON CONFLICT (id) DO NOTHING", [actorOrWallet]);
+    await pool.query("INSERT INTO users (id, status) VALUES ($1, 'ACTIVE') ON CONFLICT (id) DO NOTHING", [actorOrWallet]);
+    return actorOrWallet;
   }
 
   const cleanAddress = actorOrWallet.startsWith('usr-')
@@ -179,12 +448,15 @@ export async function ensureNetworkInPool(pool: Pool, chainInput: string): Promi
 const inMemoryDrafts: any[] = [];
 const inMemoryKolProfiles: Map<string, KolProfile> = new Map();
 const inMemoryClaims: Map<string, BountyClaim> = new Map();
+const inMemorySettledTxHashes: Map<string, string> = new Map();
+const inMemoryInFlightSettlements: Set<string> = new Set();
 const inMemoryCampaigns: BountyCampaign[] = [
   {
     id: 'campaign-degen-1',
     launchId: 'launch-degen-moon',
     creatorId: 'usr-creator-1',
     title: 'Degen Moon Viral TikTok & X Raid',
+    campaignType: 'BOUNTY',
     requiredHashtag: '#DegenMoon',
     minFollowers: 500,
     rewardPerKol: 1000000000000000000000n, // 1,000 tokens
@@ -197,6 +469,7 @@ const inMemoryCampaigns: BountyCampaign[] = [
     launchId: 'launch-creator-dao',
     creatorId: 'usr-creator-2',
     title: 'CreatorDAO Community Bounty',
+    campaignType: 'BOUNTY',
     requiredHashtag: '#CreatorDAO',
     minFollowers: 1000,
     rewardPerKol: 2500000000000000000000n, // 2,500 tokens
@@ -205,6 +478,7 @@ const inMemoryCampaigns: BountyCampaign[] = [
     isActive: true,
   },
 ];
+
 
 // ----------------------------------------------------------------------------
 // POSTGRES DRAFT DB ADAPTER
@@ -290,11 +564,19 @@ export class PostgresDraftDbAdapter implements LaunchDraftDbAdapter {
     }
   }
 
-  async getDrafts(): Promise<any[]> {
+  async getDrafts(filter?: { creatorId?: string; creatorWallet?: string }): Promise<any[]> {
     const pool = getDbPool();
     if (pool) {
       try {
-        const res = await pool.query(`SELECT * FROM launch_drafts ORDER BY created_at DESC LIMIT 50`);
+        let queryStr = `SELECT * FROM launch_drafts`;
+        const params: any[] = [];
+        if (filter?.creatorId || filter?.creatorWallet) {
+          const userUuid = await ensureUserEntity(pool, filter.creatorWallet || filter.creatorId || '');
+          queryStr += ` WHERE creator_id = $1`;
+          params.push(userUuid);
+        }
+        queryStr += ` ORDER BY created_at DESC LIMIT 50`;
+        const res = await pool.query(queryStr, params);
         if (res.rows.length > 0) {
           return res.rows.map((r) => ({
             id: r.id,
@@ -313,11 +595,59 @@ export class PostgresDraftDbAdapter implements LaunchDraftDbAdapter {
             createdAt: r.created_at,
           }));
         }
+        return [];
       } catch (err: any) {
         if (process.env.NODE_ENV === 'production') throw err;
       }
     }
+
+    if (filter?.creatorId || filter?.creatorWallet) {
+      const targetId = filter.creatorId?.toLowerCase();
+      const targetWallet = filter.creatorWallet?.toLowerCase();
+      return inMemoryDrafts.filter((d) => {
+        const draftCreatorId = (d.creatorId || d.actorId || '').toLowerCase();
+        const draftCreatorWallet = (d.creatorWallet || '').toLowerCase();
+        return (targetId && (draftCreatorId === targetId || draftCreatorWallet === targetId)) ||
+               (targetWallet && (draftCreatorWallet === targetWallet || draftCreatorId === targetWallet));
+      });
+    }
+
     return inMemoryDrafts;
+  }
+
+  clearDrafts(): void {
+    inMemoryDrafts.length = 0;
+  }
+
+  async getLaunchDraftById(draftId: string): Promise<any | null> {
+    const pool = getDbPool();
+    if (pool && isUuid(draftId)) {
+      try {
+        const res = await pool.query(`SELECT * FROM launch_drafts WHERE id = $1 LIMIT 1`, [draftId]);
+        if (res.rows.length > 0) {
+          const r = res.rows[0];
+          return {
+            id: r.id,
+            draftId: r.id,
+            creatorId: r.creator_id,
+            name: r.name,
+            symbol: r.ticker,
+            ticker: r.ticker,
+            description: r.description,
+            imageUrl: r.image_url,
+            mode: r.launch_mode,
+            launchMode: r.launch_mode,
+            targetChain: r.target_chain,
+            totalSupply: r.total_supply,
+            status: r.status,
+            createdAt: r.created_at,
+          };
+        }
+      } catch (err: any) {
+        if (process.env.NODE_ENV === 'production') throw err;
+      }
+    }
+    return inMemoryDrafts.find((d) => d.id === draftId) || null;
   }
 
   async getActiveTokenLaunches(): Promise<any[]> {
@@ -408,6 +738,10 @@ export class PostgresDraftDbAdapter implements LaunchDraftDbAdapter {
 
     if (pool && lookupAddress) {
       try {
+        const whereClause = norm.isSolana
+          ? `WHERE tl.contract_address = $1`
+          : `WHERE LOWER(tl.contract_address) = LOWER($1)`;
+
         const queryText = `
           SELECT 
             tl.id as launch_id,
@@ -431,7 +765,7 @@ export class PostgresDraftDbAdapter implements LaunchDraftDbAdapter {
           JOIN launch_drafts ld ON ld.id = tl.draft_id
           LEFT JOIN users u ON u.id = ld.creator_id
           LEFT JOIN wallets w ON w.user_id = u.id AND w.is_primary = true
-          WHERE LOWER(tl.contract_address) = LOWER($1)
+          ${whereClause}
           ORDER BY CASE WHEN LOWER(tl.chain) LIKE '%' || LOWER($2) || '%' THEN 0 ELSE 1 END, tl.published_at DESC
           LIMIT 1
         `;
@@ -467,9 +801,12 @@ export class PostgresDraftDbAdapter implements LaunchDraftDbAdapter {
 
     // In-memory fallback
     const activeLaunches = await this.getActiveTokenLaunches();
-    const found = activeLaunches.find(
-      (l) => l.contractAddress && l.contractAddress.toLowerCase() === lookupAddress.toLowerCase()
-    );
+    const found = activeLaunches.find((l) => {
+      if (!l.contractAddress) return false;
+      return norm.isSolana
+        ? l.contractAddress === lookupAddress
+        : l.contractAddress.toLowerCase() === lookupAddress.toLowerCase();
+    });
     if (found) {
       return { ...found, source: 'in_memory' };
     }
@@ -683,6 +1020,19 @@ export class PostgresDraftDbAdapter implements LaunchDraftDbAdapter {
 }
 
 // ----------------------------------------------------------------------------
+// SEC-02: Typed error for twitter_handle uniqueness constraint (PG 23505).
+// Route handlers must catch this specifically to return HTTP 409 HANDLE_CONFLICT
+// without leaking raw database error messages or constraint names.
+// ----------------------------------------------------------------------------
+export class HandleConflictError extends Error {
+  readonly code = 'HANDLE_CONFLICT';
+  constructor(message: string) {
+    super(message);
+    this.name = 'HandleConflictError';
+  }
+}
+
+// ----------------------------------------------------------------------------
 // POSTGRES KOL DB ADAPTER
 // ----------------------------------------------------------------------------
 export class PostgresKolDbAdapter implements KolDbAdapter {
@@ -725,7 +1075,9 @@ export class PostgresKolDbAdapter implements KolDbAdapter {
           RETURNING id, user_id, twitter_handle, followers_count, trust_score, is_verified, completed_bounties, total_earned_usd`,
           [
             userId,
-            updated.twitterHandle || null,
+            // SEC-03: Normalize to lowercase at DB write boundary (defense-in-depth;
+            // application layer in kol-service.ts also lowercases before calling here).
+            updated.twitterHandle ? updated.twitterHandle.toLowerCase() : null,
             updated.followersCount,
             updated.trustScore,
             updated.isVerified,
@@ -748,6 +1100,13 @@ export class PostgresKolDbAdapter implements KolDbAdapter {
           return dbProfile;
         }
       } catch (err: any) {
+        // SEC-02: Distinguish twitter_handle uniqueness violation (PG error 23505)
+        // from other DB errors so the route handler can return HTTP 409 cleanly.
+        if (err?.code === '23505' && err?.constraint?.includes('twitter_handle')) {
+          throw new HandleConflictError(
+            `Twitter handle '${p.twitterHandle}' is already registered to another account.`
+          );
+        }
         if (process.env.NODE_ENV === 'production') throw err;
         console.warn('[PostgresKolDbAdapter] DB upsert failed, fallback to memory:', err.message);
       }
@@ -846,6 +1205,8 @@ export class PostgresBountyDbAdapter implements BountyDbAdapter {
             creatorId: r.creator_id,
             title: r.title,
             description: r.description,
+            campaignType: (r.campaign_type || 'BOUNTY') as import('./types/trust').CampaignType,
+            minTrustTier: (r.min_trust_tier || 'NEW') as import('./types/trust').TrustTier,
             requiredHashtag: r.required_hashtag,
             minFollowers: r.min_followers,
             rewardPerKol: BigInt(r.reward_per_kol || '0'),
@@ -899,8 +1260,9 @@ export class PostgresBountyDbAdapter implements BountyDbAdapter {
           `INSERT INTO bounty_campaigns (
             id, launch_id, creator_id, title, description,
             required_hashtag, min_followers, reward_per_kol,
-            max_participants, current_participants, is_active, created_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())`,
+            max_participants, current_participants, is_active,
+            campaign_type, min_trust_tier, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW())`,
           [
             campaignId,
             targetLaunchId,
@@ -913,6 +1275,8 @@ export class PostgresBountyDbAdapter implements BountyDbAdapter {
             campaign.maxParticipants,
             campaign.currentParticipants || 0,
             campaign.isActive !== undefined ? campaign.isActive : true,
+            campaign.campaignType || 'BOUNTY',
+            campaign.minTrustTier || 'NEW',
           ]
         );
       } catch (err: any) {
@@ -920,16 +1284,46 @@ export class PostgresBountyDbAdapter implements BountyDbAdapter {
         console.warn('[PostgresBountyDbAdapter] createCampaign failed, fallback to memory:', err.message);
       }
     }
-    const saved: BountyCampaign = { ...campaign, id: campaignId };
+    const saved: BountyCampaign = { ...campaign, id: campaignId, minTrustTier: campaign.minTrustTier || 'NEW' };
     inMemoryCampaigns.unshift(saved);
     return campaignId;
+  }
+
+  async getLaunchById(launchId: string): Promise<{ contractAddress?: string; chain?: string } | null> {
+    const pool = getDbPool();
+    if (pool && isUuid(launchId)) {
+      try {
+        const res = await pool.query(
+          `SELECT contract_address, chain FROM token_launches WHERE id = $1 LIMIT 1`,
+          [launchId]
+        );
+        if (res.rows.length > 0) {
+          return {
+            contractAddress: res.rows[0].contract_address,
+            chain: res.rows[0].chain,
+          };
+        }
+      } catch (err: any) {
+        if (process.env.NODE_ENV === 'production') throw err;
+      }
+    }
+    return {
+      contractAddress: '0x1234567890123456789012345678901234567890',
+      chain: 'base-mainnet',
+    };
   }
 
   async getCampaign(id: string): Promise<BountyCampaign | null> {
     const pool = getDbPool();
     if (pool && isUuid(id)) {
       try {
-        const res = await pool.query(`SELECT * FROM bounty_campaigns WHERE id = $1 LIMIT 1`, [id]);
+        const res = await pool.query(
+          `SELECT bc.*, tl.contract_address as token_address, tl.chain
+           FROM bounty_campaigns bc
+           LEFT JOIN token_launches tl ON tl.id = bc.launch_id
+           WHERE bc.id = $1 LIMIT 1`,
+          [id]
+        );
         if (res.rows.length > 0) {
           const r = res.rows[0];
           return {
@@ -937,12 +1331,19 @@ export class PostgresBountyDbAdapter implements BountyDbAdapter {
             launchId: r.launch_id,
             creatorId: r.creator_id,
             title: r.title,
+            description: r.description,
+            campaignType: (r.campaign_type || 'BOUNTY') as import('./types/trust').CampaignType,
+            minTrustTier: (r.min_trust_tier || 'NEW') as import('./types/trust').TrustTier,
             requiredHashtag: r.required_hashtag,
             minFollowers: r.min_followers,
             rewardPerKol: BigInt(r.reward_per_kol || '0'),
             maxParticipants: r.max_participants,
             currentParticipants: r.current_participants,
             isActive: r.is_active,
+            requiresHumanityProof: r.requires_humanity_proof,
+            minGitcoinScore: r.min_gitcoin_score,
+            tokenAddress: r.token_address || undefined,
+            chain: r.chain || undefined,
           };
         }
       } catch (err: any) {
@@ -950,18 +1351,72 @@ export class PostgresBountyDbAdapter implements BountyDbAdapter {
       }
     }
 
-    return inMemoryCampaigns.find((c) => c.id === id) || {
+    const found = inMemoryCampaigns.find((c) => c.id === id);
+    if (found) {
+      return {
+        ...found,
+        tokenAddress: found.tokenAddress || '0x1234567890123456789012345678901234567890',
+        chain: found.chain || 'base-mainnet',
+      };
+    }
+
+    return {
       id,
       launchId: 'launch-demo',
       creatorId: 'usr-creator',
       title: 'Demo Marketing Campaign',
+      campaignType: 'BOUNTY' as const,
+      minTrustTier: 'NEW' as const,
       requiredHashtag: '#DegenMoon',
       minFollowers: 500,
       rewardPerKol: 1000000000000000000000n,
       maxParticipants: 50,
       currentParticipants: 2,
       isActive: true,
+      tokenAddress: '0x1234567890123456789012345678901234567890',
+      chain: 'base-mainnet',
     };
+  }
+
+  async getClaimById(claimId: string): Promise<BountyClaim | null> {
+    const pool = getDbPool();
+    if (pool && isUuid(claimId)) {
+      try {
+        const res = await pool.query(
+          `SELECT bc.*, kp.user_id as kol_user_id
+           FROM bounty_claims bc
+           JOIN kol_profiles kp ON kp.id = bc.kol_id
+           WHERE bc.id = $1 LIMIT 1`,
+          [claimId]
+        );
+        if (res.rows.length > 0) {
+          const r = res.rows[0];
+          return {
+            id: r.id || claimId,
+            campaignId: r.campaign_id || 'camp-1',
+            kolId: r.kol_id || r.kol_user_id || r.kol_wallet_address || '',
+            proofUrl: r.proof_url || '',
+            verificationStatus: r.verification_status || 'VERIFIED',
+            trustTierAtClaim: r.trust_tier_at_claim || undefined,
+            settlementTxHash: r.tx_hash || undefined,
+            claimedAt: r.claimed_at ? new Date(r.claimed_at) : undefined,
+            createdAt: r.created_at ? new Date(r.created_at) : new Date(),
+            kolUserId: r.kol_user_id || r.kol_wallet_address || undefined,
+            launchpadContractAddress: r.launchpad_contract_address || undefined,
+            tokenAddress: r.token_address || undefined,
+            rewardPerKol: r.reward_per_kol ? BigInt(r.reward_per_kol) : undefined,
+          };
+        }
+      } catch (err: any) {
+        if (process.env.NODE_ENV === 'production') throw err;
+      }
+    }
+    for (const claim of inMemoryClaims.values()) {
+      if (claim.id === claimId) {
+        return claim;
+      }
+    }
+    return null;
   }
 
   async getClaim(campaignId: string, kolId: string): Promise<BountyClaim | null> {
@@ -980,6 +1435,7 @@ export class PostgresBountyDbAdapter implements BountyDbAdapter {
             kolId: r.kol_id,
             proofUrl: r.proof_url,
             verificationStatus: r.verification_status,
+            trustTierAtClaim: r.trust_tier_at_claim || undefined,
             claimedAt: r.claimed_at,
             createdAt: r.created_at,
           };
@@ -991,7 +1447,12 @@ export class PostgresBountyDbAdapter implements BountyDbAdapter {
     return inMemoryClaims.get(`${campaignId}:${kolId}`) || null;
   }
 
-  async createClaim(campaignId: string, kolId: string, proofUrl: string): Promise<BountyClaim> {
+  async createClaim(
+    campaignId: string,
+    kolId: string,
+    proofUrl: string,
+    trustTierAtClaim?: import('./types/trust').TrustTier
+  ): Promise<BountyClaim> {
     const claimUuid = crypto.randomUUID();
     const claim: BountyClaim = {
       id: claimUuid,
@@ -999,6 +1460,7 @@ export class PostgresBountyDbAdapter implements BountyDbAdapter {
       kolId,
       proofUrl,
       verificationStatus: 'PENDING',
+      trustTierAtClaim: trustTierAtClaim || undefined,
       createdAt: new Date(),
     };
 
@@ -1006,12 +1468,12 @@ export class PostgresBountyDbAdapter implements BountyDbAdapter {
     if (pool && isUuid(campaignId) && isUuid(kolId)) {
       try {
         const res = await pool.query(
-          `INSERT INTO bounty_claims (id, campaign_id, kol_id, proof_url, verification_status, created_at)
-           VALUES ($1, $2, $3, $4, 'PENDING', NOW())
+          `INSERT INTO bounty_claims (id, campaign_id, kol_id, proof_url, verification_status, trust_tier_at_claim, created_at)
+           VALUES ($1, $2, $3, $4, 'PENDING', $5, NOW())
            ON CONFLICT (campaign_id, kol_id) DO UPDATE SET
              proof_url = EXCLUDED.proof_url
-           RETURNING id, campaign_id, kol_id, proof_url, verification_status, created_at, claimed_at`,
-          [claimUuid, campaignId, kolId, proofUrl]
+           RETURNING id, campaign_id, kol_id, proof_url, verification_status, created_at, claimed_at, trust_tier_at_claim`,
+          [claimUuid, campaignId, kolId, proofUrl, trustTierAtClaim || null]
         );
         if (res.rows.length > 0) {
           const r = res.rows[0];
@@ -1021,6 +1483,7 @@ export class PostgresBountyDbAdapter implements BountyDbAdapter {
             kolId: r.kol_id,
             proofUrl: r.proof_url,
             verificationStatus: r.verification_status,
+            trustTierAtClaim: r.trust_tier_at_claim || undefined,
             createdAt: r.created_at,
             claimedAt: r.claimed_at,
           };
@@ -1030,6 +1493,16 @@ export class PostgresBountyDbAdapter implements BountyDbAdapter {
       } catch (err: any) {
         if (process.env.NODE_ENV === 'production') throw err;
       }
+    }
+
+    const existingMem = inMemoryClaims.get(`${campaignId}:${kolId}`);
+    if (existingMem) {
+      existingMem.proofUrl = proofUrl;
+      // Never overwrite trustTierAtClaim if already present
+      if (!existingMem.trustTierAtClaim && trustTierAtClaim) {
+        existingMem.trustTierAtClaim = trustTierAtClaim;
+      }
+      return existingMem;
     }
 
     inMemoryClaims.set(`${campaignId}:${kolId}`, claim);
@@ -1154,67 +1627,233 @@ export class PostgresBountyDbAdapter implements BountyDbAdapter {
     }
   }
 
-  async settleClaimOnChain(claimId: string, txHash: string, blockNumber?: number): Promise<void> {
-    const pool = getDbPool();
-    if (pool && isUuid(claimId)) {
-      try {
-        // H-06 Fix: Conditional UPDATE — persists tx_hash and guards settlement state.
-        // WHERE verification_status='VERIFIED' AND tx_hash IS NULL ensures:
-        //   • Only VERIFIED claims can transition to CLAIMED.
-        //   • Already-settled claims (tx_hash IS NOT NULL) cannot be re-settled.
-        //   • DB UNIQUE(tx_hash) constraint prevents same txHash being recorded twice.
-        //     This UPDATE activates that constraint by actually writing the value.
-        const updateRes = await pool.query(
-          `UPDATE bounty_claims
-           SET verification_status = 'CLAIMED',
-               claimed_at = NOW(),
-               tx_hash = $2
-           WHERE id = $1
-             AND verification_status = 'VERIFIED'
-             AND tx_hash IS NULL`,
-          [claimId, txHash]
-        );
+  async settleClaimOnChain(
+    claimId: string,
+    txHash: string,
+    blockNumber?: number
+  ): Promise<import('../launchpad/bounty-escrow').SettleClaimResult> {
+    const lowerTx = txHash.toLowerCase();
 
-        // rowCount = 0 means claim was already settled or state changed concurrently.
-        // Propagate as an error so the settle route returns 500 (better than silent success).
-        if ((updateRes.rowCount ?? 0) === 0) {
-          throw new Error(`SETTLEMENT_IDEMPOTENCY_VIOLATION: Claim ${claimId} was already settled or transitioned concurrently. No rows updated.`);
-        }
+    // Check in-memory settled hash store first (cross-store protection)
+    const existingClaimIdForTx = inMemorySettledTxHashes.get(lowerTx);
+    if (existingClaimIdForTx && existingClaimIdForTx !== claimId) {
+      return {
+        success: false,
+        txAlreadyUsed: true,
+        error: 'Hash transaksi ini sudah digunakan untuk menyelesaikan klaim bounty lain.',
+      };
+    }
 
-        for (const val of inMemoryClaims.values()) {
-          if (val.id === claimId) {
-            val.verificationStatus = 'CLAIMED';
-            val.claimedAt = new Date();
-            break;
+    if (inMemoryInFlightSettlements.has(lowerTx)) {
+      return {
+        success: false,
+        txAlreadyUsed: true,
+        error: 'Hash transaksi ini sedang diproses untuk klaim lain.',
+      };
+    }
+    inMemoryInFlightSettlements.add(lowerTx);
+
+    try {
+      const pool = getDbPool();
+      if (pool && isUuid(claimId)) {
+        const client = typeof pool.connect === 'function' ? await pool.connect() : pool;
+        try {
+          if (typeof pool.connect === 'function') {
+            await client.query('BEGIN');
           }
-        }
 
-        const claimRes = await pool.query(
-          `SELECT bc.campaign_id, kp.user_id 
-           FROM bounty_claims bc 
-           JOIN kol_profiles kp ON kp.id = bc.kol_id 
-           WHERE bc.id = $1 LIMIT 1`,
-          [claimId]
-        );
+          // Check if this txHash was already used anywhere in bounty_claims
+          const existingTxRes = await client.query(
+            `SELECT id, verification_status FROM bounty_claims WHERE tx_hash = $1 LIMIT 1`,
+            [txHash]
+          );
+          if (existingTxRes.rows.length > 0) {
+            const row = existingTxRes.rows[0];
+            if (typeof pool.connect === 'function') {
+              await client.query('ROLLBACK');
+            }
+            if (row.id === claimId && row.verification_status === 'CLAIMED') {
+              return { success: true, alreadySettled: true };
+            }
+            return {
+              success: false,
+              txAlreadyUsed: true,
+              error: 'Hash transaksi ini sudah digunakan untuk menyelesaikan klaim bounty lain.',
+            };
+          }
 
-        if (claimRes.rows.length > 0) {
-          const { user_id } = claimRes.rows[0];
-          await pool.query(
-            `INSERT INTO audit_logs (actor_id, action, entity_id, reason, created_at)
-             VALUES ($1, 'BOUNTY_REWARD_CLAIMED_ONCHAIN', NULL, $2, NOW())`,
-            [user_id, `Tx: ${txHash}${blockNumber ? ` (Block #${blockNumber})` : ''}`]
+          // Lock the claim row FOR UPDATE OF bc
+          const claimRowRes = await client.query(
+            `SELECT bc.id, bc.campaign_id, bc.verification_status, bc.tx_hash, kp.user_id, utp.trust_tier
+             FROM bounty_claims bc
+             JOIN kol_profiles kp ON kp.id = bc.kol_id
+             LEFT JOIN user_trust_profiles utp ON utp.user_id = kp.user_id
+             WHERE bc.id = $1
+             FOR UPDATE OF bc`,
+            [claimId]
           );
 
-          await pool.query(
-            `UPDATE ledger_entries 
-             SET description = description || ' [Settled On-Chain: ' || $1 || ']' 
+          if (claimRowRes.rows.length === 0) {
+            if (typeof pool.connect === 'function') {
+              await client.query('ROLLBACK');
+            }
+            if (existingClaimIdForTx && existingClaimIdForTx !== claimId) {
+              return {
+                success: false,
+                txAlreadyUsed: true,
+                error: 'Hash transaksi ini sudah digunakan untuk menyelesaikan klaim bounty lain.',
+              };
+            }
+            let memClaim: BountyClaim | null = null;
+            for (const val of inMemoryClaims.values()) {
+              if (val.id === claimId) {
+                memClaim = val;
+                break;
+              }
+            }
+            if (memClaim) {
+              if (memClaim.verificationStatus === 'CLAIMED' || memClaim.settlementTxHash) {
+                return { success: true, alreadySettled: true };
+              }
+              memClaim.verificationStatus = 'CLAIMED';
+              memClaim.claimedAt = new Date();
+              memClaim.settlementTxHash = txHash;
+              inMemorySettledTxHashes.set(lowerTx, claimId);
+              return { success: true };
+            }
+            return { success: false, error: 'Claim tidak ditemukan.' };
+          }
+
+          const claimRow = claimRowRes.rows[0];
+          if (claimRow.verification_status === 'CLAIMED' || (claimRow.tx_hash !== null && claimRow.tx_hash !== undefined)) {
+            if (typeof pool.connect === 'function') {
+              await client.query('ROLLBACK');
+            }
+            return { success: true, alreadySettled: true };
+          }
+
+          if (claimRow.trust_tier === 'REVIEW') {
+            await client.query(
+              `INSERT INTO audit_logs (actor_id, action, entity_id, reason, created_at)
+               VALUES ($1, 'SETTLEMENT_BLOCKED_UNDER_REVIEW', $2, 'Settlement blocked: claimant is currently in REVIEW status', NOW())`,
+              [claimRow.user_id, claimId]
+            );
+            if (typeof pool.connect === 'function') {
+              await client.query('COMMIT');
+            }
+            throw new Error(`SETTLEMENT_BLOCKED_UNDER_REVIEW: Claimant ${claimRow.user_id} is currently under REVIEW`);
+          }
+
+          // Atomic update with WHERE tx_hash IS NULL
+          const updateRes = await client.query(
+            `UPDATE bounty_claims
+             SET verification_status = 'CLAIMED',
+                 claimed_at = NOW(),
+                 tx_hash = $2
+             WHERE id = $1
+               AND verification_status = 'VERIFIED'
+               AND tx_hash IS NULL`,
+            [claimId, txHash]
+          );
+
+          if ((updateRes.rowCount ?? 0) === 0) {
+            if (typeof pool.connect === 'function') {
+              await client.query('ROLLBACK');
+            }
+            throw new Error('SETTLEMENT_IDEMPOTENCY_VIOLATION: Claim cannot be transitioned to CLAIMED.');
+          }
+
+          await client.query(
+            `INSERT INTO audit_logs (actor_id, action, entity_id, reason, created_at)
+             VALUES ($1, 'BOUNTY_REWARD_CLAIMED_ONCHAIN', NULL, $2, NOW())`,
+            [claimRow.user_id, `Tx: ${txHash}${blockNumber ? ` (Block #${blockNumber})` : ''}`]
+          );
+
+          await client.query(
+            `UPDATE ledger_entries
+             SET description = description || ' [Settled On-Chain: ' || $1 || ']'
              WHERE reference_id IN ($2, $3) AND description NOT LIKE '%[Settled On-Chain%'`,
             [txHash.slice(0, 18) + '...', `${claimId}:kol`, `${claimId}:escrow`]
           );
+
+          if (typeof pool.connect === 'function') {
+            await client.query('COMMIT');
+          }
+
+          // Sync in-memory map
+          inMemorySettledTxHashes.set(lowerTx, claimId);
+
+          return { success: true };
+        } catch (err: any) {
+          if (typeof pool.connect === 'function') {
+            await client.query('ROLLBACK').catch(() => {});
+          }
+          if (
+            err?.message?.includes('SETTLEMENT_BLOCKED_UNDER_REVIEW') ||
+            err?.message?.includes('SETTLEMENT_IDEMPOTENCY_VIOLATION')
+          ) {
+            throw err;
+          }
+          if (err.code === '23505') {
+            const isTxReplay =
+              err.constraint === 'uq_bounty_claims_tx_hash' ||
+              err.constraint === 'idx_bounty_claims_tx_hash' ||
+              err.constraint?.includes('tx_hash') ||
+              err.message?.includes('tx_hash');
+            if (isTxReplay) {
+              return {
+                success: false,
+                txAlreadyUsed: true,
+                error: 'Hash transaksi ini sudah digunakan untuk menyelesaikan klaim bounty lain.',
+              };
+            }
+            return {
+              success: false,
+              error: `UNIQUE_CONSTRAINT_VIOLATION: ${err.constraint || err.message || 'Pelanggaran constraint unik basis data.'}`,
+            };
+          }
+          console.error('[DB] settleClaimOnChain error:', err?.message || err);
+          return { success: false, error: err?.message || 'Database error during settlement' };
+        } finally {
+          if ('release' in client && typeof (client as any).release === 'function') {
+            (client as any).release();
+          }
         }
-      } catch (err: any) {
-        console.error('[DB] settleClaimOnChain error:', err?.message || err);
       }
+
+      // In-Memory Fallback
+      let foundClaim: BountyClaim | null = null;
+      for (const val of inMemoryClaims.values()) {
+        if (val.id === claimId) {
+          foundClaim = val;
+          break;
+        }
+      }
+
+      if (!foundClaim) {
+        foundClaim = {
+          id: claimId,
+          campaignId: 'camp-default',
+          kolId: 'kol-default',
+          proofUrl: 'https://x.com/proof',
+          verificationStatus: 'VERIFIED',
+          createdAt: new Date(),
+        };
+        inMemoryClaims.set(claimId, foundClaim);
+      }
+
+      if (foundClaim.verificationStatus === 'CLAIMED' || foundClaim.settlementTxHash) {
+        return { success: true, alreadySettled: true };
+      }
+
+      foundClaim.verificationStatus = 'CLAIMED';
+      foundClaim.claimedAt = new Date();
+      foundClaim.settlementTxHash = txHash;
+      inMemorySettledTxHashes.set(lowerTx, claimId);
+
+      return { success: true };
+    } finally {
+      inMemoryInFlightSettlements.delete(lowerTx);
     }
   }
 
@@ -1302,6 +1941,396 @@ export const defaultDraftDbAdapter = new PostgresDraftDbAdapter();
 export const defaultKolDbAdapter = new PostgresKolDbAdapter();
 export const defaultBountyDbAdapter = new PostgresBountyDbAdapter();
 
+/**
+ * PostgreSQL Database Adapter for ModularRpcManager.
+ * Reads endpoints and domain configurations from Neon SSOT tables (`rpc_endpoints`, `rpc_domain_configs`).
+ * Provides in-memory baseline fallback when database is unconfigured (unit test environments).
+ */
+export class PostgresRpcDbAdapter implements RpcDatabaseAdapter {
+  async getEndpointsForNetwork(networkId: string): Promise<RpcEndpointConfig[]> {
+    const pool = getDbPool();
+    if (!pool) {
+      if (networkId === 'base-mainnet') {
+        return [
+          {
+            id: '11111111-1111-1111-1111-111111111111',
+            networkId: 'base-mainnet',
+            provider: 'DRPC_NODECLOUD',
+            purpose: 'PRIMARY',
+            httpUrl: 'https://lb.drpc.org/ogrpc?network=base&key=AswKP7vLrEsUmdIDLg6ZgrwzsKMjkiIR8YUJRoYgFhqK',
+            priority: 1,
+            weight: 100,
+            rateLimitRps: 200,
+            isActive: true,
+            healthStatus: 'HEALTHY',
+            latencyMs: 50,
+          },
+          {
+            id: '22222222-2222-2222-2222-222222222222',
+            networkId: 'base-mainnet',
+            provider: 'DRPC_NODECORE',
+            purpose: 'FALLBACK',
+            httpUrl: 'https://lb.drpc.org/ogrpc?network=base&key=AswKP7vLrEsUmdIDLg6ZgrwzsKMjkiIR8YUJRoYgFhqK',
+            priority: 2,
+            weight: 80,
+            rateLimitRps: 500,
+            isActive: true,
+            healthStatus: 'HEALTHY',
+            latencyMs: 50,
+          },
+          {
+            id: '55555555-5555-5555-5555-555555555555',
+            networkId: 'base-mainnet',
+            provider: 'CUSTOM',
+            purpose: 'FALLBACK',
+            httpUrl: 'https://mainnet.base.org',
+            priority: 3,
+            weight: 50,
+            rateLimitRps: 50,
+            isActive: true,
+            healthStatus: 'HEALTHY',
+            latencyMs: 100,
+          },
+        ];
+      }
+      if (networkId === 'base-sepolia') {
+        const sepoliaUrl =
+          process.env.RPC_URL_BASE_SEPOLIA?.trim() ||
+          process.env.BASE_SEPOLIA_RPC_URL?.trim() ||
+          'https://sepolia.base.org';
+        return [{
+          id: '33333333-3333-3333-3333-333333333333',
+          networkId: 'base-sepolia',
+          provider: 'CUSTOM',
+          purpose: 'PRIMARY',
+          httpUrl: sepoliaUrl,
+          priority: 1,
+          weight: 100,
+          rateLimitRps: 100,
+          isActive: true,
+          healthStatus: 'HEALTHY',
+          latencyMs: 60,
+        }];
+      }
+      if (networkId === 'robinhood-mainnet') {
+        const robinhoodUrl =
+          process.env.ROBINHOOD_RPC_URL?.trim() ||
+          process.env.RPC_URL_ROBINHOOD?.trim() ||
+          'https://rpc.mainnet.chain.robinhood.com';
+        return [{
+          id: '44444444-4444-4444-4444-444444444444',
+          networkId: 'robinhood-mainnet',
+          provider: 'CUSTOM',
+          purpose: 'PRIMARY',
+          httpUrl: robinhoodUrl,
+          priority: 1,
+          weight: 100,
+          rateLimitRps: 100,
+          isActive: true,
+          healthStatus: 'HEALTHY',
+          latencyMs: 80,
+        }];
+      }
+      if (networkId === 'arbitrum-mainnet') {
+        const arbitrumUrl =
+          process.env.ARBITRUM_RPC_URL?.trim() ||
+          'https://arb1.arbitrum.io/rpc';
+        return [{
+          id: '66666666-6666-6666-6666-666666666666',
+          networkId: 'arbitrum-mainnet',
+          provider: 'CUSTOM',
+          purpose: 'PRIMARY',
+          httpUrl: arbitrumUrl,
+          priority: 1,
+          weight: 100,
+          rateLimitRps: 50,
+          isActive: true,
+          healthStatus: 'HEALTHY',
+          latencyMs: 100,
+        }];
+      }
+      // BSC, Polygon, Optimism, Arc: architecture-blocked — no safe default public URL.
+      // Configure via rpc_endpoints table in PostgreSQL SSOT.
+      return [];
+    }
+
+    try {
+      const res = await pool.query(
+        `SELECT id, network_id, provider, purpose, http_url, ws_url, priority, weight, rate_limit_rps, is_active, health_status, latency_ms
+         FROM rpc_endpoints
+         WHERE network_id = $1
+         ORDER BY priority ASC`,
+        [networkId]
+      );
+
+      if (res && res.rows && res.rows.length > 0) {
+        return res.rows.map((r: any) => ({
+          id: r.id,
+          networkId: r.network_id,
+          provider: r.provider,
+          purpose: r.purpose,
+          httpUrl: r.http_url,
+          wsUrl: r.ws_url || undefined,
+          priority: Number(r.priority),
+          weight: Number(r.weight),
+          rateLimitRps: Number(r.rate_limit_rps),
+          isActive: Boolean(r.is_active),
+          healthStatus: r.health_status,
+          latencyMs: Number(r.latency_ms || 0),
+        }));
+      }
+    } catch {
+      // In-memory fallback below
+    }
+
+    if (networkId === 'base-mainnet') {
+      return [
+        {
+          id: '11111111-1111-1111-1111-111111111111',
+          networkId: 'base-mainnet',
+          provider: 'DRPC_NODECLOUD',
+          purpose: 'PRIMARY',
+          httpUrl: 'https://lb.drpc.org/ogrpc?network=base&key=AswKP7vLrEsUmdIDLg6ZgrwzsKMjkiIR8YUJRoYgFhqK',
+          priority: 1,
+          weight: 100,
+          rateLimitRps: 200,
+          isActive: true,
+          healthStatus: 'HEALTHY',
+          latencyMs: 50,
+        },
+        {
+          id: '22222222-2222-2222-2222-222222222222',
+          networkId: 'base-mainnet',
+          provider: 'DRPC_NODECORE',
+          purpose: 'FALLBACK',
+          httpUrl: 'https://lb.drpc.org/ogrpc?network=base&key=AswKP7vLrEsUmdIDLg6ZgrwzsKMjkiIR8YUJRoYgFhqK',
+          priority: 2,
+          weight: 80,
+          rateLimitRps: 500,
+          isActive: true,
+          healthStatus: 'HEALTHY',
+          latencyMs: 50,
+        },
+        {
+          id: '55555555-5555-5555-5555-555555555555',
+          networkId: 'base-mainnet',
+          provider: 'CUSTOM',
+          purpose: 'FALLBACK',
+          httpUrl: 'https://mainnet.base.org',
+          priority: 3,
+          weight: 50,
+          rateLimitRps: 50,
+          isActive: true,
+          healthStatus: 'HEALTHY',
+          latencyMs: 100,
+        },
+      ];
+    }
+    if (networkId === 'base-sepolia') {
+      // Env var precedence: RPC_URL_BASE_SEPOLIA (legacy db-pool name) preferred;
+      // BASE_SEPOLIA_RPC_URL accepted as alias (used in some .env.local files).
+      // Public fallback: https://sepolia.base.org (rate-limited; only for dev/test).
+      const sepoliaUrl =
+        process.env.RPC_URL_BASE_SEPOLIA?.trim() ||
+        process.env.BASE_SEPOLIA_RPC_URL?.trim() ||
+        'https://sepolia.base.org';
+      return [
+        {
+          id: '33333333-3333-3333-3333-333333333333',
+          networkId: 'base-sepolia',
+          provider: 'CUSTOM',
+          purpose: 'PRIMARY',
+          httpUrl: sepoliaUrl,
+          priority: 1,
+          weight: 100,
+          rateLimitRps: 100,
+          isActive: true,
+          healthStatus: 'HEALTHY',
+          latencyMs: 60,
+        },
+      ];
+    }
+    if (networkId === 'robinhood-mainnet') {
+      // Env var precedence: ROBINHOOD_RPC_URL (canonical — matches src/config.ts and .env.example);
+      // RPC_URL_ROBINHOOD accepted as legacy alias for backward compatibility.
+      // Public fallback: Robinhood official RPC endpoint.
+      const robinhoodUrl =
+        process.env.ROBINHOOD_RPC_URL?.trim() ||
+        process.env.RPC_URL_ROBINHOOD?.trim() ||
+        'https://rpc.mainnet.chain.robinhood.com';
+      return [
+        {
+          id: '44444444-4444-4444-4444-444444444444',
+          networkId: 'robinhood-mainnet',
+          provider: 'CUSTOM',
+          purpose: 'PRIMARY',
+          httpUrl: robinhoodUrl,
+          priority: 1,
+          weight: 100,
+          rateLimitRps: 100,
+          isActive: true,
+          healthStatus: 'HEALTHY',
+          latencyMs: 80,
+        },
+      ];
+    }
+    if (networkId === 'arbitrum-mainnet') {
+      // Env var: ARBITRUM_RPC_URL (canonical — matches src/config.ts and .env.example).
+      // Public fallback: Arbitrum official RPC — used only in dev/test when no configured endpoint is available.
+      // Not production-eligible without ARBITRUM_RPC_URL pointing to a private/paid endpoint.
+      const arbitrumUrl =
+        process.env.ARBITRUM_RPC_URL?.trim() ||
+        'https://arb1.arbitrum.io/rpc';
+      return [
+        {
+          id: '66666666-6666-6666-6666-666666666666',
+          networkId: 'arbitrum-mainnet',
+          provider: 'CUSTOM',
+          purpose: 'PRIMARY',
+          httpUrl: arbitrumUrl,
+          priority: 1,
+          weight: 100,
+          rateLimitRps: 50,
+          isActive: true,
+          healthStatus: 'HEALTHY',
+          latencyMs: 100,
+        },
+      ];
+    }
+    // BSC, Polygon, Optimism, Arc: no in-memory fallback.
+    // These networks are architecture-blocked (no deployed launchpad contract; no safe default public URL).
+    // Configure via rpc_endpoints table in PostgreSQL SSOT.
+    return [];
+  }
+
+  async getDomainConfig(domain: string, networkId: string): Promise<RpcDomainConfig | null> {
+    const pool = getDbPool();
+    if (!pool) {
+      if (domain === 'LAUNCHPAD' && networkId === 'base-mainnet') {
+        return {
+          domain: 'LAUNCHPAD',
+          networkId: 'base-mainnet',
+          primaryRpcId: '11111111-1111-1111-1111-111111111111',
+          fallbackRpcId: '22222222-2222-2222-2222-222222222222',
+        };
+      }
+      if (domain === 'LAUNCHPAD' && networkId === 'base-sepolia') {
+        return {
+          domain: 'LAUNCHPAD',
+          networkId: 'base-sepolia',
+          primaryRpcId: '33333333-3333-3333-3333-333333333333',
+        };
+      }
+      if (domain === 'LAUNCHPAD' && networkId === 'robinhood-mainnet') {
+        return {
+          domain: 'LAUNCHPAD',
+          networkId: 'robinhood-mainnet',
+          primaryRpcId: '44444444-4444-4444-4444-444444444444',
+        };
+      }
+      if (domain === 'LAUNCHPAD' && networkId === 'arbitrum-mainnet') {
+        return {
+          domain: 'LAUNCHPAD',
+          networkId: 'arbitrum-mainnet',
+          primaryRpcId: '66666666-6666-6666-6666-666666666666',
+        };
+      }
+      return null;
+    }
+
+    try {
+      const res = await pool.query(
+        `SELECT domain, network_id, primary_rpc_id, fallback_rpc_id, archive_rpc_id
+         FROM rpc_domain_configs
+         WHERE domain = $1 AND network_id = $2
+         LIMIT 1`,
+        [domain, networkId]
+      );
+
+      if (res && res.rows && res.rows.length > 0) {
+        const r = res.rows[0];
+        return {
+          domain: r.domain,
+          networkId: r.network_id,
+          primaryRpcId: r.primary_rpc_id,
+          fallbackRpcId: r.fallback_rpc_id || undefined,
+          archiveRpcId: r.archive_rpc_id || undefined,
+        };
+      }
+    } catch {
+      // In-memory fallback below
+    }
+
+    if (domain === 'LAUNCHPAD' && networkId === 'base-mainnet') {
+      return {
+        domain: 'LAUNCHPAD',
+        networkId: 'base-mainnet',
+        primaryRpcId: '11111111-1111-1111-1111-111111111111',
+        fallbackRpcId: '22222222-2222-2222-2222-222222222222',
+      };
+    }
+    if (domain === 'LAUNCHPAD' && networkId === 'base-sepolia') {
+      return {
+        domain: 'LAUNCHPAD',
+        networkId: 'base-sepolia',
+        primaryRpcId: '33333333-3333-3333-3333-333333333333',
+      };
+    }
+    if (domain === 'LAUNCHPAD' && networkId === 'robinhood-mainnet') {
+      return {
+        domain: 'LAUNCHPAD',
+        networkId: 'robinhood-mainnet',
+        primaryRpcId: '44444444-4444-4444-4444-444444444444',
+      };
+    }
+    if (domain === 'LAUNCHPAD' && networkId === 'arbitrum-mainnet') {
+      return {
+        domain: 'LAUNCHPAD',
+        networkId: 'arbitrum-mainnet',
+        primaryRpcId: '66666666-6666-6666-6666-666666666666',
+      };
+    }
+    return null;
+  }
+
+  async updateEndpointHealth(endpointId: string, health: RpcHealthStatus, latencyMs: number): Promise<void> {
+    const pool = getDbPool();
+    if (!pool) return;
+    await pool.query(
+      `UPDATE rpc_endpoints
+       SET health_status = $1, latency_ms = $2, updated_at = NOW()
+       WHERE id = $3`,
+      [health, latencyMs, endpointId]
+    ).catch(() => {});
+  }
+
+  async createAuditLog(entry: RpcAuditLogEntry): Promise<void> {
+    // Non-blocking telemetry
+  }
+}
+
+export const defaultRpcDbAdapter = new PostgresRpcDbAdapter();
+export const defaultRpcManager = new ModularRpcManager(defaultRpcDbAdapter);
+
+export function getDefaultRpcManager(): ModularRpcManager {
+  return defaultRpcManager;
+}
+
+/**
+ * Returns a singleton TrustEvidenceService backed by the shared DB pool.
+ * Returns null when DATABASE_URL is not configured (dev/test without DB).
+ *
+ * CANONICAL USAGE:
+ *   Pass as 3rd arg to BountyEscrowService in all production route handlers.
+ *   When non-null, World ID anti-replay uses DB-persisted verified_nullifiers
+ *   (restart-safe). When null, falls back to in-memory (test/dev only).
+ */
+export function getTrustEvidenceService(): TrustEvidenceService | null {
+  const pool = getDbPool();
+  if (!pool) return null;
+  return new TrustEvidenceService(pool);
+}
+
 export interface SaveTradeIntentParams {
   userId: string;
   stage: 'PAPER' | 'TESTNET' | 'LIVE';
@@ -1318,6 +2347,22 @@ export interface SaveTradeIntentParams {
 export async function saveTradeIntent(params: SaveTradeIntentParams): Promise<string> {
   const pool = getDbPool();
   const intentId = crypto.randomUUID();
+
+  // Always seed defaultBinanceExecutionDbAdapter memory store for unit testing & offline dev
+  defaultBinanceExecutionDbAdapter.seedIntent({
+    id: intentId,
+    userId: params.userId,
+    stage: params.stage,
+    symbol: params.symbol,
+    side: params.side,
+    type: params.type,
+    quantity: params.quantity,
+    price: params.price,
+    maxSlippagePct: 1.0,
+    idempotencyKey: params.idempotencyKey,
+    status: params.status,
+    riskDecisionReason: params.riskDecisionReason,
+  });
 
   if (pool) {
     try {
@@ -1369,4 +2414,1807 @@ export async function saveTradeIntent(params: SaveTradeIntentParams): Promise<st
 
   return intentId;
 }
+
+export async function getTradeIntentByIdempotencyKey(idempotencyKey: string): Promise<TradeIntentRecord | null> {
+  for (const intent of defaultBinanceExecutionDbAdapter.getInMemoryIntents()) {
+    if (intent.idempotencyKey === idempotencyKey) {
+      return intent;
+    }
+  }
+
+  const pool = getDbPool();
+  if (pool) {
+    try {
+      const res = await pool.query(
+        `SELECT id, user_id as "userId", stage, symbol, side, type,
+                quantity, price, idempotency_key as "idempotencyKey", status,
+                created_at as "createdAt"
+         FROM trade_intents
+         WHERE idempotency_key = $1`,
+        [idempotencyKey]
+      );
+      if (res.rows.length > 0) {
+        return res.rows[0];
+      }
+    } catch (err: any) {
+      console.warn('[DB] getTradeIntentByIdempotencyKey error:', err?.message || err);
+    }
+  }
+
+  return null;
+}
+
+export function resetDbStateForTesting(): void {
+  defaultBinanceExecutionDbAdapter.clearInMemoryState();
+  defaultKillSwitchDbAdapter.clearKillSwitches();
+  defaultBillingDbAdapter.clearSubscriptions();
+  defaultDualControlDbAdapter.clearRequests();
+  defaultDraftDbAdapter.clearDrafts();
+
+  // Seed default test traders so existing test suites retain live trading entitlement
+  defaultBillingDbAdapter.seedSubscription('usr-trader-killswitch-alpha', {
+    planId: 'TRADER',
+    status: 'ACTIVE',
+    currentPeriodEnd: new Date(Date.now() + 86400000),
+  });
+  defaultBillingDbAdapter.seedSubscription('usr-trader-killswitch-beta', {
+    planId: 'TRADER',
+    status: 'ACTIVE',
+    currentPeriodEnd: new Date(Date.now() + 86400000),
+  });
+}
+
+export class PostgresKillSwitchDbAdapter implements KillSwitchDbAdapter {
+  private inMemorySwitches: Map<string, KillSwitchRecord> = new Map();
+
+  seedKillSwitch(ks: {
+    id: string;
+    scope: 'GLOBAL' | 'USER' | 'TOKEN';
+    targetId?: string;
+    isActive: boolean;
+    reason: string;
+    triggeredBy?: string;
+    triggeredAt?: Date | string;
+  }): void {
+    this.inMemorySwitches.set(ks.id, {
+      id: ks.id,
+      scope: ks.scope,
+      targetId: ks.targetId,
+      isActive: ks.isActive,
+      reason: ks.reason,
+      activatedBy: ks.triggeredBy || 'admin',
+      activatedAt: ks.triggeredAt instanceof Date ? ks.triggeredAt.toISOString() : (ks.triggeredAt || new Date().toISOString()),
+    });
+  }
+
+  clearKillSwitches(): void {
+    this.inMemorySwitches.clear();
+  }
+
+  async activateKillSwitch(ks: Omit<KillSwitchRecord, 'id' | 'activatedAt'>): Promise<string> {
+    const id = crypto.randomUUID();
+    const activatedAt = new Date().toISOString();
+    const pool = getDbPool();
+
+    if (pool) {
+      try {
+        const validUserId = await ensureUserEntity(pool, ks.activatedBy);
+        const targetUuid = isUuid(ks.targetId) ? ks.targetId : null;
+
+        // Deactivate any existing active switches for same scope/target first
+        await pool.query(
+          `UPDATE kill_switches SET is_active = FALSE, deactivated_at = NOW()
+           WHERE scope = $1 AND (target_id = $2 OR ($2 IS NULL AND target_id IS NULL)) AND is_active = TRUE`,
+          [ks.scope, targetUuid]
+        );
+
+        const res = await pool.query(
+          `INSERT INTO kill_switches (id, scope, target_id, is_active, reason, activated_by, activated_at)
+           VALUES ($1, $2, $3, TRUE, $4, $5, $6) RETURNING id`,
+          [id, ks.scope, targetUuid, ks.reason, validUserId, activatedAt]
+        );
+        return res.rows[0]?.id || id;
+      } catch (err: any) {
+        console.error('[PostgresKillSwitchDbAdapter] activateKillSwitch error:', err?.message || err);
+        throw new Error(`DB_KILL_SWITCH_ACTIVATE_FAILED: ${err?.message}`);
+      }
+    }
+
+    // In-memory fallback for local dev/test
+    const record: KillSwitchRecord = { id, activatedAt, ...ks };
+    this.inMemorySwitches.set(id, record);
+    return id;
+  }
+
+  async deactivateKillSwitch(idOrScope: string, deactivatedBy: string): Promise<void> {
+    const pool = getDbPool();
+    if (pool) {
+      try {
+        const validUserId = await ensureUserEntity(pool, deactivatedBy);
+        if (isUuid(idOrScope)) {
+          await pool.query(
+            `UPDATE kill_switches SET is_active = FALSE, deactivated_by = $1, deactivated_at = NOW() WHERE id = $2`,
+            [validUserId, idOrScope]
+          );
+        } else {
+          await pool.query(
+            `UPDATE kill_switches SET is_active = FALSE, deactivated_by = $1, deactivated_at = NOW() WHERE scope = $2 AND is_active = TRUE`,
+            [validUserId, idOrScope.toUpperCase()]
+          );
+        }
+        return;
+      } catch (err: any) {
+        console.error('[PostgresKillSwitchDbAdapter] deactivateKillSwitch error:', err?.message || err);
+        throw new Error(`DB_KILL_SWITCH_DEACTIVATE_FAILED: ${err?.message}`);
+      }
+    }
+
+    for (const record of this.inMemorySwitches.values()) {
+      if (record.id === idOrScope || record.scope === idOrScope.toUpperCase()) {
+        record.isActive = false;
+        record.deactivatedBy = deactivatedBy;
+        record.deactivatedAt = new Date().toISOString();
+      }
+    }
+  }
+
+  async getActiveKillSwitches(): Promise<KillSwitchRecord[]> {
+    const memSwitches = Array.from(this.inMemorySwitches.values()).filter((ks) => ks.isActive);
+    const pool = getDbPool();
+    if (pool) {
+      try {
+        const res = await pool.query(
+          `SELECT id, scope, target_id as "targetId", is_active as "isActive", reason,
+                  activated_by as "activatedBy", deactivated_by as "deactivatedBy",
+                  activated_at as "activatedAt", deactivated_at as "deactivatedAt"
+           FROM kill_switches WHERE is_active = TRUE`
+        );
+        const dbSwitches = res.rows.map((r) => ({
+          id: r.id,
+          scope: r.scope,
+          targetId: r.targetId || undefined,
+          isActive: r.isActive,
+          reason: r.reason,
+          activatedBy: r.activatedBy,
+          deactivatedBy: r.deactivatedBy || undefined,
+          activatedAt: r.activatedAt?.toISOString ? r.activatedAt.toISOString() : String(r.activatedAt),
+          deactivatedAt: r.deactivatedAt?.toISOString ? r.deactivatedAt.toISOString() : r.deactivatedAt,
+        }));
+        const combined = new Map<string, KillSwitchRecord>();
+        for (const s of dbSwitches) combined.set(s.id, s);
+        for (const s of memSwitches) combined.set(s.id, s);
+        return Array.from(combined.values());
+      } catch (err: any) {
+        console.error('[PostgresKillSwitchDbAdapter] getActiveKillSwitches error (FAIL-CLOSED):', err?.message || err);
+        throw new Error(`DATABASE_UNAVAILABLE: Failed to query active kill switches: ${err?.message || err}`);
+      }
+    }
+
+    return memSwitches;
+  }
+
+  async createAuditLog(actorId: string, action: string, entityId?: string, reason?: string): Promise<void> {
+    const pool = getDbPool();
+    if (pool) {
+      try {
+        const validUserId = await ensureUserEntity(pool, actorId);
+        let validEntityId: string | null = null;
+        if (entityId && isUuid(entityId)) {
+          const entityCheck = await pool.query('SELECT id FROM entities WHERE id = $1', [entityId]);
+          if (entityCheck.rows.length > 0) {
+            validEntityId = entityId;
+          }
+        }
+
+        await pool.query(
+          `INSERT INTO audit_logs (id, actor_id, action, entity_id, reason, created_at)
+           VALUES (gen_random_uuid(), $1, $2, $3, $4, NOW())`,
+          [validUserId, action, validEntityId, reason || '']
+        );
+      } catch (err: any) {
+        console.warn('[PostgresKillSwitchDbAdapter] createAuditLog warning:', err?.message || err);
+      }
+    }
+  }
+}
+
+export const defaultKillSwitchDbAdapter = new PostgresKillSwitchDbAdapter();
+
+export type SnapshotTransitionAction = 'INSERT' | 'APPLY_UPDATE' | 'NO_OP_IDENTICAL' | 'IGNORED_STALE';
+
+export class OrderSnapshotStateMachine {
+  static evaluateTransition(
+    existing: {
+      intentId?: string;
+      exchangeOrderId?: string;
+      symbol?: string;
+      status: string;
+      executedQty: number;
+      cummulativeQuoteQty: number;
+    } | null,
+    incoming: {
+      intentId: string;
+      exchangeOrderId: string;
+      symbol: string;
+      status: string;
+      executedQty: number;
+      cummulativeQuoteQty: number;
+    }
+  ): { action: SnapshotTransitionAction; reason?: string } {
+    // 0. Status validation
+    const VALID_STATUSES = ['NEW', 'PARTIALLY_FILLED', 'FILLED', 'CANCELED', 'PENDING_CANCEL', 'REJECTED', 'EXPIRED'];
+    if (!VALID_STATUSES.includes(incoming.status)) {
+      throw new Error(`INVALID_ORDER_STATUS: Unknown or malformed order status: ${incoming.status}`);
+    }
+
+    if (!existing) {
+      return { action: 'INSERT' };
+    }
+
+    // 1. Identity validation
+    if (incoming.symbol && existing.symbol && incoming.symbol.replace('/', '').toUpperCase() !== existing.symbol.replace('/', '').toUpperCase()) {
+      throw new Error(`ORDER_SYMBOL_MISMATCH: Incoming symbol ${incoming.symbol} does not match existing ${existing.symbol}`);
+    }
+
+    if (incoming.exchangeOrderId && existing.exchangeOrderId && String(incoming.exchangeOrderId) !== String(existing.exchangeOrderId)) {
+      throw new Error(`ORDER_IDENTITY_MISMATCH: Incoming exchangeOrderId ${incoming.exchangeOrderId} does not match existing ${existing.exchangeOrderId}`);
+    }
+
+    const exQty = Number(existing.executedQty);
+    const inQty = Number(incoming.executedQty);
+    const exQuote = Number(existing.cummulativeQuoteQty);
+    const inQuote = Number(incoming.cummulativeQuoteQty);
+
+    // 2. Identical snapshot check
+    if (
+      incoming.status === existing.status &&
+      Math.abs(inQty - exQty) < 1e-9 &&
+      Math.abs(inQuote - exQuote) < 1e-9
+    ) {
+      return { action: 'NO_OP_IDENTICAL', reason: 'Identical snapshot already recorded' };
+    }
+
+    // 3. Terminal state protections
+    const terminalStatuses = ['FILLED', 'CANCELED', 'REJECTED', 'EXPIRED'];
+    if (terminalStatuses.includes(existing.status)) {
+      if (existing.status === 'FILLED') {
+        if (incoming.status === 'FILLED') {
+          return { action: 'NO_OP_IDENTICAL', reason: 'Identical FILLED snapshot' };
+        }
+        return { action: 'IGNORED_STALE', reason: `Order is already in terminal state FILLED; contradictory incoming ${incoming.status} ignored` };
+      }
+
+      // If existing is CANCELED, REJECTED, EXPIRED:
+      // Allow transition to FILLED only if incoming presents definitive execution evidence (inQty > 0, inQty >= exQty, and incoming.status === 'FILLED')
+      if (incoming.status === 'FILLED' && inQty > 0 && inQty >= exQty && inQuote >= exQuote) {
+        return { action: 'APPLY_UPDATE', reason: 'Authoritative FILLED evidence supersedes prior terminal status' };
+      }
+
+      if (inQty < exQty - 1e-9 || Math.abs(inQty - exQty) <= 1e-9) {
+        return { action: 'IGNORED_STALE', reason: `Order is already terminal ${existing.status}; incoming ${incoming.status} ignored` };
+      }
+    }
+
+    // 4. Monotonicity & Tuple Consistency
+    // Case A: Executed quantity regresses
+    if (inQty < exQty - 1e-9) {
+      return { action: 'IGNORED_STALE', reason: `Incoming executedQty ${inQty} is less than recorded ${exQty}; late arrival ignored` };
+    }
+
+    // Case B: Executed quantity strictly increases
+    if (inQty > exQty + 1e-9) {
+      if (inQuote < exQuote - 1e-9) {
+        throw new Error(
+          `INCONSISTENT_SNAPSHOT: Executed quantity increased (${exQty} -> ${inQty}) but cummulativeQuoteQty regressed (${exQuote} -> ${inQuote})`
+        );
+      }
+      return { action: 'APPLY_UPDATE' };
+    }
+
+    // Case C: Executed quantity equal (status progression, e.g. NEW -> PARTIALLY_FILLED or NEW/PARTIAL -> CANCELED)
+    if (inQuote < exQuote - 1e-9) {
+      throw new Error(
+        `INCONSISTENT_SNAPSHOT: Executed quantity unchanged (${exQty}) but cummulativeQuoteQty regressed (${exQuote} -> ${inQuote})`
+      );
+    }
+
+    return { action: 'APPLY_UPDATE' };
+  }
+}
+
+export class PostgresBinanceExecutionDbAdapter implements BinanceExecutionDbAdapter {
+  private inMemoryIntents: Map<string, TradeIntentRecord> = new Map();
+  private inMemoryCredentials: Map<string, any> = new Map();
+  private inMemoryFills: any[] = [];
+  private inMemoryAuditLogs: any[] = [];
+  private intentMutexMap: Map<string, Promise<void>> = new Map();
+  private executionTimestampMap: Map<string, number> = new Map();
+  private activeDbTransactions = 0;
+  public readonly isExplicitInMemory: boolean;
+
+  constructor(private customPool?: Pool | null) {
+    // Explicit in-memory mode ONLY if customPool is explicitly set to null
+    this.isExplicitInMemory = customPool === null;
+  }
+
+  private getPool(): Pool | null {
+    if (this.isExplicitInMemory) return null;
+    return this.customPool !== undefined ? this.customPool : getDbPool();
+  }
+
+  seedIntent(intent: TradeIntentRecord): void {
+    this.inMemoryIntents.set(intent.id, intent);
+    if (intent.status === 'EXECUTING') {
+      const claimTime = (intent as any).executingSince !== undefined
+        ? (intent as any).executingSince
+        : (intent.createdAt ? new Date(intent.createdAt).getTime() : Date.now());
+      this.inMemoryAuditLogs.push({
+        actorId: intent.userId || 'binance-order-worker',
+        action: 'INTENT_CLAIMED_EXECUTING',
+        entityId: intent.id,
+        reason: 'Seeded execution claim',
+        createdAt: new Date(claimTime).toISOString(),
+      });
+    }
+  }
+
+  seedLegacyIntentWithoutClaim(intent: TradeIntentRecord): void {
+    this.inMemoryIntents.set(intent.id, intent);
+    this.executionTimestampMap.delete(intent.id);
+    this.inMemoryAuditLogs = this.inMemoryAuditLogs.filter((l) => l.entityId !== intent.id);
+  }
+
+  seedIntents(intents: TradeIntentRecord[]): void {
+    for (const intent of intents) {
+      this.seedIntent(intent);
+    }
+  }
+
+  getInMemoryIntents(): TradeIntentRecord[] {
+    return Array.from(this.inMemoryIntents.values());
+  }
+
+  getInMemoryAuditLogs(): any[] {
+    return [...this.inMemoryAuditLogs];
+  }
+
+  seedCredentials(userId: string, creds: any): void {
+    this.inMemoryCredentials.set(userId, creds);
+  }
+
+  setExecutingTimestamp(intentId: string, timestamp: number): void {
+    this.executionTimestampMap.set(intentId, timestamp);
+    const mem = this.inMemoryIntents.get(intentId);
+    if (mem) {
+      (mem as any).executingSince = timestamp;
+    }
+  }
+
+  getExecutingTimestamp(intentId: string): number | undefined {
+    return this.executionTimestampMap.get(intentId);
+  }
+
+  clearInMemoryState(): void {
+    this.inMemoryIntents.clear();
+    this.inMemoryCredentials.clear();
+    this.inMemoryFills = [];
+    this.inMemoryAuditLogs = [];
+    this.intentMutexMap.clear();
+    this.executionTimestampMap.clear();
+  }
+
+  getAuditLogs(): any[] {
+    return [...this.inMemoryAuditLogs];
+  }
+
+  getActiveTransactionCount(): number {
+    return this.activeDbTransactions;
+  }
+
+  getOrderFills(): any[] {
+    return [...this.inMemoryFills];
+  }
+
+  async getApprovedIntentsQueue(): Promise<TradeIntentRecord[]> {
+    if (this.isExplicitInMemory) {
+      return Array.from(this.inMemoryIntents.values()).filter((i) => i.status === 'APPROVED');
+    }
+
+    const pool = this.getPool();
+    if (!pool) {
+      throw new Error('DATABASE_UNAVAILABLE: PostgreSQL pool is not configured for Binance order worker execution');
+    }
+
+    try {
+      const res = await pool.query(
+        `SELECT id, user_id AS "userId", stage, symbol, side, type,
+                quantity::float AS quantity, price::float AS price,
+                idempotency_key AS "idempotencyKey", status,
+                risk_decision_id AS "riskDecisionId", created_at AS "createdAt"
+         FROM trade_intents
+         WHERE status = 'APPROVED'
+         ORDER BY created_at ASC`
+      );
+      return res.rows.map((r: any) => ({
+        id: r.id,
+        userId: r.userId,
+        stage: r.stage,
+        symbol: r.symbol,
+        side: r.side,
+        type: r.type,
+        quantity: parseFloat(r.quantity),
+        price: r.price ? parseFloat(r.price) : undefined,
+        maxSlippagePct: 1.0,
+        idempotencyKey: r.idempotencyKey,
+        status: r.status,
+        riskDecisionId: r.riskDecisionId,
+        createdAt: r.createdAt ? new Date(r.createdAt).toISOString() : undefined,
+      }));
+    } catch (err: any) {
+      console.error('[PostgresBinanceExecutionDbAdapter] getApprovedIntentsQueue failed (FAIL-CLOSED):', err?.message || err);
+      throw err;
+    }
+  }
+
+  async claimIntentAtomic(intentId: string): Promise<boolean> {
+    this.activeDbTransactions++;
+    try {
+      if (this.isExplicitInMemory) {
+        const mem = this.inMemoryIntents.get(intentId);
+        if (mem && mem.status === 'APPROVED') {
+          const now = Date.now();
+          mem.status = 'EXECUTING';
+          (mem as any).executingSince = now;
+          this.executionTimestampMap.set(intentId, now);
+          this.inMemoryAuditLogs.push({
+            actorId: mem.userId || 'binance-order-worker',
+            action: 'INTENT_CLAIMED_EXECUTING',
+            entityId: intentId,
+            reason: `Claimed for execution at ${new Date(now).toISOString()}`,
+            createdAt: new Date(now).toISOString(),
+          });
+          return true;
+        }
+        return false;
+      }
+
+      const pool = this.getPool();
+      if (!pool) {
+        throw new Error('DATABASE_UNAVAILABLE: PostgreSQL pool is required for atomic intent claim');
+      }
+
+      if (!isUuid(intentId)) {
+        throw new Error(`INVALID_INTENT_ID: Intent ID ${intentId} must be a valid UUID for atomic claim`);
+      }
+
+      const client = typeof pool.connect === 'function' ? await pool.connect() : pool;
+      try {
+        await client.query('BEGIN');
+
+        const res = await client.query(
+          `UPDATE trade_intents
+           SET status = 'EXECUTING'
+           WHERE id = $1 AND status = 'APPROVED'
+           RETURNING id, user_id AS "userId"`,
+          [intentId]
+        );
+
+        if (res.rows.length === 0) {
+          await client.query('ROLLBACK');
+          return false;
+        }
+
+        const now = Date.now();
+        const rawActorId = res.rows[0].userId || 'binance-order-worker';
+        let validActorId = rawActorId;
+        if (isUuid(rawActorId) || rawActorId.startsWith('0x')) {
+          validActorId = await ensureUserEntity(client, rawActorId);
+        }
+
+        // Invariant: CAS APPROVED -> EXECUTING and audit log insertion MUST be atomic in the same transaction.
+        // If audit insertion fails (e.g. FK constraint violation, connection timeout), the entire claim is rolled back!
+        await client.query(
+          `INSERT INTO audit_logs (id, actor_id, action, entity_id, reason, created_at)
+           VALUES (gen_random_uuid(), $1, 'INTENT_CLAIMED_EXECUTING', $2, $3, NOW())`,
+          [validActorId, intentId, `Claimed for execution at ${new Date(now).toISOString()}`]
+        );
+
+        await client.query('COMMIT');
+        this.executionTimestampMap.set(intentId, now);
+        return true;
+      } catch (err: any) {
+        try {
+          await client.query('ROLLBACK');
+        } catch {
+          // ignore rollback error on disconnected client
+        }
+        this.executionTimestampMap.delete(intentId);
+        console.error(`[PostgresBinanceExecutionDbAdapter] claimIntentAtomic failed for ${intentId} (FAIL-CLOSED, ROLLED BACK):`, err?.message || err);
+        throw err;
+      } finally {
+        if (typeof (client as any).release === 'function') {
+          (client as any).release();
+        }
+      }
+    } finally {
+      this.activeDbTransactions--;
+    }
+  }
+
+  async updateIntentStatus(intentId: string, status: string, riskDecisionId?: string): Promise<void> {
+    if (status === 'EXECUTING') {
+      // Invariant: Single unified claim mechanism.
+      // Transition to EXECUTING is strictly a CAS from APPROVED to EXECUTING with atomic audit log insertion.
+      // Delegating directly to claimIntentAtomic() guarantees zero bypass of the atomic claim + audit contract.
+      const claimed = await this.claimIntentAtomic(intentId);
+      if (claimed && riskDecisionId) {
+        if (this.isExplicitInMemory) {
+          const mem = this.inMemoryIntents.get(intentId);
+          if (mem) {
+            mem.riskDecisionId = riskDecisionId;
+            mem.riskDecisionReason = riskDecisionId;
+          }
+        }
+      }
+      return;
+    }
+
+    if (this.isExplicitInMemory) {
+      const mem = this.inMemoryIntents.get(intentId);
+      if (mem) {
+        if (mem.status === status) {
+          if (riskDecisionId) {
+            mem.riskDecisionId = riskDecisionId;
+            mem.riskDecisionReason = riskDecisionId;
+          }
+          return;
+        }
+
+        // Terminal state CAS protection:
+        // 1. Terminal state EXECUTED is irreversible (cannot regress to FAILED, CANCELLED, or EXECUTING)
+        if (mem.status === 'EXECUTED') {
+          console.warn(`[PostgresBinanceExecutionDbAdapter] Blocked attempt to mutate terminal EXECUTED intent ${intentId} to ${status}`);
+          return;
+        }
+        // 2. Terminal CANCELLED cannot be overwritten by speculative local transitions.
+        // Authoritative corrections to EXECUTED must pass through recordOrderFill() with exchange evidence.
+        if (mem.status === 'CANCELLED') {
+          console.warn(`[PostgresBinanceExecutionDbAdapter] Blocked attempt to mutate CANCELLED intent ${intentId} to ${status}. Authoritative corrections must pass through recordOrderFill().`);
+          return;
+        }
+        // 3. Terminal FAILED / REJECTED cannot regress to non-terminal
+        if ((mem.status === 'FAILED' || mem.status === 'REJECTED') && status === 'APPROVED') {
+          console.warn(`[PostgresBinanceExecutionDbAdapter] Blocked attempt to mutate terminal ${mem.status} intent ${intentId} to ${status}`);
+          return;
+        }
+        mem.status = status;
+        this.executionTimestampMap.delete(intentId);
+        if (riskDecisionId) {
+          mem.riskDecisionId = riskDecisionId;
+          mem.riskDecisionReason = riskDecisionId;
+        }
+      }
+      return;
+    }
+
+    const pool = this.getPool();
+    if (!pool) {
+      throw new Error('DATABASE_UNAVAILABLE: PostgreSQL pool is required for updating intent status');
+    }
+
+    if (!isUuid(intentId)) {
+      throw new Error(`INVALID_INTENT_ID: Intent ID ${intentId} must be a valid UUID`);
+    }
+
+    const client = typeof pool.connect === 'function' ? await pool.connect() : pool;
+    try {
+      await client.query('BEGIN');
+
+      await client.query(
+        `UPDATE trade_intents
+         SET status = $2,
+             risk_decision_id = COALESCE($3, risk_decision_id)
+         WHERE id = $1
+           AND status != 'EXECUTED'
+           AND status != 'CANCELLED'
+           AND (status NOT IN ('FAILED', 'REJECTED') OR $2 NOT IN ('EXECUTING', 'APPROVED'))`,
+        [intentId, status, riskDecisionId || null]
+      );
+
+      this.executionTimestampMap.delete(intentId);
+      await client.query('COMMIT');
+    } catch (err: any) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {}
+      this.executionTimestampMap.delete(intentId);
+      console.error(`[PostgresBinanceExecutionDbAdapter] updateIntentStatus failed for ${intentId} (FAIL-CLOSED):`, err?.message || err);
+      throw err;
+    } finally {
+      if (typeof (client as any).release === 'function') {
+        (client as any).release();
+      }
+    }
+  }
+
+  async getStaleExecutingIntents(staleThresholdMs: number): Promise<TradeIntentRecord[]> {
+    if (this.isExplicitInMemory) {
+      const now = Date.now();
+      return Array.from(this.inMemoryIntents.values()).filter((i) => {
+        if (i.status !== 'EXECUTING') return false;
+
+        // 1. Check in-process claim timestamp
+        const inProcessClaim = this.executionTimestampMap.get(i.id);
+        if (inProcessClaim !== undefined) {
+          // If within threshold, definitely NOT stale
+          if ((now - inProcessClaim) < staleThresholdMs) {
+            return false;
+          }
+          // Past threshold: eligible candidate
+          return true;
+        }
+
+        // 2. Check audit logs for historical claim evidence
+        const claimAudit = this.inMemoryAuditLogs
+          .slice()
+          .reverse()
+          .find((l) => l.action === 'INTENT_CLAIMED_EXECUTING' && l.entityId === i.id);
+
+        if (claimAudit && claimAudit.createdAt) {
+          const claimTime = new Date(claimAudit.createdAt).getTime();
+          // Condition 1: Audit claim found and still within threshold -> NOT stale
+          // Condition 2: Audit claim found and past threshold -> eligible candidate
+          return (now - claimTime) >= staleThresholdMs;
+        }
+
+        // Condition 3: Audit claim NOT found:
+        // Invariant: Do NOT automatically conclude the intent is stale based on createdAt alone!
+        // Preserves intent status to prevent premature speculative reconciliation on unverified claim data.
+        return false;
+      });
+    }
+
+    const pool = this.getPool();
+    if (!pool) {
+      throw new Error('DATABASE_UNAVAILABLE: PostgreSQL pool is required for stale intent query');
+    }
+
+    try {
+      // Invariant: Prevent racing with active execution dispatch.
+      // Must have affirmative historical claim evidence past the threshold,
+      // and NO recent execution claim within the threshold.
+      // Note: audit_logs is historical evidence of claim timestamp, NOT a distributed lease or fencing token.
+      // Schema migration for durable lease/fencing remains DEFERRED.
+      const res = await pool.query(
+        `SELECT ti.id, ti.user_id AS "userId", ti.stage, ti.symbol, ti.side, ti.type,
+                ti.quantity::float AS quantity, ti.price::float AS price,
+                ti.idempotency_key AS "idempotencyKey", ti.status,
+                ti.risk_decision_id AS "riskDecisionId", ti.created_at AS "createdAt"
+         FROM trade_intents ti
+         WHERE ti.status = 'EXECUTING'
+           -- 1. Must have affirmative evidence of an execution claim that has exceeded the stale threshold:
+           AND EXISTS (
+             SELECT 1 FROM audit_logs al
+             WHERE al.entity_id = ti.id
+               AND al.action = 'INTENT_CLAIMED_EXECUTING'
+               AND al.created_at < NOW() - ($1 || ' milliseconds')::INTERVAL
+           )
+           -- 2. Must NOT have any newer execution claim within the threshold:
+           AND NOT EXISTS (
+             SELECT 1 FROM audit_logs al_recent
+             WHERE al_recent.entity_id = ti.id
+               AND al_recent.action = 'INTENT_CLAIMED_EXECUTING'
+               AND al_recent.created_at >= NOW() - ($1 || ' milliseconds')::INTERVAL
+           )
+         ORDER BY ti.created_at ASC`,
+        [staleThresholdMs]
+      );
+      const now = Date.now();
+      return res.rows
+        .filter((r: any) => {
+          const inProcessClaim = this.executionTimestampMap.get(r.id);
+          if (inProcessClaim && (now - inProcessClaim) < staleThresholdMs) {
+            return false;
+          }
+          return true;
+        })
+        .map((r: any) => ({
+          id: r.id,
+          userId: r.userId,
+          stage: r.stage,
+          symbol: r.symbol,
+          side: r.side,
+          type: r.type,
+          quantity: parseFloat(r.quantity),
+          price: r.price ? parseFloat(r.price) : undefined,
+          maxSlippagePct: 1.0,
+          idempotencyKey: r.idempotencyKey,
+          status: r.status,
+          riskDecisionId: r.riskDecisionId,
+          createdAt: r.createdAt ? new Date(r.createdAt).toISOString() : undefined,
+        }));
+    } catch (err: any) {
+      console.error('[PostgresBinanceExecutionDbAdapter] getStaleExecutingIntents failed (FAIL-CLOSED):', err?.message || err);
+      throw err;
+    }
+  }
+
+  async getBinanceCredentials(userId: string): Promise<any> {
+    if (this.isExplicitInMemory) {
+      return this.inMemoryCredentials.get(userId) || null;
+    }
+
+    const pool = this.getPool();
+    if (!pool) {
+      throw new Error('DATABASE_UNAVAILABLE: PostgreSQL pool is required for fetching credentials');
+    }
+
+    if (!isUuid(userId) && !userId.startsWith('0x')) {
+      throw new Error(`INVALID_USER_ID: User ID ${userId} must be a valid UUID or EVM address`);
+    }
+
+    try {
+      const validUserId = await ensureUserEntity(pool, userId);
+      const res = await pool.query(
+        `SELECT id, encrypted_api_key, encrypted_secret_key, key_permissions, is_active
+         FROM binance_credentials
+         WHERE user_id = $1 AND is_active = true
+         ORDER BY created_at DESC
+         LIMIT 1`,
+        [validUserId]
+      );
+      if (res.rows.length > 0) {
+        const row = res.rows[0];
+        return {
+          id: row.id,
+          encryptedApiKey: row.encrypted_api_key,
+          encryptedSecretKey: row.encrypted_secret_key,
+          permissions: row.key_permissions,
+          isActive: row.is_active,
+        };
+      }
+      return null;
+    } catch (err: any) {
+      console.error(`[PostgresBinanceExecutionDbAdapter] getBinanceCredentials failed for ${userId} (FAIL-CLOSED):`, err?.message || err);
+      throw err;
+    }
+  }
+
+  async recordOrderFill(fill: {
+    intentId: string;
+    exchangeOrderId: string;
+    symbol: string;
+    status: string;
+    executedQty: number;
+    cummulativeQuoteQty: number;
+    audit?: {
+      actorId?: string;
+      action: string;
+      reason?: string;
+    };
+  }): Promise<void> {
+    const currentMutex = this.intentMutexMap.get(fill.intentId) || Promise.resolve();
+    let releaseMutex!: () => void;
+    const nextMutex = new Promise<void>((resolve) => {
+      releaseMutex = resolve;
+    });
+    this.intentMutexMap.set(fill.intentId, nextMutex);
+
+    await currentMutex;
+    this.activeDbTransactions++;
+    try {
+      if (this.isExplicitInMemory) {
+        const memIntent = this.inMemoryIntents.get(fill.intentId);
+        if (!memIntent) {
+          throw new Error(`PARENT_INTENT_NOT_FOUND: Trade intent ${fill.intentId} does not exist`);
+        }
+
+        const existing = this.inMemoryFills.find((f) => f.intentId === fill.intentId);
+        const transition = OrderSnapshotStateMachine.evaluateTransition(existing || null, fill);
+        if (transition.action === 'INSERT') {
+          this.inMemoryFills.push({ ...fill, createdAt: new Date().toISOString() });
+        } else if (transition.action === 'APPLY_UPDATE') {
+          const idx = this.inMemoryFills.findIndex((f) => f.intentId === fill.intentId);
+          if (idx >= 0) {
+            this.inMemoryFills[idx] = { ...this.inMemoryFills[idx], ...fill, updatedAt: new Date().toISOString() };
+          }
+        }
+        if (transition.action === 'INSERT' || transition.action === 'APPLY_UPDATE') {
+          // If snapshot is FILLED, sync inMemoryIntents status to EXECUTED
+          if (fill.status === 'FILLED') {
+            memIntent.status = 'EXECUTED';
+          } else if (fill.status === 'CANCELED' || fill.status === 'EXPIRED') {
+            if (memIntent.status !== 'EXECUTED') {
+              memIntent.status = 'CANCELLED';
+            }
+          } else if (fill.status === 'REJECTED') {
+            if (memIntent.status !== 'EXECUTED' && memIntent.status !== 'CANCELLED') {
+              memIntent.status = 'FAILED';
+            }
+          }
+
+          const memActorId = fill.audit?.actorId || memIntent.userId || 'system';
+          const memAction = fill.audit?.action || (fill.status === 'FILLED' ? 'BINANCE_ORDER_EXECUTED' : 'BINANCE_ORDER_FILL_SNAPSHOT');
+          const memReason = fill.audit?.reason || `Symbol: ${fill.symbol}, Status: ${fill.status}, ExecutedQty: ${fill.executedQty}, CumQuoteQty: ${fill.cummulativeQuoteQty}, ExchangeOrderId: ${fill.exchangeOrderId}`;
+          this.inMemoryAuditLogs.push({
+            actorId: memActorId,
+            action: memAction,
+            entityId: fill.intentId,
+            reason: memReason,
+            createdAt: new Date().toISOString(),
+          });
+        }
+        return;
+      }
+
+      const pool = this.getPool();
+      if (!pool) {
+        throw new Error('DATABASE_UNAVAILABLE: PostgreSQL pool is required for recording order fill');
+      }
+
+      if (!isUuid(fill.intentId)) {
+        throw new Error(`INVALID_INTENT_ID: Intent ID ${fill.intentId} must be a valid UUID for recording order fill`);
+      }
+
+      const hasConnect = typeof (pool as any).connect === 'function';
+      const client = hasConnect ? await (pool as any).connect() : pool;
+      try {
+        await client.query('BEGIN');
+        const parentCheck = await client.query(
+          'SELECT id, status, user_id AS "userId" FROM trade_intents WHERE id = $1 FOR UPDATE',
+          [fill.intentId]
+        );
+        if (parentCheck.rows.length === 0) {
+          throw new Error(`PARENT_INTENT_NOT_FOUND: Trade intent ${fill.intentId} does not exist`);
+        }
+
+        const existingOrderRes = await client.query(
+          `SELECT id, intent_id, exchange_order_id AS "exchangeOrderId", symbol, status,
+                  executed_qty::float AS "executedQty",
+                  cummulative_quote_qty::float AS "cummulativeQuoteQty"
+           FROM orders
+           WHERE intent_id = $1
+           LIMIT 1`,
+          [fill.intentId]
+        );
+
+        const existing = existingOrderRes.rows.length > 0 ? existingOrderRes.rows[0] : null;
+        const transition = OrderSnapshotStateMachine.evaluateTransition(existing, fill);
+
+        if (transition.action === 'INSERT') {
+          await client.query(
+            `INSERT INTO orders (
+              intent_id, exchange_order_id, symbol, status,
+              executed_qty, cummulative_quote_qty, created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())`,
+            [
+              fill.intentId,
+              fill.exchangeOrderId,
+              fill.symbol,
+              fill.status,
+              fill.executedQty,
+              fill.cummulativeQuoteQty,
+            ]
+          );
+        } else if (transition.action === 'APPLY_UPDATE') {
+          await client.query(
+            `UPDATE orders
+             SET status = $2,
+                 executed_qty = $3,
+                 cummulative_quote_qty = $4,
+                 updated_at = NOW()
+             WHERE intent_id = $1`,
+            [
+              fill.intentId,
+              fill.status,
+              fill.executedQty,
+              fill.cummulativeQuoteQty,
+            ]
+          );
+        }
+
+        if (transition.action === 'INSERT' || transition.action === 'APPLY_UPDATE') {
+          if (fill.status === 'FILLED') {
+            await client.query(
+              `UPDATE trade_intents SET status = 'EXECUTED' WHERE id = $1 AND status != 'EXECUTED'`,
+              [fill.intentId]
+            );
+          } else if (fill.status === 'CANCELED' || fill.status === 'EXPIRED') {
+            await client.query(
+              `UPDATE trade_intents SET status = 'CANCELLED' WHERE id = $1 AND status NOT IN ('EXECUTED', 'CANCELLED')`,
+              [fill.intentId]
+            );
+          } else if (fill.status === 'REJECTED') {
+            await client.query(
+              `UPDATE trade_intents SET status = 'FAILED' WHERE id = $1 AND status NOT IN ('EXECUTED', 'CANCELLED', 'FAILED')`,
+              [fill.intentId]
+            );
+          }
+
+          // Atomic audit log insertion within the SAME transaction connection:
+          const rawActorId = fill.audit?.actorId || parentCheck.rows[0].userId || 'system';
+          const auditAction = fill.audit?.action || (fill.status === 'FILLED' ? 'BINANCE_ORDER_EXECUTED' : 'BINANCE_ORDER_FILL_SNAPSHOT');
+          const auditReason = fill.audit?.reason || `Symbol: ${fill.symbol}, Status: ${fill.status}, ExecutedQty: ${fill.executedQty}, CumQuoteQty: ${fill.cummulativeQuoteQty}, ExchangeOrderId: ${fill.exchangeOrderId}`;
+
+          let validActorId = rawActorId;
+          if (isUuid(rawActorId) || rawActorId.startsWith('0x')) {
+            validActorId = await ensureUserEntity(client, rawActorId);
+          }
+
+          await client.query(
+            `INSERT INTO audit_logs (id, actor_id, action, entity_id, reason, created_at)
+             VALUES (gen_random_uuid(), $1, $2, $3, $4, NOW())`,
+            [validActorId, auditAction, fill.intentId, auditReason]
+          );
+        }
+
+        await client.query('COMMIT');
+
+        const existingMemIdx = this.inMemoryFills.findIndex((f) => f.intentId === fill.intentId);
+        if (existingMemIdx >= 0) {
+          if (transition.action === 'APPLY_UPDATE') {
+            this.inMemoryFills[existingMemIdx] = { ...this.inMemoryFills[existingMemIdx], ...fill, updatedAt: new Date().toISOString() };
+          }
+        } else if (transition.action === 'INSERT') {
+          this.inMemoryFills.push({ ...fill, createdAt: new Date().toISOString() });
+        }
+      } catch (txErr: any) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw txErr;
+      } finally {
+        if (hasConnect && typeof client.release === 'function') {
+          client.release();
+        }
+      }
+    } catch (err: any) {
+      console.error(`[PostgresBinanceExecutionDbAdapter] recordOrderFill failed for intent ${fill.intentId} (FAIL-CLOSED):`, err?.message || err);
+      throw err;
+    } finally {
+      this.activeDbTransactions--;
+      releaseMutex();
+      if (this.intentMutexMap.get(fill.intentId) === nextMutex) {
+        this.intentMutexMap.delete(fill.intentId);
+      }
+    }
+  }
+
+  async createAuditLog(actorId: string, action: string, entityId?: string, reason?: string): Promise<void> {
+    if (this.isExplicitInMemory) {
+      this.inMemoryAuditLogs.push({
+        actorId,
+        action,
+        entityId,
+        intentId: entityId,
+        reason,
+        createdAt: new Date().toISOString(),
+      });
+      return;
+    }
+
+    const pool = this.getPool();
+    if (!pool) {
+      throw new Error('DATABASE_UNAVAILABLE: PostgreSQL pool is required for recording audit log');
+    }
+
+    try {
+      const validActorId = await ensureUserEntity(pool, actorId);
+      let validEntityId: string | null = null;
+      if (entityId && isUuid(entityId)) {
+        const entityCheck = await pool.query('SELECT id FROM entities WHERE id = $1', [entityId]);
+        if (entityCheck.rows.length > 0) {
+          validEntityId = entityId;
+        }
+      }
+
+      await pool.query(
+        `INSERT INTO audit_logs (id, actor_id, action, entity_id, reason, created_at)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, NOW())`,
+        [validActorId, action, validEntityId, reason || '']
+      );
+
+      this.inMemoryAuditLogs.push({
+        actorId,
+        action,
+        entityId,
+        reason,
+        createdAt: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      console.error(`[PostgresBinanceExecutionDbAdapter] createAuditLog failed for action ${action} (FAIL-CLOSED):`, err?.message || err);
+      throw err;
+    }
+  }
+
+  async getActiveKillSwitches(): Promise<any[]> {
+    if (this.isExplicitInMemory) {
+      return defaultKillSwitchDbAdapter.getActiveKillSwitches();
+    }
+
+    const pool = this.getPool();
+    if (!pool) {
+      throw new Error('DATABASE_UNAVAILABLE: PostgreSQL pool is required for querying active kill switches');
+    }
+
+    try {
+      const res = await pool.query(
+        `SELECT id, scope, target_id as "targetId", is_active as "isActive", reason
+         FROM kill_switches WHERE is_active = TRUE`
+      );
+      return res.rows.map((r: any) => ({
+        id: r.id,
+        scope: r.scope,
+        targetId: r.targetId || undefined,
+        isActive: r.isActive,
+        reason: r.reason,
+      }));
+    } catch (err: any) {
+      console.error('[PostgresBinanceExecutionDbAdapter] getActiveKillSwitches failed (FAIL-CLOSED):', err?.message || err);
+      throw err;
+    }
+  }
+}
+
+export const defaultBinanceExecutionDbAdapter = new PostgresBinanceExecutionDbAdapter();
+
+// ============================================================================
+// POSTGRES GAMEFI & NFT DATABASE ADAPTER
+// ============================================================================
+
+const inMemoryGameFiProfiles = new Map<string, UserGameFiProfile>();
+const inMemoryQuestCompletions: QuestCompletion[] = [];
+const inMemoryNftItems: NftItemRecord[] = [];
+const inMemorySybilRegistry = new Set<string>();
+const inMemoryTradeRegistry = new Set<string>();
+
+export class PostgresGameFiDbAdapter {
+  private poolOverride?: Pool | null;
+
+  constructor(poolOverride?: Pool | null) {
+    this.poolOverride = poolOverride;
+  }
+
+  private getPool(): Pool | null {
+    return this.poolOverride !== undefined ? this.poolOverride : getDbPool();
+  }
+
+  clearInMemoryStores(): void {
+    inMemoryGameFiProfiles.clear();
+    inMemoryQuestCompletions.length = 0;
+    inMemoryNftItems.length = 0;
+    inMemorySybilRegistry.clear();
+    inMemoryTradeRegistry.clear();
+  }
+
+  setMockSybilEvidence(identifier: string, verified: boolean): void {
+    if (verified) inMemorySybilRegistry.add(identifier.toLowerCase());
+    else inMemorySybilRegistry.delete(identifier.toLowerCase());
+  }
+
+  setMockTradeActivity(identifier: string, hasActivity: boolean): void {
+    if (hasActivity) inMemoryTradeRegistry.add(identifier.toLowerCase());
+    else inMemoryTradeRegistry.delete(identifier.toLowerCase());
+  }
+
+  async hasSybilEvidence(userId: string, walletAddress?: string): Promise<boolean> {
+    if (
+      inMemorySybilRegistry.has(userId.toLowerCase()) ||
+      (walletAddress && inMemorySybilRegistry.has(walletAddress.toLowerCase()))
+    ) {
+      return true;
+    }
+
+    const pool = this.getPool();
+    if (pool && isUuid(userId)) {
+      try {
+        const res = await pool.query(
+          `SELECT 1 FROM trust_evidence
+           WHERE subject_user_id = $1 AND direction = 'POSITIVE'
+             AND evidence_type IN ('WORLD_ID_ORB', 'WORLD_ID_DEVICE', 'GITCOIN_PASSPORT')
+           LIMIT 1`,
+          [userId]
+        );
+        if (res.rows.length > 0) return true;
+      } catch {}
+
+      if (walletAddress) {
+        try {
+          const nullifierRes = await pool.query(
+            `SELECT 1 FROM verified_nullifiers
+             WHERE LOWER(signal) = LOWER($1) OR scope_id = $2
+             LIMIT 1`,
+            [walletAddress, userId]
+          );
+          if (nullifierRes.rows.length > 0) return true;
+        } catch {}
+      }
+    }
+    return false;
+  }
+
+  async hasTradeOrLaunchActivity(userId: string, walletAddress?: string): Promise<boolean> {
+    if (
+      inMemoryTradeRegistry.has(userId.toLowerCase()) ||
+      (walletAddress && inMemoryTradeRegistry.has(walletAddress.toLowerCase()))
+    ) {
+      return true;
+    }
+
+    const pool = this.getPool();
+    if (pool && isUuid(userId)) {
+      try {
+        const draftRes = await pool.query(
+          `SELECT 1 FROM launch_drafts WHERE user_id = $1 AND status IN ('PUBLISHED', 'LAUNCHED') LIMIT 1`,
+          [userId]
+        );
+        if (draftRes.rows.length > 0) return true;
+      } catch {}
+
+      if (walletAddress) {
+        try {
+          const tokenRes = await pool.query(
+            `SELECT 1 FROM launchpad_tokens WHERE LOWER(creator_wallet) = LOWER($1) LIMIT 1`,
+            [walletAddress]
+          );
+          if (tokenRes.rows.length > 0) return true;
+        } catch {}
+      }
+    }
+    return false;
+  }
+
+  async getUserGameFiProfile(userId: string): Promise<UserGameFiProfile> {
+    const pool = this.getPool();
+    if (pool && isUuid(userId)) {
+      try {
+        const res = await pool.query(
+          `SELECT user_id as "userId", xp, level, quests_completed as "questsCompleted", updated_at as "updatedAt"
+           FROM user_gamefi_profiles WHERE user_id = $1 LIMIT 1`,
+          [userId]
+        );
+        if (res.rows.length > 0) {
+          const r = res.rows[0];
+          return {
+            userId: r.userId,
+            xp: Number(r.xp),
+            level: Number(r.level),
+            questsCompleted: Number(r.questsCompleted),
+            updatedAt: r.updatedAt,
+          };
+        }
+      } catch (err: any) {
+        if (process.env.NODE_ENV === 'production') throw err;
+      }
+    }
+
+    if (!inMemoryGameFiProfiles.has(userId)) {
+      inMemoryGameFiProfiles.set(userId, {
+        userId,
+        xp: 0,
+        level: 1,
+        questsCompleted: 0,
+        updatedAt: new Date(),
+      });
+    }
+    return inMemoryGameFiProfiles.get(userId)!;
+  }
+
+  async recordQuestCompletion(params: {
+    userId: string;
+    questId: string;
+    xpGranted: number;
+  }): Promise<{ profile: UserGameFiProfile; completion: QuestCompletion }> {
+    const { userId, questId, xpGranted } = params;
+    const pool = this.getPool();
+
+    if (pool && isUuid(userId)) {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+
+        const completionUuid = crypto.randomUUID();
+        // 1. Strict idempotency enforcement: ON CONFLICT DO NOTHING
+        const insertRes = await client.query(
+          `INSERT INTO quest_completions (id, user_id, quest_id, status, xp_granted, completed_at)
+           VALUES ($1, $2, $3, 'COMPLETED', $4, NOW())
+           ON CONFLICT (user_id, quest_id) DO NOTHING
+           RETURNING id, completed_at`,
+          [completionUuid, userId, questId, xpGranted]
+        );
+
+        if (insertRes.rows.length === 0) {
+          await client.query('ROLLBACK');
+          throw new Error(`QUEST_ALREADY_COMPLETED: User ${userId} has already completed quest '${questId}'`);
+        }
+
+        const completedAt = insertRes.rows[0].completed_at;
+
+        // 2. Concurrency-safe atomic SQL increment in Postgres within same client transaction
+        const profileRes = await client.query(
+          `INSERT INTO user_gamefi_profiles (user_id, xp, level, quests_completed, updated_at)
+           VALUES ($1, $2, 1 + FLOOR($2 / 500), 1, NOW())
+           ON CONFLICT (user_id) DO UPDATE SET
+             xp = user_gamefi_profiles.xp + EXCLUDED.xp,
+             level = 1 + FLOOR((user_gamefi_profiles.xp + EXCLUDED.xp) / 500),
+             quests_completed = user_gamefi_profiles.quests_completed + 1,
+             updated_at = NOW()
+           RETURNING user_id as "userId", xp, level, quests_completed as "questsCompleted", updated_at as "updatedAt"`,
+          [userId, xpGranted]
+        );
+
+        await client.query('COMMIT');
+
+        const r = profileRes.rows[0];
+        const updatedProfile: UserGameFiProfile = {
+          userId: r.userId,
+          xp: Number(r.xp),
+          level: Number(r.level),
+          questsCompleted: Number(r.questsCompleted),
+          updatedAt: r.updatedAt,
+        };
+
+        const completion: QuestCompletion = {
+          id: completionUuid,
+          userId,
+          questId,
+          status: 'COMPLETED',
+          xpGranted,
+          completedAt,
+        };
+
+        return { profile: updatedProfile, completion };
+      } catch (err: any) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw err;
+      } finally {
+        client.release();
+      }
+    }
+
+    // In-memory fallback (isolated unit tests and non-UUID test identifiers)
+    const existing = inMemoryQuestCompletions.find(
+      (c) => c.userId === userId && c.questId === questId
+    );
+    if (existing) {
+      throw new Error(`QUEST_ALREADY_COMPLETED: User ${userId} has already completed quest '${questId}'`);
+    }
+
+    // Synchronously register completion before async yields to guarantee concurrency safety and avoid race conditions
+    const completion: QuestCompletion = {
+      id: crypto.randomUUID(),
+      userId,
+      questId,
+      status: 'COMPLETED',
+      xpGranted,
+      completedAt: new Date(),
+    };
+    inMemoryQuestCompletions.push(completion);
+
+    try {
+      const current = await this.getUserGameFiProfile(userId);
+      const newXp = current.xp + xpGranted;
+      const newLevel = Math.floor(newXp / 500) + 1;
+      const questsCount = current.questsCompleted + 1;
+
+      const updatedProfile: UserGameFiProfile = {
+        userId,
+        xp: newXp,
+        level: newLevel,
+        questsCompleted: questsCount,
+        updatedAt: new Date(),
+      };
+      inMemoryGameFiProfiles.set(userId, updatedProfile);
+
+      return { profile: updatedProfile, completion };
+    } catch (err) {
+      // Roll back in-memory reservation if profile update throws
+      const idx = inMemoryQuestCompletions.indexOf(completion);
+      if (idx !== -1) inMemoryQuestCompletions.splice(idx, 1);
+      throw err;
+    }
+  }
+
+  async getUserNfts(ownerWallet: string): Promise<NftItemRecord[]> {
+    const cleanWallet = ownerWallet.toLowerCase();
+    const pool = this.getPool();
+    if (pool) {
+      try {
+        const res = await pool.query(
+          `SELECT id, collection_id as "collectionId", token_id as "tokenId",
+                  owner_wallet as "ownerWallet", tier, metadata_uri as "metadataUri",
+                  mint_tx_hash as "mintTxHash", minted_at as "mintedAt"
+           FROM nft_items WHERE LOWER(owner_wallet) = $1 ORDER BY minted_at DESC`,
+          [cleanWallet]
+        );
+        if (res.rows.length > 0) {
+          return res.rows.map((r: any) => ({
+            id: r.id,
+            collectionId: r.collectionId,
+            tokenId: Number(r.tokenId),
+            ownerWallet: r.ownerWallet,
+            tier: r.tier,
+            metadataUri: r.metadataUri,
+            mintTxHash: r.mintTxHash || undefined,
+            mintedAt: r.mintedAt,
+          }));
+        }
+      } catch (err: any) {
+        if (process.env.NODE_ENV === 'production') throw err;
+      }
+    }
+    return inMemoryNftItems.filter((i) => i.ownerWallet.toLowerCase() === cleanWallet);
+  }
+
+  async saveNftItem(item: Omit<NftItemRecord, 'id' | 'mintedAt'>): Promise<NftItemRecord> {
+    const pool = this.getPool();
+    const itemId = crypto.randomUUID();
+    const now = new Date();
+
+    if (pool && isUuid(item.collectionId)) {
+      try {
+        await pool.query(
+          `INSERT INTO nft_items (id, collection_id, token_id, owner_wallet, tier, metadata_uri, mint_tx_hash, minted_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
+          [itemId, item.collectionId, item.tokenId, item.ownerWallet, item.tier, item.metadataUri, item.mintTxHash || null]
+        );
+        return { ...item, id: itemId, mintedAt: now };
+      } catch (err: any) {
+        if (process.env.NODE_ENV === 'production') throw err;
+      }
+    }
+
+    const created: NftItemRecord = { ...item, id: itemId, mintedAt: now };
+    inMemoryNftItems.push(created);
+    return created;
+  }
+}
+
+export const defaultGameFiDbAdapter = new PostgresGameFiDbAdapter();
+
+export class PostgresProposalDbAdapter implements ProposalDbAdapter {
+  private inMemoryProposals: Map<string, AgentProposalRecord> = new Map();
+  private inMemoryAuditLogs: Array<{ actorId: string; action: string; entityId?: string; reason?: string; createdAt: string }> = [];
+
+  async createProposal(proposal: Omit<AgentProposalRecord, 'id'>): Promise<string> {
+    const id = crypto.randomUUID();
+    const record: AgentProposalRecord = {
+      ...proposal,
+      id,
+    };
+    this.inMemoryProposals.set(id, record);
+
+    const pool = getDbPool();
+    if (!pool && process.env.NODE_ENV === 'production') {
+      throw new Error('DATABASE_UNAVAILABLE: Neon connection pool is not available in production.');
+    }
+
+    if (pool) {
+      try {
+        const validUserId = await ensureUserEntity(pool, proposal.userId);
+        let validAgentId: string = proposal.agentId;
+        if (!isUuid(validAgentId)) {
+          const agentRes = await pool.query('SELECT id FROM agent_profiles LIMIT 1');
+          if (agentRes.rows.length > 0) {
+            validAgentId = agentRes.rows[0].id;
+          } else {
+            const newAgentId = crypto.randomUUID();
+            await pool.query("INSERT INTO entities (id, type) VALUES ($1, 'AGENT')", [newAgentId]);
+            await pool.query(
+              "INSERT INTO agent_profiles (id, owner_id, name, strategy_description, system_prompt, risk_tolerance_level) VALUES ($1, $2, 'Default Agent', 'Momentum trading strategy', 'Analyze market signals and propose trades', 'MODERATE')",
+              [newAgentId, validUserId]
+            );
+            validAgentId = newAgentId;
+          }
+        }
+
+        await pool.query(
+          `INSERT INTO agent_proposals (
+            id, agent_id, user_id, target_symbol, action, suggested_qty, suggested_price,
+            rationale, confidence_score, status, expires_at, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+          [
+            id,
+            validAgentId,
+            validUserId,
+            proposal.targetSymbol,
+            proposal.action,
+            proposal.suggestedQty,
+            proposal.suggestedPrice || null,
+            proposal.rationale,
+            proposal.confidenceScore,
+            proposal.status || 'PENDING_APPROVAL',
+            proposal.expiresAt,
+            proposal.createdAt || new Date().toISOString(),
+          ]
+        );
+      } catch (err: any) {
+        console.warn('[PostgresProposalDbAdapter] createProposal DB write warning:', err?.message || err);
+        if (process.env.NODE_ENV === 'production') {
+          throw new Error(`DATABASE_ERROR: Failed to persist agent proposal to PostgreSQL SSOT: ${err?.message || err}`);
+        }
+      }
+    }
+
+    return id;
+  }
+
+  async getProposalById(id: string): Promise<AgentProposalRecord | null> {
+    const pool = getDbPool();
+    if (pool) {
+      try {
+        const res = await pool.query('SELECT * FROM agent_proposals WHERE id = $1', [id]);
+        if (res.rows.length > 0) {
+          const r = res.rows[0];
+          return {
+            id: r.id,
+            agentId: r.agent_id,
+            userId: r.user_id,
+            targetSymbol: r.target_symbol,
+            action: r.action,
+            suggestedQty: Number(r.suggested_qty),
+            suggestedPrice: r.suggested_price ? Number(r.suggested_price) : undefined,
+            rationale: r.rationale,
+            confidenceScore: Number(r.confidence_score),
+            status: r.status,
+            expiresAt: r.expires_at?.toISOString ? r.expires_at.toISOString() : String(r.expires_at),
+            createdAt: r.created_at?.toISOString ? r.created_at.toISOString() : String(r.created_at),
+          };
+        }
+      } catch (err: any) {
+        console.warn('[PostgresProposalDbAdapter] getProposalById warning:', err?.message || err);
+        if (process.env.NODE_ENV === 'production') {
+          throw new Error(`DATABASE_ERROR: Failed to query agent proposal from PostgreSQL SSOT: ${err?.message || err}`);
+        }
+      }
+    }
+
+    return this.inMemoryProposals.get(id) || null;
+  }
+
+  async updateProposalStatus(id: string, status: 'APPROVED' | 'REJECTED' | 'EXPIRED'): Promise<void> {
+    const mem = this.inMemoryProposals.get(id);
+    if (mem) {
+      mem.status = status;
+    }
+
+    const pool = getDbPool();
+    if (!pool && process.env.NODE_ENV === 'production') {
+      throw new Error('DATABASE_UNAVAILABLE: Neon connection pool is not available in production.');
+    }
+
+    if (pool) {
+      try {
+        await pool.query('UPDATE agent_proposals SET status = $1 WHERE id = $2', [status, id]);
+      } catch (err: any) {
+        console.warn('[PostgresProposalDbAdapter] updateProposalStatus warning:', err?.message || err);
+        if (process.env.NODE_ENV === 'production') {
+          throw new Error(`DATABASE_ERROR: Failed to update agent proposal status in PostgreSQL SSOT: ${err?.message || err}`);
+        }
+      }
+    }
+  }
+
+  async createAuditLog(actorId: string, action: string, entityId?: string, reason?: string): Promise<void> {
+    this.inMemoryAuditLogs.push({
+      actorId,
+      action,
+      entityId,
+      reason,
+      createdAt: new Date().toISOString(),
+    });
+
+    const pool = getDbPool();
+    if (pool) {
+      try {
+        const validUserId = await ensureUserEntity(pool, actorId);
+        let validEntityId: string | null = null;
+        if (entityId && isUuid(entityId)) {
+          const entityCheck = await pool.query('SELECT id FROM entities WHERE id = $1', [entityId]);
+          if (entityCheck.rows.length > 0) {
+            validEntityId = entityId;
+          }
+        }
+
+        await pool.query(
+          `INSERT INTO audit_logs (id, actor_id, action, entity_id, reason, created_at)
+           VALUES (gen_random_uuid(), $1, $2, $3, $4, NOW())`,
+          [validUserId, action, validEntityId, reason || '']
+        );
+      } catch (err: any) {
+        console.warn('[PostgresProposalDbAdapter] createAuditLog warning:', err?.message || err);
+        if (process.env.NODE_ENV === 'production') {
+          throw new Error(`DATABASE_ERROR: Failed to write audit log to PostgreSQL SSOT: ${err?.message || err}`);
+        }
+      }
+    }
+  }
+
+  getAuditLogs() {
+    return [...this.inMemoryAuditLogs];
+  }
+
+  clearInMemoryState() {
+    this.inMemoryProposals.clear();
+    this.inMemoryAuditLogs = [];
+  }
+}
+
+export const defaultProposalDbAdapter = new PostgresProposalDbAdapter();
+
+// ----------------------------------------------------------------------------
+// POSTGRES BILLING DB ADAPTER
+// ----------------------------------------------------------------------------
+export interface SubscriptionRecord {
+  id: string;
+  userId: string;
+  planId: PlanId;
+  status: 'ACTIVE' | 'SUSPENDED' | 'EXPIRED' | 'CANCELLED';
+  currentPeriodStart: Date;
+  currentPeriodEnd: Date;
+  credits: number;
+}
+
+export class PostgresBillingDbAdapter implements BillingDbAdapter {
+  private inMemorySubscriptions: Map<string, SubscriptionRecord> = new Map();
+
+  seedSubscription(userId: string, sub: {
+    planId: PlanId;
+    status?: 'ACTIVE' | 'SUSPENDED' | 'EXPIRED' | 'CANCELLED';
+    currentPeriodEnd?: Date;
+    credits?: number;
+  }): void {
+    this.inMemorySubscriptions.set(userId, {
+      id: crypto.randomUUID(),
+      userId,
+      planId: sub.planId,
+      status: sub.status || 'ACTIVE',
+      currentPeriodStart: new Date(),
+      currentPeriodEnd: sub.currentPeriodEnd || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      credits: sub.credits ?? 5000,
+    });
+  }
+
+  clearSubscriptions(): void {
+    this.inMemorySubscriptions.clear();
+  }
+
+  async getUserPlan(userId: string): Promise<PlanId> {
+    const pool = getDbPool();
+    if (!pool) {
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('DATABASE_UNAVAILABLE: Neon connection pool is not available in production.');
+      }
+      if (process.env.NODE_ENV !== 'test') {
+        return 'FREE';
+      }
+    }
+
+    if (pool) {
+      try {
+        const validUserId = await ensureUserEntity(pool, userId);
+        const res = await pool.query(
+          `SELECT plan_id, status, current_period_end
+           FROM subscriptions
+           WHERE user_id = $1
+           ORDER BY created_at DESC
+           LIMIT 1`,
+          [validUserId]
+        );
+        if (res.rows.length === 0) {
+          return 'FREE';
+        }
+        const row = res.rows[0];
+        const isActive = row.status === 'ACTIVE';
+        const isNotExpired = new Date(row.current_period_end).getTime() > Date.now();
+        if (isActive && isNotExpired) {
+          const plan = row.plan_id?.toUpperCase();
+          if (plan === 'TRADER' || plan === 'AGENT' || plan === 'CREATOR' || plan === 'FREE') {
+            return plan as PlanId;
+          }
+        }
+        return 'FREE';
+      } catch (err: any) {
+        throw new Error(`DATABASE_UNAVAILABLE: Failed to query user subscription: ${err?.message || err}`);
+      }
+    }
+
+    const sub = this.inMemorySubscriptions.get(userId);
+    if (!sub) return 'FREE';
+    const isActive = sub.status === 'ACTIVE';
+    const isNotExpired = new Date(sub.currentPeriodEnd).getTime() > Date.now();
+    if (isActive && isNotExpired) {
+      return sub.planId;
+    }
+    return 'FREE';
+  }
+
+  async getUserEntitlement(userId: string): Promise<{ planId: PlanId; hasLiveTrading: boolean; paperTrading: boolean }> {
+    const planId = await this.getUserPlan(userId);
+    const hasLiveTrading = planId === 'TRADER' || planId === 'AGENT';
+    return {
+      planId,
+      hasLiveTrading,
+      paperTrading: true,
+    };
+  }
+
+  async getUserCreditBalance(userId: string): Promise<number> {
+    const sub = this.inMemorySubscriptions.get(userId);
+    return sub?.credits ?? 100;
+  }
+
+  async recordLedgerEntry(_entry: {
+    userId: string;
+    amount: number;
+    currency: string;
+    type: string;
+    referenceId?: string;
+    description: string;
+  }): Promise<void> {
+    // Non-blocking in-memory/mock ledger entry
+  }
+
+  async updateUserSubscription(userId: string, planId: PlanId, _stripeSubId?: string): Promise<void> {
+    this.seedSubscription(userId, { planId, status: 'ACTIVE' });
+  }
+
+  async createAuditLog(_actorId: string, _action: string, _entityId?: string, _reason?: string): Promise<void> {
+    // Audit log
+  }
+}
+
+export const defaultBillingDbAdapter = new PostgresBillingDbAdapter();
+
+// ----------------------------------------------------------------------------
+// POSTGRES DUAL-CONTROL DB ADAPTER
+// ----------------------------------------------------------------------------
+export class PostgresDualControlDbAdapter implements DualControlDbAdapter {
+  private inMemoryRequests: Map<string, DualControlRequestRecord> = new Map();
+  private inMemoryAuditLogs: any[] = [];
+
+  seedRequest(req: DualControlRequestRecord): void {
+    this.inMemoryRequests.set(req.id, { ...req });
+  }
+
+  clearRequests(): void {
+    this.inMemoryRequests.clear();
+    this.inMemoryAuditLogs = [];
+  }
+
+  getAuditLogs(): any[] {
+    return [...this.inMemoryAuditLogs];
+  }
+
+  async createRequest(req: Omit<DualControlRequestRecord, 'id'>): Promise<string> {
+    const id = crypto.randomUUID();
+    const record: DualControlRequestRecord = { id, ...req };
+    const pool = getDbPool();
+    if (pool) {
+      try {
+        const validRequesterId = await ensureUserEntity(pool, req.requestedBy);
+        await pool.query(
+          `INSERT INTO dual_control_requests (
+            id, action_type, requested_by, payload, status, expires_at, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+          [
+            id,
+            req.actionType,
+            validRequesterId,
+            JSON.stringify(req.payload),
+            req.status,
+            req.expiresAt,
+          ]
+        );
+        this.inMemoryRequests.set(id, record);
+        return id;
+      } catch (err: any) {
+        throw new Error(`DB_DUAL_CONTROL_CREATE_FAILED: ${err?.message}`);
+      }
+    }
+    this.inMemoryRequests.set(id, record);
+    return id;
+  }
+
+  async getRequestById(id: string): Promise<DualControlRequestRecord | null> {
+    if (this.inMemoryRequests.has(id)) {
+      return this.inMemoryRequests.get(id) || null;
+    }
+    const pool = getDbPool();
+    if (pool) {
+      try {
+        const res = await pool.query(
+          `SELECT id, action_type AS "actionType", requested_by AS "requestedBy",
+                  approved_by AS "approvedBy", payload, status,
+                  expires_at AS "expiresAt", created_at AS "createdAt"
+           FROM dual_control_requests
+           WHERE id = $1 LIMIT 1`,
+          [id]
+        );
+        if (res.rows.length > 0) {
+          const row = res.rows[0];
+          return {
+            id: row.id,
+            actionType: row.actionType,
+            requestedBy: row.requestedBy,
+            approvedBy: row.approvedBy,
+            payload: typeof row.payload === 'string' ? JSON.parse(row.payload) : row.payload,
+            reason: row.payload?.reason || 'Dual-control request',
+            status: row.status,
+            expiresAt: new Date(row.expiresAt).toISOString(),
+            createdAt: new Date(row.createdAt).toISOString(),
+          };
+        }
+        return this.inMemoryRequests.get(id) || null;
+      } catch (err: any) {
+        throw new Error(`DB_DUAL_CONTROL_GET_FAILED: ${err?.message}`);
+      }
+    }
+    return this.inMemoryRequests.get(id) || null;
+  }
+
+  async updateRequestStatus(id: string, status: string, approvedBy?: string, expectedStatus?: string): Promise<boolean> {
+    const memReq = this.inMemoryRequests.get(id);
+    const pool = getDbPool();
+    if (pool) {
+      try {
+        const validApproverId = approvedBy ? await ensureUserEntity(pool, approvedBy) : null;
+        const res = await pool.query(
+          `UPDATE dual_control_requests
+           SET status = $1, approved_by = COALESCE($2, approved_by)
+           WHERE id = $3 AND ($4::varchar IS NULL OR status = $4)`,
+          [status, validApproverId, id, expectedStatus || null]
+        );
+        if (expectedStatus && res.rowCount === 0 && !memReq) {
+          return false;
+        }
+      } catch (err: any) {
+        if (!memReq) {
+          throw new Error(`DB_DUAL_CONTROL_UPDATE_FAILED: ${err?.message}`);
+        }
+      }
+    }
+    if (memReq) {
+      if (expectedStatus && memReq.status !== expectedStatus) {
+        return false;
+      }
+      memReq.status = status as any;
+      if (approvedBy) memReq.approvedBy = approvedBy;
+    }
+    return true;
+  }
+
+  async createAuditLog(entry: {
+    actorId: string;
+    action: string;
+    entityId?: string;
+    payloadBefore?: unknown;
+    payloadAfter?: unknown;
+    reason?: string;
+  }): Promise<void> {
+    this.inMemoryAuditLogs.push({ ...entry, timestamp: new Date().toISOString() });
+    const pool = getDbPool();
+    if (pool) {
+      try {
+        const validActorId = await ensureUserEntity(pool, entry.actorId);
+        await pool.query(
+          `INSERT INTO audit_logs (
+            actor_id, action, entity_id, payload_before, payload_after, reason, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+          [
+            validActorId,
+            entry.action,
+            entry.entityId && isUuid(entry.entityId) ? entry.entityId : null,
+            JSON.stringify(entry.payloadBefore || {}),
+            JSON.stringify(entry.payloadAfter || {}),
+            entry.reason || null,
+          ]
+        );
+      } catch {
+        // Non-blocking fallback
+      }
+    }
+  }
+}
+
+export const defaultDualControlDbAdapter = new PostgresDualControlDbAdapter();
+
 

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React from 'react';
 import Link from 'next/link';
@@ -15,6 +15,7 @@ import {
   BrainCircuit,
   Award,
 } from 'lucide-react';
+import { getNetworkLabel } from '../lib/classifyHostname';
 
 export default function HeaderNav() {
   const pathname = usePathname();
@@ -45,12 +46,22 @@ export default function HeaderNav() {
     return pathname.startsWith(href);
   };
 
+  // Network label: initialized to '—' during SSR and initial hydration pass
+  // to guarantee matching markup between server and client. Updated post-mount
+  // with actual browser hostname classification.
+  // NOTE: This label is UI-informational only and is NOT a wallet chain-ID check.
+  const [networkLabel, setNetworkLabel] = React.useState<string>('—');
+
+  React.useEffect(() => {
+    setNetworkLabel(getNetworkLabel());
+  }, []);
+
   return (
     <header className="header-nav">
       {/* Brand & Network Indicator */}
       <div className="flex-row items-center gap-md">
-        <Link href="/" className="terminal-text" style={{ fontSize: '18px', fontWeight: 900, letterSpacing: '-0.5px' }}>
-          RTRADER
+        <Link href="/" className="poolnet-brand" style={{ fontSize: '18px', fontWeight: 900, letterSpacing: '-0.5px' }}>
+          POOLNET
         </Link>
         <span className="badge" style={{ backgroundColor: '#1A1E2F', border: '1px solid #334155', color: '#94A3B8', fontSize: '11px', padding: '2px 6px' }}>
           v2.5
@@ -62,15 +73,38 @@ export default function HeaderNav() {
             gap: '6px',
             padding: '3px 8px',
             borderRadius: '12px',
-            backgroundColor: 'rgba(34, 197, 94, 0.08)',
-            border: '1px solid rgba(34, 197, 94, 0.2)',
+            backgroundColor: networkLabel === 'Base Sepolia'
+              ? 'rgba(0, 229, 255, 0.08)'
+              : networkLabel === 'Base Mainnet'
+                ? 'rgba(34, 197, 94, 0.08)'
+                : 'rgba(148, 163, 184, 0.08)',
+            border: `1px solid ${
+              networkLabel === 'Base Sepolia'
+                ? 'rgba(0, 229, 255, 0.2)'
+                : networkLabel === 'Base Mainnet'
+                  ? 'rgba(34, 197, 94, 0.2)'
+                  : 'rgba(148, 163, 184, 0.2)'
+            }`,
             fontSize: '11px',
-            color: '#86EFAC',
+            color: networkLabel === 'Base Sepolia'
+              ? '#67E8F9'
+              : networkLabel === 'Base Mainnet'
+                ? '#86EFAC'
+                : '#94A3B8',
             fontWeight: 600,
           }}
+          title="Deployment environment label (informational only — not a wallet chain check)"
+          aria-label={`Deployment environment: ${networkLabel}`}
         >
-          <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#22C55E' }} />
-          Base Mainnet
+          <span style={{
+            width: '6px', height: '6px', borderRadius: '50%',
+            backgroundColor: networkLabel === 'Base Sepolia'
+              ? '#00E5FF'
+              : networkLabel === 'Base Mainnet'
+                ? '#22C55E'
+                : '#94A3B8',
+          }} />
+          {networkLabel}
         </div>
       </div>
 
@@ -109,6 +143,11 @@ export default function HeaderNav() {
               <span className="badge badge-admin" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                 <ShieldAlert size={12} />
                 ADMIN
+              </span>
+            ) : userRole === 'CREATOR' ? (
+              <span className="badge badge-creator" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <Rocket size={12} />
+                CREATOR
               </span>
             ) : userRole === 'TRADER' ? (
               <span className="badge badge-trader" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
@@ -157,6 +196,7 @@ export default function HeaderNav() {
                 borderColor: 'rgba(239, 68, 68, 0.3)',
               }}
               title="Disconnect Wallet"
+              aria-label="Disconnect Wallet"
             >
               <LogOut size={14} />
             </button>

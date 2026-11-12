@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "bun:test";
+import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { encodeEventTopics, encodeAbiParameters, type Address, type Hash } from "viem";
 import {
   deployClanker,
@@ -8,6 +8,8 @@ import {
   CLANKER_V3_1_ABI,
   CLANKER_V3_1_FACTORY_ADDRESS,
   WETH9_BASE_ADDRESS,
+  _setRealSdkLoadedForTest,
+  isProductionEnvironment,
 } from "../src/modules/evm/clanker-deployer.ts";
 import { resetConfig } from "../src/config.ts";
 import type { TokenIdentity } from "../src/modules/ai/gemini-brain.ts";
@@ -146,6 +148,7 @@ describe("Clanker v4 Token Deployer Engine", () => {
     expect(result.simulated).toBe(false);
     expect(result.chain).toBe("clanker");
     expect(result.tokenAddress?.toLowerCase()).toBe(expectedTokenAddress.toLowerCase());
+    expect(result.poolId?.toLowerCase()).toBe(expectedPoolAddress.toLowerCase());
     expect(result.poolAddress?.toLowerCase()).toBe(expectedPoolAddress.toLowerCase());
     expect(result.txHash).toBe(expectedTxHash);
     expect(result.deployCostEth).toBeGreaterThan(0);
@@ -254,5 +257,85 @@ describe("Clanker v4 Token Deployer Engine", () => {
     expect(normalizeTrendInput({ chain: "clanker" })).toContain("clanker");
     expect(normalizeTrendInput("custom trend")).toBe("custom trend");
     expect(normalizeTrendInput(undefined)).toContain("Trending");
+  });
+
+  describe("Clanker Deployer Fail-Closed Hardening & Environment Safety", () => {
+    const origNodeEnv = process.env.NODE_ENV;
+    const origAppEnv = process.env.APP_ENV;
+
+    afterEach(() => {
+      process.env.NODE_ENV = origNodeEnv;
+      process.env.APP_ENV = origAppEnv;
+      _setRealSdkLoadedForTest(true, null);
+    });
+
+    it("should reject deployment with CLANKER_SDK_UNAVAILABLE when SDK is missing in production", async () => {
+      process.env.NODE_ENV = "production";
+      _setRealSdkLoadedForTest(false, new Error("Cannot find module 'clanker-sdk/v4'"));
+
+      const result = await deployClanker(mockIdentity, mockAssets, { dryRun: true });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("CLANKER_SDK_UNAVAILABLE");
+      expect(result.error).toContain("required in production");
+    });
+
+    it("should reject mock execution in production even if allowMockSdk is explicitly set to true", async () => {
+      process.env.NODE_ENV = "production";
+      _setRealSdkLoadedForTest(false, new Error("SDK uninitialized"));
+
+      const result = await deployClanker(mockIdentity, mockAssets, {
+        dryRun: true,
+        allowMockSdk: true,
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("CLANKER_SDK_UNAVAILABLE");
+      expect(result.error).toContain("required in production");
+    });
+
+    it("should reject mock execution in development environment when allowMockSdk is false", async () => {
+      process.env.NODE_ENV = "development";
+      _setRealSdkLoadedForTest(false, new Error("SDK missing"));
+
+      const result = await deployClanker(mockIdentity, mockAssets, {
+        dryRun: true,
+        allowMockSdk: false,
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("CLANKER_SDK_UNAVAILABLE");
+    });
+
+    it("should allow mock execution in test environment when explicit mock opt-in is enabled", async () => {
+      process.env.NODE_ENV = "test";
+      _setRealSdkLoadedForTest(false, null);
+
+      const mockPublicClient = {
+        simulateContract: async () => ({ result: undefined }),
+      };
+
+      const result = await deployClanker(mockIdentity, mockAssets, {
+        dryRun: true,
+        allowMockSdk: true,
+        publicClientOverride: mockPublicClient,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.simulated).toBe(true);
+    });
+
+    it("should correctly identify production environment via isProductionEnvironment helper", () => {
+      process.env.NODE_ENV = "production";
+      expect(isProductionEnvironment()).toBe(true);
+
+      process.env.NODE_ENV = "test";
+      process.env.APP_ENV = "production";
+      expect(isProductionEnvironment()).toBe(true);
+
+      process.env.NODE_ENV = "test";
+      process.env.APP_ENV = "development";
+      expect(isProductionEnvironment()).toBe(false);
+    });
   });
 });

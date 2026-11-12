@@ -24,13 +24,83 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { base } from "viem/chains";
-import { Clanker as ClankerV4 } from "clanker-sdk/v4";
-import { ClankerDeployments } from "clanker-sdk";
 import { getConfig } from "../../config.ts";
 import { logger } from "../../logger.ts";
 import { sanitizeSecret } from "./bankr-deployer.ts";
 import type { TokenIdentity } from "../ai/gemini-brain.ts";
 import type { UploadResult } from "../ipfs/pinata-uploader.ts";
+
+// ─── SDK Safe Load / Fallbacks ─────────────────────────────────────────────
+
+export let isRealSdkLoaded = false;
+export let sdkLoadError: Error | null = null;
+
+let ClankerV4: any = class MockClankerV4 {
+  constructor(_opts?: any) {}
+  async getDeployTransaction(_config: any, _account: any) {
+    return {
+      address: "0xE85A59c628F7d27878ACeB4bf3b35733630083a9",
+      abi: [],
+      functionName: "deployToken",
+      args: [],
+      value: 0n,
+      expectedAddress: "0x1111111111111111111111111111111111111111",
+    };
+  }
+};
+
+let ClankerDeployments: any = {
+  "8453": {
+    clanker_v4: {
+      address: "0xE85A59c628F7d27878ACeB4bf3b35733630083a9",
+      abi: []
+    }
+  }
+};
+
+try {
+  const sdk = await import("clanker-sdk");
+  if (sdk.ClankerDeployments) ClankerDeployments = sdk.ClankerDeployments;
+} catch (e: any) {
+  if (!sdkLoadError) sdkLoadError = e instanceof Error ? e : new Error(String(e));
+}
+
+try {
+  // @ts-ignore
+  const v4Module = await import("clanker-sdk/v4");
+  if (v4Module?.Clanker) {
+    ClankerV4 = v4Module.Clanker;
+    isRealSdkLoaded = true;
+  } else {
+    if (!sdkLoadError) sdkLoadError = new Error("clanker-sdk/v4 export 'Clanker' is missing");
+  }
+} catch (e: any) {
+  if (!sdkLoadError) sdkLoadError = e instanceof Error ? e : new Error(String(e));
+}
+
+/** Test helper to simulate SDK load state for unit testing failure paths. */
+export function _setRealSdkLoadedForTest(loaded: boolean, err: Error | null = null) {
+  isRealSdkLoaded = loaded;
+  sdkLoadError = err;
+}
+
+/**
+ * Resolves whether the current execution context is production.
+ * Returns true if NODE_ENV, APP_ENV, or DEPLOY_MODE is production / mainnet.
+ */
+export function isProductionEnvironment(): boolean {
+  const nodeEnv = (process.env.NODE_ENV ?? "").toLowerCase();
+  const appEnv = (process.env.APP_ENV ?? "").toLowerCase();
+  const deployMode = (process.env.DEPLOY_MODE ?? "").toLowerCase();
+  return (
+    nodeEnv === "production" ||
+    appEnv === "production" ||
+    appEnv === "prod" ||
+    deployMode === "mainnet"
+  );
+}
+
+export { ClankerV4 };
 
 // ─── Chain Constants ──────────────────────────────────────────────────────────
 
@@ -58,8 +128,37 @@ export const CLANKER_DEPLOY_GAS_LIMIT = 5_000_000n;
 /** Base Clanker launchpad token viewer URL. */
 export const CLANKER_LAUNCHPAD_URL = "https://www.clanker.world/clanker/";
 
+const defaultAbi = [
+  {
+    anonymous: false,
+    type: "event",
+    name: "TokenCreated",
+    inputs: [
+      { indexed: false, name: "msgSender", type: "address" },
+      { indexed: true, name: "tokenAddress", type: "address" },
+      { indexed: true, name: "tokenAdmin", type: "address" },
+      { indexed: false, name: "tokenImage", type: "string" },
+      { indexed: false, name: "tokenName", type: "string" },
+      { indexed: false, name: "tokenSymbol", type: "string" },
+      { indexed: false, name: "tokenMetadata", type: "string" },
+      { indexed: false, name: "tokenContext", type: "string" },
+      { indexed: false, name: "startingTick", type: "int24" },
+      { indexed: false, name: "poolHook", type: "address" },
+      { indexed: false, name: "poolId", type: "bytes32" },
+      { indexed: false, name: "pairedToken", type: "address" },
+      { indexed: false, name: "locker", type: "address" },
+      { indexed: false, name: "mevModule", type: "address" },
+      { indexed: false, name: "extensionsSupply", type: "uint256" },
+      { indexed: false, name: "extensions", type: "address[]" },
+    ],
+  },
+];
+
 /** ABI for Clanker v4 factory contract. */
-export const CLANKER_V4_ABI = (ClankerDeployments as any)["8453"].clanker_v4.abi;
+export const CLANKER_V4_ABI =
+  (ClankerDeployments["8453"]?.clanker_v4?.abi && ClankerDeployments["8453"]?.clanker_v4?.abi.length > 0)
+    ? ClankerDeployments["8453"].clanker_v4.abi
+    : defaultAbi;
 
 /** Backward-compatible alias for previous ABI name. */
 export const CLANKER_V3_1_ABI = CLANKER_V4_ABI;
@@ -73,6 +172,11 @@ export interface ClankerDeployOptions {
   creatorRewardPct?: number;
   /** If true, only simulate — never send live TX. */
   dryRun?: boolean;
+  /**
+   * Explicit test-only flag to permit mock SDK execution when real SDK is missing.
+   * STRICTLY REJECTED IN PRODUCTION (returns CLANKER_SDK_UNAVAILABLE).
+   */
+  allowMockSdk?: boolean;
   /** Override RPC URL (defaults to BASE_RPC_URL from config). */
   rpcUrl?: string;
   /** Initial pool market cap in ETH. Default: 10 */
@@ -104,6 +208,9 @@ export interface ClankerAssetInput {
 export interface ClankerDeployResult {
   success: boolean;
   tokenAddress?: string;
+  /** Uniswap v4 32-byte pool ID hash (bytes32 hex string, e.g. 0x645d579d...). */
+  poolId?: string;
+  /** Backward-compatible alias for poolId. */
   poolAddress?: string;
   txHash?: string;
   chain: "clanker";
@@ -130,6 +237,27 @@ export async function deployClanker(
   const rpcUrl = options.rpcUrl ?? cfg.BASE_RPC_URL;
   const isDryRun = options.dryRun ?? cfg.DRY_RUN ?? false;
   const devBuyEth = options.devBuyEth ?? cfg.CLANKER_DEV_BUY_ETH ?? 0;
+
+  // ── Fail-Closed Production & Mock Gate ──
+  if (!isRealSdkLoaded) {
+    const isProd = isProductionEnvironment();
+    const isTestEnv = (process.env.NODE_ENV ?? "").toLowerCase() === "test";
+    const allowMock = !isProd && (options.allowMockSdk === true || (isTestEnv && options.allowMockSdk !== false));
+
+    if (isProd || !allowMock) {
+      const errorMsg = sdkLoadError
+        ? `CLANKER_SDK_UNAVAILABLE: Official clanker-sdk/v4 is required in production (${sdkLoadError.message})`
+        : `CLANKER_SDK_UNAVAILABLE: Official clanker-sdk/v4 is required in production`;
+      logger.error(`❌ [CLANKER] ${errorMsg}`);
+      return {
+        success: false,
+        chain: "clanker",
+        error: errorMsg,
+        simulated: isDryRun,
+      };
+    }
+    logger.warn(`⚠️  [CLANKER] Real clanker-sdk/v4 is unconfigured; executing via explicit test mock fallback.`);
+  }
 
   // ── Build account from deployerPrivateKey or EVM_PRIVATE_KEY ──
   let rawKey = (options.deployerPrivateKey || cfg.EVM_PRIVATE_KEY).trim();
@@ -282,6 +410,7 @@ export async function deployClanker(
 
     // ── Parse TokenCreated event from logs ──
     let tokenAddress: string | undefined = expectedAddress;
+    let poolId: string | undefined;
     let poolAddress: string | undefined;
     for (const log of receipt.logs) {
       try {
@@ -292,7 +421,8 @@ export async function deployClanker(
         });
         if (decoded.eventName === "TokenCreated") {
           tokenAddress = (decoded.args as any).tokenAddress as string;
-          poolAddress = (decoded.args as any).poolId as string;
+          poolId = ((decoded.args as any).poolId ?? (decoded.args as any).poolAddress ?? (decoded.args as any).poolKey) as string;
+          poolAddress = poolId;
           break;
         }
       } catch { /* non-matching log */ }
@@ -307,13 +437,14 @@ export async function deployClanker(
 
     logger.success(
       `🎉 [CLANKER] Token deployed!\n` +
-      `   Token: ${tokenAddress ?? "unknown"} | Pool: ${poolAddress ?? "unknown"}\n` +
+      `   Token: ${tokenAddress ?? "unknown"} | Pool: ${poolId ?? poolAddress ?? "unknown"}\n` +
       `   TX: ${txHash} | Gas: ${gasUsed} units | Cost: ${deployCostEth.toFixed(8)} ETH`
     );
 
     return {
       success: true,
       tokenAddress,
+      poolId,
       poolAddress,
       txHash,
       chain: "clanker",

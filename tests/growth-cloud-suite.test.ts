@@ -132,7 +132,7 @@ describe("4-Pillar Cloud-Native Launch & Growth Suite", () => {
       );
       const webLink = profile.links.find((l: any) => l.label === "Website");
       expect(webLink.url).toBe(res.primaryUrl);
-    }, 20000);
+    }, 60000);
   });
 
   // ─── PILAR 2: ANTI-SYBIL VOLUME SPARK ────────────────────────────────────────

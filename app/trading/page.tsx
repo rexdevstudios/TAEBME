@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
@@ -255,8 +255,12 @@ export default function TradingPage() {
             <option value="PEOPLE/ETH">PEOPLE / ETH (Fair Launch)</option>
             <option value="CDAO/ETH">CDAO / ETH (Community Prelaunch)</option>
           </select>
-          <span className={error ? 'badge badge-admin' : 'badge badge-trader'} style={{ fontSize: '12px' }}>
-            {error ? '● RETRYING' : '● LIVE STREAM'}
+          <span
+            className={error ? 'badge badge-admin' : 'badge-live'}
+            role="status"
+            aria-label={error ? 'Connection retrying' : 'Live market stream active'}
+          >
+            {error ? 'RETRYING...' : 'LIVE'}
           </span>
         </div>
       </div>
@@ -533,8 +537,9 @@ export default function TradingPage() {
                   disabled={isSubmitting || proposalStatus === 'APPROVED'}
                   className="btn-primary"
                   style={{ flex: 1, justifyContent: 'center', opacity: proposalStatus === 'APPROVED' ? 0.5 : 1 }}
+                  aria-label="Approve trade proposal and submit as trade intent"
                 >
-                  {isSubmitting ? 'Processing...' : proposalStatus === 'APPROVED' ? 'Approved' : 'Approve'}
+                  {isSubmitting ? 'Processing...' : proposalStatus === 'APPROVED' ? 'Approved ✓' : 'Approve Proposal'}
                 </button>
 
                 <button
@@ -542,8 +547,9 @@ export default function TradingPage() {
                   disabled={isSubmitting || proposalStatus === 'REJECTED'}
                   className="btn-destructive"
                   style={{ flex: 1, justifyContent: 'center', opacity: proposalStatus === 'REJECTED' ? 0.5 : 1 }}
+                  aria-label="Reject trade proposal"
                 >
-                  {proposalStatus === 'REJECTED' ? 'Rejected' : 'Reject'}
+                  {proposalStatus === 'REJECTED' ? 'Rejected ✗' : 'Reject Proposal'}
                 </button>
               </div>
             )}

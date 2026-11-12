@@ -139,6 +139,7 @@ export interface CreateTradeIntentRequest {
   quantity: number;
   price?: number;
   maxSlippagePct: number;
+  idempotencyKey?: string;
 }
 
 // 5. AGENT CONTRACTS

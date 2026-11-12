@@ -3,9 +3,12 @@
 // ============================================================================
 
 import { BountyCampaign, BountyClaim, KolProfile, WorldIdProofPayload } from '../shared/types/domain';
+import { TrustTier, isTrustTierSufficient } from '../shared/types/trust';
 import { FirecrawlScraperService } from '../intelligence/firecrawl-scraper';
 import { TweetQualityScorer, TweetQualityAuditResult } from '../intelligence/tweet-quality-scorer';
 import { SybilResistanceService } from '../social/sybil-resistance-service';
+import { TrustEvidenceService } from '../social/trust-evidence-service';
+import { ModularRpcManager } from '../network-registry/rpc-manager';
 import { ethers } from 'ethers';
 
 export interface BountyClaimItem {
@@ -15,18 +18,27 @@ export interface BountyClaimItem {
   isClaimed?: boolean;
 }
 
+export interface SettleClaimResult {
+  success: boolean;
+  alreadySettled?: boolean;
+  txAlreadyUsed?: boolean;
+  error?: string;
+}
+
 export interface BountyDbAdapter {
   getCampaign(campaignId: string): Promise<BountyCampaign | null>;
   listCampaigns?(launchId?: string): Promise<BountyCampaign[]>;
   createCampaign?(campaign: BountyCampaign): Promise<string>;
   getClaim(campaignId: string, kolId: string): Promise<BountyClaim | null>;
-  createClaim(campaignId: string, kolId: string, proofUrl: string): Promise<BountyClaim>;
+  getClaimById?(claimId: string): Promise<BountyClaim | null>;
+  getLaunchById?(launchId: string): Promise<{ contractAddress?: string; chain?: string } | null>;
+  createClaim(campaignId: string, kolId: string, proofUrl: string, trustTierAtClaim?: TrustTier): Promise<BountyClaim>;
   updateClaimStatus(claimId: string, status: 'VERIFIED' | 'REJECTED' | 'CLAIMED'): Promise<void>;
   incrementCampaignParticipant(campaignId: string): Promise<void>;
   createAuditLog(actorId: string, action: string, entityId?: string, reason?: string): Promise<void>;
   getVerifiedClaims?(campaignId?: string): Promise<BountyClaimItem[]>;
   recordBountyAllocation?(userId: string, claimId: string, amount: string, currency: string, creatorId?: string): Promise<void>;
-  settleClaimOnChain?(claimId: string, txHash: string, blockNumber?: number): Promise<void>;
+  settleClaimOnChain?(claimId: string, txHash: string, blockNumber?: number): Promise<SettleClaimResult | void>;
 }
 
 export interface ClaimVerificationOptions {
@@ -34,6 +46,8 @@ export interface ClaimVerificationOptions {
   tokenAddress?: string;
   chain?: string;
   walletAddress?: string;
+  rpcUrl?: string;
+  authenticatedUserId?: string;
   tweetTextContent?: string;
   sybilProof?: {
     gitcoinScore?: number;
@@ -44,7 +58,9 @@ export interface ClaimVerificationOptions {
 export class BountyEscrowService {
   constructor(
     private db: BountyDbAdapter,
-    private scraper?: FirecrawlScraperService
+    private scraper?: FirecrawlScraperService,
+    private trustService?: TrustEvidenceService,
+    private rpcManager?: ModularRpcManager
   ) {}
 
   static hashClaim(walletAddress: string, tokenAmount: bigint): string {
@@ -148,6 +164,72 @@ export class BountyEscrowService {
       return { success: false, reason: 'CAMPAIGN_FULL' };
     }
 
+    // Phase 2C: Authoritative Trust-Tier Gate (Pre-Verification)
+    const rawRequiredTier = campaign.minTrustTier || 'NEW';
+    if (!['NEW', 'VERIFIED', 'ESTABLISHED', 'TRUSTED'].includes(rawRequiredTier)) {
+      return {
+        success: false,
+        reason: `INVALID_CAMPAIGN_CONFIG: Invalid campaign minimum trust tier: ${rawRequiredTier}`,
+      };
+    }
+    const requiredTier: TrustTier = rawRequiredTier as TrustTier;
+
+    let userTier: TrustTier = 'NEW';
+    const authoritativeUserId = options.authenticatedUserId || kol.userId;
+
+    if (this.trustService) {
+      try {
+        const profile = await this.trustService.getProfile(authoritativeUserId);
+        if (profile) {
+          userTier = profile.trustTier;
+        } else {
+          // Missing profile: treat as 'NEW', do not fabricate verification
+          userTier = 'NEW';
+        }
+      } catch (err: any) {
+        // Fail closed on trust service errors
+        return {
+          success: false,
+          reason: 'TRUST_SERVICE_UNAVAILABLE: Failed to resolve authoritative trust profile',
+        };
+      }
+    } else {
+      if (process.env.NODE_ENV === 'production') {
+        return {
+          success: false,
+          reason: 'TRUST_SERVICE_UNAVAILABLE: Trust service is required in production',
+        };
+      }
+      userTier = 'NEW';
+    }
+
+    // REVIEW status always fails the claim gate regardless of campaign requirement
+    if (userTier === 'REVIEW') {
+      await this.db.createAuditLog(
+        kol.userId,
+        'CLAIM_BLOCKED_UNDER_REVIEW',
+        undefined,
+        `Campaign ${campaignId} rejected: user is in REVIEW status`
+      );
+      return {
+        success: false,
+        reason: 'ACCOUNT_UNDER_REVIEW: User account is currently under review and cannot submit claims',
+      };
+    }
+
+    if (!isTrustTierSufficient(userTier, requiredTier)) {
+      await this.db.createAuditLog(
+        kol.userId,
+        'CLAIM_REJECTED_TRUST_TIER',
+        undefined,
+        `Campaign ${campaignId} requires ${requiredTier}, but user has ${userTier}`
+      );
+      return {
+        success: false,
+        reason: `INSUFFICIENT_TRUST_TIER: User tier ${userTier} does not satisfy campaign required tier ${requiredTier}`,
+      };
+    }
+
     const titleLower = (campaign.title || '').toLowerCase();
     const isHoldCampaign =
       options.claimType === 'HOLD' ||
@@ -169,16 +251,45 @@ export class BountyEscrowService {
     const effectiveSybil = options.sybilProof || sybilProof;
     if (campaign.requiresHumanityProof) {
       if (effectiveSybil?.worldIdProof) {
-        const worldIdResult = SybilResistanceService.verifyWorldIdProof(effectiveSybil.worldIdProof, campaignId);
+        // Phase 1: Use DB-persisted anti-replay when trustService is wired (restart-safe)
+        // Falls back to in-memory for backward compatibility with test adapters
+        const worldIdResult = this.trustService
+          ? await SybilResistanceService.verifyWorldIdProofPersisted(
+              effectiveSybil.worldIdProof,
+              campaignId,
+              this.trustService,
+              undefined,
+              kol.id
+            )
+          : SybilResistanceService.verifyWorldIdProof(effectiveSybil.worldIdProof, campaignId);
         if (!worldIdResult.isValid) {
           return { success: false, reason: worldIdResult.reason || 'WORLD_ID_VERIFICATION_FAILED' };
         }
       } else if (effectiveSybil?.gitcoinScore !== undefined) {
         const minScore = campaign.minGitcoinScore || SybilResistanceService.DEFAULT_GITCOIN_THRESHOLD;
+        // In production or when DB trustService is active, gitcoinScore cannot be self-asserted
+        if (this.trustService) {
+          const profile = await this.trustService.getProfile(kol.id);
+          if (!profile?.isGitcoinVerified) {
+            return {
+              success: false,
+              reason: 'UNVERIFIED_GITCOIN_SCORE: Gitcoin Passport score must be verified via /api/social/sybil-verify before claim submission',
+            };
+          }
+        }
         if (effectiveSybil.gitcoinScore < minScore) {
           return {
             success: false,
             reason: `INSUFFICIENT_GITCOIN_SCORE: Score ${effectiveSybil.gitcoinScore} is below required threshold (${minScore})`,
+          };
+        }
+      } else if (this.trustService) {
+        // Check if user already holds verified humanity in PostgreSQL SSOT
+        const profile = await this.trustService.getProfile(kol.id);
+        if (!profile?.isWorldIdVerified && !profile?.isGitcoinVerified) {
+          return {
+            success: false,
+            reason: 'PROOF_OF_HUMANITY_REQUIRED: Campaign requires Gitcoin Passport or World ID ZK-proof',
           };
         }
       } else {
@@ -188,6 +299,7 @@ export class BountyEscrowService {
         };
       }
     }
+
 
     // 0.5 Idempotent Pre-Check: Prevent duplicate claims for the same campaign & KOL
     const existingClaim = await this.db.getClaim(campaignId, kol.id);
@@ -199,8 +311,9 @@ export class BountyEscrowService {
       };
     }
 
-    // 1. Create or retrieve initial claim record
-    const claim = await this.db.createClaim(campaignId, kol.id, proofUrl);
+    // 1. Create or retrieve initial claim record (persisting immutable trust snapshot)
+    const effectiveTier = userTier;
+    const claim = await this.db.createClaim(campaignId, kol.id, proofUrl, effectiveTier);
     const isNewParticipant = !existingClaim || existingClaim.verificationStatus !== 'VERIFIED';
     const rewardFormatted = ethers.formatUnits(campaign.rewardPerKol, 18);
 
@@ -219,7 +332,14 @@ export class BountyEscrowService {
       let balanceFormatted = '0';
       try {
         const isRh = String(options.chain || '').toLowerCase().includes('robinhood');
-        const rpcUrl = isRh ? 'https://rpc.mainnet.chain.robinhood.com' : 'https://mainnet.base.org';
+        let rpcUrl: string;
+        if (isRh) {
+          rpcUrl = 'https://rpc.mainnet.chain.robinhood.com';
+        } else if (this.rpcManager) {
+          rpcUrl = await this.rpcManager.getActiveHttpRpc('base-mainnet', 'LAUNCHPAD');
+        } else {
+          rpcUrl = options.rpcUrl || 'https://mainnet.base.org';
+        }
         const provider = new ethers.JsonRpcProvider(rpcUrl);
         const erc20 = new ethers.Contract(
           tokenAddr,
@@ -247,6 +367,16 @@ export class BountyEscrowService {
       }
       await this.db.recordBountyAllocation?.(kol.userId, claim.id, rewardFormatted, 'TOKENS', campaign.creatorId);
       await this.db.createAuditLog(kol.userId, 'HODL_CLAIM_VERIFIED', claim.id, `Balance: ${balanceFormatted}`);
+      // Phase 1: Record trust evidence (idempotent — sourceId is claim.id)
+      await this.trustService?.recordEvidence({
+        subjectUserId: kol.userId,
+        evidenceType: 'BOUNTY_COMPLETED',
+        sourceType: 'BOUNTY',
+        sourceId: claim.id,
+        direction: 'POSITIVE',
+        campaignId,
+        metadata: { claimType: 'HODL', campaignTitle: campaign.title, balance: balanceFormatted },
+      });
       return { success: true, claim, reason: 'HODL_BALANCE_VERIFIED', onChainBalance: balanceFormatted };
     }
 
@@ -290,6 +420,16 @@ export class BountyEscrowService {
       }
       await this.db.recordBountyAllocation?.(kol.userId, claim.id, rewardFormatted, 'TOKENS', campaign.creatorId);
       await this.db.createAuditLog(kol.userId, 'BOUNTY_CLAIM_VERIFIED', claim.id, proofUrl);
+      // Phase 1: Record trust evidence (idempotent — sourceId is claim.id)
+      await this.trustService?.recordEvidence({
+        subjectUserId: kol.userId,
+        evidenceType: 'BOUNTY_COMPLETED',
+        sourceType: 'BOUNTY',
+        sourceId: claim.id,
+        direction: 'POSITIVE',
+        campaignId,
+        metadata: { claimType: 'SOCIAL', campaignTitle: campaign.title, proofUrl, qualityScore: audit.qualityScore },
+      });
       return { success: true, claim, qualityAudit: audit };
     } else {
       await this.db.updateClaimStatus(claim.id, 'REJECTED');

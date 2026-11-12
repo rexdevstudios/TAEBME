@@ -58,7 +58,7 @@ export function parseDaemonArgs(argv: string[]): DaemonArgs {
   return { isDaemon, intervalMinutes, isTestBroadcast };
 }
 
-export async function runFlywheelSinglePass(): Promise<{
+export async function runFlywheelSinglePass(options?: { maxTokens?: number }): Promise<{
   processedCount: number;
   deploymentsCount: number;
   summary: ReturnType<typeof getFlywheelSummary>;
@@ -87,6 +87,10 @@ export async function runFlywheelSinglePass(): Promise<{
     deployments = [...fleetBase.all, ...fleetClanker.all].slice(0, 5);
   }
 
+  if (options?.maxTokens && options.maxTokens > 0) {
+    deployments = deployments.slice(0, options.maxTokens);
+  }
+
   if (deployments.length === 0) {
     logger.warn("[NOTICE] No active Base tokens found in database. Deploy a token first!");
     return {
@@ -99,12 +103,14 @@ export async function runFlywheelSinglePass(): Promise<{
   logger.info(`   Found ${deployments.length} confirmed Base token(s) to monitor.`);
 
   // 1. Scan fees on-chain / API
-  logger.info("[WORKER] Querying accrued fees from Bankr...");
-  try {
-    const detected = await scanCreatorFees();
-    logger.info(`   Scanned ${detected.length} fee events.`);
-  } catch (err) {
-    logger.warn(`   Fee scan notice: ${String(err)}`);
+  if (!options?.skipFeeScan) {
+    logger.info("[WORKER] Querying accrued fees from Bankr...");
+    try {
+      const detected = await scanCreatorFees();
+      logger.info(`   Scanned ${detected.length} fee events.`);
+    } catch (err) {
+      logger.warn(`   Fee scan notice: ${String(err)}`);
+    }
   }
 
   // 2. Process each deployment

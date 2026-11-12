@@ -11,8 +11,8 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import axios from "axios";
 import { z } from "zod";
-import { getConfig } from "../../config.ts";
-import { logger } from "../../logger.ts";
+import { getConfig } from "../../config";
+import { logger } from "../../logger";
 
 const MAX_RETRIES = 3;
 
@@ -195,8 +195,20 @@ export async function callByteDanceModelArk(
       );
       return applyIdentityOverrides(validated.data);
     } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : String(err);
-      logger.warn(`⚠️  [AI-FALLBACK] ByteDance error (attempt ${attempt}/${MAX_RETRIES}): ${errMsg}`);
+      // Extract safe diagnostic fields only — never log raw error messages, request
+      // headers, authorization values, or request configuration. Axios errors may
+      // include request config (including Authorization headers) in their message.
+      const errClass = err instanceof Error ? (err.name || err.constructor.name) : "UnknownError";
+      const httpStatus = (err as { response?: { status?: number } })?.response?.status ?? null;
+      const errCode = (err as { code?: string })?.code ?? null;
+      const safeDiagnostic = [
+        errClass,
+        httpStatus !== null ? `HTTP ${httpStatus}` : null,
+        errCode !== null ? `code=${errCode}` : null,
+      ]
+        .filter(Boolean)
+        .join(" | ");
+      logger.warn(`⚠️  [AI-FALLBACK] ByteDance error (attempt ${attempt}/${MAX_RETRIES}): ${safeDiagnostic}`);
       if (attempt < MAX_RETRIES) {
         await new Promise((r) => setTimeout(r, 2000 * attempt));
       }

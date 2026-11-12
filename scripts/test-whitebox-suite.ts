@@ -203,9 +203,10 @@ async function runWhiteboxSuite() {
 
   const baseUserLimits = {
     maxOrderValueUsd: 5000,
-    dailyLossLimitUsd: 1000,
-    maxLeverage: 5,
+    maxDailyLossUsd: 1000,
+    currentDailyLossUsd: 0,
     maxOpenPositions: 3,
+    currentOpenPositions: 0,
   };
 
   // 4.1 Paper Trading Auto-Approval Invariant
@@ -218,6 +219,8 @@ async function runWhiteboxSuite() {
       quantity: 1,
       price: 3000,
       stage: 'PAPER',
+      maxSlippagePct: 1.0,
+      idempotencyKey: 'test-key-paper-1',
     },
     baseUserLimits,
     { planId: 'PRO', hasLiveTrading: true },
@@ -236,6 +239,8 @@ async function runWhiteboxSuite() {
       quantity: 0.1,
       price: 60000,
       stage: 'LIVE',
+      maxSlippagePct: 1.0,
+      idempotencyKey: 'test-key-live-unentitled',
     },
     baseUserLimits,
     { planId: 'FREE', hasLiveTrading: false }, // No live trading permission
@@ -260,13 +265,13 @@ async function runWhiteboxSuite() {
       quantity: 0.5,
       price: 3000,
       stage: 'LIVE',
+      maxSlippagePct: 1.0,
+      idempotencyKey: 'test-key-killswitch',
     },
     baseUserLimits,
     { planId: 'ENTERPRISE', hasLiveTrading: true },
     [
       {
-        id: 'ks-1',
-        name: 'GLOBAL_EMERGENCY_STOP',
         isActive: true,
         scope: 'GLOBAL',
         reason: 'Circuit breaker triggered by extreme volatility',
@@ -288,6 +293,8 @@ async function runWhiteboxSuite() {
       quantity: 10, // 10 * 3000 = $30,000 > $5,000 limit
       price: 3000,
       stage: 'LIVE',
+      maxSlippagePct: 1.0,
+      idempotencyKey: 'test-key-exceeding',
     },
     baseUserLimits,
     { planId: 'ENTERPRISE', hasLiveTrading: true },

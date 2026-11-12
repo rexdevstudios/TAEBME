@@ -6,26 +6,24 @@ import { ethers } from 'ethers';
 const SYSTEM_ACTOR_ID = '07f847b9-60a4-48e4-8a45-3626b133b0fe';
 
 /**
- * Validates request authorization against CRON_SECRET or Vercel platform cron header.
- * Allows open access in non-production environments if CRON_SECRET is not configured.
+ * Validates request authorization against CRON_SECRET Bearer token.
+ * Note: x-vercel-cron header alone is NOT an authorization mechanism.
+ * In production, CRON_SECRET is strictly required and must be at least 16 characters.
  */
 function isCronAuthorized(req: NextRequest): boolean {
   const cronSecret = process.env.CRON_SECRET?.trim();
 
-  // Permissive in development/testing if secret is not explicitly set
-  if (!cronSecret && process.env.NODE_ENV !== 'production') {
-    return true;
+  // CRON_SECRET is strictly mandatory (min 16 chars) and fail-closed
+  if (!cronSecret || cronSecret.length < 16) {
+    if (process.env.NODE_ENV === 'production') {
+      console.error('[SECURITY] CRON_SECRET is unconfigured or insufficient in production.');
+    }
+    return false;
   }
 
-  // Check Bearer authorization header
+  // Authorize strictly via Authorization: Bearer <CRON_SECRET>
   const authHeader = req.headers.get('authorization');
   if (authHeader && authHeader === `Bearer ${cronSecret}`) {
-    return true;
-  }
-
-  // Check Vercel native cron header
-  const vercelCronHeader = req.headers.get('x-vercel-cron');
-  if (vercelCronHeader) {
     return true;
   }
 
@@ -39,7 +37,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: 'UNAUTHORIZED: Valid CRON_SECRET or Vercel cron header required',
+        error: 'UNAUTHORIZED: Valid Authorization: Bearer <CRON_SECRET> header is required',
         timestamp: new Date().toISOString(),
       },
       { status: 401 }
@@ -163,7 +161,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: 'UNAUTHORIZED: Valid CRON_SECRET or Vercel cron header required',
+        error: 'UNAUTHORIZED: Valid Authorization: Bearer <CRON_SECRET> header is required',
         timestamp: new Date().toISOString(),
       },
       { status: 401 }

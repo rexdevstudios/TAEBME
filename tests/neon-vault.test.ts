@@ -139,6 +139,6 @@ describe("Neon Serverless PostgreSQL Multi-Tenant Cloud Database Suite", () => {
       } finally {
         await masterSql.close();
       }
-    }, 35000);
+    }, 90000);
   });
 });

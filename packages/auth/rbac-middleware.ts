@@ -11,7 +11,8 @@ export type Capability =
   | 'REVIEW_FLAGGED_TOKEN'
   | 'FREEZE_TOKEN'
   | 'MANAGE_BILLING_PLANS'
-  | 'OVERRIDE_RISK_ENGINE';
+  | 'OVERRIDE_RISK_ENGINE'
+  | 'SETTLE_BOUNTY_CLAIM';
 
 const RBAC_MATRIX: Record<Capability, Role[]> = {
   VIEW_TOKENS: [
@@ -31,6 +32,7 @@ const RBAC_MATRIX: Record<Capability, Role[]> = {
   FREEZE_TOKEN: ['SUPER_ADMIN', 'MODERATOR', 'RISK_ADMIN'],
   MANAGE_BILLING_PLANS: ['SUPER_ADMIN', 'BILLING_ADMIN'],
   OVERRIDE_RISK_ENGINE: ['SUPER_ADMIN'], // Requires Dual Control Break-Glass!
+  SETTLE_BOUNTY_CLAIM: ['SUPER_ADMIN', 'SYSTEM_ADMIN', 'TRADER', 'CREATOR'],
 };
 
 export interface UserContext {

@@ -5,6 +5,7 @@ import { TradingRiskGate } from '../packages/trading/risk-gate';
 import { NutritionLabelService } from '../packages/intelligence/nutrition-label';
 import { TradeIntentInput, UserRiskLimits } from '../packages/shared/types/domain';
 import { ethers } from 'ethers';
+import crypto from 'crypto';
 
 async function runNextPhaseSimulation() {
   console.log('================================================================');
@@ -76,28 +77,37 @@ async function runNextPhaseSimulation() {
   const testSigner = ethers.Wallet.createRandom();
   const testWalletAddress = testSigner.address;
   const testHandle = 'cryptorider';
+  const attestationTimestamp = Date.now();
+  const testNonce = crypto.randomUUID();
 
-  const attestationMsg = KolService.getAttestationMessage(testWalletAddress, testHandle);
+  const attestationMsg = KolService.getAttestationMessage(testWalletAddress, testHandle, attestationTimestamp, testNonce);
   const signature = await testSigner.signMessage(attestationMsg);
 
-  // Verifikasi signature secara kriptografis
-  const isAttestationValid = KolService.verifySocialAttestation(testWalletAddress, testHandle, signature);
-  if (!isAttestationValid) {
-    throw new Error('FAIL: Valid cryptographic social attestation was rejected');
+  // Verifikasi signature secara kriptografis (SEC-01: timestamp & nonce now mandatory)
+  const attestationResult = KolService.verifySocialAttestation(testWalletAddress, testHandle, signature, attestationTimestamp, testNonce);
+  if (!attestationResult.isValid) {
+    throw new Error('FAIL: Valid cryptographic social attestation was rejected: ' + attestationResult.reason);
   }
   console.log('SUCCESS: EIP-191 Social Attestation verified cleanly for @' + testHandle);
 
   // Verifikasi penolakan jika handle diubah (spoofing attempt)
-  const isSpoofedValid = KolService.verifySocialAttestation(testWalletAddress, 'fake_impersonator', signature);
-  if (isSpoofedValid) {
+  const spoofedResult = KolService.verifySocialAttestation(testWalletAddress, 'fake_impersonator', signature, attestationTimestamp, testNonce);
+  if (spoofedResult.isValid) {
     throw new Error('FAIL: Spoofed twitter handle should have been rejected');
   }
   console.log('SUCCESS: Spoofed handle impersonation correctly rejected');
 
+  // Verifikasi penolakan anti-replay jika nonce diubah
+  const replayedResult = KolService.verifySocialAttestation(testWalletAddress, testHandle, signature, attestationTimestamp, crypto.randomUUID());
+  if (replayedResult.isValid) {
+    throw new Error('FAIL: Replayed attestation with altered nonce should have been rejected');
+  }
+  console.log('SUCCESS: Anti-replay protection with nonce verified cleanly');
+
   // Profiling via KolService dengan Arkham Enrichment
   const mockKolDb = {
     upsertKolProfile: async (p: any) => ({ ...p, id: 'kol-test' }),
-    getKolProfile: async () => null,
+    getKolProfile: async () => ({ id: 'kol-test', isVerified: true }),
     createAuditLog: async () => {},
   };
   const arkham = new ArkhamIntelligenceService();

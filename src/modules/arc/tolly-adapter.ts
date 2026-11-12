@@ -7,18 +7,21 @@
 
 import {
   formatUnits,
+  erc20Abi,
   type PublicClient,
+  type Transport,
+  type Chain,
   type Address,
+  type Account,
 } from "viem";
 import {
   TOLLY_PAD_ADDRESS,
   TOLLY_TOKEN_ADDRESS,
   TOLLY_API_BASE,
-  ERC20_ABI,
   type TollyHealthStatus,
   type TollyTokenInfo,
-} from "./types.ts";
-import { logger } from "../../logger.ts";
+} from "./types";
+import { logger } from "../../logger";
 
 export class TollyAdapter {
   /**
@@ -49,23 +52,27 @@ export class TollyAdapter {
     const [name, symbol, decimals, totalSupply] = await Promise.all([
       publicClient.readContract({
         address: tokenAddress,
-        abi: ERC20_ABI,
+        abi: erc20Abi,
         functionName: "name",
+        authorizationList: undefined,
       }),
       publicClient.readContract({
         address: tokenAddress,
-        abi: ERC20_ABI,
+        abi: erc20Abi,
         functionName: "symbol",
+        authorizationList: undefined,
       }),
       publicClient.readContract({
         address: tokenAddress,
-        abi: ERC20_ABI,
+        abi: erc20Abi,
         functionName: "decimals",
+        authorizationList: undefined,
       }),
       publicClient.readContract({
         address: tokenAddress,
-        abi: ERC20_ABI,
+        abi: erc20Abi,
         functionName: "totalSupply",
+        authorizationList: undefined,
       }),
     ]);
 
@@ -90,14 +97,16 @@ export class TollyAdapter {
     const [balance, decimals] = await Promise.all([
       publicClient.readContract({
         address: tokenAddress,
-        abi: ERC20_ABI,
+        abi: erc20Abi,
         functionName: "balanceOf",
         args: [walletAddress],
+        authorizationList: undefined,
       }),
       publicClient.readContract({
         address: tokenAddress,
-        abi: ERC20_ABI,
+        abi: erc20Abi,
         functionName: "decimals",
+        authorizationList: undefined,
       }),
     ]);
 

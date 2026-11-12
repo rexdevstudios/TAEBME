@@ -17,9 +17,6 @@ export class UpstashRedisPubSubAdapter implements PubSubAdapter {
 
   constructor(private client: UpstashRedisClient = upstashRedis) {}
 
-  /**
-   * Publish message ke Redis channel via REST API.
-   */
   async publish(channel: string, message: string): Promise<void> {
     if (!this.client.isConfigured()) {
       console.log(`[Redis PubSub] Client unconfigured — local in-memory fallback for publish to channel ${channel}`);
@@ -27,14 +24,9 @@ export class UpstashRedisPubSubAdapter implements PubSubAdapter {
       return;
     }
 
-    try {
-      await this.client.publish(channel, message);
-      // Trigger local subscribers in same process as well
-      this.triggerLocalSubscribers(channel, message);
-    } catch (err) {
-      console.warn(`[Redis PubSub] Publish failed for channel ${channel}:`, (err as Error).message);
-      this.triggerLocalSubscribers(channel, message);
-    }
+    await this.client.publish(channel, message);
+    // Trigger local subscribers in same process as well
+    this.triggerLocalSubscribers(channel, message);
   }
 
   /**

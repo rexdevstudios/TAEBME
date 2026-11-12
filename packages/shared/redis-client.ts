@@ -136,6 +136,21 @@ export class UpstashRedisClient {
   }
 
   /**
+   * SET key value NX EX ttlSeconds — atomic "set if not exists" with TTL.
+   * Returns true if the key was SET (did not previously exist).
+   * Returns false if the key already existed (key NOT overwritten).
+   *
+   * Use for single-use nonce issuance: guarantees only one winner across
+   * multiple concurrent serverless instances. Safe to call in any environment;
+   * returns false (fail-closed) if Redis is unconfigured or unreachable.
+   */
+  async setNx(key: string, value: string, ttlSeconds: number): Promise<boolean> {
+    const res = await this.executeCommand<string>(['SET', key, value, 'NX', 'EX', String(ttlSeconds)]);
+    // Redis returns "OK" on success, null if key already existed
+    return res === 'OK';
+  }
+
+  /**
    * INCR counter key untuk sliding-window rate limiting.
    */
   async incr(key: string): Promise<number | null> {
@@ -148,6 +163,16 @@ export class UpstashRedisClient {
   async publish(channel: string, message: string): Promise<number> {
     const res = await this.executeCommand<number>(['PUBLISH', channel, message]);
     return res ?? 0;
+  }
+
+  /**
+   * EXPIRE key ttlSeconds — set a key's TTL.
+   * Returns true if the TTL was set, false if key does not exist or Redis is unavailable.
+   * Use after INCR to start a rate-limit window that auto-expires.
+   */
+  async expire(key: string, ttlSeconds: number): Promise<boolean> {
+    const res = await this.executeCommand<number>(['EXPIRE', key, String(ttlSeconds)]);
+    return (res ?? 0) === 1;
   }
 
   /**

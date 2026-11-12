@@ -6,7 +6,7 @@
  */
 
 import { defineChain, type Chain } from "viem";
-import { ARC_CHAIN_ID, ARC_CHAIN_NAME, ARC_RPC_DEFAULT, ARC_EXPLORER_DEFAULT } from "./types.ts";
+import { ARC_CHAIN_ID, ARC_CHAIN_NAME, ARC_RPC_DEFAULT, ARC_EXPLORER_DEFAULT } from "./types";
 
 export const arcMainnet: Chain = defineChain({
   id: ARC_CHAIN_ID,

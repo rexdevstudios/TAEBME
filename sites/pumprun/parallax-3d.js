@@ -34,7 +34,7 @@ if ('serviceWorker' in navigator) {
     function animateMatrix() {
       ctx.fillStyle = 'rgba(2, 6, 23, 0.12)';
       ctx.fillRect(0, 0, width, height);
-      ctx.fillStyle = '#bbf91f';
+      ctx.fillStyle = '#ff007a';
       ctx.font = fontSize + 'px monospace';
 
       for (let i = 0; i < drops.length; i++) {
@@ -121,7 +121,7 @@ if ('serviceWorker' in navigator) {
 
     function animateParticles() {
       ctx.clearRect(0, 0, width, height);
-      ctx.fillStyle = '#bbf91f';
+      ctx.fillStyle = '#ff007a';
       ctx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
 
       for (let i = 0; i < particles.length; i++) {
@@ -182,7 +182,7 @@ function recordVisitorTelemetry(eventType, meta) {
   try {
     var payload = {
       ticker: 'PUMPRUN',
-      contractAddress: '0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A',
+      contractAddress: '0x7CE19E4F978009EB644c27946B47221b824C0bA3',
       eventType: eventType,
       userAddress: meta && meta.userAddress ? meta.userAddress : null,
       walletProvider: meta && meta.walletProvider ? meta.walletProvider : null,
@@ -484,7 +484,7 @@ async function executeRpcWithFailover(chainKey, method, params, timeoutMs) {
           params: {
             type: 'ERC20',
             options: {
-              address: '0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A',
+              address: '0x7CE19E4F978009EB644c27946B47221b824C0bA3',
               symbol: 'PUMPRUN',
               decimals: 18,
             },
@@ -644,7 +644,7 @@ async function executeRpcWithFailover(chainKey, method, params, timeoutMs) {
   async function updateRealBurn() {
     try {
       const deadData = '0x70a08231000000000000000000000000000000000000000000000000000000000000dead';
-      const burnRes = await executeRpcWithFailover('base', 'eth_call', [{ to: '0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A', data: deadData }, 'latest']);
+      const burnRes = await executeRpcWithFailover('base', 'eth_call', [{ to: '0x7CE19E4F978009EB644c27946B47221b824C0bA3', data: deadData }, 'latest']);
       if (burnRes && burnRes !== '0x') {
         const burnedVal = Number(BigInt(burnRes) / 10n**18n);
         if (burnElem) burnElem.innerText = burnedVal.toLocaleString();
@@ -686,7 +686,7 @@ async function executeRpcWithFailover(chainKey, method, params, timeoutMs) {
       try {
         const cleanAddr = addr.toLowerCase().replace(/^0x/, '').padStart(64, '0');
         const calldata = '0x70a08231' + cleanAddr;
-        const balHex = await executeRpcWithFailover('base', 'eth_call', [{ to: '0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A', data: calldata }, 'latest']);
+        const balHex = await executeRpcWithFailover('base', 'eth_call', [{ to: '0x7CE19E4F978009EB644c27946B47221b824C0bA3', data: calldata }, 'latest']);
 
         let tokenBal = 0n;
         if (balHex && balHex !== '0x') {
@@ -789,8 +789,8 @@ async function executeRpcWithFailover(chainKey, method, params, timeoutMs) {
 
     const userAddr = window.connectedAddress || (window.ethereum && window.ethereum.selectedAddress) || '0x0000000000000000000000000000000000000001';
     const isBuy = currentMode === 'buy';
-    const sellToken = isBuy ? '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE' : '0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A';
-    const buyToken = isBuy ? '0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A' : '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
+    const sellToken = isBuy ? '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE' : '0x7CE19E4F978009EB644c27946B47221b824C0bA3';
+    const buyToken = isBuy ? '0x7CE19E4F978009EB644c27946B47221b824C0bA3' : '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
     const sellAmountWei = BigInt(Math.floor(val * 1e18)).toString();
 
     try {
@@ -849,16 +849,16 @@ async function executeRpcWithFailover(chainKey, method, params, timeoutMs) {
 
     if (executeLink) {
       if ('base' === 'solana') {
-        executeLink.href = 'https://pump.fun/0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A';
+        executeLink.href = 'https://pump.fun/0x7CE19E4F978009EB644c27946B47221b824C0bA3';
       } else if ('base' === 'robinhood') {
-        executeLink.href = 'https://pons.fun/token/0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A';
+        executeLink.href = 'https://pons.fun/token/0x7CE19E4F978009EB644c27946B47221b824C0bA3';
       } else if ('base' === 'clanker') {
-        executeLink.href = 'https://clanker.world/clanker/0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A';
+        executeLink.href = 'https://clanker.world/clanker/0x7CE19E4F978009EB644c27946B47221b824C0bA3';
       } else if (true) {
-        executeLink.href = 'https://app.doppler.lol/tokens/base/0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A';
+        executeLink.href = 'https://app.doppler.lol/tokens/base/0x7CE19E4F978009EB644c27946B47221b824C0bA3';
       } else {
         const amtStr = val > 0 ? String(val) : '0.05';
-        executeLink.href = 'https://app.uniswap.org/swap?chain=base&inputCurrency=NATIVE&outputCurrency=0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A&exactAmount=' + encodeURIComponent(amtStr);
+        executeLink.href = 'https://app.uniswap.org/swap?chain=base&inputCurrency=NATIVE&outputCurrency=0x7CE19E4F978009EB644c27946B47221b824C0bA3&exactAmount=' + encodeURIComponent(amtStr);
       }
       executeLink.setAttribute('data-external-url', executeLink.href);
 
@@ -907,7 +907,7 @@ async function executeRpcWithFailover(chainKey, method, params, timeoutMs) {
             const allowanceCallData = '0xdd62ed3e' + userAddrClean + spenderClean;
             const allowanceHex = await window.ethereum.request({
               method: 'eth_call',
-              params: [{ to: '0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A', data: allowanceCallData }, 'latest'],
+              params: [{ to: '0x7CE19E4F978009EB644c27946B47221b824C0bA3', data: allowanceCallData }, 'latest'],
             });
 
             const currentAllowance = BigInt(allowanceHex || '0x0');
@@ -924,7 +924,7 @@ async function executeRpcWithFailover(chainKey, method, params, timeoutMs) {
                 method: 'eth_sendTransaction',
                 params: [{
                   from: userAddr,
-                  to: '0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A',
+                  to: '0x7CE19E4F978009EB644c27946B47221b824C0bA3',
                   data: approveData,
                 }],
               });
@@ -1004,7 +1004,7 @@ function launchConfetti() {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
 
-  const colors = ['#bbf91f', '#10aff9', '#10b981', '#38bdf8', '#fbbf24', '#f43f5e'];
+  const colors = ['#ff007a', '#ffb703', '#10b981', '#38bdf8', '#fbbf24', '#f43f5e'];
   const confettiCount = 55;
   const particles = [];
 
@@ -1104,7 +1104,7 @@ function launchConfetti() {
 
         const liveEvents = [
           '<span class="text-cyan-400">[BLOCK]</span> Base Mainnet height: #' + currentBlock.toLocaleString() + ' • Gas: ' + gasGwei + ' Gwei',
-          '<span class="text-emerald-400">[ON-CHAIN]</span> Token Contract: <span class="font-mono text-white">0x81462025...CBCA4A</span> • Verified on Basescan',
+          '<span class="text-emerald-400">[ON-CHAIN]</span> Token Contract: <span class="font-mono text-white">0x7CE19E4F...4C0bA3</span> • Verified on Basescan',
           '<span class="text-emerald-400">[SECURITY]</span> On-chain audit: 0.0% Buy Tax / 0.0% Sell Tax • Non-mintable',
           '<span class="text-purple-400">[TELEMETRY]</span> DEX Route: Base Mainnet AMM • Direct Peer-to-Peer Settlement'
         ];
@@ -1143,13 +1143,13 @@ function launchConfetti() {
         appendLog('<span class="text-emerald-400">[STATUS: ONLINE]</span> Connected to Base Mainnet L2.');
       }
     } else if (cmd === '/ca') {
-      appendLog('<span class="text-cyan-400">[CONTRACT]</span> <span class="font-mono text-white">0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A</span><br/>' +
-        '<a href="https://basescan.org/token/0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A" target="_blank" class="text-brandPrimary hover:underline">View on Basescan ↗</a>');
+      appendLog('<span class="text-cyan-400">[CONTRACT]</span> <span class="font-mono text-white">0x7CE19E4F978009EB644c27946B47221b824C0bA3</span><br/>' +
+        '<a href="https://basescan.org/token/0x7CE19E4F978009EB644c27946B47221b824C0bA3" target="_blank" class="text-brandPrimary hover:underline">View on Basescan ↗</a>');
     } else if (cmd === '/buyback') {
       appendLog('<span class="text-amber-400">[BUYBACK RESERVE]</span> Autonomous buyback executes on-chain via DEX liquidity fee routing.');
     } else if (cmd === '/balance') {
       try {
-        const balHex = await executeRpcWithFailover('base', 'eth_getBalance', ['0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A', 'latest']);
+        const balHex = await executeRpcWithFailover('base', 'eth_getBalance', ['0x7CE19E4F978009EB644c27946B47221b824C0bA3', 'latest']);
         const balEth = balHex ? (Number(BigInt(balHex)) / 1e18).toFixed(4) : '0.0000';
         appendLog('<span class="text-amber-400">[ON-CHAIN BALANCE]</span><br/>' +
           'Smart Contract: ' + balEth + ' ETH on Base Mainnet.<br/>' +
@@ -1161,7 +1161,7 @@ function launchConfetti() {
       logs.innerHTML = '<div class="text-emerald-400">[TERMINAL CLEARED] Connected to PUMPRUN node.</div>';
     } else {
       appendLog('<span class="text-brandPrimary">[AI AGENT]</span> ' +
-        'Contract <span class="font-mono text-white">0x81462025...</span> is active on Base Mainnet. Type /help for on-chain commands.');
+        'Contract <span class="font-mono text-white">0x7CE19E4F...</span> is active on Base Mainnet. Type /help for on-chain commands.');
     }
   });
 })();
@@ -1191,7 +1191,7 @@ function launchConfetti() {
         // Topic 0: Transfer(address,address,uint256)
         const transferTopic = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
         const logs = await executeRpcWithFailover('base', 'eth_getLogs', [{
-          address: '0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A',
+          address: '0x7CE19E4F978009EB644c27946B47221b824C0bA3',
           topics: [transferTopic],
           fromBlock: fromBlock,
           toBlock: toBlock
@@ -1270,7 +1270,7 @@ function launchConfetti() {
   async function updateRealTreasury() {
     try {
       // Query contract ETH balance directly on-chain
-      const ethBalHex = await executeRpcWithFailover('base', 'eth_getBalance', ['0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A', 'latest']);
+      const ethBalHex = await executeRpcWithFailover('base', 'eth_getBalance', ['0x7CE19E4F978009EB644c27946B47221b824C0bA3', 'latest']);
       const ethBal = ethBalHex ? Number(BigInt(ethBalHex)) / 1e18 : 0;
       const ethPrice = window.__latestEthPrice || 3070;
       let currentReserveUsd = Math.round(ethBal * ethPrice);
@@ -1278,7 +1278,7 @@ function launchConfetti() {
 
       // Query real on-chain burned tokens from dead address
       const deadData = '0x70a08231000000000000000000000000000000000000000000000000000000000000dead';
-      const burnRes = await executeRpcWithFailover('base', 'eth_call', [{ to: '0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A', data: deadData }, 'latest']);
+      const burnRes = await executeRpcWithFailover('base', 'eth_call', [{ to: '0x7CE19E4F978009EB644c27946B47221b824C0bA3', data: deadData }, 'latest']);
       const burnedVal = (burnRes && burnRes !== '0x') ? Number(BigInt(burnRes) / 10n**18n) : 0;
 
       if (reserveElem) reserveElem.innerText = '$' + usdBal.toLocaleString();
@@ -1333,7 +1333,7 @@ function launchConfetti() {
   const seal = document.getElementById('lp-verified-seal');
   const statusText = document.getElementById('lp-status-text');
   const marqueeLp = document.getElementById('marquee-lp-badge');
-  const ca = '0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A';
+  const ca = '0x7CE19E4F978009EB644c27946B47221b824C0bA3';
   const chain = 'base';
 
   if (!card && !marqueeLp) return;
@@ -1379,7 +1379,7 @@ function launchConfetti() {
 
 // 12. Real-Time WebSocket Price Telemetry & Resilient Market Data Poller (DexScreener API)
 (function initLiveMarketData() {
-  const ca = '0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A';
+  const ca = '0x7CE19E4F978009EB644c27946B47221b824C0bA3';
   const chain = 'base';
   if (!ca || ca.startsWith('0x000000000000000000000000000000000000dead')) return;
 

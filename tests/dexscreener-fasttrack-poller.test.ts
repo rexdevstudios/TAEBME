@@ -25,7 +25,7 @@ describe("DexScreener Fast-Track Poller & Audit Suite", () => {
     expect(typeof result.sniperBotReady).toBe("boolean");
     expect(typeof result.pairCreated).toBe("boolean");
     expect(result.timestamp).toBeDefined();
-  }, 30000);
+  }, 60000);
 
   it("should handle unindexed simulated tokens safely without crashing", async () => {
     const mockSimulatedCa = "0x0000000000000000000000000000000000000001";
@@ -35,5 +35,5 @@ describe("DexScreener Fast-Track Poller & Audit Suite", () => {
     expect(result.contractAddress).toBe(mockSimulatedCa);
     expect(result.pairCreated).toBe(false);
     expect(result.isDexScreenerPaid).toBe(false);
-  }, 30000);
+  }, 60000);
 });

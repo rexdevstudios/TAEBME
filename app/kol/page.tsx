@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
@@ -191,33 +191,48 @@ export default function KolHubPage() {
     setIsVerifyingWeb3(true);
     setWeb3Feedback(null);
     try {
+      const results: string[] = [];
       if (farcasterUsername) {
-        await fetch('/api/social/verify-farcaster', {
+        const fcRes = await fetch('/api/social/verify-farcaster', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             walletAddress,
-            fid: 12345,
-            username: farcasterUsername,
-            followersCount: 850,
+            fid: 1, // Basic numeric identifier prompt
+            username: farcasterUsername.replace(/^@/, '').trim(),
           }),
         });
+        const fcJson = await fcRes.json();
+        if (fcRes.ok && fcJson.success) {
+          results.push('Farcaster terverifikasi');
+        } else {
+          results.push(`Farcaster: ${fcJson.error || 'Verifikasi gagal'}`);
+        }
       }
       if (lensHandle) {
-        await fetch('/api/social/verify-lens', {
+        const lensRes = await fetch('/api/social/verify-lens', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             walletAddress,
-            handle: lensHandle,
-            followersCount: 420,
+            handle: lensHandle.trim(),
           }),
         });
+        const lensJson = await lensRes.json();
+        if (lensRes.ok && lensJson.success) {
+          results.push('Lens terverifikasi');
+        } else {
+          results.push(`Lens: ${lensJson.error || 'Verifikasi gagal'}`);
+        }
       }
-      setWeb3Feedback('🎉 Identitas Web3 (Farcaster & Lens) berhasil diverifikasi dan disinkronkan!');
-      fetchProfile(walletAddress);
-    } catch {
-      setWeb3Feedback('❌ Gagal memverifikasi identitas Web3');
+      if (results.length > 0) {
+        setWeb3Feedback(`ℹ️ Hasil Verifikasi Web3: ${results.join(' • ')}`);
+        fetchProfile(walletAddress);
+      } else {
+        setWeb3Feedback('⚠️ Silakan masukkan Farcaster username atau Lens handle.');
+      }
+    } catch (err: any) {
+      setWeb3Feedback(`❌ Gagal memverifikasi identitas Web3: ${err?.message || 'Network error'}`);
     } finally {
       setIsVerifyingWeb3(false);
     }
@@ -645,20 +660,28 @@ export default function KolHubPage() {
                   Passport Verified
                 </span>
 
-                {/* Web3 Native Badges */}
+                {/* Web3 Native Badges — only shown when verified data exists */}
                 <div style={{ marginTop: '8px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                  <span className="badge" style={{ backgroundColor: 'rgba(139,92,246,0.15)', color: '#A78BFA', border: '1px solid rgba(139,92,246,0.3)', fontSize: '10px' }}>
-                    🟣 FC: @{kolProfile?.farcasterUsername || 'verified_kol'}
-                  </span>
-                  <span className="badge" style={{ backgroundColor: 'rgba(16,185,129,0.15)', color: '#34D399', border: '1px solid rgba(16,185,129,0.3)', fontSize: '10px' }}>
-                    🌿 Lens: {kolProfile?.lensHandle || 'kol.lens'}
-                  </span>
-                  <span className="badge" style={{ backgroundColor: 'rgba(255,214,0,0.15)', color: '#FFD600', border: '1px solid rgba(255,214,0,0.3)', fontSize: '10px' }}>
-                    ⚡ Paymaster Eligible
-                  </span>
-                  <span className="badge" style={{ backgroundColor: 'rgba(56,189,248,0.15)', color: '#38BDF8', border: '1px solid rgba(56,189,248,0.3)', fontSize: '10px' }}>
-                    ⚡ {boosterMultiplier.toFixed(2)}x Yield Booster ({(boosterMultiplier * 4.2).toFixed(2)}% APY)
-                  </span>
+                  {kolProfile?.farcasterUsername && (
+                    <span className="badge" style={{ backgroundColor: 'rgba(139,92,246,0.15)', color: '#A78BFA', border: '1px solid rgba(139,92,246,0.3)', fontSize: '10px' }}>
+                      🟣 FC: @{kolProfile.farcasterUsername}
+                    </span>
+                  )}
+                  {kolProfile?.lensHandle && (
+                    <span className="badge" style={{ backgroundColor: 'rgba(16,185,129,0.15)', color: '#34D399', border: '1px solid rgba(16,185,129,0.3)', fontSize: '10px' }}>
+                      🌿 Lens: {kolProfile.lensHandle}
+                    </span>
+                  )}
+                  {kolProfile?.paymasterEligible && (
+                    <span className="badge" style={{ backgroundColor: 'rgba(255,214,0,0.15)', color: '#FFD600', border: '1px solid rgba(255,214,0,0.3)', fontSize: '10px' }}>
+                      ⚡ Paymaster Eligible
+                    </span>
+                  )}
+                  {kolProfile?.farcasterUsername && (
+                    <span className="badge" style={{ backgroundColor: 'rgba(56,189,248,0.15)', color: '#38BDF8', border: '1px solid rgba(56,189,248,0.3)', fontSize: '10px' }}>
+                      ⚡ {boosterMultiplier.toFixed(2)}x Yield Booster ({(boosterMultiplier * 4.2).toFixed(2)}% APY)
+                    </span>
+                  )}
                 </div>
               </div>
             </div>

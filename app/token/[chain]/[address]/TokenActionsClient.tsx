@@ -64,7 +64,7 @@ export default function TokenActionsClient({
               address: contractAddress,
               symbol: tokenSymbol.slice(0, 6).toUpperCase(),
               decimals: 18,
-              image: 'https://rtrader.io/token-default.png',
+              image: `${typeof window !== 'undefined' ? window.location.origin : ''}/token-default.png`,
             },
           },
         });

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ApiResponse } from '@packages/shared/contracts/api-contracts';
-import { getDbPool } from '@packages/shared/db-pool';
+import { getDbPool, defaultRpcManager } from '@packages/shared/db-pool';
+import { resolveNetworkDefinition } from '@packages/network-registry/rpc-manager';
 import { ethers } from 'ethers';
 
 export const dynamic = 'force-dynamic';
@@ -72,8 +73,13 @@ export async function GET(req: NextRequest) {
   }
 }
 
+import { requireCapability } from '@packages/auth/session';
+
 export async function POST(req: NextRequest) {
   try {
+    // SG-01: Enforce authoritative authentication and capability check
+    await requireCapability(req, 'REVIEW_FLAGGED_TOKEN');
+
     const pool = getDbPool();
     if (!pool) {
       const res: ApiResponse<null> = {
@@ -84,12 +90,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(res, { status: 503 });
     }
 
-    // Query all active HODL claims
-    const claimsQuery = `
+    let body: any = {};
+    try {
+      body = await req.json();
+    } catch {
+      body = {};
+    }
+    const targetClaimId = body?.claimId || undefined;
+    const targetCampaignId = body?.campaignId || undefined;
+
+    // Query active HODL claims that have not already been settled on-chain
+    let claimsQuery = `
       SELECT 
         bc.id as claim_id,
         bc.campaign_id,
         bc.kol_id,
+        bc.verification_status,
         tl.contract_address,
         tl.chain,
         COALESCE(w.address, kp.user_id::text, bc.kol_id::text) as wallet_address
@@ -100,9 +116,22 @@ export async function POST(req: NextRequest) {
       LEFT JOIN wallets w ON w.user_id = kp.user_id
       WHERE (LOWER(c.title) LIKE '%hold%' OR LOWER(c.title) LIKE '%hodl%' OR LOWER(c.title) LIKE '%loyalty%')
         AND c.is_active = true
-      LIMIT 20
+        AND bc.verification_status != 'CLAIMED'
+        AND bc.tx_hash IS NULL
     `;
-    const claimsRes = await pool.query(claimsQuery);
+    const queryParams: any[] = [];
+
+    if (targetClaimId) {
+      queryParams.push(targetClaimId);
+      claimsQuery += ` AND bc.id = $${queryParams.length}`;
+    } else if (targetCampaignId) {
+      queryParams.push(targetCampaignId);
+      claimsQuery += ` AND bc.campaign_id = $${queryParams.length}`;
+    }
+
+    claimsQuery += ` LIMIT 20`;
+
+    const claimsRes = await pool.query(claimsQuery, queryParams);
 
     const reVerificationResults: Array<{
       claimId: string;
@@ -111,48 +140,127 @@ export async function POST(req: NextRequest) {
       chain: string;
       onChainBalance: string;
       status: 'VERIFIED' | 'DISQUALIFIED' | 'UNCHANGED';
+      reason?: string;
     }> = [];
 
     for (const r of claimsRes.rows) {
       const wallet = r.wallet_address;
       const token = r.contract_address;
-      const isRh = String(r.chain || '').toLowerCase().includes('robinhood');
-      const rpcUrl = isRh ? 'https://rpc.mainnet.chain.robinhood.com' : 'https://mainnet.base.org';
 
-      let currentBalance = 0n;
-      let balanceFormatted = '0';
-
-      if (ethers.isAddress(wallet) && ethers.isAddress(token)) {
-        try {
-          const provider = new ethers.JsonRpcProvider(rpcUrl);
-          const erc20 = new ethers.Contract(
-            token,
-            ['function balanceOf(address) view returns (uint256)'],
-            provider
-          );
-          currentBalance = await erc20.balanceOf(wallet);
-          balanceFormatted = currentBalance.toString();
-        } catch {
-          // Fallback simulation balance if node timeout
-          balanceFormatted = '10000000000000000000000';
-        }
+      // Validate address format
+      if (!ethers.isAddress(wallet) || !ethers.isAddress(token)) {
+        await pool.query(
+          `UPDATE bounty_claims SET verification_status = 'REJECTED' WHERE id = $1`,
+          [r.claim_id]
+        );
+        reVerificationResults.push({
+          claimId: r.claim_id,
+          walletAddress: wallet,
+          tokenAddress: token,
+          chain: r.chain,
+          onChainBalance: '0',
+          status: 'DISQUALIFIED',
+          reason: 'INVALID_WALLET_OR_TOKEN_ADDRESS',
+        });
+        continue;
       }
 
-      // Zero-Sell Enforcement Rule: If balance is active, keep verified
-      const newStatus = 'VERIFIED';
-      await pool.query(
-        `UPDATE bounty_claims SET verification_status = $1 WHERE id = $2`,
-        [newStatus, r.claim_id]
-      );
+      const netDef = resolveNetworkDefinition(r.chain);
+      let rpcUrl = '';
+      let rpcError: string | null = null;
 
-      reVerificationResults.push({
-        claimId: r.claim_id,
-        walletAddress: wallet,
-        tokenAddress: token,
-        chain: r.chain,
-        onChainBalance: balanceFormatted,
-        status: newStatus,
-      });
+      if (!netDef) {
+        reVerificationResults.push({
+          claimId: r.claim_id,
+          walletAddress: wallet,
+          tokenAddress: token,
+          chain: r.chain,
+          onChainBalance: '0',
+          status: 'UNCHANGED',
+          reason: `UNSUPPORTED_CHAIN: Jaringan "${r.chain}" tidak terdaftar atau tidak didukung.`,
+        });
+        continue;
+      }
+
+      try {
+        rpcUrl = await defaultRpcManager.getActiveHttpRpc(netDef.networkId, 'LAUNCHPAD');
+      } catch (err: any) {
+        rpcError = err?.message || 'RPC_RESOLUTION_FAILED';
+      }
+
+      // Fail-closed on RPC lookup failure: NEVER assume non-zero balance and NEVER update to VERIFIED
+      if (rpcError || !rpcUrl) {
+        reVerificationResults.push({
+          claimId: r.claim_id,
+          walletAddress: wallet,
+          tokenAddress: token,
+          chain: r.chain,
+          onChainBalance: '0',
+          status: 'UNCHANGED',
+          reason: `RPC_LOOKUP_FAILED: ${rpcError || 'RPC_UNAVAILABLE'}`,
+        });
+        continue;
+      }
+
+      let currentBalance: bigint | null = null;
+
+      try {
+        const provider = new ethers.JsonRpcProvider(rpcUrl);
+        const erc20 = new ethers.Contract(
+          token,
+          ['function balanceOf(address) view returns (uint256)'],
+          provider
+        );
+        currentBalance = await erc20.balanceOf(wallet);
+      } catch (err: any) {
+        rpcError = err?.message || 'RPC_TIMEOUT';
+      }
+
+      // Fail-closed on RPC failure: NEVER assume non-zero balance and NEVER update to VERIFIED
+      if (currentBalance === null || rpcError) {
+        reVerificationResults.push({
+          claimId: r.claim_id,
+          walletAddress: wallet,
+          tokenAddress: token,
+          chain: r.chain,
+          onChainBalance: '0',
+          status: 'UNCHANGED',
+          reason: `RPC_LOOKUP_FAILED: ${rpcError}`,
+        });
+        continue;
+      }
+
+      const balanceFormatted = currentBalance.toString();
+
+      // Zero-Sell Enforcement Rule: If balance > 0, verify; if balance === 0, disqualify
+      if (currentBalance > 0n) {
+        await pool.query(
+          `UPDATE bounty_claims SET verification_status = $1 WHERE id = $2`,
+          ['VERIFIED', r.claim_id]
+        );
+        reVerificationResults.push({
+          claimId: r.claim_id,
+          walletAddress: wallet,
+          tokenAddress: token,
+          chain: r.chain,
+          onChainBalance: balanceFormatted,
+          status: 'VERIFIED',
+        });
+      } else {
+        await pool.query(
+          `UPDATE bounty_claims SET verification_status = $1 WHERE id = $2`,
+          ['REJECTED', r.claim_id]
+        );
+        reVerificationResults.push({
+          claimId: r.claim_id,
+          walletAddress: wallet,
+          tokenAddress: token,
+          chain: r.chain,
+          onChainBalance: '0',
+          status: 'DISQUALIFIED',
+          reason: 'ZERO_BALANCE',
+        });
+      }
     }
 
     const response: ApiResponse<typeof reVerificationResults> = {
@@ -162,9 +270,22 @@ export async function POST(req: NextRequest) {
     };
     return NextResponse.json(response, { status: 200 });
   } catch (err: any) {
+    const message = err?.message || 'Failed to verify HODL balances';
+    if (message.startsWith('UNAUTHORIZED')) {
+      return NextResponse.json(
+        { success: false, error: { code: 'UNAUTHORIZED', message }, timestamp: new Date().toISOString() },
+        { status: 401 }
+      );
+    }
+    if (message.startsWith('RBAC_FORBIDDEN') || message.startsWith('AUTH_ACCOUNT_')) {
+      return NextResponse.json(
+        { success: false, error: { code: 'FORBIDDEN', message }, timestamp: new Date().toISOString() },
+        { status: 403 }
+      );
+    }
     const response: ApiResponse<null> = {
       success: false,
-      error: { code: 'HODL_VERIFY_FAILED', message: err?.message || 'Failed to verify HODL balances' },
+      error: { code: 'HODL_VERIFY_FAILED', message },
       timestamp: new Date().toISOString(),
     };
     return NextResponse.json(response, { status: 500 });

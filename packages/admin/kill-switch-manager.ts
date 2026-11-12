@@ -48,13 +48,13 @@ export class KillSwitchManager {
       `Emergency kill switch activated for ${scope} (Target: ${targetId || 'ALL'}). Reason: ${reason}`
     );
 
-    // Optional Async PubSub Broadcast for Sub-Second Worker Notification
+    // PubSub Broadcast for Sub-Second Worker Notification (Non-blocking for DB SSOT)
     if (pubsub) {
       try {
         const payload = JSON.stringify({ event: 'KILL_SWITCH_ACTIVATED', scope, targetId, reason, id, timestamp: activatedAt });
         await pubsub.publish('kill_switch_triggered_pubsub', payload);
-      } catch (err) {
-        console.warn(`[KillSwitchManager] PubSub broadcast warning (non-blocking):`, (err as Error).message);
+      } catch (pubsubErr: any) {
+        console.error('[KillSwitchManager] PubSub broadcast error on activate (PostgreSQL SSOT preserved):', pubsubErr);
       }
     }
 
@@ -83,13 +83,13 @@ export class KillSwitchManager {
       `Kill switch recovered/deactivated. Reason: ${reason}`
     );
 
-    // Optional Async PubSub Broadcast
+    // PubSub Broadcast (Non-blocking for DB SSOT)
     if (pubsub) {
       try {
         const payload = JSON.stringify({ event: 'KILL_SWITCH_DEACTIVATED', killSwitchId, reason, timestamp: new Date().toISOString() });
         await pubsub.publish('kill_switch_triggered_pubsub', payload);
-      } catch (err) {
-        console.warn(`[KillSwitchManager] PubSub broadcast warning (non-blocking):`, (err as Error).message);
+      } catch (pubsubErr: any) {
+        console.error('[KillSwitchManager] PubSub broadcast error on deactivate (PostgreSQL SSOT preserved):', pubsubErr);
       }
     }
   }

@@ -192,16 +192,31 @@ export function getCanonicalAppUrl(): string {
 }
 
 /**
- * Validates that smart contract configuration and chainId are strictly consistent with the environment.
+ * Validates that a chainId is registered in the known multi-chain network registry.
+ *
+ * SECURITY CONTRACT (FINDING-A24-04 fix):
+ * - Accepts any chainId that is registered in KNOWN_NETWORKS (packages/network-registry/rpc-manager.ts).
+ * - Rejects completely unknown chainIds with SECURITY_MISCONFIGURATION to prevent rogue-network attacks.
+ * - Does NOT enforce a single-chain lock — multi-chain EVM deployment is intentional (Base, Robinhood, Arbitrum, BSC, etc.).
+ * - Environment-specific routing (production vs testnet) is enforced at the RPC/contract-address layer, not here.
+ *
+ * PREVIOUS BEHAVIOUR (pre A2.8.30.24 fix):
+ *   Production was hard-locked to 8453; testnet to 84532. This blocked all multi-chain bounty settlement.
  */
 export function validateChainAndContractConsistency(targetChainId: number): void {
-  const currentEnv = getAppEnvironment();
+  // Import KNOWN_NETWORKS inline to avoid circular dependency (env-config has no network-registry dep).
+  // Known chain IDs: Base Mainnet (8453), Base Sepolia (84532), Robinhood (4663),
+  //   BSC Mainnet (56), BSC Testnet (97), Arbitrum One (42161),
+  //   Polygon (137), Optimism (10), Arc Mainnet (5042).
+  const REGISTERED_CHAIN_IDS = new Set([8453, 84532, 4663, 56, 97, 42161, 137, 10, 5042]);
 
-  if (currentEnv === 'production' && targetChainId !== 8453) {
-    throw new Error(`SECURITY_MISCONFIGURATION: Production environment is locked to Base Mainnet (8453). Received chainId: ${targetChainId}`);
+  if (!REGISTERED_CHAIN_IDS.has(targetChainId)) {
+    throw new Error(
+      `SECURITY_MISCONFIGURATION: Chain ID ${targetChainId} is not registered in KNOWN_NETWORKS. ` +
+      `Registered IDs: ${[...REGISTERED_CHAIN_IDS].join(', ')}. ` +
+      `Add the chain to packages/network-registry/rpc-manager.ts before using it.`
+    );
   }
-
-  if (currentEnv === 'testnet' && targetChainId !== 84532) {
-    throw new Error(`SECURITY_MISCONFIGURATION: Testnet environment is locked to Base Sepolia (84532). Received chainId: ${targetChainId}`);
-  }
+  // Chain is registered. Environment-level isolation (production URL ≠ testnet URL,
+  // dedicated contract addresses per chain) is enforced at the call site (web3-provider / RPC manager).
 }

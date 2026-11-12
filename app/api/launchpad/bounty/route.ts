@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ApiResponse } from '@packages/shared/contracts/api-contracts';
 import { BountyCampaign } from '@packages/shared/types/domain';
+import { isValidCampaignTrustTier, CampaignTrustTier } from '@packages/shared/types/trust';
 import { defaultBountyDbAdapter } from '@packages/shared/db-pool';
 
 export async function GET(req: NextRequest) {
@@ -21,10 +22,34 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(response);
 }
 
+import { requireCapability } from '@packages/auth/session';
+
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { launchId, creatorId, title, requiredHashtag, minFollowers, rewardPerKol, maxParticipants } = body;
+    // SG-03: Require authenticated session with campaign creation capability
+    const session = await requireCapability(req, 'PUBLISH_LAUNCH');
+
+    const body = await req.json().catch(() => ({}));
+    const {
+      launchId,
+      creatorId,
+      title,
+      requiredHashtag,
+      minFollowers,
+      rewardPerKol,
+      maxParticipants,
+      minTrustTier,
+    } = body;
+
+    // Reject caller attempting to impersonate another creator
+    if (creatorId && creatorId !== session.user.userId) {
+      const res: ApiResponse<null> = {
+        success: false,
+        error: { code: 'FORBIDDEN', message: 'Cannot create a campaign on behalf of another creator' },
+        timestamp: new Date().toISOString(),
+      };
+      return NextResponse.json(res, { status: 403 });
+    }
 
     if (!title || !requiredHashtag) {
       const res: ApiResponse<null> = {
@@ -35,11 +60,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(res, { status: 400 });
     }
 
+    // Phase 2C: Validate optional minTrustTier (default 'NEW', reject 'REVIEW' and unknown strings)
+    let validatedMinTrustTier: CampaignTrustTier = 'NEW';
+    if (minTrustTier !== undefined && minTrustTier !== null) {
+      if (!isValidCampaignTrustTier(minTrustTier)) {
+        const res: ApiResponse<null> = {
+          success: false,
+          error: {
+            code: 'INVALID_INPUT',
+            message: `Invalid minTrustTier: ${minTrustTier}. Allowed values: NEW, VERIFIED, ESTABLISHED, TRUSTED`,
+          },
+          timestamp: new Date().toISOString(),
+        };
+        return NextResponse.json(res, { status: 400 });
+      }
+      validatedMinTrustTier = minTrustTier;
+    }
+
     const newCampaign: BountyCampaign = {
       id: `campaign-${Date.now()}`,
       launchId: launchId || `launch-${Date.now()}`,
-      creatorId: creatorId || 'usr-creator-anonymous',
+      creatorId: session.user.userId,
       title,
+      campaignType: 'BOUNTY',
+      minTrustTier: validatedMinTrustTier,
       requiredHashtag: requiredHashtag.startsWith('#') ? requiredHashtag : `#${requiredHashtag}`,
       minFollowers: Number(minFollowers) || 500,
       rewardPerKol: BigInt(rewardPerKol || '1000000000000000000000'),
@@ -62,10 +106,23 @@ export async function POST(req: NextRequest) {
       timestamp: new Date().toISOString(),
     };
     return NextResponse.json(response, { status: 201 });
-  } catch (error) {
+  } catch (error: any) {
+    const message = error?.message || 'Failed to create bounty campaign';
+    if (message.startsWith('UNAUTHORIZED')) {
+      return NextResponse.json(
+        { success: false, error: { code: 'UNAUTHORIZED', message }, timestamp: new Date().toISOString() },
+        { status: 401 }
+      );
+    }
+    if (message.startsWith('RBAC_FORBIDDEN') || message.startsWith('AUTH_ACCOUNT_')) {
+      return NextResponse.json(
+        { success: false, error: { code: 'FORBIDDEN', message }, timestamp: new Date().toISOString() },
+        { status: 403 }
+      );
+    }
     const res: ApiResponse<null> = {
       success: false,
-      error: { code: 'CAMPAIGN_CREATION_FAILED', message: (error as Error).message },
+      error: { code: 'CAMPAIGN_CREATION_FAILED', message },
       timestamp: new Date().toISOString(),
     };
     return NextResponse.json(res, { status: 400 });

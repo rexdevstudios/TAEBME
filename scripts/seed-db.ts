@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { Client } from 'pg';
+import { resolvePoolSslConfig } from '../packages/shared/db-pool';
 
 async function seedDatabase() {
   console.log('================================================================');
@@ -25,10 +26,12 @@ async function seedDatabase() {
     process.exit(1);
   }
 
+  const [clientConnectionString, sslConfig] = resolvePoolSslConfig(dbUrl);
+
   console.log('[1/3] Connecting to PostgreSQL database...');
   const client = new Client({
-    connectionString: dbUrl,
-    ssl: { rejectUnauthorized: false }
+    connectionString: clientConnectionString,
+    ssl: sslConfig,
   });
 
   try {

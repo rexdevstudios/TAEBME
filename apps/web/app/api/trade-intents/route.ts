@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { TradingRiskGate } from '@packages/trading/risk-gate';
-import { rateLimiter } from '@packages/auth/rate-limiter';
-import { ApiResponse, CreateTradeIntentRequest } from '@packages/shared/contracts/api-contracts';
-import { TradeIntentInput, UserRiskLimits } from '@packages/shared/types/domain';
-
-
+import { TradingRiskGate } from '../../../../../packages/trading/risk-gate';
+import { rateLimiter } from '../../../../../packages/auth/rate-limiter';
+import { ApiResponse, CreateTradeIntentRequest } from '../../../../../packages/shared/contracts/api-contracts';
+import { TradeIntentInput, UserRiskLimits } from '../../../../../packages/shared/types/domain';
+import { requireCapability } from '../../../../../packages/auth/session';
+import { saveTradeIntent, defaultKillSwitchDbAdapter, defaultBillingDbAdapter } from '../../../../../packages/shared/db-pool';
 
 export async function POST(req: NextRequest) {
   try {
@@ -21,10 +21,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(response, { status: 429 });
     }
 
-    const body = (await req.json()) as CreateTradeIntentRequest & { userId?: string };
+    // Require TRADE_MANUALLY capability
+    const auth = await requireCapability(req, 'TRADE_MANUALLY');
+
+    const body = (await req.json()) as CreateTradeIntentRequest;
     
     const intent: TradeIntentInput = {
-      userId: body.userId || 'usr-anonymous',
+      userId: auth.user.userId,
       stage: body.stage || 'PAPER',
       symbol: body.symbol || 'DEGEN/USDT',
       side: body.side || 'BUY',
@@ -32,7 +35,7 @@ export async function POST(req: NextRequest) {
       quantity: body.quantity || 1.0,
       price: body.price,
       maxSlippagePct: body.maxSlippagePct || 1.0,
-      idempotencyKey: `intent-${Date.now()}`,
+      idempotencyKey: body.idempotencyKey || `intent-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     };
 
     const userLimits: UserRiskLimits = {
@@ -43,15 +46,40 @@ export async function POST(req: NextRequest) {
       currentOpenPositions: 0,
     };
 
+    // Authoritatively query active kill switches from PostgreSQL SSOT (Fail-Closed)
+    const activeKillSwitches = await defaultKillSwitchDbAdapter.getActiveKillSwitches();
+
+    // Authoritatively resolve user subscription plan & live trading entitlement from PostgreSQL SSOT (Fail-Closed)
+    const userEntitlement = await defaultBillingDbAdapter.getUserEntitlement(auth.user.userId);
+
     const { status, decision } = TradingRiskGate.evaluateIntent(
       intent,
       userLimits,
-      { planId: 'TRADER', hasLiveTrading: true },
-      []
+      userEntitlement,
+      activeKillSwitches
     );
 
+    // Persist Trade Intent to PostgreSQL SSOT
+    let persistedIntentId = intent.idempotencyKey;
+    try {
+      persistedIntentId = await saveTradeIntent({
+        userId: auth.user.userId,
+        stage: intent.stage as any,
+        symbol: intent.symbol,
+        side: intent.side as any,
+        type: intent.type as any,
+        quantity: intent.quantity,
+        price: intent.price,
+        idempotencyKey: intent.idempotencyKey,
+        status: decision.isApproved ? 'APPROVED' : 'REJECTED',
+        riskDecisionReason: decision.reason,
+      });
+    } catch (dbErr: any) {
+      console.warn('[POST /api/trade-intents] DB persistence warning (non-blocking):', dbErr?.message);
+    }
+
     const data = {
-      tradeIntentId: intent.idempotencyKey,
+      tradeIntentId: persistedIntentId,
       status,
       decision,
     };
@@ -64,10 +92,29 @@ export async function POST(req: NextRequest) {
     };
 
     return NextResponse.json(response, { status: decision.isApproved ? 200 : 400 });
-  } catch (err) {
+  } catch (err: any) {
+    const message = err?.message || 'Trade intent creation failed';
+    if (message.includes('DATABASE_UNAVAILABLE') || message.includes('KILL_SWITCH_UNAVAILABLE')) {
+      return NextResponse.json(
+        { success: false, error: { code: 'SERVICE_UNAVAILABLE', message }, timestamp: new Date().toISOString() },
+        { status: 503 }
+      );
+    }
+    if (message.startsWith('RBAC_FORBIDDEN') || message.startsWith('AUTH_ACCOUNT_')) {
+      return NextResponse.json(
+        { success: false, error: { code: 'FORBIDDEN', message }, timestamp: new Date().toISOString() },
+        { status: 403 }
+      );
+    }
+    if (message.startsWith('UNAUTHORIZED')) {
+      return NextResponse.json(
+        { success: false, error: { code: 'UNAUTHORIZED', message }, timestamp: new Date().toISOString() },
+        { status: 401 }
+      );
+    }
     const response: ApiResponse<null> = {
       success: false,
-      error: { code: 'SERVER_ERROR', message: (err as Error).message },
+      error: { code: 'SERVER_ERROR', message },
       timestamp: new Date().toISOString(),
     };
     return NextResponse.json(response, { status: 500 });

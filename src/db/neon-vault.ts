@@ -16,6 +16,7 @@ import { SQL } from "bun";
 import { getConfig } from "../config.ts";
 import { logger } from "../logger.ts";
 import { normalizeTokenIdentifier, normalizeChainName } from "../../packages/shared/token-identifier.ts";
+import { getAppEnvironment } from "../../packages/shared/env-config.ts";
 
 export interface TokenIdentityRecord {
   contractAddr: string;
@@ -62,11 +63,9 @@ export function normalizeTokenDatabaseName(ticker: string): string {
  * Memeriksa apakah konfigurasi Neon PostgreSQL tersedia di environment.
  */
 export function isNeonConfigured(): boolean {
-  const envUrl = process.env.NEON_DATABASE_URL;
-  if (envUrl && envUrl.startsWith("postgres")) return true;
   try {
-    const cfg = getConfig();
-    return Boolean(cfg.NEON_DATABASE_URL && cfg.NEON_DATABASE_URL.startsWith("postgres"));
+    const url = getNeonMasterDatabaseUrl();
+    return Boolean(url && url.startsWith("postgres"));
   } catch {
     return false;
   }
@@ -74,12 +73,42 @@ export function isNeonConfigured(): boolean {
 
 /**
  * Mendapatkan master URL Neon PostgreSQL (mengarah ke 'neondb').
+ * Environment-aware:
+ * - APP_ENV=testnet -> requires DATABASE_URL_TESTNET / NEON_DATABASE_URL_TESTNET. Fails closed if missing.
+ * - APP_ENV=production -> uses DATABASE_URL / NEON_DATABASE_URL.
  */
 export function getNeonMasterDatabaseUrl(): string {
-  const url =
-    process.env.NEON_DATABASE_URL ||
-    "postgresql://neondb_owner:npg_RDN4IvzsGJ9k@ep-mute-shape-ay3alze1-pooler.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require";
-  return url;
+  const env = getAppEnvironment();
+
+  if (env === 'testnet') {
+    const testnetUrl = (process.env.DATABASE_URL_TESTNET || process.env.NEON_DATABASE_URL_TESTNET)?.trim();
+    if (!testnetUrl || testnetUrl.includes('placeholder')) {
+      throw new Error(
+        'TESTNET_DATABASE_NOT_CONFIGURED: APP_ENV is set to "testnet", but DATABASE_URL_TESTNET environment variable is missing or unconfigured. Refusing to fall back to production database.'
+      );
+    }
+    return testnetUrl;
+  }
+
+  if (env === 'production') {
+    const prodUrl = (process.env.DATABASE_URL || process.env.NEON_DATABASE_URL)?.trim();
+    if (!prodUrl || prodUrl.includes('placeholder')) {
+      throw new Error(
+        'CRITICAL_CONFIG_ERROR: DATABASE_URL / NEON_DATABASE_URL is not configured in production environment. Refusing to operate unbacked state.'
+      );
+    }
+    return prodUrl;
+  }
+
+  // Dev / test
+  const customUrl = (process.env.DATABASE_URL_TESTNET || process.env.NEON_DATABASE_URL_TESTNET || process.env.DATABASE_URL || process.env.NEON_DATABASE_URL)?.trim();
+  if (customUrl && !customUrl.includes('placeholder')) {
+    return customUrl;
+  }
+
+  throw new Error(
+    'DATABASE_NOT_CONFIGURED: DATABASE_URL or NEON_DATABASE_URL environment variable is missing. Set DATABASE_URL in your environment or .env file.'
+  );
 }
 
 /**

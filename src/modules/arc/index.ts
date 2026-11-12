@@ -5,8 +5,8 @@
  * Exports network definitions, viem clients, ArcPad & Tolly adapters, and type definitions.
  */
 
-export * from "./types.ts";
-export * from "./arc-chain-definition.ts";
-export * from "./arc-client.ts";
-export * from "./arcpad-adapter.ts";
-export * from "./tolly-adapter.ts";
+export * from "./types";
+export * from "./arc-chain-definition";
+export * from "./arc-client";
+export * from "./arcpad-adapter";
+export * from "./tolly-adapter";

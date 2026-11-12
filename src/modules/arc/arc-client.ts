@@ -13,21 +13,26 @@ import {
   formatUnits,
   type PublicClient,
   type WalletClient,
+  type Transport,
+  type Chain,
   type Address,
   type Hex,
+  type Account,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { arcMainnet } from "./arc-chain-definition.ts";
+import { arcMainnet } from "./arc-chain-definition";
 import {
   ARC_RPC_DEFAULT,
   ARC_NATIVE_DECIMALS,
   ARC_USDC_FACADE_DECIMALS,
-} from "./types.ts";
+} from "./types";
 
 /**
  * Creates an isolated PublicClient for Arc Mainnet.
  */
-export function getArcPublicClient(rpcUrl: string = ARC_RPC_DEFAULT): PublicClient {
+export function getArcPublicClient(
+  rpcUrl: string = ARC_RPC_DEFAULT
+): PublicClient<Transport, Chain, Account | undefined> {
   return createPublicClient({
     chain: arcMainnet,
     transport: http(rpcUrl, {
@@ -93,7 +98,7 @@ export function rawToFacadeUsdc(rawAmount: bigint): string {
  * Fetches the native USDC balance of an address on Arc Chain.
  */
 export async function getArcNativeBalance(
-  publicClient: PublicClient,
+  publicClient: PublicClient<Transport, Chain>,
   address: Address
 ): Promise<{ wei: bigint; usdc: string; numeric: number }> {
   const balanceWei = await publicClient.getBalance({ address });

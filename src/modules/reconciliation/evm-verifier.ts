@@ -13,17 +13,24 @@ import {
   http,
   formatUnits,
   formatEther,
+  erc20Abi,
   type PublicClient,
+  type Transport,
+  type Chain,
   type TransactionReceipt,
   type Address,
+  type Log,
+  type Account,
   defineChain,
 } from "viem";
 import { base } from "viem/chains";
 import { privateKeyToAccount } from "viem/accounts";
-import { getConfig } from "../../config.ts";
-import { logger } from "../../logger.ts";
-import { sanitizeSecret } from "../evm/bankr-deployer.ts";
-import { getArcPublicClient } from "../arc/index.ts";
+import { getConfig } from "../../config";
+import { logger } from "../../logger";
+import { sanitizeSecret } from "../evm/bankr-deployer";
+import { getArcPublicClient } from "../arc/index";
+
+type EvmLog = Log & { topics?: string[] };
 
 export const robinhoodChain = defineChain({
   id: 4663,
@@ -84,7 +91,9 @@ export interface EvmTokenBalance {
 /**
  * Returns a configured viem public client for the specified EVM chain.
  */
-export function getEvmPublicClient(chain = "base"): PublicClient<any, any> | null {
+export function getEvmPublicClient(
+  chain = "base"
+): PublicClient<Transport, Chain, Account | undefined> | null {
   const cfg = getConfig();
   const normalized = chain.trim().toLowerCase();
 
@@ -92,25 +101,25 @@ export function getEvmPublicClient(chain = "base"): PublicClient<any, any> | nul
     return createPublicClient({
       chain: base,
       transport: http(cfg.BASE_RPC_URL, { timeout: cfg.API_TIMEOUT_MS ?? 15000 }),
-    });
+    }) as PublicClient;
   }
 
   if (normalized === "robinhood") {
     return createPublicClient({
       chain: robinhoodChain,
       transport: http(cfg.ROBINHOOD_RPC_URL, { timeout: cfg.API_TIMEOUT_MS ?? 15000 }),
-    });
+    }) as PublicClient;
   }
 
   if (normalized === "arbitrum") {
     return createPublicClient({
       chain: arbitrumChain,
       transport: http(cfg.ARBITRUM_RPC_URL, { timeout: cfg.API_TIMEOUT_MS ?? 15000 }),
-    });
+    }) as PublicClient;
   }
 
   if (normalized === "arc") {
-    return getArcPublicClient() as any;
+    return getArcPublicClient();
   }
 
   logger.warn(`⚠️  [EVM VERIFIER] Chain '${chain}' is not supported. Supported: 'base', 'robinhood', 'arbitrum', 'arc'.`);
@@ -138,7 +147,7 @@ export function deriveEvmAddress(privateKeyHex?: string): string | null {
 export async function verifyEvmTransactionReceipt(
   txHash: string,
   chain = "base",
-  customClient?: PublicClient<any, any>
+  customClient?: PublicClient
 ): Promise<EvmReceiptVerification> {
   const sanitizedHash = sanitizeSecret(txHash);
 
@@ -225,7 +234,7 @@ export async function verifyEvmDeploymentAttribution(
   txHash: string,
   expectedTokenAddress?: string,
   chain = "base",
-  customClient?: PublicClient<any, any>
+  customClient?: PublicClient
 ): Promise<EvmDeploymentAttribution> {
   const receiptResult = await verifyEvmTransactionReceipt(txHash, chain, customClient);
 
@@ -275,7 +284,7 @@ export async function verifyEvmDeploymentAttribution(
 
   const target = expectedTokenAddress.toLowerCase();
   const targetClean = target.replace(/^0x/, "");
-  const logs = receipt.logs || [];
+  const logs: EvmLog[] = (receipt.logs || []) as EvmLog[];
 
   if (logs.length === 0) {
     return {
@@ -298,7 +307,7 @@ export async function verifyEvmDeploymentAttribution(
 
   // Check B: Is target address present in topics or data of any event?
   const topicOrDataMatch = logs.some((log) => {
-    const inTopics = log.topics?.some((t) => t?.toLowerCase().includes(targetClean));
+    const inTopics = log.topics?.some((t) => t.toLowerCase().includes(targetClean));
     const inData = log.data?.toLowerCase().includes(targetClean);
     return Boolean(inTopics || inData);
   });
@@ -336,7 +345,7 @@ export async function verifyEvmTransactionAttribution(
   expectedTokenAddress?: string,
   expectedWallet?: string,
   chain = "base",
-  customClient?: PublicClient<any, any>
+  customClient?: PublicClient
 ): Promise<EvmTransactionAttribution> {
   const receiptResult = await verifyEvmTransactionReceipt(txHash, chain, customClient);
   if (receiptResult.status !== "confirmed" || !receiptResult.receipt) {
@@ -350,13 +359,13 @@ export async function verifyEvmTransactionAttribution(
   let tokenTransferred = false;
   let walletInvolved = false;
 
-  const logs = receipt.logs || [];
+  const logs: EvmLog[] = (receipt.logs || []) as EvmLog[];
   if (expectedTokenAddress) {
     const targetToken = expectedTokenAddress.toLowerCase().replace(/^0x/, "");
     tokenTransferred = logs.some(
       (log) =>
         log.address?.toLowerCase() === expectedTokenAddress.toLowerCase() ||
-        log.topics?.some((t) => t?.toLowerCase().includes(targetToken)) ||
+        log.topics?.some((t) => t.toLowerCase().includes(targetToken)) ||
         log.data?.toLowerCase().includes(targetToken)
     );
   }
@@ -368,7 +377,7 @@ export async function verifyEvmTransactionAttribution(
       receipt.to?.toLowerCase() === expectedWallet.toLowerCase() ||
       logs.some(
         (log) =>
-          log.topics?.some((t) => t?.toLowerCase().includes(targetWallet)) ||
+          log.topics?.some((t) => t.toLowerCase().includes(targetWallet)) ||
           log.data?.toLowerCase().includes(targetWallet)
       );
   }
@@ -388,7 +397,7 @@ export async function verifyEvmTokenBalance(
   tokenAddress: string,
   walletAddress: string,
   chain = "base",
-  customClient?: PublicClient<any, any>
+  customClient?: PublicClient
 ): Promise<EvmTokenBalance | null> {
   if (!/^0x[a-fA-F0-9]{40}$/.test(tokenAddress) || !/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
     return null;
@@ -401,11 +410,13 @@ export async function verifyEvmTokenBalance(
     // 1. Fetch decimals (default to 18 if call fails)
     let decimals = 18;
     try {
-      decimals = await client.readContract({
+      const decResult = await client.readContract({
         address: tokenAddress as Address,
-        abi: ERC20_MINIMAL_ABI,
+        abi: erc20Abi,
         functionName: "decimals",
+        authorizationList: undefined,
       });
+      decimals = Number(decResult);
     } catch {
       decimals = 18;
     }
@@ -413,9 +424,10 @@ export async function verifyEvmTokenBalance(
     // 2. Fetch raw balance
     const rawBalance = await client.readContract({
       address: tokenAddress as Address,
-      abi: ERC20_MINIMAL_ABI,
+      abi: erc20Abi,
       functionName: "balanceOf",
       args: [walletAddress as Address],
+      authorizationList: undefined,
     });
 
     const balanceString = rawBalance.toString();
@@ -537,7 +549,7 @@ export interface EvmContractExistence {
 export async function verifyEvmContractExists(
   tokenAddress: string,
   chain = "base",
-  customClient?: PublicClient<any, any>
+  customClient?: PublicClient
 ): Promise<EvmContractExistence> {
   const sanitized = sanitizeSecret(tokenAddress);
   if (!tokenAddress || !/^0x[a-fA-F0-9]{40}$/.test(tokenAddress)) {

@@ -3,7 +3,7 @@ import { ApiResponse } from '@packages/shared/contracts/api-contracts';
 import { BountyEscrowService, BountyClaimItem } from '@packages/launchpad/bounty-escrow';
 import { FirecrawlScraperService } from '@packages/intelligence/firecrawl-scraper';
 import { BountyCampaign, BountyClaim, KolProfile } from '@packages/shared/types/domain';
-import { defaultBountyDbAdapter, defaultKolDbAdapter, getDbPool } from '@packages/shared/db-pool';
+import { defaultBountyDbAdapter, defaultKolDbAdapter, getDbPool, getTrustEvidenceService, defaultRpcManager } from '@packages/shared/db-pool';
 import { authenticateSession } from '@packages/auth/session';
 
 export async function GET(req: NextRequest) {
@@ -178,13 +178,18 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const service = new BountyEscrowService(defaultBountyDbAdapter);
+    // Wire TrustEvidenceService for DB-persisted World ID anti-replay (S-01 fix).
+    // getTrustEvidenceService() returns null when DATABASE_URL is absent (dev/test),
+    // in which case BountyEscrowService falls back to in-memory safely.
+    const trustService = getTrustEvidenceService();
+    const service = new BountyEscrowService(defaultBountyDbAdapter, undefined, trustService ?? undefined, defaultRpcManager);
 
     const result = await service.submitAndVerifyClaim(campaignId, kol, finalProofUrl, {
       claimType,
       tokenAddress: resolvedTokenAddress,
       chain: resolvedChain,
       walletAddress,
+      authenticatedUserId: session.user.userId,
     });
 
     if (result.success && result.claim) {
@@ -195,13 +200,29 @@ export async function POST(req: NextRequest) {
       };
       return NextResponse.json(response, { status: 200 });
     } else {
+      let statusCode = 422;
+      let errorCode = 'VERIFICATION_REJECTED';
+      if (result.reason?.startsWith('ACCOUNT_UNDER_REVIEW')) {
+        statusCode = 403;
+        errorCode = 'ACCOUNT_UNDER_REVIEW';
+      } else if (result.reason?.startsWith('INSUFFICIENT_TRUST_TIER')) {
+        statusCode = 422;
+        errorCode = 'INSUFFICIENT_TRUST_TIER';
+      } else if (result.reason?.startsWith('TRUST_SERVICE_UNAVAILABLE')) {
+        statusCode = 503;
+        errorCode = 'TRUST_SERVICE_UNAVAILABLE';
+      } else if (result.reason?.startsWith('INVALID_CAMPAIGN_CONFIG')) {
+        statusCode = 500;
+        errorCode = 'INVALID_CAMPAIGN_CONFIG';
+      }
+
       const response: ApiResponse<typeof result> = {
         success: false,
-        error: { code: 'VERIFICATION_REJECTED', message: result.reason || 'Verification rejected' },
+        error: { code: errorCode, message: result.reason || 'Verification rejected' },
         data: result,
         timestamp: new Date().toISOString(),
       };
-      return NextResponse.json(response, { status: 422 });
+      return NextResponse.json(response, { status: statusCode });
     }
   } catch (error) {
     const res: ApiResponse<null> = {

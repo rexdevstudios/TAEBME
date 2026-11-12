@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
@@ -46,16 +46,13 @@ export default function BillingPage() {
       setPaymentFeedback('🔒 SIWE Session Required: Please connect your EVM wallet to subscribe.');
       return;
     }
-
-    setSelectedPlan(plan);
-    setIsProcessing(true);
-    setPaymentFeedback(null);
-
-    setTimeout(() => {
+    if (plan.priceUsd === 0) {
       setActivePlanId(plan.id);
-      setPaymentFeedback(`✅ Payment Intent Created! Subscribed to ${plan.name} ($${plan.priceUsd}/mo) via dRPC Onchain Settlement.`);
-      setIsProcessing(false);
-    }, 600);
+      setPaymentFeedback('✓ Free tier activated. No payment required.');
+      return;
+    }
+    // Paid subscription integration coming soon — no payment is processed here.
+    setPaymentFeedback('⏳ Paid subscription processing is coming soon. No payment has been taken.');
   };
 
   const defaultPlans: Plan[] = [
@@ -87,7 +84,7 @@ export default function BillingPage() {
             </div>
           )}
           <span className="badge badge-trader" style={{ border: '1px solid #00E676', color: '#00E676', backgroundColor: '#041E15' }}>
-            {loading ? 'LOADING API PLANS...' : 'dRPC ONCHAIN RAIL ACTIVE'}
+            {loading ? 'LOADING...' : 'PLANS LOADED'}
           </span>
         </div>
       </div>
@@ -176,14 +173,29 @@ export default function BillingPage() {
                   {isConnecting ? 'Connecting...' : 'Connect MetaMask to Subscribe'}
                 </button>
               ) : (
-                <button
-                  onClick={() => handleSubscribe(plan)}
-                  disabled={isProcessing || isActive}
-                  className={isActive ? 'btn-secondary' : 'btn-primary'}
-                  style={{ width: '100%', justifyContent: 'center' }}
-                >
-                  {isActive ? 'Current Active Plan' : isProcessing && selectedPlan?.id === plan.id ? 'Processing Intent...' : `Subscribe via Crypto ($${plan.priceUsd})`}
-                </button>
+                plan.priceUsd === 0 ? (
+                  <button
+                    onClick={() => handleSubscribe(plan)}
+                    disabled={isActive}
+                    className={isActive ? 'btn-secondary' : 'btn-primary'}
+                    style={{ width: '100%', justifyContent: 'center' }}
+                    aria-label={isActive ? 'Current plan' : 'Activate free tier'}
+                  >
+                    {isActive ? 'Current Active Plan' : 'Activate Free Tier'}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleSubscribe(plan)}
+                    disabled={true}
+                    className="btn-secondary"
+                    style={{ width: '100%', justifyContent: 'center', cursor: 'not-allowed', opacity: 0.5 }}
+                    title="Paid subscription processing is coming soon. No payment is taken."
+                    aria-label="Subscription coming soon"
+                  >
+                    <CreditCard size={14} />
+                    Coming Soon
+                  </button>
+                )
               )}
             </div>
           );
@@ -198,8 +210,8 @@ export default function BillingPage() {
           </h3>
           <div className="grid-4">
             <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '16px', borderRadius: '6px' }}>
-              <div style={{ color: '#00E5FF', fontWeight: 800, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}><TrendingUp size={14} /> Total ARR / Run-Rate</div>
-              <div style={{ fontSize: '18px', fontWeight: 900, color: 'var(--color-foreground)', margin: '8px 0', fontFamily: 'var(--font-mono)' }}>$14,280 USD</div>
+              <div style={{ color: '#00E5FF', fontWeight: 800, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}><TrendingUp size={14} /> Total ARR / Run-Rate <span className="badge-coming-soon">STATIC</span></div>
+              <div style={{ fontSize: '18px', fontWeight: 900, color: 'var(--color-muted)', margin: '8px 0', fontFamily: 'var(--font-mono)' }}>$14,280 USD</div>
               <div className="text-muted" style={{ fontSize: '11px' }}>48 Paid Institutional Seats</div>
             </div>
             <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '16px', borderRadius: '6px' }}>
@@ -209,12 +221,12 @@ export default function BillingPage() {
             </div>
             <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '16px', borderRadius: '6px' }}>
               <div style={{ color: '#D500F9', fontWeight: 800, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}><Zap size={14} /> Credit Mint Burn Rate</div>
-              <div style={{ fontSize: '18px', fontWeight: 900, color: 'var(--color-foreground)', margin: '8px 0', fontFamily: 'var(--font-mono)' }}>12,450 / day</div>
+              <div style={{ fontSize: '18px', fontWeight: 900, color: 'var(--color-muted)', margin: '8px 0', fontFamily: 'var(--font-mono)' }}>12,450 / day</div>
               <div className="text-muted" style={{ fontSize: '11px' }}>Arkham + Firecrawl Scrapes</div>
             </div>
             <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '16px', borderRadius: '6px' }}>
               <div style={{ color: '#FFC400', fontWeight: 800, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}><Banknote size={14} /> Smart Contract Vault</div>
-              <div style={{ fontSize: '18px', fontWeight: 900, color: 'var(--color-foreground)', margin: '8px 0', fontFamily: 'var(--font-mono)' }}>8.45 ETH</div>
+              <div style={{ fontSize: '18px', fontWeight: 900, color: 'var(--color-muted)', margin: '8px 0', fontFamily: 'var(--font-mono)' }}>8.45 ETH</div>
               <div className="text-muted" style={{ fontSize: '11px' }}>Treasury Multi-sig Safe</div>
             </div>
           </div>

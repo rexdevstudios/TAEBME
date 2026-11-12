@@ -2,13 +2,13 @@
   <defs>
     <!-- Background Gradients -->
     <radialGradient id="bgGlow" cx="20%" cy="20%" r="80%">
-      <stop offset="0%" stop-color="#bbf91f" stop-opacity="0.18" />
-      <stop offset="50%" stop-color="#10aff9" stop-opacity="0.08" />
+      <stop offset="0%" stop-color="#ff007a" stop-opacity="0.18" />
+      <stop offset="50%" stop-color="#ffb703" stop-opacity="0.08" />
       <stop offset="100%" stop-color="#030712" stop-opacity="1" />
     </radialGradient>
     <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#bbf91f" />
-      <stop offset="100%" stop-color="#10aff9" />
+      <stop offset="0%" stop-color="#ff007a" />
+      <stop offset="100%" stop-color="#ffb703" />
     </linearGradient>
     <!-- Subtle Grid Pattern -->
     <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
@@ -47,7 +47,7 @@
     <g transform="translate(0, 205)">
       <rect width="520" height="52" rx="14" fill="#090d16" stroke="#1f2937" stroke-width="1.5" />
       <text x="16" y="32" fill="#6b7280" font-size="13" font-family="monospace">CA:</text>
-      <text x="45" y="32" fill="#e5e7eb" font-size="13" font-family="monospace" font-weight="600">0x814620255bf422d45c0f8aBF7ad89F40a1CBCA4A</text>
+      <text x="45" y="32" fill="#e5e7eb" font-size="13" font-family="monospace" font-weight="600">0x7CE19E4F978009EB644c27946B47221b824C0bA3</text>
     </g>
   </g>
 
@@ -64,7 +64,7 @@
     <!-- Card 2: Buyback & Burn -->
     <g transform="translate(265, 0)">
       <rect width="235" height="120" rx="16" fill="#090d16" stroke="#1f2937" stroke-width="1.5" />
-      <text x="24" y="52" fill="#bbf91f" font-size="36" font-weight="900">30%</text>
+      <text x="24" y="52" fill="#ff007a" font-size="36" font-weight="900">30%</text>
       <text x="24" y="82" fill="#ffffff" font-size="15" font-weight="700">Auto Buyback &amp; Burn</text>
       <text x="24" y="102" fill="#6b7280" font-size="12">Perpetual Deflation</text>
     </g>
@@ -72,7 +72,7 @@
     <!-- Card 3: Passive Dividends -->
     <g transform="translate(0, 145)">
       <rect width="235" height="120" rx="16" fill="#090d16" stroke="#1f2937" stroke-width="1.5" />
-      <text x="24" y="52" fill="#10aff9" font-size="36" font-weight="900">20%</text>
+      <text x="24" y="52" fill="#ffb703" font-size="36" font-weight="900">20%</text>
       <text x="24" y="82" fill="#ffffff" font-size="15" font-weight="700">Passive Dividends</text>
       <text x="24" y="102" fill="#6b7280" font-size="12">Direct Holder Airdrops</text>
     </g>
@@ -88,7 +88,7 @@
 
   <!-- Bottom Brand Footer -->
   <g transform="translate(60, 560)">
-    <circle cx="6" cy="-4" r="5" fill="#bbf91f" />
+    <circle cx="6" cy="-4" r="5" fill="#ff007a" />
     <text x="24" y="0" fill="#6b7280" font-size="14" font-weight="500">Autonomous Web3 Token Engine • DexScreener Verified • LP Locked &amp; Renounced</text>
   </g>
 </svg>

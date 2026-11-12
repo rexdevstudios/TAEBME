@@ -43,7 +43,16 @@ export class TradingRiskGate {
       };
     }
 
-    // 2. Paper Trading Auto-Approval (tanpa batas risiko live exchange)
+    // 2. Evaluasi Deterministik Risk Engine (Kill Switch, Slippage, Max Order, Daily Loss)
+    const decision = evaluateTradeRisk(intent, userLimits, activeKillSwitches);
+    if (!decision.isApproved) {
+      return {
+        status: 'RISK_REJECTED',
+        decision,
+      };
+    }
+
+    // 3. Paper Trading Auto-Approval (setelah lolos kill switch & risk gate)
     if (intent.stage === 'PAPER') {
       return {
         status: 'RISK_APPROVED',
@@ -54,9 +63,6 @@ export class TradingRiskGate {
         },
       };
     }
-
-    // 3. Evaluasi Deterministik Risk Engine (Kill Switch, Slippage, Max Order, Daily Loss)
-    const decision = evaluateTradeRisk(intent, userLimits, activeKillSwitches);
 
     const status: TradeIntentStatus = decision.isApproved ? 'RISK_APPROVED' : 'RISK_REJECTED';
 

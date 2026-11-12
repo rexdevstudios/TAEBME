@@ -54,8 +54,8 @@
   background: conic-gradient(
     from var(--border-angle),
     transparent 20%,
-    #bbf91f 80%,
-    #10aff9 95%,
+    #ff007a 80%,
+    #ffb703 95%,
     transparent
   );
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
@@ -128,5 +128,5 @@
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #bbf91f;
+  background: #ff007a;
 }

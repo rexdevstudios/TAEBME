@@ -30,9 +30,10 @@ import {
   type ArcPadDeployResult,
   type ArcPadTokensApiResponse,
   type ArcPadTokenRecord,
-} from "./types.ts";
-import { nativeUsdcToWei } from "./arc-client.ts";
-import { logger } from "../../logger.ts";
+} from "./types";
+import { nativeUsdcToWei } from "./arc-client";
+import { arcMainnet } from "./arc-chain-definition";
+import { logger } from "../../logger";
 
 export class ArcPadAdapter {
   /**
@@ -206,6 +207,7 @@ export class ArcPadAdapter {
       );
 
       const txHash = await walletClient.writeContract({
+        account: walletClient.account ?? sender,
         address: ARC_CURVE_PAD_ADDRESS,
         abi: ARC_CURVE_PAD_ABI,
         functionName: "createToken",
@@ -222,6 +224,7 @@ export class ArcPadAdapter {
         ],
         value: simulation.devBuyWei,
         gas: ARCPAD_DEPLOY_GAS_LIMIT,
+        chain: arcMainnet,
       });
 
       logger.info(`[ArcPadAdapter] TX sent: ${txHash}. Awaiting receipt...`);
@@ -243,18 +246,18 @@ export class ArcPadAdapter {
       for (const log of receipt.logs) {
         try {
           if (log.address.toLowerCase() === ARC_CURVE_PAD_ADDRESS.toLowerCase()) {
+            const logWithTopics = log as { data: Hex; topics?: [Hex, ...Hex[]] };
+            if (!logWithTopics.topics || logWithTopics.topics.length === 0 || !logWithTopics.data) continue;
             const decoded = decodeEventLog({
               abi: ARC_CURVE_PAD_ABI,
-              data: log.data,
-              topics: log.topics,
+              eventName: "TokenCreated",
+              data: logWithTopics.data,
+              topics: logWithTopics.topics,
             });
-
-            if (decoded.eventName === "TokenCreated") {
-              const args = decoded.args as any;
-              tokenAddress = args.token;
-              poolAddress = args.pool;
-              break;
-            }
+            const eventArgs = decoded.args as { token?: Address; pool?: Address };
+            tokenAddress = eventArgs.token;
+            poolAddress = eventArgs.pool;
+            break;
           }
         } catch {
           // Continue scanning logs

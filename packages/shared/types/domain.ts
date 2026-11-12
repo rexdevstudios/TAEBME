@@ -130,6 +130,19 @@ export function evaluateTradeRisk(
         riskFactors: ['USER_SUSPENDED'],
       };
     }
+    if (
+      ks.scope === 'TOKEN' &&
+      ks.targetId &&
+      (ks.targetId.toLowerCase() === intent.symbol.toLowerCase() ||
+       ks.targetId.toLowerCase() === intent.symbol.replace('/', '').toLowerCase())
+    ) {
+      return {
+        isApproved: false,
+        score: 100,
+        reason: `TOKEN_KILL_SWITCH_ACTIVE: ${ks.reason}`,
+        riskFactors: ['TOKEN_HALTED'],
+      };
+    }
   }
 
   // B. Max Slippage Guardrail (Max 3%)
@@ -212,6 +225,17 @@ export function validateFairLaunchPurchase(
 // ----------------------------------------------------------------------------
 // 4. SOCIALFI & KOL DOMAIN CONTRACTS
 // ----------------------------------------------------------------------------
+
+/**
+ * Campaign catalog type discriminator.
+ * Determines the campaign's purpose and behavior ruleset.
+ * NOT to be confused with claim behavior types (HOLD/STAKE/SOCIAL) which are
+ * determined by the claim submission payload (claimType field).
+ *
+ * Sourced from bounty_campaigns.campaign_type column.
+ */
+export type { CampaignType } from './trust';
+
 export interface KolProfile {
   id: string;
   userId: string;
@@ -234,7 +258,19 @@ export interface BountyCampaign {
   creatorId: string;
   title: string;
   description?: string;
-  campaignType?: 'SHARE' | 'HOLD' | 'STAKE';
+  /**
+   * Campaign catalog type discriminator (maps to bounty_campaigns.campaign_type column).
+   * Defaults to 'BOUNTY' for all existing campaigns (backward-compatible).
+   */
+  campaignType: import('./trust').CampaignType;
+  /**
+   * Claim behavior hint — governs which verification branch is used in BountyEscrowService.
+   * 'HOLD' = on-chain balance check, 'STAKE' = staking verification, default = social/tweet.
+   * This is set in the claim submission payload, NOT the campaign catalog type.
+   * @deprecated Use the claimType field in claim submission payload instead.
+   *             This field is retained for backward compatibility with existing campaigns.
+   */
+  claimBehaviorHint?: 'SHARE' | 'HOLD' | 'STAKE';
   requiredHashtag: string;
   minFollowers: number;
   rewardPerKol: bigint;
@@ -243,6 +279,15 @@ export interface BountyCampaign {
   isActive: boolean;
   requiresHumanityProof?: boolean;
   minGitcoinScore?: number;
+  /**
+   * Minimum trust tier required for a participant to claim this bounty.
+   * Can be: 'NEW' | 'VERIFIED' | 'ESTABLISHED' | 'TRUSTED'.
+   * 'REVIEW' is invalid as a campaign requirement and rejected at API/DB levels.
+   * Defaults to 'NEW' for open participation / backward compatibility.
+   */
+  minTrustTier?: import('./trust').TrustTier;
+  tokenAddress?: string;
+  chain?: string;
 }
 
 export interface BountyClaim {
@@ -251,12 +296,24 @@ export interface BountyClaim {
   kolId: string;
   proofUrl: string;
   verificationStatus: 'PENDING' | 'VERIFIED' | 'REJECTED' | 'CLAIMED';
+  settlementTxHash?: string;
   sybilVerified?: boolean;
   humanityScore?: number;
   nullifierHash?: string;
+  /**
+   * Immutable snapshot of the claimant's trust tier at the moment the claim passed verification.
+   * Remains unchanged through all status transitions and retries.
+   * Historical claims remain undefined / null.
+   */
+  trustTierAtClaim?: import('./trust').TrustTier;
   claimedAt?: Date;
   createdAt: Date;
+  kolUserId?: string;
+  launchpadContractAddress?: string;
+  tokenAddress?: string;
+  rewardPerKol?: bigint;
 }
+
 
 export interface NutritionLabelRiskScore {
   tokenAddress: string;
@@ -334,5 +391,67 @@ export interface CcipBridgeQuote {
   encodedMessage: string;
 }
 
+// ============================================================================
+// GAMEFI & NFT DOMAIN INTERFACES (PHASE 4)
+// ============================================================================
 
+export type NftPassTier = 'BRONZE' | 'SILVER' | 'GOLD';
 
+export interface NftCollectionRecord {
+  id: string;
+  name: string;
+  symbol: string;
+  contractAddress?: string;
+  chain: string;
+  maxSupply: number;
+  createdAt: Date;
+}
+
+export interface NftItemRecord {
+  id: string;
+  collectionId: string;
+  tokenId: number;
+  ownerWallet: string;
+  tier: NftPassTier;
+  metadataUri: string;
+  mintTxHash?: string;
+  mintedAt: Date;
+}
+
+export interface UserGameFiProfile {
+  userId: string;
+  xp: number;
+  level: number;
+  questsCompleted: number;
+  updatedAt: Date;
+}
+
+export interface QuestDefinition {
+  id: string;
+  title: string;
+  description: string;
+  xpReward: number;
+  badgeTier?: NftPassTier;
+  isActive: boolean;
+  createdAt: Date;
+}
+
+export interface QuestCompletion {
+  id: string;
+  userId: string;
+  questId: string;
+  status: 'COMPLETED' | 'PENDING' | 'REJECTED';
+  xpGranted: number;
+  completedAt: Date;
+}
+
+export interface MintVoucherPayload {
+  recipient: string;
+  tier: NftPassTier;
+  nonce: string;
+  deadline: number;
+  signature: string;
+  metadataUri?: string;
+  contractAddress?: string;
+  chainId?: number;
+}

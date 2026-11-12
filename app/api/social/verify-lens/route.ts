@@ -1,37 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { FarcasterLensService } from '@/packages/social/farcaster-lens-service';
+import { authenticateSession } from '@/packages/auth/session';
 import { ethers } from 'ethers';
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { walletAddress, handle, profileId, followersCount } = body;
-
-    if (!walletAddress || !ethers.isAddress(walletAddress)) {
+    // 1. SIWE Session Authentication (Fail-Closed)
+    const session = await authenticateSession(req);
+    if (!session) {
       return NextResponse.json(
-        { success: false, error: 'INVALID_WALLET_ADDRESS: Valid wallet address required' },
+        { success: false, error: 'UNAUTHORIZED: Valid cryptographic SIWE session required' },
+        { status: 401 }
+      );
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const { walletAddress, handle, profileId } = body;
+
+    const targetWallet = session.walletAddress;
+    if (walletAddress && ethers.getAddress(walletAddress).toLowerCase() !== ethers.getAddress(targetWallet).toLowerCase()) {
+      return NextResponse.json(
+        { success: false, error: 'FORBIDDEN: Cannot verify Lens credentials for another wallet address' },
+        { status: 403 }
+      );
+    }
+
+    if (!handle || typeof handle !== 'string' || handle.trim().length < 3) {
+      return NextResponse.json(
+        { success: false, error: 'INVALID_HANDLE: Valid Lens handle required' },
         { status: 400 }
       );
     }
 
-    if (!handle) {
-      return NextResponse.json(
-        { success: false, error: 'INVALID_HANDLE: Lens handle required' },
-        { status: 400 }
-      );
-    }
-
-    const verification = FarcasterLensService.verifyLensProfile({
-      walletAddress,
+    const verification = await FarcasterLensService.verifyLensProfile({
+      walletAddress: targetWallet,
       handle,
       profileId,
-      followersCount: followersCount ? Number(followersCount) : undefined,
     });
 
     if (!verification.isValid) {
+      const isUnavailable = verification.reason?.startsWith('FEATURE_UNAVAILABLE');
       return NextResponse.json(
         { success: false, error: verification.reason || 'LENS_VERIFICATION_FAILED' },
-        { status: 400 }
+        { status: isUnavailable ? 503 : 422 }
       );
     }
 
@@ -46,3 +59,5 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+

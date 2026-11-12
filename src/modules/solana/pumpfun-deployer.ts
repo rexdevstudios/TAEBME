@@ -23,11 +23,11 @@ import {
 } from "@solana/web3.js";
 import bs58 from "bs58";
 import axios from "axios";
-import { getConfig } from "../../config.ts";
-import { logger } from "../../logger.ts";
-import { saveWallet, getUnsweptWallets, markWalletSwept } from "../../db/vault.ts";
-import type { TokenIdentity } from "../ai/gemini-brain.ts";
-import type { UploadResult } from "../ipfs/pinata-uploader.ts";
+import { getConfig } from "../../config";
+import { logger } from "../../logger";
+import { saveWallet, getUnsweptWallets, markWalletSwept } from "../../db/vault";
+import type { TokenIdentity } from "../ai/gemini-brain";
+import type { UploadResult } from "../ipfs/pinata-uploader";
 export interface DeployResult {
   success: boolean;
   contractAddress?: string;

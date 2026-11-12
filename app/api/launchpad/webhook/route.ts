@@ -5,41 +5,45 @@ import { ethers } from 'ethers';
 
 /**
  * Verifies webhook caller authenticity.
- * Checks WEBHOOK_SECRET or FAST_TRACK_WEBHOOK_SECRET against headers or query parameters.
+ * Requires non-empty WEBHOOK_SECRET / FAST_TRACK_WEBHOOK_SECRET in headers or Alchemy HMAC SHA-256 signature.
+ * Note: Query parameter authentication (?secret=) is strictly disallowed to prevent log leakage and empty matching.
  */
 function isWebhookAuthorized(req: NextRequest, rawBody?: string): boolean {
-  const secret = process.env.WEBHOOK_SECRET || process.env.FAST_TRACK_WEBHOOK_SECRET;
+  const rawSecret = process.env.WEBHOOK_SECRET || process.env.FAST_TRACK_WEBHOOK_SECRET;
+  const secret = rawSecret?.trim();
+  const alchemySigningKey = (process.env.ALCHEMY_WEBHOOK_SIGNING_KEY || process.env.WEBHOOK_SECRET)?.trim();
 
-  // Permissive in non-production environments when secret is unconfigured
-  if (!secret && process.env.NODE_ENV !== 'production') {
-    return true;
+  // Fail closed unconditionally if neither secret nor alchemy key is configured
+  if (!secret && !alchemySigningKey) {
+    return false;
   }
 
-  // 1. Header auth
-  const headerSecret = req.headers.get('x-webhook-secret') || req.headers.get('x-api-key');
-  if (headerSecret && headerSecret === secret) return true;
-
-  // 2. Query param auth
-  const { searchParams } = new URL(req.url);
-  const querySecret = searchParams.get('secret');
-  if (querySecret && querySecret === secret) return true;
-
-  // 3. Bearer token
-  const authHeader = req.headers.get('authorization');
-  if (authHeader && authHeader === `Bearer ${secret}`) return true;
-
-  // 4. Alchemy HMAC SHA-256 signature verification
+  // 1. Alchemy HMAC SHA-256 signature verification (Preferred for Alchemy Notify)
   const alchemySignature = req.headers.get('x-alchemy-signature');
-  const alchemySigningKey = process.env.ALCHEMY_WEBHOOK_SIGNING_KEY;
   if (alchemySignature && alchemySigningKey && rawBody) {
     try {
       const hmac = crypto.createHmac('sha256', alchemySigningKey);
       hmac.update(rawBody, 'utf8');
       const digest = hmac.digest('hex');
-      return crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(alchemySignature));
+      const expectedBuf = Buffer.from(digest);
+      const receivedBuf = Buffer.from(alchemySignature);
+      if (expectedBuf.length === receivedBuf.length && crypto.timingSafeEqual(expectedBuf, receivedBuf)) {
+        return true;
+      }
     } catch {
-      return false;
+      // Fall through on HMAC parse/compare error
     }
+  }
+
+  // 2. Secret-based header authentication (Secret must be at least 16 characters)
+  if (secret && secret.length >= 16) {
+    // Check custom headers
+    const headerSecret = req.headers.get('x-webhook-secret') || req.headers.get('x-api-key');
+    if (headerSecret && headerSecret === secret) return true;
+
+    // Check Bearer authorization header
+    const authHeader = req.headers.get('authorization');
+    if (authHeader && authHeader === `Bearer ${secret}`) return true;
   }
 
   return false;
@@ -133,7 +137,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Persist each event into Neon PostgreSQL `chain_events` table
+    // Persist each event into Neon PostgreSQL `chain_events` table (advisory / observability only)
     const persistedIds: string[] = [];
 
     for (const ev of eventsToPersist) {
@@ -154,19 +158,6 @@ export async function POST(req: NextRequest) {
         ]
       );
       persistedIds.push(eventUuid);
-
-      // If SWAP or LIQUIDITY event, update corresponding token_launches metrics
-      if (ev.eventName.includes('SWAP') || ev.eventName.includes('LIQUIDITY')) {
-        const volumeIncrement = Number(ev.eventData?.volumeUsd || ev.eventData?.value || 0);
-        if (volumeIncrement > 0 && ev.contractAddress) {
-          await query(
-            `UPDATE token_launches 
-             SET raised_amount = raised_amount + $1 
-             WHERE LOWER(contract_address) = LOWER($2)`,
-            [volumeIncrement, ev.contractAddress]
-          ).catch(() => {});
-        }
-      }
     }
 
     const elapsedMs = Math.round(performance.now() - startTime);

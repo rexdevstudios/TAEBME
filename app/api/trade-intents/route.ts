@@ -4,7 +4,7 @@ import { rateLimiter } from '@packages/auth/rate-limiter';
 import { ApiResponse, CreateTradeIntentRequest } from '@packages/shared/contracts/api-contracts';
 import { TradeIntentInput, UserRiskLimits } from '@packages/shared/types/domain';
 import { requireCapability } from '@packages/auth/session';
-import { saveTradeIntent } from '@packages/shared/db-pool';
+import { saveTradeIntent, defaultKillSwitchDbAdapter, defaultBillingDbAdapter } from '@packages/shared/db-pool';
 
 export async function POST(req: NextRequest) {
   try {
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
       quantity: body.quantity || 1.0,
       price: body.price,
       maxSlippagePct: body.maxSlippagePct || 1.0,
-      idempotencyKey: `intent-${Date.now()}`,
+      idempotencyKey: body.idempotencyKey || `intent-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     };
 
     const userLimits: UserRiskLimits = {
@@ -46,11 +46,17 @@ export async function POST(req: NextRequest) {
       currentOpenPositions: 0,
     };
 
+    // Authoritatively query active kill switches from PostgreSQL SSOT (Fail-Closed)
+    const activeKillSwitches = await defaultKillSwitchDbAdapter.getActiveKillSwitches();
+
+    // Authoritatively resolve user subscription plan & live trading entitlement from PostgreSQL SSOT (Fail-Closed)
+    const userEntitlement = await defaultBillingDbAdapter.getUserEntitlement(auth.user.userId);
+
     const { status, decision } = TradingRiskGate.evaluateIntent(
       intent,
       userLimits,
-      { planId: 'TRADER', hasLiveTrading: true },
-      []
+      userEntitlement,
+      activeKillSwitches
     );
 
     // Persist Trade Intent to PostgreSQL SSOT

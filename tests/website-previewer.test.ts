@@ -93,6 +93,7 @@ describe("Web3 Website Local Previewer Suite", () => {
       const instance = await startWebsitePreviewServer({
         siteDir: dummySiteDir,
         port: 3388,
+        host: "127.0.0.1",
         openBrowser: false,
       });
 
@@ -101,24 +102,24 @@ describe("Web3 Website Local Previewer Suite", () => {
         expect(instance.port).toBe(3388);
 
         // Fetch root index.html
-        const res = await fetch(`${instance.url}/`);
+        const res = await fetch(`http://127.0.0.1:${instance.port}/`);
         expect(res.status).toBe(200);
         expect(res.headers.get("content-type")).toContain("text/html");
         const body = await res.text();
         expect(body).toContain("$DUMMY Live");
 
         // Fetch JSON asset
-        const jsonRes = await fetch(`${instance.url}/dexscreener-profile.json`);
+        const jsonRes = await fetch(`http://127.0.0.1:${instance.port}/dexscreener-profile.json`);
         expect(jsonRes.status).toBe(200);
         expect(jsonRes.headers.get("content-type")).toContain("application/json");
 
         // Fetch SVG asset
-        const svgRes = await fetch(`${instance.url}/og-image.svg`);
+        const svgRes = await fetch(`http://127.0.0.1:${instance.port}/og-image.svg`);
         expect(svgRes.status).toBe(200);
         expect(svgRes.headers.get("content-type")).toBe("image/svg+xml");
 
         // Fetch non-existent file
-        const notFoundRes = await fetch(`${instance.url}/non-existent.html`);
+        const notFoundRes = await fetch(`http://127.0.0.1:${instance.port}/non-existent.html`);
         expect(notFoundRes.status).toBe(404);
       } finally {
         instance.stop();

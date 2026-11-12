@@ -20,7 +20,7 @@ async function runAdvancedSocialFiSimulation() {
   const paymaster = new GaslessPaymasterService({
     defaultChainId: 8453, // Base Mainnet
   });
-  const sponsorAddress = paymaster.getSponsorAddress();
+  const sponsorAddress = await paymaster.getSponsorAddress();
   console.log('SUCCESS: Initialized Gasless Paymaster with Sponsor Address:', sponsorAddress);
 
   const testToken = '0x1111111111111111111111111111111111111111';
@@ -118,7 +118,7 @@ async function runAdvancedSocialFiSimulation() {
   console.log('\n[3/3] Testing Decentralized Reputation Graph (Farcaster & Lens Protocol)...');
 
   // 1. Farcaster Verification
-  const fcValid = FarcasterLensService.verifyFarcasterAccount({
+  const fcValid = await FarcasterLensService.verifyFarcasterAccount({
     walletAddress: testKolWallet,
     fid: 12345,
     username: 'vitalik.eth',
@@ -131,7 +131,7 @@ async function runAdvancedSocialFiSimulation() {
   console.log('SUCCESS: Farcaster FID and custody address verified cleanly for @vitalik.eth');
 
   // Custody mismatch rejection
-  const fcMismatch = FarcasterLensService.verifyFarcasterAccount({
+  const fcMismatch = await FarcasterLensService.verifyFarcasterAccount({
     walletAddress: testKolWallet,
     fid: 12345,
     username: 'impostor',
@@ -143,7 +143,7 @@ async function runAdvancedSocialFiSimulation() {
   console.log('SUCCESS: Farcaster custody mismatch correctly rejected');
 
   // 2. Lens Protocol Verification
-  const lensValid = FarcasterLensService.verifyLensProfile({
+  const lensValid = await FarcasterLensService.verifyLensProfile({
     walletAddress: testKolWallet,
     handle: 'cryptorider', // auto-appends .lens
     followersCount: 800,

@@ -19,11 +19,15 @@ import { Database } from "bun:sqlite";
 import { DB_PATH } from "../src/db/vault.ts";
 import { logger } from "../src/logger.ts";
 import { getEvmPublicClient } from "../src/modules/reconciliation/evm-verifier.ts";
+import { getDbPool } from "../packages/shared/db-pool.ts";
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-});
+function getPool(): Pool {
+  const p = getDbPool();
+  if (!p) {
+    throw new Error("DATABASE_NOT_CONFIGURED: Database connection is not configured for active environment.");
+  }
+  return p;
+}
 
 export async function syncRobinhoodTokenToNeon(tokenCa: string, poolId?: string): Promise<boolean> {
   const cleanCa = tokenCa.trim();
@@ -60,6 +64,7 @@ export async function syncRobinhoodTokenToNeon(tokenCa: string, poolId?: string)
   }
 
   try {
+    const pool = getPool();
     // 1. Check if token already exists in token_launches
     const existing = await pool.query(
       `SELECT id, draft_id, contract_address, chain FROM token_launches WHERE LOWER(contract_address) = LOWER($1);`,
@@ -240,7 +245,10 @@ async function main() {
     logger.warn(`Notice SQLite: ${sqliteErr.message}`);
   }
 
-  await pool.end();
+  const activePool = getDbPool();
+  if (activePool) {
+    await activePool.end();
+  }
   if (ok) {
     console.log(`\n✅ [SELESAI] Token Robinhood berhasil disinkronkan ke Neon PostgreSQL SSOT!`);
     console.log(`   Kunjungi http://localhost:3000/launchpad atau http://localhost:3000/token/robinhood/${targetCa}\n`);

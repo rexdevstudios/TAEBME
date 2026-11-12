@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -49,7 +49,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     openGraph: {
       title: `$${ticker} (${name}) — Verified Protocol`,
       description: `Explore live charts, security audit, and 1-click swap for $${ticker} on ${chainName}.`,
-      images: [tokenLaunch?.imageUrl || 'https://rtrader.io/token-default.png'],
+      images: [tokenLaunch?.imageUrl || '/token-default.png'],
     },
     twitter: {
       card: 'summary_large_image',
@@ -113,7 +113,7 @@ export default async function TokenPortalPage({ params }: PageProps) {
   const tokenTicker = dbLaunch?.ticker || (isSol ? `SOL-${lookupAddress.slice(0, 4)}` : 'TOKEN');
   const tokenDescription = dbLaunch?.description ||
     `Autonomous decentralized protocol deployed on ${norm.chain.toUpperCase()}. Verified on-chain liquidity, 0% tax policy, and anti-MEV protection.`;
-  const tokenImageUrl = dbLaunch?.imageUrl || 'https://rtrader.io/token-default.png';
+  const tokenImageUrl = dbLaunch?.imageUrl || '/token-default.png';
   const launchMode = dbLaunch?.launchMode || (isSol ? 'PUMP_FUN' : 'BONDING_CURVE');
   const riskScore = dbLaunch?.riskScore ?? 94;
   const raisedAmount = dbLaunch?.raisedAmount ?? 12500;
@@ -193,11 +193,14 @@ export default async function TokenPortalPage({ params }: PageProps) {
               borderRadius: '50%',
               backgroundColor: '#22C55E',
               boxShadow: '0 0 8px #22C55E',
+              animation: 'pulse-live 2s ease-in-out infinite',
+              display: 'inline-block',
             }}
           />
           <span style={{ color: '#F8FAFC', fontWeight: 700 }}>
             {norm.chain.toUpperCase()} PROTOCOL TELEMETRY
           </span>
+          <span className="badge-live" style={{ marginLeft: '8px', fontSize: '10px' }}>LIVE</span>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', color: '#94A3B8', flexWrap: 'wrap' }}>
@@ -227,7 +230,7 @@ export default async function TokenPortalPage({ params }: PageProps) {
         }}
       >
         {/* Hero Left: Token Information */}
-        <div className="card" style={{ padding: '28px' }}>
+        <div className="glass-panel" style={{ padding: '28px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '20px' }}>
             <img
               src={tokenImageUrl}
@@ -637,7 +640,7 @@ export default async function TokenPortalPage({ params }: PageProps) {
           gap: '20px',
         }}
       >
-        <div className="card" style={{ padding: '20px' }}>
+        <div className="stat-card" style={{ padding: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
             <div style={{ padding: '8px', borderRadius: '8px', backgroundColor: 'rgba(239, 68, 68, 0.1)' }}>
               <Flame size={20} color="#EF4444" />
@@ -654,7 +657,7 @@ export default async function TokenPortalPage({ params }: PageProps) {
           </p>
         </div>
 
-        <div className="card" style={{ padding: '20px' }}>
+        <div className="stat-card" style={{ padding: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
             <div style={{ padding: '8px', borderRadius: '8px', backgroundColor: 'rgba(34, 197, 94, 0.1)' }}>
               <ShieldCheck size={20} color="#22C55E" />
@@ -671,7 +674,7 @@ export default async function TokenPortalPage({ params }: PageProps) {
           </p>
         </div>
 
-        <div className="card" style={{ padding: '20px' }}>
+        <div className="stat-card" style={{ padding: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
             <div style={{ padding: '8px', borderRadius: '8px', backgroundColor: 'rgba(56, 189, 248, 0.1)' }}>
               <Coins size={20} color="#38BDF8" />
@@ -688,7 +691,7 @@ export default async function TokenPortalPage({ params }: PageProps) {
           </p>
         </div>
 
-        <div className="card" style={{ padding: '20px' }}>
+        <div className="stat-card" style={{ padding: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
             <div style={{ padding: '8px', borderRadius: '8px', backgroundColor: 'rgba(168, 85, 247, 0.1)' }}>
               <Sparkles size={20} color="#A855F7" />

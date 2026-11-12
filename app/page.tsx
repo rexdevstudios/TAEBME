@@ -1,8 +1,9 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from './context/AuthContext';
-import { Activity, ShieldAlert, Zap, Rocket, Terminal, Database, Server, Cpu, Lock, Network, Wallet, BrainCircuit } from 'lucide-react';
+import { Activity, ShieldAlert, Zap, Rocket, Award, Server, Cpu, Lock, Network, Wallet, BrainCircuit } from 'lucide-react';
+import { executeKillSwitchToggle } from './lib/kill-switch-admin-client';
 
 interface OverviewData {
   status: string;
@@ -18,7 +19,7 @@ interface OverviewData {
 }
 
 export default function OverviewPage() {
-  const { isConnected, userRole, walletAddress, connectMetaMask, isConnecting } = useAuth();
+  const { isConnected, userRole, walletAddress, connectMetaMask, isConnecting, chainId } = useAuth();
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [connectError, setConnectError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -27,6 +28,7 @@ export default function OverviewPage() {
   // Admin interactive states
   const [killSwitchActive, setKillSwitchActive] = useState(false);
   const [killSwitchReason, setKillSwitchReason] = useState('Routine platform risk evaluation');
+  const [dualControlRequestId, setDualControlRequestId] = useState('');
   const [adminFeedback, setAdminFeedback] = useState<string | null>(null);
 
   const fetchOverview = async () => {
@@ -47,9 +49,17 @@ export default function OverviewPage() {
   };
 
   useEffect(() => {
-    // Only fetch telemetry if Admin
+    // Only fetch telemetry & kill switch state if Admin
     if (userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN') {
       fetchOverview();
+      fetch('/api/admin/kill-switch')
+        .then((r) => r.json())
+        .then((json) => {
+          if (json.success && json.data) {
+            setKillSwitchActive(Boolean(json.data.isGlobalHalted));
+          }
+        })
+        .catch(() => {});
       const timer = window.setInterval(fetchOverview, 5000);
       return () => window.clearInterval(timer);
     } else {
@@ -57,18 +67,19 @@ export default function OverviewPage() {
     }
   }, [userRole]);
 
-  const handleToggleKillSwitch = () => {
-    const newState = !killSwitchActive;
-    setKillSwitchActive(newState);
-    setAdminFeedback(
-      newState
-        ? `🚨 GLOBAL KILL SWITCH ACTIVATED! Reason: "${killSwitchReason}" • Broadcasted to Redis PubSub`
-        : '✅ Global Kill Switch Deactivated. Normal trading operations resumed.'
-    );
+  const handleToggleKillSwitch = async () => {
+    const result = await executeKillSwitchToggle({
+      currentActive: killSwitchActive,
+      reason: killSwitchReason,
+      dualControlRequestId,
+    });
+    setKillSwitchActive(result.isNowActive);
+    setAdminFeedback(result.feedbackMessage);
   };
 
   const handleFlushTelemetry = () => {
-    setAdminFeedback('⚡ Non-blocking telemetry ring buffer flushed cleanly to PostgreSQL audit log (18 events recorded).');
+    // Telemetry flush not yet wired to a backend endpoint — no operation performed.
+    setAdminFeedback('⚠️ Telemetry flush is not yet integrated with a backend endpoint. No data was sent.');
   };
 
   // -------------------------
@@ -76,63 +87,309 @@ export default function OverviewPage() {
   // -------------------------
   if (!isConnected || userRole === 'GUEST') {
     return (
-      <div className="flex-col gap-lg items-center" style={{ marginTop: 'var(--space-3xl)' }}>
-        <div className="flex-col items-center gap-md" style={{ textAlign: 'center', maxWidth: '800px' }}>
-          <Terminal size={64} className="text-accent" style={{ filter: 'drop-shadow(var(--shadow-neon))' }} />
-          <h1 className="terminal-text" style={{ fontSize: '48px', margin: 0, fontWeight: 900 }}>
-            RTRADER PROTOCOL
-          </h1>
-          <p className="text-muted" style={{ fontSize: '18px', lineHeight: 1.6 }}>
-            Decision-complete execution platform for crypto launchpads, Binance trading terminal, and proposal-only AI agents. Connect your wallet via secure SIWE to begin.
-          </p>
-          
-          <div className="flex-row gap-md" style={{ marginTop: 'var(--space-md)' }}>
+      <div className="flex-col" style={{ gap: 0 }}>
+
+        {/* ── HERO SECTION ── */}
+        <section
+          style={{
+            position: 'relative',
+            paddingTop: 'var(--space-3xl)',
+            paddingBottom: 'var(--space-3xl)',
+            textAlign: 'center',
+            overflow: 'hidden',
+          }}
+        >
+          {/* Ambient background glow orbs */}
+          <div style={{
+            position: 'absolute', top: '-20%', left: '50%', transform: 'translateX(-50%)',
+            width: '600px', height: '400px',
+            background: 'radial-gradient(ellipse, rgba(0,229,255,0.08) 0%, transparent 70%)',
+            pointerEvents: 'none', zIndex: 0,
+          }} />
+          <div style={{
+            position: 'absolute', top: '30%', left: '15%',
+            width: '300px', height: '300px',
+            background: 'radial-gradient(ellipse, rgba(34,197,94,0.06) 0%, transparent 70%)',
+            pointerEvents: 'none', zIndex: 0,
+          }} />
+
+          <div style={{ position: 'relative', zIndex: 1, maxWidth: '820px', margin: '0 auto' }}>
+
+            {/* Main headline */}
+            <h1 style={{
+              fontSize: 'clamp(36px, 6vw, 64px)',
+              fontWeight: 900,
+              lineHeight: 1.05,
+              margin: '0 0 var(--space-lg) 0',
+              letterSpacing: '-1.5px',
+            }}>
+              <span className="hero-headline">The Autonomous Social Liquidity</span>
+              <br />
+              <span style={{
+                background: 'linear-gradient(135deg, #00E5FF 0%, #22C55E 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+              }}>
+                &amp; Bonding Curve Engine on Base
+              </span>
+            </h1>
+
+            {/* Sub-headline */}
+            <p className="text-muted" style={{
+              fontSize: '18px',
+              lineHeight: 1.7,
+              maxWidth: '600px',
+              margin: '0 auto var(--space-xl) auto',
+            }}>
+              Launch tokens with automated liquidity graduation, syndicate with verified KOLs,
+              and trade with zero rugpull risk — powered by deterministic bonding curves.
+            </p>
+
+            {/* CTA Buttons */}
+            <div className="flex-row" style={{ justifyContent: 'center', gap: 'var(--space-md)', flexWrap: 'wrap' }}>
+              <a href="/launchpad" className="btn-cta" style={{ textDecoration: 'none' }}>
+                <Rocket size={18} /> Launch Token
+              </a>
+              <a href="/kol" className="btn-glass" style={{ textDecoration: 'none' }}>
+                <Network size={18} /> Explore Deal Rooms
+              </a>
+              <button
+                onClick={async () => {
+                  setConnectError(null);
+                  const res = await connectMetaMask();
+                  if (!res.success && res.error) setConnectError(res.error);
+                }}
+                disabled={isConnecting}
+                className="btn-secondary"
+                style={{ fontSize: '15px', padding: '14px 24px' }}
+              >
+                <Wallet size={18} />
+                {isConnecting ? 'Signing SIWE...' : 'Connect Wallet (SIWE)'}
+              </button>
+            </div>
+
+            {connectError && (
+              <p className="text-destructive" style={{ marginTop: 'var(--space-md)', fontWeight: 600 }}>
+                {connectError}
+              </p>
+            )}
+
+            {/* Secondary auth entry — email / alternative login */}
+            <p className="text-muted" style={{ marginTop: 'var(--space-lg)', fontSize: '13px' }}>
+              Prefer email or alternative login?{' '}
+              <a
+                href="/auth/login"
+                style={{
+                  color: '#94A3B8',
+                  textDecoration: 'underline',
+                  textUnderlineOffset: '3px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+              >
+                <Lock size={12} /> Login Portal
+              </a>
+            </p>
+          </div>
+        </section>
+
+        {/* ── PROTOCOL GUARANTEE STRIP ── */}
+        <section style={{ padding: 'var(--space-2xl) 0' }}>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: 'var(--space-md)',
+          }}>
+            {[
+              { icon: <Zap size={28} style={{ color: '#00E5FF' }} />, stat: '0%', label: 'Initial Liquidity Required' },
+              { icon: <Activity size={28} style={{ color: '#22C55E' }} />, stat: 'Auto', label: 'Aerodrome Graduation' },
+              { icon: <ShieldAlert size={28} style={{ color: '#D500F9' }} />, stat: 'ZK', label: 'Anti-Sybil KOL Proof' },
+              { icon: <Lock size={28} style={{ color: '#FFD600' }} />, stat: '100%', label: 'Non-Custodial' },
+            ].map((item, i) => (
+              <div key={i} className="stat-card" style={{ textAlign: 'center' }}>
+                <div style={{ marginBottom: '12px', display: 'flex', justifyContent: 'center' }}>{item.icon}</div>
+                <div style={{ fontSize: '28px', fontWeight: 900, lineHeight: 1, marginBottom: '6px', color: 'var(--color-foreground)' }}>
+                  {item.stat}
+                </div>
+                <div className="text-muted" style={{ fontSize: '13px', lineHeight: 1.4 }}>{item.label}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ── BENTO FEATURE GRID ── */}
+        <section style={{ padding: 'var(--space-2xl) 0' }}>
+          <div style={{ textAlign: 'center', marginBottom: 'var(--space-xl)' }}>
+            <h2 style={{ fontSize: '32px', fontWeight: 800, margin: '0 0 12px 0', letterSpacing: '-0.5px' }}>
+              Everything you need to launch &amp; trade
+            </h2>
+            <p className="text-muted" style={{ fontSize: '16px', margin: 0 }}>
+              Built on Base. Powered by automated bonding curves.
+            </p>
+          </div>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+            gap: 'var(--space-lg)',
+          }}>
+            {/* Card A – Bonding Curve Launchpad */}
+            <div className="bento-card">
+              <div style={{ marginBottom: '16px' }}>
+                <Rocket size={32} style={{ color: '#00E5FF' }} className="glow-accent" />
+              </div>
+              <h3 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 10px 0', color: 'var(--color-foreground)' }}>
+                Bonding Curve Launchpad
+              </h3>
+              <p className="text-muted" style={{ fontSize: '14px', lineHeight: 1.6, margin: '0 0 16px 0' }}>
+                Fair-launch tokens on a deterministic P₀=0 bonding curve. Auto-graduates to Aerodrome at 24 ETH target with zero rugpull risk.
+              </p>
+              <div style={{
+                background: 'linear-gradient(90deg, rgba(0,229,255,0.06) 0%, rgba(34,197,94,0.06) 100%)',
+                border: '1px solid rgba(0,229,255,0.12)',
+                borderRadius: '8px',
+                padding: '12px 16px',
+                fontSize: '12px',
+                color: '#67E8F9',
+                fontFamily: 'monospace',
+              }}>
+                G = 24 ETH · Fee = 1% · S_grad = 668M tokens
+              </div>
+            </div>
+
+            {/* Card B – Angel Deal Room */}
+            <div className="bento-card">
+              <div style={{ marginBottom: '16px' }}>
+                <Award size={32} style={{ color: '#22C55E' }} />
+              </div>
+              <h3 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 10px 0', color: 'var(--color-foreground)' }}>
+                Angel Deal Room
+              </h3>
+              <p className="text-muted" style={{ fontSize: '14px', lineHeight: 1.6, margin: '0 0 16px 0' }}>
+                Syndicate with verified KOLs — Twitter, Farcaster &amp; Lens verified — for bounty-powered viral launch campaigns.
+              </p>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {['Twitter/X ✓', 'Farcaster ✓', 'Lens ✓', 'World ID ✓'].map(p => (
+                  <span key={p} style={{
+                    padding: '3px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600,
+                    background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)', color: '#86EFAC',
+                  }}>{p}</span>
+                ))}
+              </div>
+            </div>
+
+            {/* Card C – Risk Gate */}
+            <div className="bento-card">
+              <div style={{ marginBottom: '16px' }}>
+                <ShieldAlert size={32} style={{ color: '#D500F9' }} />
+              </div>
+              <h3 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 10px 0', color: 'var(--color-foreground)' }}>
+                Deterministic Risk Gate
+              </h3>
+              <p className="text-muted" style={{ fontSize: '14px', lineHeight: 1.6, margin: '0 0 16px 0' }}>
+                Every trade passes through a fail-closed TradingRiskGate. Slippage caps, MEV frontrun detection, and real-time kill switch.
+              </p>
+              <div style={{
+                background: 'rgba(213, 0, 249, 0.06)',
+                border: '1px solid rgba(213, 0, 249, 0.15)',
+                borderRadius: '8px',
+                padding: '10px 14px',
+                fontSize: '12px',
+                color: '#E879F9',
+              }}>
+                ● Slippage Cap: 3%  ● Max Order: $10,000
+              </div>
+            </div>
+
+            {/* Card D – Cross-Chain */}
+            <div className="bento-card">
+              <div style={{ marginBottom: '16px' }}>
+                <BrainCircuit size={32} style={{ color: '#FFD600' }} />
+              </div>
+              <h3 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 10px 0', color: 'var(--color-foreground)' }}>
+                Cross-Chain Liquidity
+              </h3>
+              <p className="text-muted" style={{ fontSize: '14px', lineHeight: 1.6, margin: '0 0 16px 0' }}>
+                Deploy across Base, Solana, Clanker, and Robinhood Chain. AI-advisory agents suggest optimal chain routing.
+              </p>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {['Base ✓', 'Solana ✓', 'Clanker ✓', 'RH Chain ✓'].map(c => (
+                  <span key={c} style={{
+                    padding: '3px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600,
+                    background: 'rgba(255,214,0,0.08)', border: '1px solid rgba(255,214,0,0.2)', color: '#FDE047',
+                  }}>{c}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── 3-STEP ONBOARDING WALKTHROUGH ── */}
+        <section style={{
+          padding: 'var(--space-2xl) 0 var(--space-3xl) 0',
+          textAlign: 'center',
+        }}>
+          <h2 style={{ fontSize: '28px', fontWeight: 800, margin: '0 0 var(--space-xl) 0', letterSpacing: '-0.5px' }}>
+            Start in 3 steps
+          </h2>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: 'var(--space-lg)',
+            maxWidth: '720px',
+            margin: '0 auto',
+          }}>
+            {[
+              { n: '1', title: 'Connect Wallet', desc: 'Sign-In with Ethereum (EIP-4361 SIWE) for non-custodial authentication.', color: '#00E5FF' },
+              { n: '2', title: 'Launch / Pick Pool', desc: 'Create your token on a bonding curve, or explore existing KOL deal rooms.', color: '#22C55E' },
+              { n: '3', title: 'Trade & Graduate', desc: 'Buy tokens on the curve. At 24 ETH, liquidity auto-migrates to Aerodrome DEX.', color: '#D500F9' },
+            ].map(step => (
+              <div key={step.n} className="glass-panel" style={{ padding: '28px 24px' }}>
+                <div style={{
+                  width: '40px', height: '40px', borderRadius: '50%',
+                  background: `radial-gradient(circle, ${step.color}33, ${step.color}11)`,
+                  border: `2px solid ${step.color}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  margin: '0 auto 16px auto',
+                  fontSize: '16px', fontWeight: 900, color: step.color,
+                }}>
+                  {step.n}
+                </div>
+                <h3 style={{ fontSize: '16px', fontWeight: 800, margin: '0 0 8px 0' }}>{step.title}</h3>
+                <p className="text-muted" style={{ fontSize: '13px', lineHeight: 1.6, margin: 0 }}>{step.desc}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Final CTA */}
+          <div style={{ marginTop: 'var(--space-2xl)' }}>
             <button
               onClick={async () => {
                 setConnectError(null);
                 const res = await connectMetaMask();
-                if (!res.success && res.error) {
-                  setConnectError(res.error);
-                }
+                if (!res.success && res.error) setConnectError(res.error);
               }}
               disabled={isConnecting}
-              className="btn-primary"
-              style={{ fontSize: '16px', padding: '12px 24px' }}
+              className="btn-cta"
+              style={{ fontSize: '16px', padding: '16px 40px' }}
             >
               <Wallet size={20} />
-              {isConnecting ? 'Signing SIWE...' : 'Connect MetaMask'}
+              {isConnecting ? 'Signing SIWE...' : 'Get Started — Connect Wallet'}
             </button>
-            <a href="/auth/login" className="btn-secondary" style={{ fontSize: '16px', padding: '12px 24px', textDecoration: 'none' }}>
-              <Lock size={20} /> Login Portal
-            </a>
+            {connectError && (
+              <p className="text-destructive" style={{ marginTop: 'var(--space-md)', fontWeight: 600 }}>
+                {connectError}
+              </p>
+            )}
           </div>
-          {connectError && (
-            <p className="text-destructive" style={{ marginTop: 'var(--space-sm)', fontWeight: 600 }}>
-              {connectError}
-            </p>
-          )}
-        </div>
+        </section>
 
-        <div className="grid-3" style={{ width: '100%', marginTop: 'var(--space-3xl)' }}>
-          <div className="card">
-            <Network size={32} className="text-accent" style={{ marginBottom: '16px' }} />
-            <h3 style={{ margin: '0 0 8px 0', fontSize: '18px' }}>Binance Trading Terminal</h3>
-            <p className="text-muted" style={{ margin: 0, fontSize: '14px' }}>Direct AES-256 API connection for lightning fast execution with max slippage caps.</p>
-          </div>
-          <div className="card">
-            <Rocket size={32} className="text-accent" style={{ marginBottom: '16px' }} />
-            <h3 style={{ margin: '0 0 8px 0', fontSize: '18px' }}>Degen Launchpad</h3>
-            <p className="text-muted" style={{ margin: 0, fontSize: '14px' }}>Create and launch EVM tokens instantly. Controlled strictly by role-based gating.</p>
-          </div>
-          <div className="card">
-            <BrainCircuit size={32} className="text-accent" style={{ marginBottom: '16px' }} />
-            <h3 style={{ margin: '0 0 8px 0', fontSize: '18px' }}>AI Proposals</h3>
-            <p className="text-muted" style={{ margin: 0, fontSize: '14px' }}>AI Agent acts as an intelligence layer generating actionable trade and launch proposals.</p>
-          </div>
-        </div>
       </div>
     );
   }
+
 
   // -------------------------
   // TRADER / CREATOR VIEW
@@ -167,10 +424,10 @@ export default function OverviewPage() {
               <ShieldAlert size={20} className="text-accent" /> Security Overview
             </h3>
             <ul style={{ paddingLeft: '20px', color: 'var(--color-foreground)', margin: 0 }} className="flex-col gap-sm">
-              <li>Session: <span className="text-accent">Active (HttpOnly Cookie)</span></li>
-              <li>Network: <span className="text-accent">Ethereum Mainnet</span></li>
-              <li>Max Order Size: <span>$10,000 (Risk Engine Enforced)</span></li>
-              <li>Max Slippage Cap: <span>3.0%</span></li>
+              <li>Session: <span className="text-accent">Active</span></li>
+              <li>Wallet: <span style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', color: 'var(--color-accent)' }}>{walletAddress ? `${walletAddress.slice(0, 8)}...${walletAddress.slice(-4)}` : '—'}</span></li>
+              <li>Max Order Size: <span>$10,000 <span style={{ color: '#94A3B8', fontSize: '11px' }}>(Platform Default)</span></span></li>
+              <li>Max Slippage Cap: <span>3.0% <span style={{ color: '#94A3B8', fontSize: '11px' }}>(Platform Default)</span></span></li>
             </ul>
           </div>
           <div className="card">
@@ -178,8 +435,9 @@ export default function OverviewPage() {
               <Activity size={20} className="text-accent" /> Recent Activity
             </h3>
             <div className="flex-col gap-sm text-muted">
-              <p style={{ margin: 0 }}>No recent trading activity detected for this session.</p>
-              <a href="/trading" className="text-accent" style={{ textDecoration: 'underline' }}>Start trading now</a>
+              <p style={{ margin: 0 }}>No trade intents have been submitted in this session.</p>
+              <p style={{ margin: '4px 0 0 0', fontSize: '11px' }}>Trade intents are logged after submitting a proposal in the Trading Terminal.</p>
+              <a href="/trading" className="text-accent" style={{ textDecoration: 'underline', fontSize: '13px', marginTop: '8px', display: 'inline-block' }}>Open Trading Terminal →</a>
             </div>
           </div>
         </div>
@@ -282,6 +540,20 @@ export default function OverviewPage() {
             <div style={{ fontSize: '12px', color: 'var(--color-foreground)', marginBottom: '16px' }}>
               Status: <strong style={{ color: killSwitchActive ? 'var(--color-destructive)' : 'var(--color-accent)' }}>{killSwitchActive ? 'ACTIVE (HALTED)' : 'NORMAL (ONLINE)'}</strong>
             </div>
+            <div style={{ fontSize: '11px', color: '#94A3B8', marginBottom: '4px', fontWeight: 600 }}>
+              Dual-Control Approval ID <span style={{ color: 'var(--color-destructive)' }}>*</span>
+            </div>
+            <input
+              type="text"
+              value={dualControlRequestId}
+              onChange={(e) => setDualControlRequestId(e.target.value)}
+              placeholder="e.g. 550e8400-e29b-41d4-a716-446655440000"
+              className="input"
+              style={{ padding: '8px', fontSize: '12px', marginBottom: '8px' }}
+            />
+            <div style={{ fontSize: '11px', color: '#94A3B8', marginBottom: '4px', fontWeight: 600 }}>
+              Audit Reason
+            </div>
             <input
               type="text"
               value={killSwitchReason}
@@ -318,10 +590,13 @@ export default function OverviewPage() {
             </div>
             <button
               onClick={handleFlushTelemetry}
-              className="btn-primary"
-              style={{ width: '100%', justifyContent: 'center', backgroundColor: '#7C4DFF', border: 'none' }}
+              className="btn-secondary"
+              disabled={true}
+              style={{ width: '100%', justifyContent: 'center', cursor: 'not-allowed', opacity: 0.5 }}
+              title="Telemetry flush is not yet integrated with a backend endpoint."
+              aria-label="Telemetry flush not yet available"
             >
-              Flush Telemetry Buffer
+              Flush Telemetry (Not Wired)
             </button>
           </div>
         </div>

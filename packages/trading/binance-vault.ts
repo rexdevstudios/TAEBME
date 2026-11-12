@@ -42,12 +42,27 @@ export class BinanceCredentialVault {
    * Dekripsi API Key / Secret Key terenkripsi dengan Audit Trail Mandatori
    */
   static async decrypt(
-    payload: EncryptedPayload,
+    payload: EncryptedPayload | string,
     masterKeyHex: string,
     actorId: string,
     credentialId: string,
     auditDb?: AuditAdapter
   ): Promise<string> {
+    let normalized: EncryptedPayload;
+    if (typeof payload === 'string') {
+      try {
+        normalized = JSON.parse(payload);
+      } catch {
+        throw new Error('VAULT_INVALID_PAYLOAD: String payload is not valid JSON EncryptedPayload');
+      }
+    } else {
+      normalized = payload;
+    }
+
+    if (!normalized.encryptedData || !normalized.iv || !normalized.authTag) {
+      throw new Error('VAULT_INVALID_PAYLOAD: Missing encryptedData, iv, or authTag in payload');
+    }
+
     // 1. Mandatory Audit Logging
     if (auditDb) {
       await auditDb.createAuditLog(
@@ -59,13 +74,13 @@ export class BinanceCredentialVault {
     }
 
     const key = Buffer.from(masterKeyHex, 'hex');
-    const iv = Buffer.from(payload.iv, 'hex');
-    const authTag = Buffer.from(payload.authTag, 'hex');
+    const iv = Buffer.from(normalized.iv, 'hex');
+    const authTag = Buffer.from(normalized.authTag, 'hex');
 
     const decipher = crypto.createDecipheriv(this.ALGORITHM, key, iv);
     decipher.setAuthTag(authTag);
 
-    let decrypted = decipher.update(payload.encryptedData, 'hex', 'utf8');
+    let decrypted = decipher.update(normalized.encryptedData, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
 
     return decrypted;

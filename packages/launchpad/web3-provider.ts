@@ -5,6 +5,7 @@
 
 import { ethers } from 'ethers';
 import { BONDING_CURVE_LAUNCHPAD_ABI } from './contracts/BondingCurveLaunchpadAbi';
+import { getEnvironmentConfig, validateChainAndContractConsistency } from '../shared/env-config';
 
 export interface ChainConfig {
   chainId: number;
@@ -126,21 +127,31 @@ export async function getCurrentChainId(): Promise<number> {
 }
 
 /**
- * Validates and enforces that user is connected to a supported Base network.
+ * Validates and enforces that user is connected to the environment-expected Base network.
  * Prompts user to switch network via wallet_switchEthereumChain if necessary.
  */
 export async function ensureBaseNetwork(
-  targetHexChainId: string = '0x2105'
+  targetHexChainId?: string
 ): Promise<{ success: boolean; chainId?: number; error?: string }> {
   if (typeof window === 'undefined' || !(window as any).ethereum) {
     return { success: false, error: 'Dompet Web3 tidak terdeteksi.' };
   }
 
+  const envConfig = getEnvironmentConfig();
+  const hexChain = targetHexChainId || envConfig.chainHex;
+
   const ethereum = (window as any).ethereum;
   const targetConfig =
     Object.values(SUPPORTED_BASE_CHAINS).find(
-      (c) => c.hexChainId.toLowerCase() === targetHexChainId.toLowerCase()
-    ) || SUPPORTED_BASE_CHAINS.BASE_MAINNET;
+      (c) => c.hexChainId.toLowerCase() === hexChain.toLowerCase()
+    ) || (envConfig.env === 'testnet' ? SUPPORTED_BASE_CHAINS.BASE_SEPOLIA : SUPPORTED_BASE_CHAINS.BASE_MAINNET);
+
+  // Validate chain consistency with active environment
+  try {
+    validateChainAndContractConsistency(targetConfig.chainId);
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
 
   try {
     const currentChainHex: string = await ethereum.request({ method: 'eth_chainId' });

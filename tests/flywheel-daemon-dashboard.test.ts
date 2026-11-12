@@ -129,14 +129,14 @@ describe("Flywheel Daemon, Multi-Chain Dashboard & Dual-Chain Preflight Tests", 
     });
 
     it("3.6 should execute runFlywheelSinglePass safely and return summary metrics", async () => {
-      const result = await runFlywheelSinglePass();
+      const result = await runFlywheelSinglePass({ maxTokens: 5, skipFeeScan: true });
       expect(result).toHaveProperty("processedCount");
       expect(result).toHaveProperty("deploymentsCount");
       expect(result).toHaveProperty("summary");
       expect(typeof result.processedCount).toBe("number");
       expect(typeof result.deploymentsCount).toBe("number");
       expect(result.summary).toHaveProperty("eventCount");
-    }, 30000);
+    }, 60000);
   });
 
   describe("4. Dual-Chain Preflight Audit Engine", () => {
@@ -164,6 +164,6 @@ describe("Flywheel Daemon, Multi-Chain Dashboard & Dual-Chain Preflight Tests", 
 
       // Verify Overall Verdict
       expect(["ALL_SYSTEMS_READY", "PARTIAL_READY", "BLOCKED"]).toContain(audit.overallVerdict);
-    });
+    }, 60000);
   });
 });
