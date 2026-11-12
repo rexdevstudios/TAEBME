@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
 import { ethers } from 'ethers';
 import { z } from 'zod';
 import { authenticateSession } from '@packages/auth/session';
@@ -8,7 +8,7 @@ import { NftPassTier } from '@packages/shared/types/domain';
 
 const ALLOWED_TIERS: readonly NftPassTier[] = ['BRONZE', 'SILVER', 'GOLD'] as const;
 
-export const VoucherResponseSchema = z.object({
+const VoucherResponseSchema = z.object({
   recipient: z.string(),
   tier: z.enum(['BRONZE', 'SILVER', 'GOLD']),
   nonce: z.string(),
