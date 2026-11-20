@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
 
     // 1. Authoritative Kill Switch, Entitlement & Deterministic Risk Gate (Fail-Closed)
     const activeKillSwitches = await defaultKillSwitchDbAdapter.getActiveKillSwitches();
-    const userEntitlement = await defaultBillingDbAdapter.getUserEntitlement(auth.walletAddress || auth.user.userId);
+    const userEntitlement = await defaultBillingDbAdapter.getUserEntitlement(auth.user.userId);
     const { status: gateStatus, decision } = TradingRiskGate.evaluateIntent(
       {
         userId: auth.user.userId,

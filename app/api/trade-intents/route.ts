@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
     const activeKillSwitches = await defaultKillSwitchDbAdapter.getActiveKillSwitches();
 
     // Authoritatively resolve user subscription plan & live trading entitlement from PostgreSQL SSOT (Fail-Closed)
-    const userEntitlement = await defaultBillingDbAdapter.getUserEntitlement(auth.walletAddress || auth.user.userId);
+    const userEntitlement = await defaultBillingDbAdapter.getUserEntitlement(auth.user.userId);
 
     const { status, decision } = TradingRiskGate.evaluateIntent(
       intent,

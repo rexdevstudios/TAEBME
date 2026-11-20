@@ -1,5 +1,8 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { ApiResponse } from '@packages/shared/contracts/api-contracts';
+import { requireCapability } from '@packages/auth/session';
+import { defaultBillingDbAdapter } from '@packages/shared/db-pool';
+import type { PlanId } from '@packages/billing/subscriptions-engine';
 
 const CANONICAL_PLANS = [
   {
@@ -72,11 +75,101 @@ const CANONICAL_PLANS = [
 
 export const dynamic = 'force-dynamic';
 
+const VALID_PLAN_IDS = new Set<PlanId>(['FREE', 'CREATOR', 'TRADER', 'AGENT']);
+
 export async function GET() {
-  const response: ApiResponse<typeof CANONICAL_PLANS> = {
+  const discounts = await defaultBillingDbAdapter.getPlanDiscounts().catch(
+    (): Record<PlanId, { discountPct: number; promoLabel?: string }> => ({
+      FREE: { discountPct: 0 },
+      CREATOR: { discountPct: 0 },
+      TRADER: { discountPct: 0 },
+      AGENT: { discountPct: 0 },
+    })
+  );
+
+  const enrichedPlans = CANONICAL_PLANS.map((plan) => {
+    const pid = plan.id as PlanId;
+    const disc: { discountPct: number; promoLabel?: string } = discounts[pid] || { discountPct: 0 };
+    const discountPct = Math.max(0, Math.min(100, Number(disc.discountPct ?? 0)));
+    const originalPriceUsd = plan.priceUsd;
+    const originalPriceEth = plan.priceEth;
+    const finalPriceUsd = Math.max(0, Math.round(originalPriceUsd * (1 - discountPct / 100) * 100) / 100);
+    const numEth = parseFloat(originalPriceEth || '0');
+    const finalPriceEth =
+      numEth <= 0 || discountPct >= 100
+        ? '0'
+        : (numEth * (1 - discountPct / 100)).toFixed(4).replace(/\.?0+$/, '');
+
+    return {
+      ...plan,
+      originalPriceUsd,
+      originalPriceEth,
+      discountPct,
+      promoLabel: disc.promoLabel,
+      priceUsd: finalPriceUsd,
+      monthlyPriceUsd: finalPriceUsd,
+      priceEth: finalPriceEth,
+    };
+  });
+
+  const response: ApiResponse<typeof enrichedPlans> = {
     success: true,
-    data: CANONICAL_PLANS,
+    data: enrichedPlans,
     timestamp: new Date().toISOString(),
   };
   return NextResponse.json(response, { status: 200 });
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    let auth;
+    try {
+      auth = await requireCapability(req, 'MANAGE_BILLING_PLANS');
+    } catch (authErr: unknown) {
+      const msg = authErr instanceof Error ? authErr.message : String(authErr);
+      const isForbidden = msg.includes('RBAC_FORBIDDEN') || msg.includes('AUTH_ACCOUNT');
+      return NextResponse.json(
+        { success: false, error: isForbidden ? `FORBIDDEN: ${msg}` : `UNAUTHORIZED: ${msg}`, timestamp: new Date().toISOString() },
+        { status: isForbidden ? 403 : 401 }
+      );
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const rawPlan = typeof body?.planId === 'string' ? body.planId.trim().toUpperCase() : '';
+    if (!VALID_PLAN_IDS.has(rawPlan as PlanId)) {
+      return NextResponse.json(
+        { success: false, error: 'INVALID_PLAN: Supported plans are FREE, CREATOR, TRADER, AGENT', timestamp: new Date().toISOString() },
+        { status: 400 }
+      );
+    }
+
+    const rawDiscount = Number(body?.discountPct ?? 0);
+    if (!Number.isFinite(rawDiscount) || rawDiscount < 0 || rawDiscount > 100) {
+      return NextResponse.json(
+        { success: false, error: 'INVALID_DISCOUNT_PCT: discountPct must be a number between 0 and 100', timestamp: new Date().toISOString() },
+        { status: 400 }
+      );
+    }
+
+    const promoLabel = typeof body?.promoLabel === 'string' ? body.promoLabel.trim().slice(0, 64) : undefined;
+
+    const updated = await defaultBillingDbAdapter.setPlanDiscount({
+      planId: rawPlan as PlanId,
+      discountPct: rawDiscount,
+      promoLabel,
+      actorId: auth.walletAddress || auth.user.userId,
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: updated,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json(
+      { success: false, error: msg || 'PLAN_DISCOUNT_UPDATE_FAILED', timestamp: new Date().toISOString() },
+      { status: 500 }
+    );
+  }
 }

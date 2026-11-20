@@ -19,7 +19,11 @@ interface Plan {
   name: string;
   priceUsd?: number;
   monthlyPriceUsd?: number;
+  originalPriceUsd?: number;
   priceEth?: string;
+  originalPriceEth?: string;
+  discountPct?: number;
+  promoLabel?: string;
   monthlyCredits: number;
   hasLiveTrading?: boolean;
   hasCreatorAccess?: boolean;
@@ -38,6 +42,27 @@ export default function BillingPage() {
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
   const [ledgerEntries, setLedgerEntries] = useState<LedgerEntry[]>([]);
   const [ledgerLoading, setLedgerLoading] = useState(false);
+
+  // Admin Discount Management State
+  const [discountPlanId, setDiscountPlanId] = useState<string>('CREATOR');
+  const [discountPctInput, setDiscountPctInput] = useState<number>(20);
+  const [promoLabelInput, setPromoLabelInput] = useState<string>('LAUNCH PROMO');
+  const [discountSaving, setDiscountSaving] = useState<boolean>(false);
+  const [discountFeedback, setDiscountFeedback] = useState<string | null>(null);
+
+  const fetchPlans = useCallback(async () => {
+    try {
+      const res = await fetch('/api/billing/plans');
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        setPlans(json.data);
+      }
+    } catch (err) {
+      console.warn('[Billing UI] API fetch error (using fallback plans):', (err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   const fetchLedger = useCallback(async () => {
     if (!isConnected) {
@@ -69,21 +94,41 @@ export default function BillingPage() {
   }, [planId]);
 
   useEffect(() => {
-    async function fetchPlans() {
-      try {
-        const res = await fetch('/api/billing/plans');
-        const json = await res.json();
-        if (json.success && Array.isArray(json.data)) {
-          setPlans(json.data);
-        }
-      } catch (err) {
-        console.warn('[Billing UI] API fetch error (using fallback plans):', (err as Error).message);
-      } finally {
-        setLoading(false);
-      }
-    }
     fetchPlans();
-  }, []);
+  }, [fetchPlans]);
+
+  const handleSaveDiscount = async (overridePct?: number) => {
+    const pctToApply = overridePct !== undefined ? overridePct : discountPctInput;
+    setDiscountSaving(true);
+    setDiscountFeedback(null);
+    try {
+      const res = await fetch('/api/billing/plans', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          planId: discountPlanId,
+          discountPct: pctToApply,
+          promoLabel: pctToApply > 0 ? promoLabelInput.trim() || `${pctToApply}% OFF` : '',
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        setDiscountFeedback(`⚠️ Gagal menyimpan diskon (${res.status}): ${json.error || 'Forbidden / Error'}`);
+        return;
+      }
+      await fetchPlans();
+      setDiscountFeedback(
+        pctToApply > 0
+          ? `✅ Diskon ${pctToApply}% (${promoLabelInput || 'PROMO'}) diterapkan pada paket ${discountPlanId}!`
+          : `✅ Diskon paket ${discountPlanId} di-reset ke harga normal (0%).`
+      );
+    } catch (err: any) {
+      setDiscountFeedback(`⚠️ Gagal menyimpan diskon: ${err?.message || 'Network error'}`);
+    } finally {
+      setDiscountSaving(false);
+    }
+  };
 
   const handleSubscribe = async (plan: Plan) => {
     if (!isConnected) {
@@ -213,6 +258,9 @@ export default function BillingPage() {
           const normId = plan.id.toUpperCase();
           const isActive = normId === activePlanId;
           const displayPrice = plan.priceUsd ?? plan.monthlyPriceUsd ?? 0;
+          const origPrice = plan.originalPriceUsd ?? displayPrice;
+          const discountPct = Number(plan.discountPct ?? 0);
+          const hasDiscount = discountPct > 0 && origPrice > displayPrice;
           const hasCreator = plan.hasCreatorAccess ?? (normId === 'CREATOR' || normId === 'AGENT');
           const hasLive = plan.hasLiveTrading ?? (normId === 'TRADER' || normId === 'AGENT');
           const hasAgent = plan.hasAgentAccess ?? (normId === 'AGENT');
@@ -239,12 +287,42 @@ export default function BillingPage() {
               )}
 
               <div>
-                <h3 style={{ color: 'var(--color-foreground)', marginTop: 0, fontSize: '16px', fontWeight: 800 }}>{plan.name}</h3>
-                <div style={{ fontSize: '24px', fontWeight: 900, color: 'var(--color-accent)', marginBottom: '4px', fontFamily: 'var(--font-mono)' }}>
-                  ${displayPrice} <span style={{ fontSize: '12px', color: 'var(--color-muted)', fontWeight: 500 }}>/ month</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <h3 style={{ color: 'var(--color-foreground)', margin: 0, fontSize: '16px', fontWeight: 800 }}>{plan.name}</h3>
+                  {hasDiscount && (
+                    <span
+                      style={{
+                        backgroundColor: 'rgba(16, 185, 129, 0.16)',
+                        color: '#00E676',
+                        border: '1px solid #00E676',
+                        padding: '2px 7px',
+                        borderRadius: '4px',
+                        fontSize: '10px',
+                        fontWeight: 900,
+                        fontFamily: 'var(--font-mono)',
+                      }}
+                    >
+                      -{discountPct}% {plan.promoLabel ? `· ${plan.promoLabel}` : 'OFF'}
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: '24px', fontWeight: 900, color: 'var(--color-accent)', marginBottom: '4px', fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
+                  {hasDiscount && (
+                    <span style={{ fontSize: '14px', color: '#94A3B8', textDecoration: 'line-through', fontWeight: 600 }}>
+                      ${origPrice}
+                    </span>
+                  )}
+                  <span>
+                    ${displayPrice} <span style={{ fontSize: '12px', color: 'var(--color-muted)', fontWeight: 500 }}>/ month</span>
+                  </span>
                 </div>
                 {plan.priceEth && (
                   <div style={{ fontSize: '11px', color: '#38BDF8', marginBottom: '14px', fontFamily: 'var(--font-mono)' }}>
+                    {hasDiscount && plan.originalPriceEth && (
+                      <span style={{ color: '#64748B', textDecoration: 'line-through', marginRight: '6px' }}>
+                        {plan.originalPriceEth} ETH
+                      </span>
+                    )}
                     ~{plan.priceEth} ETH on Base L2
                   </div>
                 )}
@@ -418,12 +496,121 @@ export default function BillingPage() {
         </div>
       )}
 
-      {/* Admin Billing Rail Diagnostics Console (SYSTEM_ADMIN Exclusive) */}
-      {(userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN') && (
-        <div className="bg-panel" style={{ border: '1px solid #FF9100', borderRadius: '8px', padding: '24px' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#FFD600', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <ShieldAlert size={18} /> System Admin: dRPC Onchain Settlement &amp; Revenue Diagnostics
-          </h3>
+      {/* Admin Billing Rail Diagnostics Console (SYSTEM_ADMIN / SUPER_ADMIN / BILLING_ADMIN Exclusive) */}
+      {(userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN' || (userRole as string) === 'BILLING_ADMIN') && (
+        <div className="bg-panel" style={{ border: '1px solid #FF9100', borderRadius: '8px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div>
+            <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#FFD600', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <ShieldAlert size={18} /> Admin Tier Discount &amp; Promo Campaign Manager (SSOT `plans`)
+            </h3>
+            <p className="text-muted" style={{ margin: 0, fontSize: '12px' }}>
+              Atur persentase diskon (`0% - 100%`) dan label promo pada paket layanan (`CREATOR`, `TRADER`, `AGENT`). Perubahan langsung tersimpan di PostgreSQL (`plans.features`) dan otomatis memotong harga USD &amp; ETH di seluruh halaman.
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <div className="flex-col gap-xs" style={{ minWidth: '160px' }}>
+              <label style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-muted)' }}>Target Paket Layanan</label>
+              <select
+                aria-label="Target plan for discount"
+                value={discountPlanId}
+                onChange={(e) => setDiscountPlanId(e.target.value)}
+                className="input"
+                style={{ padding: '8px 10px', fontSize: '12px', fontWeight: 800 }}
+              >
+                <option value="CREATOR">CREATOR ($49 / 0.015 ETH)</option>
+                <option value="TRADER">TRADER ($79 / 0.025 ETH)</option>
+                <option value="AGENT">AGENT ($149 / 0.045 ETH)</option>
+              </select>
+            </div>
+
+            <div className="flex-col gap-xs" style={{ width: '130px' }}>
+              <label style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-muted)' }}>Diskon (%)</label>
+              <input
+                aria-label="Discount percentage"
+                type="number"
+                min={0}
+                max={100}
+                value={discountPctInput}
+                onChange={(e) => setDiscountPctInput(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
+                className="input"
+                style={{ padding: '8px 10px', fontSize: '12px', fontFamily: 'var(--font-mono)', fontWeight: 800 }}
+              />
+            </div>
+
+            <div className="flex-col gap-xs" style={{ flex: '1 1 200px' }}>
+              <label style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-muted)' }}>Label Promo</label>
+              <input
+                aria-label="Promo label"
+                type="text"
+                placeholder="cth: EARLY ADOPTER / RAMADAN SALE"
+                value={promoLabelInput}
+                onChange={(e) => setPromoLabelInput(e.target.value)}
+                className="input"
+                style={{ padding: '8px 10px', fontSize: '12px' }}
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => handleSaveDiscount()}
+              disabled={discountSaving}
+              className="btn-primary"
+              style={{ padding: '9px 16px', fontSize: '12px' }}
+            >
+              {discountSaving ? 'Saving...' : 'Apply Discount'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setDiscountPctInput(0);
+                handleSaveDiscount(0);
+              }}
+              disabled={discountSaving}
+              className="btn-secondary"
+              style={{ padding: '9px 14px', fontSize: '12px' }}
+            >
+              Reset (0%)
+            </button>
+          </div>
+
+          {/* Preset Quick Buttons */}
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <span className="text-muted" style={{ fontSize: '11px' }}>Quick Presets:</span>
+            {[10, 25, 50, 75, 100].map((pct) => (
+              <button
+                key={pct}
+                type="button"
+                onClick={() => {
+                  setDiscountPctInput(pct);
+                  handleSaveDiscount(pct);
+                }}
+                disabled={discountSaving}
+                className="btn-secondary"
+                style={{ padding: '4px 10px', fontSize: '11px', fontFamily: 'var(--font-mono)' }}
+              >
+                {pct}% OFF
+              </button>
+            ))}
+          </div>
+
+          {discountFeedback && (
+            <div
+              style={{
+                padding: '10px 14px',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: 800,
+                backgroundColor: discountFeedback.includes('✅') ? 'rgba(16, 185, 129, 0.14)' : 'rgba(245, 158, 11, 0.14)',
+                color: discountFeedback.includes('✅') ? '#6EE7B7' : '#FDE047',
+                border: `1px solid ${discountFeedback.includes('✅') ? 'rgba(16, 185, 129, 0.35)' : 'rgba(245, 158, 11, 0.35)'}`,
+              }}
+            >
+              {discountFeedback}
+            </div>
+          )}
+
           <div className="grid-4">
             <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '16px', borderRadius: '6px' }}>
               <div style={{ color: '#00E5FF', fontWeight: 800, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}><TrendingUp size={14} /> Active Billing Plans</div>

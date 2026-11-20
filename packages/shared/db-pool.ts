@@ -4296,6 +4296,10 @@ export interface SubscriptionRecord {
 
 export class PostgresBillingDbAdapter implements BillingDbAdapter {
   private inMemorySubscriptions: Map<string, SubscriptionRecord> = new Map();
+  private inMemoryPlanDiscounts: Map<
+    PlanId,
+    { discountPct: number; promoLabel?: string; updatedBy?: string; updatedAt?: string }
+  > = new Map();
 
   seedSubscription(userId: string, sub: {
     planId: PlanId;
@@ -4316,6 +4320,103 @@ export class PostgresBillingDbAdapter implements BillingDbAdapter {
 
   clearSubscriptions(): void {
     this.inMemorySubscriptions.clear();
+    this.inMemoryPlanDiscounts.clear();
+  }
+
+  async getPlanDiscounts(): Promise<
+    Record<PlanId, { discountPct: number; promoLabel?: string; updatedBy?: string; updatedAt?: string }>
+  > {
+    const result: Record<PlanId, { discountPct: number; promoLabel?: string; updatedBy?: string; updatedAt?: string }> = {
+      FREE: { discountPct: 0 },
+      CREATOR: { discountPct: 0 },
+      TRADER: { discountPct: 0 },
+      AGENT: { discountPct: 0 },
+    };
+
+    for (const [planId, cfg] of this.inMemoryPlanDiscounts.entries()) {
+      result[planId] = { ...cfg };
+    }
+
+    const pool = getDbPool();
+    if (pool) {
+      try {
+        const res = await pool.query(`SELECT id, features FROM plans`);
+        for (const row of res.rows) {
+          const pid = String(row.id || '').toUpperCase() as PlanId;
+          if (pid === 'FREE' || pid === 'CREATOR' || pid === 'TRADER' || pid === 'AGENT') {
+            const feat = typeof row.features === 'string' ? JSON.parse(row.features || '{}') : row.features || {};
+            const pct = Math.max(0, Math.min(100, Math.round(Number(feat.discountPct ?? 0))));
+            result[pid] = {
+              discountPct: pct,
+              promoLabel: typeof feat.promoLabel === 'string' && feat.promoLabel.trim() ? feat.promoLabel.trim() : undefined,
+              updatedBy: typeof feat.updatedBy === 'string' ? feat.updatedBy : undefined,
+              updatedAt: typeof feat.updatedAt === 'string' ? feat.updatedAt : undefined,
+            };
+          }
+        }
+      } catch {
+        // Fallback to in-memory
+      }
+    }
+
+    return result;
+  }
+
+  async setPlanDiscount(params: {
+    planId: PlanId;
+    discountPct: number;
+    promoLabel?: string;
+    actorId: string;
+  }): Promise<{ planId: PlanId; discountPct: number; promoLabel?: string; updatedAt: string }> {
+    const planId = params.planId;
+    const discountPct = Math.max(0, Math.min(100, Math.round(Number(params.discountPct ?? 0))));
+    const promoLabel = params.promoLabel?.trim() || undefined;
+    const updatedAt = new Date().toISOString();
+
+    this.inMemoryPlanDiscounts.set(planId, {
+      discountPct,
+      promoLabel,
+      updatedBy: params.actorId,
+      updatedAt,
+    });
+
+    const pool = getDbPool();
+    if (pool) {
+      try {
+        const basePricesCents: Record<PlanId, number> = {
+          FREE: 0,
+          CREATOR: 4900,
+          TRADER: 7900,
+          AGENT: 14900,
+        };
+        const planCredits: Record<PlanId, number> = {
+          FREE: 100,
+          CREATOR: 2000,
+          TRADER: 5000,
+          AGENT: 15000,
+        };
+        const discountedCents = Math.max(0, Math.round(basePricesCents[planId] * (1 - discountPct / 100)));
+        const featurePatch = JSON.stringify({
+          discountPct,
+          promoLabel: promoLabel || null,
+          updatedBy: params.actorId,
+          updatedAt,
+        });
+
+        await pool.query(
+          `INSERT INTO plans (id, name, base_price_cents, monthly_credits, features)
+           VALUES ($1, $2, $3, $4, $5::jsonb)
+           ON CONFLICT (id) DO UPDATE SET
+             base_price_cents = EXCLUDED.base_price_cents,
+             features = COALESCE(plans.features, '{}'::jsonb) || EXCLUDED.features`,
+          [planId, `${planId} Tier`, discountedCents, planCredits[planId] ?? 100, featurePatch]
+        );
+      } catch (err: any) {
+        console.warn('[PostgresBillingDbAdapter] setPlanDiscount warning:', err?.message);
+      }
+    }
+
+    return { planId, discountPct, promoLabel, updatedAt };
   }
 
   async getUserPlan(userId: string): Promise<PlanId> {

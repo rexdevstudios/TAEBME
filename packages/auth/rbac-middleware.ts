@@ -12,7 +12,10 @@ export type Capability =
   | 'FREEZE_TOKEN'
   | 'MANAGE_BILLING_PLANS'
   | 'OVERRIDE_RISK_ENGINE'
-  | 'SETTLE_BOUNTY_CLAIM';
+  | 'SETTLE_BOUNTY_CLAIM'
+  // B3.2: Merkle snapshot lifecycle management (draft, finalize, publish-intent).
+  // Restricted to SUPER_ADMIN and LAUNCH_ADMIN — does NOT grant on-chain signing authority.
+  | 'MANAGE_SNAPSHOTS';
 
 const RBAC_MATRIX: Record<Capability, Role[]> = {
   VIEW_TOKENS: [
@@ -30,9 +33,12 @@ const RBAC_MATRIX: Record<Capability, Role[]> = {
   ENABLE_LIVE_AGENT: ['SUPER_ADMIN', 'TRADER'],
   REVIEW_FLAGGED_TOKEN: ['SUPER_ADMIN', 'MODERATOR', 'RISK_ADMIN'],
   FREEZE_TOKEN: ['SUPER_ADMIN', 'MODERATOR', 'RISK_ADMIN'],
-  MANAGE_BILLING_PLANS: ['SUPER_ADMIN', 'BILLING_ADMIN'],
+  MANAGE_BILLING_PLANS: ['SUPER_ADMIN', 'SYSTEM_ADMIN', 'BILLING_ADMIN'],
   OVERRIDE_RISK_ENGINE: ['SUPER_ADMIN'], // Requires Dual Control Break-Glass!
   SETTLE_BOUNTY_CLAIM: ['SUPER_ADMIN', 'SYSTEM_ADMIN', 'TRADER', 'CREATOR'],
+  // B3.2: Snapshot lifecycle — draft creation, finalization, and publication intent.
+  // Does NOT grant key signing or on-chain broadcasting authority.
+  MANAGE_SNAPSHOTS: ['SUPER_ADMIN', 'LAUNCH_ADMIN'],
 };
 
 export interface UserContext {

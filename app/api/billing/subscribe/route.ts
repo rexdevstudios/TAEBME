@@ -49,9 +49,12 @@ export async function POST(req: NextRequest) {
     const chain = typeof body?.chain === 'string' ? body.chain.trim() : 'base-mainnet';
     const appEnv = getAppEnvironment();
 
+    const discounts = await defaultBillingDbAdapter.getPlanDiscounts().catch(() => null);
+    const activeDiscountPct = Number(discounts?.[planId]?.discountPct ?? 0);
+
     let referenceId = 'free-tier-activation';
 
-    if (planId !== 'FREE') {
+    if (planId !== 'FREE' && activeDiscountPct < 100) {
       if (txHash) {
         if (!/^0x[a-fA-F0-9]{64}$/.test(txHash)) {
           return NextResponse.json(
@@ -79,6 +82,8 @@ export async function POST(req: NextRequest) {
           { status: 402 }
         );
       }
+    } else if (planId !== 'FREE' && activeDiscountPct >= 100) {
+      referenceId = `promo-100pct-${Date.now()}`;
     }
 
     await SubscriptionsEngine.grantMonthlyPlanCredits(

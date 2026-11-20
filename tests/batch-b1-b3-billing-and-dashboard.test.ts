@@ -1,11 +1,16 @@
-import { describe, it, expect } from 'bun:test';
+import { describe, it, expect, beforeEach } from 'bun:test';
 import { NextRequest } from 'next/server';
-import { GET as plansGET } from '../app/api/billing/plans/route';
+import { GET as plansGET, POST as plansPOST } from '../app/api/billing/plans/route';
 import { POST as subscribePOST } from '../app/api/billing/subscribe/route';
 import { GET as ledgerGET } from '../app/api/billing/ledger/route';
+import { defaultBillingDbAdapter } from '../packages/shared/db-pool';
+import { createSessionToken } from '../packages/auth/session';
 import { middleware } from '../middleware';
 
 describe('Batch B1–B3 — Billing Tiers, Credit Ledger SSOT & Post-Login Dashboard', () => {
+  beforeEach(() => {
+    defaultBillingDbAdapter.clearSubscriptions();
+  });
   it('GET /api/billing/plans returns all 4 canonical tiers with priceUsd, monthlyPriceUsd, priceEth, and feature flags', async () => {
     const res = await plansGET();
     expect(res.status).toBe(200);
@@ -42,5 +47,48 @@ describe('Batch B1–B3 — Billing Tiers, Credit Ledger SSOT & Post-Login Dashb
     });
     expect((await middleware(req)).status).toBe(401);
     expect((await ledgerGET(req)).status).toBe(401);
+  });
+
+  it('POST /api/billing/plans allows SUPER_ADMIN / SYSTEM_ADMIN to set tier discount and updates GET /api/billing/plans prices', async () => {
+    const unauthReq = new NextRequest('https://pndigi.site/api/billing/plans', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ planId: 'AGENT', discountPct: 50, promoLabel: 'LAUNCH 50' }),
+    });
+    expect((await plansPOST(unauthReq)).status).toBe(401);
+
+    const adminWallet = '0x0c9f4a1234567890abcdef1234567890abcd34b6';
+    const origAdmin = process.env.ADMIN_WALLET_PUBLIC_ADDRESS;
+    process.env.ADMIN_WALLET_PUBLIC_ADDRESS = adminWallet;
+    try {
+      const adminToken = createSessionToken({ userId: 'usr-0c9f4a12', walletAddress: adminWallet });
+      const adminReq = new NextRequest('https://pndigi.site/api/billing/plans', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          cookie: `rtrader_session=${adminToken}`,
+        },
+        body: JSON.stringify({ planId: 'AGENT', discountPct: 50, promoLabel: 'LAUNCH 50' }),
+      });
+
+      const postRes = await plansPOST(adminReq);
+      expect(postRes.status).toBe(200);
+      const postJson = await postRes.json();
+      expect(postJson.success).toBe(true);
+      expect(postJson.data.planId).toBe('AGENT');
+      expect(postJson.data.discountPct).toBe(50);
+
+      const getRes = await plansGET();
+      const getJson = await getRes.json();
+      const agentPlan = getJson.data.find((p: any) => p.id === 'AGENT');
+      expect(agentPlan.originalPriceUsd).toBe(149);
+      expect(agentPlan.discountPct).toBe(50);
+      expect(agentPlan.priceUsd).toBe(74.5);
+      expect(agentPlan.promoLabel).toBe('LAUNCH 50');
+    } finally {
+      if (origAdmin !== undefined) process.env.ADMIN_WALLET_PUBLIC_ADDRESS = origAdmin;
+      else delete process.env.ADMIN_WALLET_PUBLIC_ADDRESS;
+      defaultBillingDbAdapter.clearSubscriptions();
+    }
   });
 });

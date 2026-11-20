@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
         proposalDb: defaultProposalDbAdapter,
         getActiveLaunchesCount: async () => (await defaultDraftDbAdapter.getActiveTokenLaunches().catch(() => [])).length,
         getActiveKillSwitches: () => defaultKillSwitchDbAdapter.getActiveKillSwitches(),
-        getUserEntitlement: (uid) => defaultBillingDbAdapter.getUserEntitlement(auth.walletAddress || uid),
+        getUserEntitlement: (uid) => defaultBillingDbAdapter.getUserEntitlement(uid),
         saveTradeIntent,
       }
     );
