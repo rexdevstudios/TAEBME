@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Sparkles, Image as ImageIcon, Share2, ExternalLink, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 interface CreatorStudioPanelProps {
   tokenName: string;
@@ -16,6 +17,7 @@ export function CreatorStudioPanel({
   selectedChain,
   onApplyIdentity,
 }: CreatorStudioPanelProps) {
+  const { refreshSession } = useAuth();
   const [trendPrompt, setTrendPrompt] = useState('');
   const [generatedIdentity, setGeneratedIdentity] = useState<any>(null);
   const [logoDataUri, setLogoDataUri] = useState<string | null>(null);
@@ -48,6 +50,7 @@ export function CreatorStudioPanel({
       }
       setGeneratedIdentity(json.data.identity);
       onApplyIdentity(json.data.identity.name, json.data.identity.ticker);
+      refreshSession().catch(() => {});
       setStatusMsg(
         `✅ Identitas $${json.data.identity.ticker} ("${json.data.identity.name}") siap (${json.data.provider}) dan otomatis terisi ke form draft.`
       );
@@ -84,6 +87,7 @@ export function CreatorStudioPanel({
       }
       setLogoDataUri(json.data.imageDataUri);
       setIpfsMetadataUrl(json.data.ipfsMetadataUrl || null);
+      refreshSession().catch(() => {});
       setStatusMsg(
         json.data.uploadedToIpfs
           ? `✅ Logo dibuat & terunggah ke IPFS Pinata (${json.data.byteLength} bytes).`

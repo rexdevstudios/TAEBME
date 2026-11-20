@@ -16,7 +16,9 @@ import {
   defaultKillSwitchDbAdapter,
   defaultBillingDbAdapter,
   saveTradeIntent,
+  getDbPool,
 } from '@packages/shared/db-pool';
+import { SubscriptionsEngine } from '@packages/billing/subscriptions-engine';
 
 export const dynamic = 'force-dynamic';
 
@@ -79,9 +81,29 @@ export async function POST(req: NextRequest) {
       }
     );
 
+    let remainingCredits: number | undefined;
+    try {
+      if (getDbPool()) {
+        await SubscriptionsEngine.deductMeteredCredits(
+          auth.walletAddress,
+          5,
+          'FIVE_AGENT_DESK_RUN',
+          report.proposal?.id || `desk-${Date.now()}`,
+          defaultBillingDbAdapter
+        );
+        remainingCredits = await defaultBillingDbAdapter.getUserCreditBalance(auth.walletAddress);
+      }
+    } catch {
+      // Non-blocking in unit test environments without DB
+    }
+
     return NextResponse.json({
       success: true,
-      data: report,
+      data: {
+        ...report,
+        creditsBurned: 5,
+        remainingCredits,
+      },
       timestamp: new Date().toISOString(),
     });
   } catch (err: unknown) {

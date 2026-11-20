@@ -1,8 +1,18 @@
 ﻿'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { CreditCard, CheckCircle2, ShieldAlert, Zap, TrendingUp, Wallet, Banknote, Scale } from 'lucide-react';
+import { CreditCard, CheckCircle2, ShieldAlert, Zap, TrendingUp, Wallet, Banknote, Scale, History, RefreshCw } from 'lucide-react';
+
+interface LedgerEntry {
+  id: string;
+  amount: number;
+  currency: string;
+  type: string;
+  referenceId: string | null;
+  description: string;
+  createdAt: string;
+}
 
 interface Plan {
   id: string;
@@ -26,6 +36,31 @@ export default function BillingPage() {
   const [txHashInput, setTxHashInput] = useState<string>('');
   const [paymentFeedback, setPaymentFeedback] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
+  const [ledgerEntries, setLedgerEntries] = useState<LedgerEntry[]>([]);
+  const [ledgerLoading, setLedgerLoading] = useState(false);
+
+  const fetchLedger = useCallback(async () => {
+    if (!isConnected) {
+      setLedgerEntries([]);
+      return;
+    }
+    setLedgerLoading(true);
+    try {
+      const res = await fetch('/api/billing/ledger?limit=20', { credentials: 'same-origin' });
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data?.entries)) {
+        setLedgerEntries(json.data.entries);
+      }
+    } catch {
+      // Non-blocking
+    } finally {
+      setLedgerLoading(false);
+    }
+  }, [isConnected]);
+
+  useEffect(() => {
+    fetchLedger();
+  }, [fetchLedger, credits, activePlanId]);
 
   useEffect(() => {
     if (planId) {
@@ -79,6 +114,7 @@ export default function BillingPage() {
 
       setActivePlanId(targetPlanId);
       await refreshSession();
+      await fetchLedger();
       setPaymentFeedback(
         `✅ Tier ${plan.name} (${targetPlanId}) aktif! Saldo kredit: ${Number(json.data.credits).toLocaleString()} Credits${json.data.unlockedCreatorRole ? ' · Role CREATOR terbuka!' : ''}`
       );
@@ -305,6 +341,82 @@ export default function BillingPage() {
           </div>
         </div>
       </div>
+
+      {/* Live Double-Entry Credit Ledger Statement */}
+      {isConnected && (
+        <div className="bg-panel" style={{ border: '1px solid var(--color-border)', borderRadius: '8px', padding: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
+            <div>
+              <h3 style={{ fontSize: '15px', fontWeight: 900, color: 'var(--color-foreground)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <History size={16} color="var(--color-accent)" /> Double-Entry Credit Ledger Statement (`ledger_entries`)
+              </h3>
+              <p className="text-muted" style={{ margin: '2px 0 0 0', fontSize: '11px' }}>
+                Riwayat penambahan kredit tier (`+SUBSCRIPTION_GRANT`) dan pemotongan otomatis fitur (`-1 AI_ASSET_STUDIO`, `-5 FIVE_AGENT_DESK_RUN`, `-50 TOKEN_LAUNCH_PUBLISH`).
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={fetchLedger}
+              disabled={ledgerLoading}
+              className="btn-secondary"
+              style={{ fontSize: '11px', padding: '6px 10px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+            >
+              <RefreshCw size={12} /> {ledgerLoading ? 'Syncing...' : 'Refresh Ledger'}
+            </button>
+          </div>
+
+          {ledgerEntries.length === 0 ? (
+            <div className="text-muted" style={{ fontSize: '12px', padding: '12px 0' }}>
+              {ledgerLoading ? 'Memuat mutasi kredit dari PostgreSQL...' : 'Belum ada riwayat mutasi kredit tercatat untuk sesi ini.'}
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', fontFamily: 'var(--font-mono)' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--color-border)', color: 'var(--color-muted)', textAlign: 'left' }}>
+                    <th style={{ padding: '8px 10px' }}>Timestamp</th>
+                    <th style={{ padding: '8px 10px' }}>Action Type</th>
+                    <th style={{ padding: '8px 10px' }}>Description</th>
+                    <th style={{ padding: '8px 10px' }}>Reference</th>
+                    <th style={{ padding: '8px 10px', textAlign: 'right' }}>Amount (CREDITS)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ledgerEntries.map((entry) => {
+                    const isCredit = entry.amount >= 0;
+                    return (
+                      <tr key={entry.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                        <td style={{ padding: '8px 10px', color: 'var(--color-muted)' }}>
+                          {new Date(entry.createdAt).toLocaleString()}
+                        </td>
+                        <td style={{ padding: '8px 10px', fontWeight: 800, color: isCredit ? 'var(--color-accent)' : '#38BDF8' }}>
+                          {entry.type}
+                        </td>
+                        <td style={{ padding: '8px 10px', color: 'var(--color-foreground)', fontFamily: 'var(--font-sans)' }}>
+                          {entry.description}
+                        </td>
+                        <td style={{ padding: '8px 10px', color: 'var(--color-muted)' }}>
+                          {entry.referenceId ? entry.referenceId.slice(0, 18) : '—'}
+                        </td>
+                        <td
+                          style={{
+                            padding: '8px 10px',
+                            textAlign: 'right',
+                            fontWeight: 900,
+                            color: isCredit ? '#00E676' : '#FF5252',
+                          }}
+                        >
+                          {isCredit ? `+${entry.amount.toLocaleString()}` : entry.amount.toLocaleString()} cr
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Admin Billing Rail Diagnostics Console (SYSTEM_ADMIN Exclusive) */}
       {(userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN') && (

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ApiResponse } from '@packages/shared/contracts/api-contracts';
-import { defaultDraftDbAdapter, getDbPool } from '@packages/shared/db-pool';
+import { defaultDraftDbAdapter, defaultBillingDbAdapter, getDbPool } from '@packages/shared/db-pool';
 import { requireCapability } from '@packages/auth/session';
+import { SubscriptionsEngine } from '@packages/billing/subscriptions-engine';
 import {
   verifyEvmTransactionReceipt,
   verifyEvmDeploymentAttribution,
@@ -158,6 +159,20 @@ export async function POST(req: NextRequest) {
       currentSupply,
       graduationThreshold: graduationThreshold ? Number(graduationThreshold) : undefined,
     });
+
+    try {
+      if (getDbPool() && session.walletAddress) {
+        await SubscriptionsEngine.deductMeteredCredits(
+          session.walletAddress,
+          50,
+          'TOKEN_LAUNCH_PUBLISH',
+          result.launchId || draftId,
+          defaultBillingDbAdapter
+        );
+      }
+    } catch {
+      // Non-blocking fallback
+    }
 
     const response: ApiResponse<{
       launchId: string;

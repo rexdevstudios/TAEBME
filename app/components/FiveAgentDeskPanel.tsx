@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Radar, Microscope, BrainCircuit, ShieldCheck, Zap, AlertTriangle, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 interface FiveAgentDeskPanelProps {
   isConnected: boolean;
@@ -24,6 +25,7 @@ export function FiveAgentDeskPanel({
   defaultAction,
   defaultQty,
 }: FiveAgentDeskPanelProps) {
+  const { refreshSession } = useAuth();
   const [mode, setMode] = useState<'PAPER' | 'LIVE_ADVISORY'>('PAPER');
   const [symbol, setSymbol] = useState(defaultSymbol || 'BTCUSDT');
   const [action, setAction] = useState<'BUY' | 'SELL'>(defaultAction || 'BUY');
@@ -52,6 +54,7 @@ export function FiveAgentDeskPanel({
         return;
       }
       setReport(json.data);
+      refreshSession().catch(() => {});
     } catch (err: any) {
       setError(`Koneksi gagal: ${err?.message || 'Unknown error'}`);
     } finally {

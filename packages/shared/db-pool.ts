@@ -4389,13 +4389,85 @@ export class PostgresBillingDbAdapter implements BillingDbAdapter {
           TRADER: 5000,
           AGENT: 15000,
         };
-        return defaultCredits[plan] ?? 100;
+        const initialGrant = defaultCredits[plan] ?? 100;
+        await pool
+          .query(
+            `INSERT INTO ledger_entries (
+               id, user_id, amount, currency, type, reference_id, description, created_at
+             ) VALUES ($1, $2, $3, 'CREDITS', 'INITIAL_PLAN_GRANT', $4, $5, NOW())`,
+            [
+              crypto.randomUUID(),
+              validUserId,
+              initialGrant,
+              `init-${plan.toLowerCase()}`,
+              `Initial credit allocation for ${plan} tier`,
+            ]
+          )
+          .catch(() => {});
+        return initialGrant;
       } catch {
         // Fallback to in-memory
       }
     }
     const sub = this.inMemorySubscriptions.get(userId);
     return sub?.credits ?? 100;
+  }
+
+  async getUserLedgerEntries(
+    userId: string,
+    limit: number = 25
+  ): Promise<
+    Array<{
+      id: string;
+      amount: number;
+      currency: string;
+      type: string;
+      referenceId: string | null;
+      description: string;
+      createdAt: string;
+    }>
+  > {
+    const safeLimit = Math.max(1, Math.min(100, Math.floor(limit || 25)));
+    const pool = getDbPool();
+    if (pool) {
+      try {
+        const validUserId = await ensureUserEntity(pool, userId);
+        await this.getUserCreditBalance(userId);
+        const res = await pool.query(
+          `SELECT id, amount::numeric AS amount, currency, type, reference_id AS "referenceId",
+                  COALESCE(description, '') AS description, created_at AS "createdAt"
+           FROM ledger_entries
+           WHERE user_id = $1 AND currency = 'CREDITS'
+           ORDER BY created_at DESC
+           LIMIT $2`,
+          [validUserId, safeLimit]
+        );
+        return res.rows.map((r: any) => ({
+          id: String(r.id),
+          amount: Math.round(Number(r.amount ?? 0)),
+          currency: String(r.currency || 'CREDITS'),
+          type: String(r.type || 'LEDGER_ENTRY'),
+          referenceId: r.referenceId ? String(r.referenceId) : null,
+          description: String(r.description || ''),
+          createdAt: r.createdAt?.toISOString ? r.createdAt.toISOString() : String(r.createdAt || new Date().toISOString()),
+        }));
+      } catch {
+        // Fallback to in-memory
+      }
+    }
+    const balance = await this.getUserCreditBalance(userId);
+    const plan = await this.getUserPlan(userId).catch(() => 'FREE' as PlanId);
+    return [
+      {
+        id: `mem-init-${plan.toLowerCase()}`,
+        amount: balance,
+        currency: 'CREDITS',
+        type: 'INITIAL_PLAN_GRANT',
+        referenceId: `init-${plan.toLowerCase()}`,
+        description: `Initial credit allocation for ${plan} tier`,
+        createdAt: new Date().toISOString(),
+      },
+    ];
   }
 
   async recordLedgerEntry(entry: {

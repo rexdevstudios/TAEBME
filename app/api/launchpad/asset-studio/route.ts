@@ -10,6 +10,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireCapability } from '@packages/auth/session';
+import { SubscriptionsEngine } from '@packages/billing/subscriptions-engine';
+import { defaultBillingDbAdapter, getDbPool } from '@packages/shared/db-pool';
 import {
   generateTokenIdentityFromTrend,
   generateTokenLogoBuffer,
@@ -23,8 +25,9 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
+    let auth;
     try {
-      await requireCapability(req, 'CREATE_LAUNCH_DRAFT');
+      auth = await requireCapability(req, 'CREATE_LAUNCH_DRAFT');
     } catch (authErr: unknown) {
       const msg = authErr instanceof Error ? authErr.message : String(authErr);
       const isForbidden = msg.includes('RBAC_FORBIDDEN') || msg.includes('AUTH_ACCOUNT');
@@ -33,6 +36,24 @@ export async function POST(req: NextRequest) {
         { status: isForbidden ? 403 : 401 }
       );
     }
+
+    const burnStudioCredit = async (actionName: string): Promise<number | undefined> => {
+      try {
+        if (getDbPool() && auth?.walletAddress) {
+          await SubscriptionsEngine.deductMeteredCredits(
+            auth.walletAddress,
+            1,
+            'AI_ASSET_STUDIO',
+            `studio-${actionName}-${Date.now()}`,
+            defaultBillingDbAdapter
+          );
+          return await defaultBillingDbAdapter.getUserCreditBalance(auth.walletAddress);
+        }
+      } catch {
+        // Non-blocking fallback
+      }
+      return undefined;
+    };
 
     const body = await req.json().catch(() => ({}));
     const action = typeof body?.action === 'string' ? body.action : '';
@@ -47,9 +68,10 @@ export async function POST(req: NextRequest) {
       }
 
       const result = await generateTokenIdentityFromTrend(trendPrompt);
+      const remainingCredits = await burnStudioCredit('generate-identity');
       return NextResponse.json({
         success: true,
-        data: result,
+        data: { ...result, creditsBurned: 1, remainingCredits },
         timestamp: new Date().toISOString(),
       });
     }
@@ -78,6 +100,7 @@ export async function POST(req: NextRequest) {
         }
         const safeIdentity = applyIdentityPrivacyShield(parsed.data);
         const ipfs = await uploadLogoAndMetadataToIpfs(buffer, safeIdentity);
+        const remainingCredits = await burnStudioCredit('generate-logo-ipfs');
         return NextResponse.json({
           success: true,
           data: {
@@ -87,11 +110,14 @@ export async function POST(req: NextRequest) {
             ipfsImageUrl: ipfs.imageUrl,
             ipfsMetadataUrl: ipfs.metadataUrl,
             uploadedToIpfs: ipfs.uploadedToIpfs,
+            creditsBurned: 1,
+            remainingCredits,
           },
           timestamp: new Date().toISOString(),
         });
       }
 
+      const remainingCredits = await burnStudioCredit('generate-logo');
       return NextResponse.json({
         success: true,
         data: {
@@ -99,6 +125,8 @@ export async function POST(req: NextRequest) {
           byteLength: buffer.length,
           isFallback,
           uploadedToIpfs: false,
+          creditsBurned: 1,
+          remainingCredits,
         },
         timestamp: new Date().toISOString(),
       });

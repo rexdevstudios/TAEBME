@@ -2,6 +2,7 @@ import { describe, it, expect } from 'bun:test';
 import { NextRequest } from 'next/server';
 import { GET as plansGET } from '../app/api/billing/plans/route';
 import { POST as subscribePOST } from '../app/api/billing/subscribe/route';
+import { GET as ledgerGET } from '../app/api/billing/ledger/route';
 import { middleware } from '../middleware';
 
 describe('Batch B1–B3 — Billing Tiers, Credit Ledger SSOT & Post-Login Dashboard', () => {
@@ -33,5 +34,13 @@ describe('Batch B1–B3 — Billing Tiers, Credit Ledger SSOT & Post-Login Dashb
     });
     expect((await middleware(req)).status).toBe(401);
     expect((await subscribePOST(req)).status).toBe(401);
+  });
+
+  it('GET /api/billing/ledger fails closed (401) without SIWE session', async () => {
+    const req = new NextRequest('https://pndigi.site/api/billing/ledger?limit=10', {
+      method: 'GET',
+    });
+    expect((await middleware(req)).status).toBe(401);
+    expect((await ledgerGET(req)).status).toBe(401);
   });
 });
