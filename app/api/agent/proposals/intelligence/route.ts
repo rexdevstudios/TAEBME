@@ -6,7 +6,8 @@ import { fetchDefiLlamaMacroSignal } from '@packages/intelligence/defillama-clie
 import { generateMarketAdvisoryNote } from '@packages/intelligence/llm-advisory-client';
 import { ApiResponse } from '@packages/shared/contracts/api-contracts';
 import { requireCapability } from '@packages/auth/session';
-import { defaultProposalDbAdapter } from '@packages/shared/db-pool';
+import { defaultProposalDbAdapter, defaultBillingDbAdapter, getDbPool } from '@packages/shared/db-pool';
+import { SubscriptionsEngine } from '@packages/billing/subscriptions-engine';
 
 export async function POST(req: NextRequest) {
   try {
@@ -47,7 +48,23 @@ export async function POST(req: NextRequest) {
       suggestedQty,
     }).catch(() => null);
 
-    const enrichedProposal = { ...proposal, llmAdvisory };
+    let remainingCredits: number | undefined;
+    try {
+      if (getDbPool() && auth.walletAddress) {
+        await SubscriptionsEngine.deductMeteredCredits(
+          auth.walletAddress,
+          1,
+          'AI_PROPOSAL_SIGNAL',
+          proposal.id || `prop-${Date.now()}`,
+          defaultBillingDbAdapter
+        );
+        remainingCredits = await defaultBillingDbAdapter.getUserCreditBalance(auth.walletAddress);
+      }
+    } catch {
+      // Non-blocking fallback
+    }
+
+    const enrichedProposal = { ...proposal, llmAdvisory, creditsBurned: 1, remainingCredits };
 
     const response: ApiResponse<typeof enrichedProposal> = {
       success: true,

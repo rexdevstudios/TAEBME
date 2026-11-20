@@ -593,7 +593,8 @@ export async function ensureUserEntity(pool: Pool | PoolClient | any, actorOrWal
     return actorOrWallet;
   }
 
-  const cleanAddress = actorOrWallet.startsWith('usr-')
+  const isUsrPrefix = actorOrWallet.startsWith('usr-');
+  const cleanAddress = isUsrPrefix
     ? actorOrWallet.slice(4).toLowerCase()
     : actorOrWallet.toLowerCase();
 
@@ -603,6 +604,16 @@ export async function ensureUserEntity(pool: Pool | PoolClient | any, actorOrWal
   );
   if (existingWallet.rows.length > 0) {
     return existingWallet.rows[0].user_id;
+  }
+
+  if (isUsrPrefix && /^[a-f0-9]{6,16}$/i.test(cleanAddress)) {
+    const prefixMatch = await pool.query(
+      'SELECT user_id FROM wallets WHERE LOWER(address) LIKE $1 ORDER BY is_primary DESC, created_at ASC LIMIT 1',
+      [`0x${cleanAddress}%`]
+    );
+    if (prefixMatch.rows.length > 0) {
+      return prefixMatch.rows[0].user_id;
+    }
   }
 
   const newUserId = crypto.randomUUID();

@@ -22,6 +22,9 @@ export default function OverviewPage() {
   const { isConnected, userRole, planId, credits, walletAddress, connectMetaMask, isConnecting, chainId } = useAuth();
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [activeLaunches, setActiveLaunches] = useState<any[]>([]);
+  const [gameFiProfile, setGameFiProfile] = useState<{ xp: number; level: number; passTier: string; completedQuests: string[] } | null>(null);
+  const [questFeedback, setQuestFeedback] = useState<string | null>(null);
+  const [questLoading, setQuestLoading] = useState<string | null>(null);
   const [connectError, setConnectError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -59,6 +62,15 @@ export default function OverviewPage() {
           }
         })
         .catch(() => {});
+
+      fetch('/api/gamefi/profile', { credentials: 'same-origin' })
+        .then((r) => r.json())
+        .then((json) => {
+          if (json.success && json.profile) {
+            setGameFiProfile(json.profile);
+          }
+        })
+        .catch(() => {});
     }
     // Only fetch telemetry & kill switch state if Admin
     if (userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN') {
@@ -91,6 +103,32 @@ export default function OverviewPage() {
   const handleFlushTelemetry = () => {
     // Telemetry flush not yet wired to a backend endpoint — no operation performed.
     setAdminFeedback('⚠️ Telemetry flush is not yet integrated with a backend endpoint. No data was sent.');
+  };
+
+  const handleCompleteQuest = async (questId: string) => {
+    setQuestLoading(questId);
+    setQuestFeedback(null);
+    try {
+      const res = await fetch('/api/gamefi/quests/complete', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questId }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        setQuestFeedback(`⚠️ Quest (${questId}): ${json.error || 'Syarat quest belum terpenuhi'}`);
+        return;
+      }
+      if (json.profile) {
+        setGameFiProfile(json.profile);
+      }
+      setQuestFeedback(`✅ Quest "${questId}" selesai! +${json.completion?.xpGranted ?? 100} XP ditambahkan ke profil GameFi Anda.`);
+    } catch (err: any) {
+      setQuestFeedback(`⚠️ Gagal memverifikasi quest: ${err?.message || 'Network error'}`);
+    } finally {
+      setQuestLoading(null);
+    }
   };
 
   // -------------------------
@@ -529,6 +567,67 @@ export default function OverviewPage() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+
+        {/* GameFi Trader Pass & Quest Progression Card */}
+        <div className="card" style={{ border: '1px solid rgba(168, 85, 247, 0.35)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '12px' }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 900, color: '#C084FC', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Award size={17} /> GameFi Trader Pass &amp; On-Chain Quest Progression
+              </h3>
+              <p className="text-muted" style={{ margin: '2px 0 0 0', fontSize: '12px' }}>
+                Selesaikan quest ekosistem untuk meningkatkan XP dan membuka kualifikasi Trader Pass NFT (`BRONZE` → `SILVER 250 XP` → `GOLD 500 XP`).
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
+              <span style={{ padding: '4px 10px', borderRadius: '6px', backgroundColor: 'rgba(168, 85, 247, 0.15)', color: '#E9D5FF', border: '1px solid rgba(168, 85, 247, 0.35)', fontWeight: 800 }}>
+                XP: {gameFiProfile?.xp ?? 0}
+              </span>
+              <span style={{ padding: '4px 10px', borderRadius: '6px', backgroundColor: 'rgba(56, 189, 248, 0.15)', color: '#7DD3FC', border: '1px solid rgba(56, 189, 248, 0.35)', fontWeight: 800 }}>
+                LEVEL: {gameFiProfile?.level ?? 1}
+              </span>
+              <span style={{ padding: '4px 10px', borderRadius: '6px', backgroundColor: 'rgba(255, 196, 0, 0.15)', color: '#FDE047', border: '1px solid rgba(255, 196, 0, 0.35)', fontWeight: 800 }}>
+                PASS: {gameFiProfile?.passTier || 'BRONZE'}
+              </span>
+            </div>
+          </div>
+
+          {questFeedback && (
+            <div style={{ marginBottom: '12px', padding: '8px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 700, backgroundColor: questFeedback.includes('✅') ? 'rgba(16, 185, 129, 0.12)' : 'rgba(245, 158, 11, 0.12)', color: questFeedback.includes('✅') ? '#6EE7B7' : '#FDE047', border: `1px solid ${questFeedback.includes('✅') ? 'rgba(16, 185, 129, 0.35)' : 'rgba(245, 158, 11, 0.35)'}` }}>
+              {questFeedback}
+            </div>
+          )}
+
+          <div className="grid-3" style={{ gap: '12px' }}>
+            {[
+              { id: 'connect_siwe', title: '1. Non-Custodial SIWE Login', xp: '+100 XP', desc: 'Verifikasi sesi dompet EIP-4361 SIWE aktif.' },
+              { id: 'verify_sybil', title: '2. Anti-Sybil Social Passport', xp: '+250 XP', desc: 'Verifikasi profil KOL / World ID / Farcaster di KOL Hub.' },
+              { id: 'first_trade_or_launch', title: '3. First Trade Intent or Token Launch', xp: '+500 XP', desc: 'Buat 1 trade intent di Terminal/5-Agent Desk atau launch token.' },
+            ].map((q) => {
+              const isDone = gameFiProfile?.completedQuests?.includes(q.id);
+              return (
+                <div key={q.id} className="bg-panel" style={{ border: '1px solid var(--color-border)', borderRadius: '6px', padding: '12px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '10px' }}>
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <span style={{ fontWeight: 800, fontSize: '12px', color: 'var(--color-foreground)' }}>{q.title}</span>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 900, color: 'var(--color-accent)' }}>{q.xp}</span>
+                    </div>
+                    <div className="text-muted" style={{ fontSize: '11px' }}>{q.desc}</div>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={isDone || questLoading !== null}
+                    onClick={() => handleCompleteQuest(q.id)}
+                    className={isDone ? 'btn-secondary' : 'btn-primary'}
+                    style={{ width: '100%', justifyContent: 'center', padding: '7px 10px', fontSize: '11px' }}
+                  >
+                    {isDone ? '✓ Completed' : questLoading === q.id ? 'Verifying...' : `Claim ${q.xp}`}
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>

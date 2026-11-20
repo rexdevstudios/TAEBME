@@ -21,7 +21,7 @@ import { normalizeChainName } from '@packages/shared/token-identifier';
 export type LaunchModeType = 'BONDING_CURVE' | 'FAIR_LAUNCH' | 'WHITELIST_PRIVATE' | 'FIXED_PRICE' | 'COMMUNITY_PRELAUNCH';
 
 export default function LaunchpadPage() {
-  const { isConnected, userRole, walletAddress, connectMetaMask, isConnecting } = useAuth();
+  const { isConnected, userRole, walletAddress, connectMetaMask, isConnecting, refreshSession } = useAuth();
   const [connectError, setConnectError] = useState<string | null>(null);
   const [isAngelModalOpen, setIsAngelModalOpen] = useState(false);
   const [tokenName, setTokenName] = useState('');
@@ -123,9 +123,48 @@ export default function LaunchpadPage() {
   };
 
   const [isRegisteringOnChain, setIsRegisteringOnChain] = useState(false);
+  const [isBankrDeploying, setIsBankrDeploying] = useState(false);
   const [onChainFeedback, setOnChainFeedback] = useState<string | null>(null);
   const [publishedTxHash, setPublishedTxHash] = useState<string | null>(null);
   const [onChainTokenAddress, setOnChainTokenAddress] = useState<string>('');
+
+  const handleBankrDeploy = async (simulateOnly: boolean) => {
+    if (!draftResult) return;
+    setIsBankrDeploying(true);
+    setOnChainFeedback(null);
+    try {
+      const res = await fetch('/api/launchpad/bankr-deploy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tokenName: draftResult.name || tokenName,
+          tokenSymbol: draftResult.ticker || draftResult.symbol || tokenSymbol,
+          chain: selectedChain,
+          feeRecipient: walletAddress || creatorWallet || undefined,
+          degenMode: isDegenMode,
+          simulateOnly,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        const errMsg = typeof json.error === 'string' ? json.error : json.error?.message || 'Bankr deploy failed';
+        setOnChainFeedback(`❌ Bankr Deploy (${res.status}): ${errMsg}`);
+        return;
+      }
+      const d = json.data || {};
+      if (d.tokenAddress) setOnChainTokenAddress(d.tokenAddress);
+      if (d.txHash) setPublishedTxHash(d.txHash);
+      refreshSession().catch(() => {});
+      fetchActiveTokens();
+      setOnChainFeedback(
+        `✅ Bankr ${d.status?.toUpperCase() || 'DEPLOYED'}: $${d.tokenSymbol || tokenSymbol} on ${selectedChain.toUpperCase()} (${d.tokenAddress || 'Simulated CA'}) · -${d.creditsBurned ?? 50} Credits`
+      );
+    } catch (err: any) {
+      setOnChainFeedback(`❌ Bankr Deploy Error: ${err?.message || 'Network error'}`);
+    } finally {
+      setIsBankrDeploying(false);
+    }
+  };
 
   const handleRegisterOnChain = async () => {
     if (!draftResult) return;
@@ -247,6 +286,7 @@ export default function LaunchpadPage() {
           }
           // Refresh active token fleet in UI
           fetchActiveTokens();
+          refreshSession().catch(() => {});
         } catch (pubCatchErr: any) {
           setOnChainFeedback(
             `✅ Token $${draftTicker} terdaftar on-chain (Hash: ${tx.hash}), tetapi sinkronisasi SSOT gagal: ${pubCatchErr?.message || 'Network error'}`
@@ -742,9 +782,32 @@ export default function LaunchpadPage() {
                   </div>
                 ) : (
                   <div style={{ fontSize: '11px', color: 'var(--color-muted)', lineHeight: '1.5' }}>
-                    ℹ️ Fungsi on-chain (<code>registerTokenLaunch</code>) diproteksi modifier <code>onlyOwner</code> pada smart contract. Draft telah tersimpan di PostgreSQL SSOT dan akan diaktivasi on-chain oleh Protocol Admin setelah review governance.
+                    ℹ️ Fungsi on-chain langsung (<code>registerTokenLaunch</code>) diproteksi modifier <code>onlyOwner</code>. Sebagai <strong>Creator</strong>, Anda dapat langsung menggunakan jalur <strong>Bankr Gas-Sponsored Pipeline</strong> di bawah:
                   </div>
                 )}
+
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '10px' }}>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => handleBankrDeploy(true)}
+                    disabled={isBankrDeploying || isRegisteringOnChain}
+                    style={{ flex: 1, padding: '8px 10px', fontSize: '11px', justifyContent: 'center', borderColor: '#38BDF8', color: '#38BDF8' }}
+                  >
+                    {isBankrDeploying ? '⏳ Running Bankr...' : '🧪 Simulate Bankr Launch (-50 cr)'}
+                  </button>
+                  {selectedChain === 'base' && (
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      onClick={() => handleBankrDeploy(false)}
+                      disabled={isBankrDeploying || isRegisteringOnChain}
+                      style={{ flex: 1, padding: '8px 10px', fontSize: '11px', justifyContent: 'center' }}
+                    >
+                      {isBankrDeploying ? '⏳ Deploying...' : '⚡ Bankr Gas-Sponsored Deploy (-50 cr)'}
+                    </button>
+                  )}
+                </div>
 
                 {onChainFeedback && (
                   <div

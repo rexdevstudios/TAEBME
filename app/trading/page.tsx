@@ -154,6 +154,7 @@ export default function TradingPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Controlled order parameters & deep-link context (Launchpad ?token= & Agent ?proposalId=)
+  const [executionMode, setExecutionMode] = useState<'PAPER' | 'DEX_NON_CUSTODIAL' | 'CEX_SINGLE_SHOT'>('PAPER');
   const [orderSide, setOrderSide] = useState<'BUY' | 'SELL'>('BUY');
   const [orderType, setOrderType] = useState<'MARKET' | 'LIMIT'>('MARKET');
   const [orderQty, setOrderQty] = useState<number>(0.1);
@@ -230,28 +231,37 @@ export default function TradingPage() {
     setIsSubmitting(true);
     setActionFeedback(null);
     try {
-      const res = await fetch('/api/trade-intents', {
+      const stage = executionMode === 'PAPER' || symbol.includes('/') ? 'PAPER' : 'TESTNET';
+      const res = await fetch('/api/trading/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          executionMode,
+          stage,
           symbol,
           side: orderSide,
           type: orderType,
           quantity: orderQty > 0 ? orderQty : 0.1,
           maxSlippagePct: orderSlippagePct > 0 ? orderSlippagePct : 1.5,
-          stage: symbol.includes('/') ? 'PAPER' : 'TESTNET',
+          tokenAddress: linkedTokenAddress || '0x4200000000000000000000000000000000000006',
+          chainId: 8453,
         }),
       });
       const json = await res.json();
-      if (json.success) {
+      if (res.ok && json.success) {
         setProposalStatus('APPROVED');
+        const execStatus = json.data?.status || 'APPROVED';
+        const intentId = json.data?.tradeIntentId || '';
         setActionFeedback(
-          symbol.includes('/')
-            ? `✅ [PAPER TRADING SIMULATION] Proposal APPROVED & Intent ${json.data?.tradeIntentId || ''} lolos Risk Gate! Simulasi bonding curve 100% aman bebas risiko modal.`
-            : `✅ Proposal APPROVED & Intent ${json.data?.tradeIntentId || ''} passed Risk Gate!`
+          executionMode === 'DEX_NON_CUSTODIAL'
+            ? `✅ [DEX NON-CUSTODIAL] Intent ${intentId} lolos Risk Gate & MEV Guard (${execStatus}). Siap ditandatangani di dompet Web3.`
+            : executionMode === 'CEX_SINGLE_SHOT'
+            ? `✅ [CEX SINGLE-SHOT] Intent ${intentId} (${execStatus}) lolos Risk Gate.`
+            : `✅ [PAPER TRADING SIMULATION] Proposal APPROVED & Intent ${intentId} (${execStatus}) lolos Risk Gate! Simulasi 100% bebas risiko modal.`
         );
       } else {
-        setActionFeedback(`❌ Risk Gate Rejected: ${json.error?.message || 'Policy violation'}`);
+        const errMsg = typeof json.error === 'string' ? json.error : json.error?.message || 'Policy violation';
+        setActionFeedback(`❌ Risk Gate Rejected: ${errMsg}`);
       }
     } catch (err) {
       setActionFeedback(`⚠️ Connection error during approval: ${(err as Error).message}`);
@@ -534,6 +544,20 @@ export default function TradingPage() {
                 {linkedProposalId && <div>Linked AI Proposal: {linkedProposalId}</div>}
               </div>
             )}
+
+            <div style={{ marginBottom: '8px' }}>
+              <select
+                aria-label="Execution mode"
+                value={executionMode}
+                onChange={(e) => setExecutionMode(e.target.value as 'PAPER' | 'DEX_NON_CUSTODIAL' | 'CEX_SINGLE_SHOT')}
+                className="input"
+                style={{ width: '100%', padding: '6px 8px', fontSize: '11px', fontWeight: 800, color: 'var(--color-accent)' }}
+              >
+                <option value="PAPER">Mode: PAPER (Simulated Fill — All Tiers)</option>
+                <option value="DEX_NON_CUSTODIAL">Mode: DEX_NON_CUSTODIAL (MEV Guard + MetaMask Sign — TRADER/AGENT)</option>
+                <option value="CEX_SINGLE_SHOT">Mode: CEX_SINGLE_SHOT (Stateless Binance Trade — TRADER/AGENT)</option>
+              </select>
+            </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
               <select

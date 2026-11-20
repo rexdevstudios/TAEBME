@@ -10,6 +10,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireCapability } from '@packages/auth/session';
 import { rateLimiter } from '@packages/auth/rate-limiter';
 import { deployTokenViaBankrApi, type BankrSupportedChain } from '@packages/launchpad/bankr-client';
+import { SubscriptionsEngine } from '@packages/billing/subscriptions-engine';
+import { defaultBillingDbAdapter, getDbPool } from '@packages/shared/db-pool';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,8 +28,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    let auth;
     try {
-      await requireCapability(req, 'PUBLISH_LAUNCH');
+      auth = await requireCapability(req, 'PUBLISH_LAUNCH');
     } catch (authErr: unknown) {
       const msg = authErr instanceof Error ? authErr.message : String(authErr);
       const isForbidden = msg.includes('RBAC_FORBIDDEN') || msg.includes('AUTH_ACCOUNT');
@@ -75,10 +78,33 @@ export async function POST(req: NextRequest) {
         ? 504
         : 422;
 
+    const isSuccess = result.status === 'deployed' || result.status === 'simulated';
+    let remainingCredits: number | undefined;
+    if (isSuccess) {
+      try {
+        if (getDbPool() && auth?.walletAddress) {
+          await SubscriptionsEngine.deductMeteredCredits(
+            auth.walletAddress,
+            50,
+            'TOKEN_LAUNCH_BANKR',
+            result.txHash || result.tokenAddress || `bankr-${tokenSymbol}-${Date.now()}`,
+            defaultBillingDbAdapter
+          );
+          remainingCredits = await defaultBillingDbAdapter.getUserCreditBalance(auth.walletAddress);
+        }
+      } catch {
+        // Non-blocking fallback
+      }
+    }
+
     return NextResponse.json(
       {
-        success: result.status === 'deployed' || result.status === 'simulated',
-        data: result,
+        success: isSuccess,
+        data: {
+          ...result,
+          creditsBurned: isSuccess ? 50 : 0,
+          remainingCredits,
+        },
         error: result.status === 'failed' || result.status === 'unknown' ? result.message : undefined,
         timestamp: new Date().toISOString(),
       },

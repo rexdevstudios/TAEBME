@@ -6,7 +6,7 @@ import { Bot, ShieldAlert, Settings2, FileCode2, Target, BrainCircuit, Activity,
 import { FiveAgentDeskPanel } from '../components/FiveAgentDeskPanel';
 
 export default function AgentPage() {
-  const { isConnected, userRole, connectMetaMask, isConnecting } = useAuth();
+  const { isConnected, userRole, connectMetaMask, isConnecting, refreshSession } = useAuth();
   const [connectError, setConnectError] = useState<string | null>(null);
   const [symbol, setSymbol] = useState('BTCUSDT');
   const [action, setAction] = useState<'BUY' | 'SELL'>('BUY');
@@ -44,6 +44,7 @@ export default function AgentPage() {
       const json = await res.json();
       if (json.success) {
         setProposal(json.data);
+        refreshSession().catch(() => {});
       } else {
         setError(json.error?.message || 'Proposal generation failed');
       }
