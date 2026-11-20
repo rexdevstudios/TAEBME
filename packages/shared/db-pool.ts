@@ -4294,12 +4294,33 @@ export interface SubscriptionRecord {
   credits: number;
 }
 
+export interface PlatformFeeAndRiskConfig {
+  studioCostCr: number;
+  deskCostCr: number;
+  launchCostCr: number;
+  maxOrderValueUsd: number;
+  maxDailyLossUsd: number;
+  maxSlippagePct: number;
+  treasuryWallet: string;
+  updatedBy?: string;
+  updatedAt?: string;
+}
+
 export class PostgresBillingDbAdapter implements BillingDbAdapter {
   private inMemorySubscriptions: Map<string, SubscriptionRecord> = new Map();
   private inMemoryPlanDiscounts: Map<
     PlanId,
     { discountPct: number; promoLabel?: string; updatedBy?: string; updatedAt?: string }
   > = new Map();
+  private inMemoryFeeAndRiskConfig: PlatformFeeAndRiskConfig = {
+    studioCostCr: 1,
+    deskCostCr: 5,
+    launchCostCr: 50,
+    maxOrderValueUsd: 10000,
+    maxDailyLossUsd: 1000,
+    maxSlippagePct: 3.0,
+    treasuryWallet: '0x0c9f4a82b5ae258e8e65ca40ac4f1abc455c34b6',
+  };
 
   seedSubscription(userId: string, sub: {
     planId: PlanId;
@@ -4321,6 +4342,85 @@ export class PostgresBillingDbAdapter implements BillingDbAdapter {
   clearSubscriptions(): void {
     this.inMemorySubscriptions.clear();
     this.inMemoryPlanDiscounts.clear();
+    this.inMemoryFeeAndRiskConfig = {
+      studioCostCr: 1,
+      deskCostCr: 5,
+      launchCostCr: 50,
+      maxOrderValueUsd: 10000,
+      maxDailyLossUsd: 1000,
+      maxSlippagePct: 3.0,
+      treasuryWallet: '0x0c9f4a82b5ae258e8e65ca40ac4f1abc455c34b6',
+    };
+  }
+
+  async getPlatformFeeAndRiskConfig(): Promise<PlatformFeeAndRiskConfig> {
+    const base: PlatformFeeAndRiskConfig = { ...this.inMemoryFeeAndRiskConfig };
+    const pool = getDbPool();
+    if (pool) {
+      try {
+        const res = await pool.query(`SELECT features FROM plans WHERE id = 'FREE' LIMIT 1`);
+        if (res.rows.length > 0) {
+          const feat = typeof res.rows[0].features === 'string' ? JSON.parse(res.rows[0].features || '{}') : res.rows[0].features || {};
+          const cfg = feat.platformFeeAndRiskConfig;
+          if (cfg && typeof cfg === 'object') {
+            if (Number.isFinite(Number(cfg.studioCostCr))) base.studioCostCr = Math.max(0, Math.round(Number(cfg.studioCostCr)));
+            if (Number.isFinite(Number(cfg.deskCostCr))) base.deskCostCr = Math.max(0, Math.round(Number(cfg.deskCostCr)));
+            if (Number.isFinite(Number(cfg.launchCostCr))) base.launchCostCr = Math.max(0, Math.round(Number(cfg.launchCostCr)));
+            if (Number.isFinite(Number(cfg.maxOrderValueUsd))) base.maxOrderValueUsd = Math.max(100, Math.round(Number(cfg.maxOrderValueUsd)));
+            if (Number.isFinite(Number(cfg.maxDailyLossUsd))) base.maxDailyLossUsd = Math.max(50, Math.round(Number(cfg.maxDailyLossUsd)));
+            if (Number.isFinite(Number(cfg.maxSlippagePct))) base.maxSlippagePct = Math.max(0.1, Math.min(10, Number(cfg.maxSlippagePct)));
+            if (typeof cfg.treasuryWallet === 'string' && /^0x[a-fA-F0-9]{40}$/.test(cfg.treasuryWallet)) {
+              base.treasuryWallet = cfg.treasuryWallet;
+            }
+            if (typeof cfg.updatedBy === 'string') base.updatedBy = cfg.updatedBy;
+            if (typeof cfg.updatedAt === 'string') base.updatedAt = cfg.updatedAt;
+          }
+        }
+      } catch {
+        // Fallback to in-memory
+      }
+    }
+    return base;
+  }
+
+  async setPlatformFeeAndRiskConfig(
+    params: Partial<PlatformFeeAndRiskConfig> & { actorId: string }
+  ): Promise<PlatformFeeAndRiskConfig> {
+    const current = await this.getPlatformFeeAndRiskConfig();
+    const updated: PlatformFeeAndRiskConfig = {
+      studioCostCr: params.studioCostCr !== undefined ? Math.max(0, Math.round(Number(params.studioCostCr))) : current.studioCostCr,
+      deskCostCr: params.deskCostCr !== undefined ? Math.max(0, Math.round(Number(params.deskCostCr))) : current.deskCostCr,
+      launchCostCr: params.launchCostCr !== undefined ? Math.max(0, Math.round(Number(params.launchCostCr))) : current.launchCostCr,
+      maxOrderValueUsd: params.maxOrderValueUsd !== undefined ? Math.max(100, Math.round(Number(params.maxOrderValueUsd))) : current.maxOrderValueUsd,
+      maxDailyLossUsd: params.maxDailyLossUsd !== undefined ? Math.max(50, Math.round(Number(params.maxDailyLossUsd))) : current.maxDailyLossUsd,
+      maxSlippagePct: params.maxSlippagePct !== undefined ? Math.max(0.1, Math.min(10, Number(params.maxSlippagePct))) : current.maxSlippagePct,
+      treasuryWallet:
+        typeof params.treasuryWallet === 'string' && /^0x[a-fA-F0-9]{40}$/.test(params.treasuryWallet)
+          ? params.treasuryWallet
+          : current.treasuryWallet,
+      updatedBy: params.actorId,
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.inMemoryFeeAndRiskConfig = { ...updated };
+
+    const pool = getDbPool();
+    if (pool) {
+      try {
+        const patch = JSON.stringify({ platformFeeAndRiskConfig: updated });
+        await pool.query(
+          `INSERT INTO plans (id, name, base_price_cents, monthly_credits, features)
+           VALUES ('FREE', 'FREE Tier', 0, 100, $1::jsonb)
+           ON CONFLICT (id) DO UPDATE SET
+             features = COALESCE(plans.features, '{}'::jsonb) || EXCLUDED.features`,
+          [patch]
+        );
+      } catch (err: any) {
+        console.warn('[PostgresBillingDbAdapter] setPlatformFeeAndRiskConfig warning:', err?.message);
+      }
+    }
+
+    return updated;
   }
 
   async getPlanDiscounts(): Promise<

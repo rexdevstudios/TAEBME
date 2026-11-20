@@ -1,7 +1,15 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Copy, Check, Wallet, ArrowDown, ExternalLink, Zap } from 'lucide-react';
+import { ethers } from 'ethers';
+import {
+  getContractConfiguration,
+  ensureBaseNetwork,
+  getBrowserSigner,
+  getLaunchpadContract,
+  normalizeWeb3Error,
+} from '@packages/launchpad/web3-provider';
 
 interface TokenActionsClientProps {
   chain: string;
@@ -28,6 +36,69 @@ export default function TokenActionsClient({
   // Swap calculator state
   const [swapAmount, setSwapAmount] = useState('0.05');
   const [swapMode, setSwapMode] = useState<'buy' | 'sell'>('buy');
+  const [referralWallet, setReferralWallet] = useState('');
+  const [isBuyingOnChain, setIsBuyingOnChain] = useState(false);
+  const [onChainSwapMsg, setOnChainSwapMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const ref = new URLSearchParams(window.location.search).get('ref');
+      if (ref && ethers.isAddress(ref)) {
+        setReferralWallet(ref);
+      }
+    }
+  }, []);
+
+  const handleOnChainCurveBuy = async () => {
+    setOnChainSwapMsg(null);
+    const contractCfg = getContractConfiguration();
+    if (!contractCfg.isConfigured || !contractCfg.contractAddress) {
+      setOnChainSwapMsg(`⚠️ ${contractCfg.message}`);
+      return;
+    }
+    const ethVal = parseFloat(swapAmount);
+    if (!Number.isFinite(ethVal) || ethVal <= 0) {
+      setOnChainSwapMsg('⚠️ Masukkan jumlah ETH yang valid (> 0).');
+      return;
+    }
+
+    setIsBuyingOnChain(true);
+    try {
+      const targetHex = chain === 'robinhood' || chain === 'robinhood-mainnet' ? '0x1237' : '0x2105';
+      const netCheck = await ensureBaseNetwork(targetHex);
+      if (!netCheck.success) {
+        setOnChainSwapMsg(`⚠️ ${netCheck.error || 'Harap beralih ke jaringan yang sesuai di MetaMask.'}`);
+        return;
+      }
+
+      const signer = await getBrowserSigner();
+      const contract = getLaunchpadContract(signer);
+      const tokenAmtWei = ethers.parseEther(String(Math.max(1, Math.floor(ethVal * 2500000))));
+      const valueWei = ethers.parseEther(swapAmount);
+
+      let tx;
+      if (referralWallet.trim() && ethers.isAddress(referralWallet.trim())) {
+        setOnChainSwapMsg('⏳ Menunggu konfirmasi MetaMask (buyTokensWithReferral — 0.25% KOL Rebate)...');
+        tx = await contract.buyTokensWithReferral(
+          ethers.getAddress(contractAddress),
+          tokenAmtWei,
+          ethers.getAddress(referralWallet.trim()),
+          { value: valueWei }
+        );
+      } else {
+        setOnChainSwapMsg('⏳ Menunggu konfirmasi MetaMask (buyTokens pada BondingCurveLaunchpad.sol)...');
+        tx = await contract.buyTokens(ethers.getAddress(contractAddress), tokenAmtWei, { value: valueWei });
+      }
+
+      setOnChainSwapMsg(`📡 Transaksi terkirim (${tx.hash.slice(0, 12)}...). Menunggu konfirmasi blok...`);
+      await tx.wait(1);
+      setOnChainSwapMsg(`✅ Pembelian Bonding Curve berhasil! TxHash: ${tx.hash}`);
+    } catch (err: any) {
+      setOnChainSwapMsg(`⚠️ Gagal membeli di Bonding Curve: ${normalizeWeb3Error(err)}`);
+    } finally {
+      setIsBuyingOnChain(false);
+    }
+  };
 
   const handleCopy = async () => {
     try {
@@ -463,6 +534,71 @@ export default function TokenActionsClient({
               <span>Uniswap Interface</span>
               <ExternalLink size={12} />
             </a>
+          </div>
+        )}
+
+        {/* Direct On-Chain BondingCurveLaunchpad.sol Buy & KOL Referral Rebate (0.25%) */}
+        {!isSolana && !isGraduated && swapMode === 'buy' && (
+          <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px dashed #334155' }}>
+            <div style={{ fontSize: '11px', color: '#94A3B8', marginBottom: '6px', display: 'flex', justifyContent: 'space-between' }}>
+              <span>Direct BondingCurveLaunchpad.sol Settlement</span>
+              <span style={{ color: '#38BDF8', fontFamily: 'monospace' }}>0.25% KOL Referral Rebate</span>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <input
+                type="text"
+                value={referralWallet}
+                onChange={(e) => setReferralWallet(e.target.value)}
+                placeholder="Opsional: KOL Referral Wallet 0x... (0.25% On-Chain Rebate)"
+                style={{
+                  flex: '1 1 200px',
+                  backgroundColor: '#020617',
+                  border: '1px solid #334155',
+                  borderRadius: '6px',
+                  padding: '7px 10px',
+                  color: '#F8FAFC',
+                  fontFamily: 'monospace',
+                  fontSize: '11px',
+                }}
+              />
+              <button
+                type="button"
+                onClick={handleOnChainCurveBuy}
+                disabled={isBuyingOnChain}
+                className="btn btn-secondary"
+                style={{
+                  padding: '7px 12px',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  borderColor: '#38BDF8',
+                  color: '#38BDF8',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  cursor: 'pointer',
+                }}
+              >
+                <Zap size={12} />
+                {isBuyingOnChain ? 'Signing MetaMask...' : 'Buy on BondingCurve Contract'}
+              </button>
+            </div>
+            {onChainSwapMsg && (
+              <div
+                style={{
+                  marginTop: '8px',
+                  padding: '8px 10px',
+                  borderRadius: '6px',
+                  fontSize: '11px',
+                  fontFamily: 'monospace',
+                  backgroundColor: onChainSwapMsg.includes('✅') ? 'rgba(16, 185, 129, 0.12)' : 'rgba(245, 158, 11, 0.12)',
+                  color: onChainSwapMsg.includes('✅') ? '#6EE7B7' : '#FDE047',
+                  border: `1px solid ${onChainSwapMsg.includes('✅') ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`,
+                  wordBreak: 'break-all',
+                }}
+              >
+                {onChainSwapMsg}
+              </div>
+            )}
           </div>
         )}
       </div>

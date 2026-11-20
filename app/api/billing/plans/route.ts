@@ -78,14 +78,25 @@ export const dynamic = 'force-dynamic';
 const VALID_PLAN_IDS = new Set<PlanId>(['FREE', 'CREATOR', 'TRADER', 'AGENT']);
 
 export async function GET() {
-  const discounts = await defaultBillingDbAdapter.getPlanDiscounts().catch(
-    (): Record<PlanId, { discountPct: number; promoLabel?: string }> => ({
-      FREE: { discountPct: 0 },
-      CREATOR: { discountPct: 0 },
-      TRADER: { discountPct: 0 },
-      AGENT: { discountPct: 0 },
-    })
-  );
+  const [discounts, platformConfig] = await Promise.all([
+    defaultBillingDbAdapter.getPlanDiscounts().catch(
+      (): Record<PlanId, { discountPct: number; promoLabel?: string }> => ({
+        FREE: { discountPct: 0 },
+        CREATOR: { discountPct: 0 },
+        TRADER: { discountPct: 0 },
+        AGENT: { discountPct: 0 },
+      })
+    ),
+    defaultBillingDbAdapter.getPlatformFeeAndRiskConfig().catch(() => ({
+      studioCostCr: 1,
+      deskCostCr: 5,
+      launchCostCr: 50,
+      maxOrderValueUsd: 10000,
+      maxDailyLossUsd: 1000,
+      maxSlippagePct: 3.0,
+      treasuryWallet: '0x0c9f4a82b5ae258e8e65ca40ac4f1abc455c34b6',
+    })),
+  ]);
 
   const enrichedPlans = CANONICAL_PLANS.map((plan) => {
     const pid = plan.id as PlanId;
@@ -117,7 +128,13 @@ export async function GET() {
     data: enrichedPlans,
     timestamp: new Date().toISOString(),
   };
-  return NextResponse.json(response, { status: 200 });
+  return NextResponse.json(
+    {
+      ...response,
+      platformConfig,
+    },
+    { status: 200 }
+  );
 }
 
 export async function POST(req: NextRequest) {
@@ -135,6 +152,26 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json().catch(() => ({}));
+
+    if (body?.action === 'update-platform-config') {
+      const updatedCfg = await defaultBillingDbAdapter.setPlatformFeeAndRiskConfig({
+        studioCostCr: body.studioCostCr !== undefined ? Number(body.studioCostCr) : undefined,
+        deskCostCr: body.deskCostCr !== undefined ? Number(body.deskCostCr) : undefined,
+        launchCostCr: body.launchCostCr !== undefined ? Number(body.launchCostCr) : undefined,
+        maxOrderValueUsd: body.maxOrderValueUsd !== undefined ? Number(body.maxOrderValueUsd) : undefined,
+        maxDailyLossUsd: body.maxDailyLossUsd !== undefined ? Number(body.maxDailyLossUsd) : undefined,
+        maxSlippagePct: body.maxSlippagePct !== undefined ? Number(body.maxSlippagePct) : undefined,
+        treasuryWallet: typeof body.treasuryWallet === 'string' ? body.treasuryWallet.trim() : undefined,
+        actorId: auth.walletAddress || auth.user.userId,
+      });
+
+      return NextResponse.json({
+        success: true,
+        data: updatedCfg,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
     const rawPlan = typeof body?.planId === 'string' ? body.planId.trim().toUpperCase() : '';
     if (!VALID_PLAN_IDS.has(rawPlan as PlanId)) {
       return NextResponse.json(

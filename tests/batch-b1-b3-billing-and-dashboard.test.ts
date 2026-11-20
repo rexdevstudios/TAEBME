@@ -85,6 +85,28 @@ describe('Batch B1–B3 — Billing Tiers, Credit Ledger SSOT & Post-Login Dashb
       expect(agentPlan.discountPct).toBe(50);
       expect(agentPlan.priceUsd).toBe(74.5);
       expect(agentPlan.promoLabel).toBe('LAUNCH 50');
+
+      const cfgReq = new NextRequest('https://pndigi.site/api/billing/plans', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          cookie: `rtrader_session=${adminToken}`,
+        },
+        body: JSON.stringify({
+          action: 'update-platform-config',
+          studioCostCr: 2,
+          deskCostCr: 10,
+          launchCostCr: 75,
+          maxOrderValueUsd: 25000,
+          maxDailyLossUsd: 2500,
+          maxSlippagePct: 2.5,
+        }),
+      });
+      const cfgRes = await plansPOST(cfgReq);
+      expect(cfgRes.status).toBe(200);
+      const cfgJson = await cfgRes.json();
+      expect(cfgJson.data.deskCostCr).toBe(10);
+      expect(cfgJson.data.maxOrderValueUsd).toBe(25000);
     } finally {
       if (origAdmin !== undefined) process.env.ADMIN_WALLET_PUBLIC_ADDRESS = origAdmin;
       else delete process.env.ADMIN_WALLET_PUBLIC_ADDRESS;

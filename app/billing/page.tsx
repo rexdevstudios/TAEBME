@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { CreditCard, CheckCircle2, ShieldAlert, Zap, TrendingUp, Wallet, Banknote, Scale, History, RefreshCw } from 'lucide-react';
+import { ethers } from 'ethers';
+import { ensureBaseNetwork, getBrowserSigner, normalizeWeb3Error } from '@packages/launchpad/web3-provider';
 
 interface LedgerEntry {
   id: string;
@@ -50,12 +52,33 @@ export default function BillingPage() {
   const [discountSaving, setDiscountSaving] = useState<boolean>(false);
   const [discountFeedback, setDiscountFeedback] = useState<string | null>(null);
 
+  // Admin Platform Fee, Credit Burn & Risk Gate Configurator State
+  const [studioCostCr, setStudioCostCr] = useState<number>(1);
+  const [deskCostCr, setDeskCostCr] = useState<number>(5);
+  const [launchCostCr, setLaunchCostCr] = useState<number>(50);
+  const [maxOrderValueUsd, setMaxOrderValueUsd] = useState<number>(10000);
+  const [maxDailyLossUsd, setMaxDailyLossUsd] = useState<number>(1000);
+  const [maxSlippagePct, setMaxSlippagePct] = useState<number>(3.0);
+  const [treasuryWallet, setTreasuryWallet] = useState<string>('0x0c9f4a82b5ae258e8e65ca40ac4f1abc455c34b6');
+  const [configSaving, setConfigSaving] = useState<boolean>(false);
+  const [configFeedback, setConfigFeedback] = useState<string | null>(null);
+
   const fetchPlans = useCallback(async () => {
     try {
       const res = await fetch('/api/billing/plans');
       const json = await res.json();
       if (json.success && Array.isArray(json.data)) {
         setPlans(json.data);
+      }
+      if (json.platformConfig) {
+        const cfg = json.platformConfig;
+        if (typeof cfg.studioCostCr === 'number') setStudioCostCr(cfg.studioCostCr);
+        if (typeof cfg.deskCostCr === 'number') setDeskCostCr(cfg.deskCostCr);
+        if (typeof cfg.launchCostCr === 'number') setLaunchCostCr(cfg.launchCostCr);
+        if (typeof cfg.maxOrderValueUsd === 'number') setMaxOrderValueUsd(cfg.maxOrderValueUsd);
+        if (typeof cfg.maxDailyLossUsd === 'number') setMaxDailyLossUsd(cfg.maxDailyLossUsd);
+        if (typeof cfg.maxSlippagePct === 'number') setMaxSlippagePct(cfg.maxSlippagePct);
+        if (typeof cfg.treasuryWallet === 'string' && cfg.treasuryWallet) setTreasuryWallet(cfg.treasuryWallet);
       }
     } catch (err) {
       console.warn('[Billing UI] API fetch error (using fallback plans):', (err as Error).message);
@@ -127,6 +150,98 @@ export default function BillingPage() {
       setDiscountFeedback(`⚠️ Gagal menyimpan diskon: ${err?.message || 'Network error'}`);
     } finally {
       setDiscountSaving(false);
+    }
+  };
+
+  const handleSavePlatformConfig = async () => {
+    setConfigSaving(true);
+    setConfigFeedback(null);
+    try {
+      const res = await fetch('/api/billing/plans', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update-platform-config',
+          studioCostCr,
+          deskCostCr,
+          launchCostCr,
+          maxOrderValueUsd,
+          maxDailyLossUsd,
+          maxSlippagePct,
+          treasuryWallet,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        setConfigFeedback(`⚠️ Gagal menyimpan konfigurasi (${res.status}): ${json.error || 'Error'}`);
+        return;
+      }
+      await fetchPlans();
+      setConfigFeedback(
+        `✅ Parameter bisnis & Risk Gate berhasil diperbarui di PostgreSQL SSOT (Burn: ${studioCostCr}/${deskCostCr}/${launchCostCr} cr · Max Order: $${maxOrderValueUsd.toLocaleString()}).`
+      );
+    } catch (err: any) {
+      setConfigFeedback(`⚠️ Gagal menyimpan konfigurasi: ${err?.message || 'Network error'}`);
+    } finally {
+      setConfigSaving(false);
+    }
+  };
+
+  const handlePayWithMetaMask = async (plan: Plan) => {
+    if (!isConnected) {
+      setPaymentFeedback('🔒 SIWE Session Required: Silakan hubungkan dompet MetaMask terlebih dahulu.');
+      return;
+    }
+    const targetPlanId = plan.id.toUpperCase();
+    const ethStr = plan.priceEth || '0';
+    const ethNum = parseFloat(ethStr);
+    if (!Number.isFinite(ethNum) || ethNum <= 0) {
+      return handleSubscribe(plan);
+    }
+
+    setIsProcessing(targetPlanId);
+    setPaymentFeedback(`⏳ Memeriksa jaringan Base L2 & menyiapkan pembayaran ${ethStr} ETH di MetaMask...`);
+    try {
+      const netCheck = await ensureBaseNetwork();
+      if (!netCheck.success) {
+        setPaymentFeedback(`⚠️ ${netCheck.error || 'Harap beralih ke jaringan Base di MetaMask.'}`);
+        return;
+      }
+      const signer = await getBrowserSigner();
+      const tx = await signer.sendTransaction({
+        to: ethers.getAddress(treasuryWallet || '0x0c9f4a82b5ae258e8e65ca40ac4f1abc455c34b6'),
+        value: ethers.parseEther(ethStr),
+      });
+      setTxHashInput(tx.hash);
+      setPaymentFeedback(`📡 Transaksi terkirim (${tx.hash.slice(0, 12)}...). Menunggu 1 konfirmasi blok Base...`);
+      await tx.wait(1);
+
+      const res = await fetch('/api/billing/subscribe', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          planId: targetPlanId,
+          txHash: tx.hash,
+          chain: 'base-mainnet',
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        setPaymentFeedback(`⚠️ Pembayaran terkirim (${tx.hash}), namun aktivasi gagal: ${json.error || 'Unknown error'}`);
+        return;
+      }
+      setActivePlanId(targetPlanId);
+      await refreshSession();
+      await fetchLedger();
+      setPaymentFeedback(
+        `✅ Pembayaran On-Chain (${tx.hash.slice(0, 10)}...) terverifikasi! Tier ${plan.name} aktif dengan ${Number(json.data.credits).toLocaleString()} Credits.`
+      );
+    } catch (err: any) {
+      setPaymentFeedback(`⚠️ Pembayaran MetaMask dibatalkan / gagal: ${normalizeWeb3Error(err)}`);
+    } finally {
+      setIsProcessing(null);
     }
   };
 
@@ -368,22 +483,35 @@ export default function BillingPage() {
                   {isConnecting ? 'Signing SIWE...' : 'Connect Wallet to Subscribe'}
                 </button>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => handleSubscribe(plan)}
-                  disabled={isActive || isProcessing !== null}
-                  className={isActive ? 'btn-secondary' : 'btn-primary'}
-                  style={{ width: '100%', justifyContent: 'center' }}
-                >
-                  <CreditCard size={14} />
-                  {isProcessing === normId
-                    ? 'Memproses...'
-                    : isActive
-                    ? 'Current Active Plan'
-                    : displayPrice === 0
-                    ? 'Activate Free Tier'
-                    : `Activate ${plan.name}`}
-                </button>
+                <div className="flex-col gap-xs">
+                  <button
+                    type="button"
+                    onClick={() => handleSubscribe(plan)}
+                    disabled={isActive || isProcessing !== null}
+                    className={isActive ? 'btn-secondary' : 'btn-primary'}
+                    style={{ width: '100%', justifyContent: 'center' }}
+                  >
+                    <CreditCard size={14} />
+                    {isProcessing === normId
+                      ? 'Memproses...'
+                      : isActive
+                      ? 'Current Active Plan'
+                      : displayPrice === 0
+                      ? 'Activate Free / 100% Promo Tier'
+                      : `Activate ${plan.name}`}
+                  </button>
+                  {!isActive && displayPrice > 0 && plan.priceEth && parseFloat(plan.priceEth) > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => handlePayWithMetaMask(plan)}
+                      disabled={isProcessing !== null}
+                      className="btn-secondary"
+                      style={{ width: '100%', justifyContent: 'center', fontSize: '11px', padding: '7px 10px', borderColor: '#38BDF8', color: '#38BDF8' }}
+                    >
+                      <Zap size={13} /> 1-Click Pay {plan.priceEth} ETH via MetaMask
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           );
@@ -413,9 +541,9 @@ export default function BillingPage() {
           <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '14px', borderRadius: '6px' }}>
             <div style={{ color: '#C084FC', fontWeight: 800, fontSize: '12px' }}>Metered Credit Consumption</div>
             <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--color-foreground)', margin: '6px 0', fontFamily: 'var(--font-mono)' }}>
-              Scrape: 1 cr · 5-Agent Desk: 5 cr · Launch: 50 cr
+              Scrape/Studio: {studioCostCr} cr · 5-Agent Desk: {deskCostCr} cr · Launch: {launchCostCr} cr
             </div>
-            <div className="text-muted" style={{ fontSize: '11px' }}>Dicatat secara double-entry di tabel PostgreSQL `ledger_entries`.</div>
+            <div className="text-muted" style={{ fontSize: '11px' }}>Max Order: ${maxOrderValueUsd.toLocaleString()} · Max Daily Loss: ${maxDailyLossUsd.toLocaleString()} · Max Slippage: {maxSlippagePct}%</div>
           </div>
         </div>
       </div>
@@ -610,6 +738,109 @@ export default function BillingPage() {
               {discountFeedback}
             </div>
           )}
+
+          {/* Dynamic Credit Burn & Risk Gate Configurator */}
+          <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '16px' }}>
+            <h4 style={{ fontSize: '14px', fontWeight: 900, color: '#38BDF8', margin: '0 0 8px 0' }}>
+              ⚙️ Dynamic Credit Burn Costs, Risk Gate Limits &amp; Treasury Receiver
+            </h4>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px', marginBottom: '12px' }}>
+              <div className="flex-col gap-xs">
+                <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-muted)' }}>AI Studio / Scrape (cr)</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={studioCostCr}
+                  onChange={(e) => setStudioCostCr(Math.max(0, Number(e.target.value) || 0))}
+                  className="input"
+                  style={{ padding: '7px 10px', fontSize: '12px', fontFamily: 'var(--font-mono)' }}
+                />
+              </div>
+              <div className="flex-col gap-xs">
+                <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-muted)' }}>5-Agent Desk Run (cr)</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={deskCostCr}
+                  onChange={(e) => setDeskCostCr(Math.max(0, Number(e.target.value) || 0))}
+                  className="input"
+                  style={{ padding: '7px 10px', fontSize: '12px', fontFamily: 'var(--font-mono)' }}
+                />
+              </div>
+              <div className="flex-col gap-xs">
+                <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-muted)' }}>Token Launch (cr)</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={launchCostCr}
+                  onChange={(e) => setLaunchCostCr(Math.max(0, Number(e.target.value) || 0))}
+                  className="input"
+                  style={{ padding: '7px 10px', fontSize: '12px', fontFamily: 'var(--font-mono)' }}
+                />
+              </div>
+              <div className="flex-col gap-xs">
+                <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-muted)' }}>Max Order Size ($ USD)</label>
+                <input
+                  type="number"
+                  min={100}
+                  value={maxOrderValueUsd}
+                  onChange={(e) => setMaxOrderValueUsd(Math.max(100, Number(e.target.value) || 100))}
+                  className="input"
+                  style={{ padding: '7px 10px', fontSize: '12px', fontFamily: 'var(--font-mono)' }}
+                />
+              </div>
+              <div className="flex-col gap-xs">
+                <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-muted)' }}>Max Daily Loss ($ USD)</label>
+                <input
+                  type="number"
+                  min={50}
+                  value={maxDailyLossUsd}
+                  onChange={(e) => setMaxDailyLossUsd(Math.max(50, Number(e.target.value) || 50))}
+                  className="input"
+                  style={{ padding: '7px 10px', fontSize: '12px', fontFamily: 'var(--font-mono)' }}
+                />
+              </div>
+              <div className="flex-col gap-xs">
+                <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-muted)' }}>Max Slippage Cap (%)</label>
+                <input
+                  type="number"
+                  step={0.1}
+                  min={0.1}
+                  max={10}
+                  value={maxSlippagePct}
+                  onChange={(e) => setMaxSlippagePct(Math.max(0.1, Math.min(10, Number(e.target.value) || 3.0)))}
+                  className="input"
+                  style={{ padding: '7px 10px', fontSize: '12px', fontFamily: 'var(--font-mono)' }}
+                />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              <div className="flex-col gap-xs" style={{ flex: '1 1 300px' }}>
+                <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-muted)' }}>Protocol Treasury Public Wallet (Base L2 Subscription Receiver)</label>
+                <input
+                  type="text"
+                  value={treasuryWallet}
+                  onChange={(e) => setTreasuryWallet(e.target.value)}
+                  className="input"
+                  style={{ padding: '7px 10px', fontSize: '12px', fontFamily: 'var(--font-mono)' }}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleSavePlatformConfig}
+                disabled={configSaving}
+                className="btn-primary"
+                style={{ padding: '9px 16px', fontSize: '12px' }}
+              >
+                {configSaving ? 'Saving...' : 'Save Fee & Risk Parameters'}
+              </button>
+            </div>
+            {configFeedback && (
+              <div style={{ marginTop: '10px', padding: '10px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: 800, backgroundColor: configFeedback.includes('✅') ? 'rgba(16, 185, 129, 0.14)' : 'rgba(245, 158, 11, 0.14)', color: configFeedback.includes('✅') ? '#6EE7B7' : '#FDE047', border: `1px solid ${configFeedback.includes('✅') ? 'rgba(16, 185, 129, 0.35)' : 'rgba(245, 158, 11, 0.35)'}` }}>
+                {configFeedback}
+              </div>
+            )}
+          </div>
 
           <div className="grid-4">
             <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '16px', borderRadius: '6px' }}>

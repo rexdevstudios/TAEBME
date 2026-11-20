@@ -72,6 +72,7 @@ export async function POST(req: NextRequest) {
     // 1. Authoritative Kill Switch, Entitlement & Deterministic Risk Gate (Fail-Closed)
     const activeKillSwitches = await defaultKillSwitchDbAdapter.getActiveKillSwitches();
     const userEntitlement = await defaultBillingDbAdapter.getUserEntitlement(auth.user.userId);
+    const dynamicRiskCfg = await defaultBillingDbAdapter.getPlatformFeeAndRiskConfig().catch(() => null);
     const { status: gateStatus, decision } = TradingRiskGate.evaluateIntent(
       {
         userId: auth.user.userId,
@@ -85,8 +86,8 @@ export async function POST(req: NextRequest) {
         idempotencyKey,
       },
       {
-        maxOrderValueUsd: 10000,
-        maxDailyLossUsd: 1000,
+        maxOrderValueUsd: dynamicRiskCfg?.maxOrderValueUsd ?? 10000,
+        maxDailyLossUsd: dynamicRiskCfg?.maxDailyLossUsd ?? 1000,
         currentDailyLossUsd: 0,
         maxOpenPositions: 5,
         currentOpenPositions: 0,

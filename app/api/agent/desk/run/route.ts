@@ -82,11 +82,14 @@ export async function POST(req: NextRequest) {
     );
 
     let remainingCredits: number | undefined;
+    let deskCost = 5;
     try {
       if (getDbPool()) {
+        const cfg = await defaultBillingDbAdapter.getPlatformFeeAndRiskConfig().catch(() => null);
+        deskCost = cfg?.deskCostCr ?? 5;
         await SubscriptionsEngine.deductMeteredCredits(
           auth.walletAddress,
-          5,
+          deskCost,
           'FIVE_AGENT_DESK_RUN',
           report.proposal?.id || `desk-${Date.now()}`,
           defaultBillingDbAdapter
@@ -101,7 +104,7 @@ export async function POST(req: NextRequest) {
       success: true,
       data: {
         ...report,
-        creditsBurned: 5,
+        creditsBurned: deskCost,
         remainingCredits,
       },
       timestamp: new Date().toISOString(),
