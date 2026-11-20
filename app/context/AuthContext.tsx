@@ -27,6 +27,26 @@ export interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/**
+ * Resolves the best available EIP-1193 provider in multi-wallet browsers
+ * (prioritizes MetaMask from window.ethereum.providers, falls back to window.ethereum).
+ */
+function resolveInjectedEthereumProvider(): any | null {
+  if (typeof window === 'undefined') return null;
+  const eth = (window as any).ethereum;
+  if (!eth) return null;
+  if (Array.isArray(eth.providers) && eth.providers.length > 0) {
+    const mm = eth.providers.find((p: any) => p?.isMetaMask && !p?.isBraveWallet);
+    return mm || eth.providers[0];
+  }
+  return eth;
+}
+
+function isMobileBrowser(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
@@ -41,6 +61,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await fetch('/api/auth/session', {
         method: 'GET',
+        credentials: 'same-origin',
+        cache: 'no-store',
         headers: { 'Cache-Control': 'no-cache' },
       });
       const json = await res.json();
@@ -103,18 +125,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Real Dynamic MetaMask Connection with EIP-4361 SIWE Signature Flow
   const connectMetaMask = useCallback(async (): Promise<{ success: boolean; address?: string; error?: string }> => {
-    if (typeof window === 'undefined' || !(window as any).ethereum) {
+    const ethereum = resolveInjectedEthereumProvider();
+    if (!ethereum) {
+      if (typeof window !== 'undefined' && isMobileBrowser()) {
+        const dappPath = `${window.location.host}${window.location.pathname}${window.location.search}`;
+        const deepLink = `https://metamask.app.link/dapp/${dappPath}`;
+        window.location.href = deepLink;
+        return {
+          success: false,
+          error: 'Membuka aplikasi MetaMask Mobile... Jika tidak otomatis terbuka, buka situs ini langsung dari browser di dalam aplikasi MetaMask.',
+        };
+      }
       return {
         success: false,
-        error: 'MetaMask or Web3 wallet extension not detected in this browser. Please install MetaMask.',
+        error: 'MetaMask atau ekstensi dompet Web3 tidak terdeteksi di browser ini. Pasang MetaMask di Desktop atau buka situs melalui MetaMask Mobile Browser.',
       };
     }
 
     setIsConnecting(true);
     try {
-      const ethereum = (window as any).ethereum;
-
-      // 1. Request dynamic accounts from MetaMask
+      // 1. Request dynamic accounts from wallet provider
       const accounts: string[] = await ethereum.request({
         method: 'eth_requestAccounts',
       });
@@ -136,6 +166,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // 2. Request SIWE Challenge from backend for this dynamic address
       const challengeRes = await fetch('/api/auth/challenge', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ walletAddress: activeAddress, chainType: 'EVM' }),
       });
@@ -147,17 +178,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const { nonce, messageToSign } = challengeJson.data;
 
-      // 3. Prompt MetaMask popup to sign challenge with user's private key
+      // 3. Prompt wallet popup to sign challenge (hex first, fallback to raw UTF-8 for wallets that require string)
       const { ethers } = await import('ethers');
       const hexMessage = ethers.hexlify(ethers.toUtf8Bytes(messageToSign));
-      const signature: string = await ethereum.request({
-        method: 'personal_sign',
-        params: [hexMessage, activeAddress],
-      });
+      let signature: string;
+      try {
+        signature = await ethereum.request({
+          method: 'personal_sign',
+          params: [hexMessage, activeAddress],
+        });
+      } catch (signErr: any) {
+        if (signErr?.code === 4001) throw signErr;
+        signature = await ethereum.request({
+          method: 'personal_sign',
+          params: [messageToSign, activeAddress],
+        });
+      }
 
-      // 4. Verify cryptographic signature on backend
+      // 4. Verify cryptographic signature on backend (sets HttpOnly Secure rtrader_session cookie)
       const verifyRes = await fetch('/api/auth/verify', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           walletAddress: activeAddress,
@@ -173,10 +214,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error(verifyJson.error?.message || 'SIWE cryptographic verification failed');
       }
 
-      // 5. Store cryptographic session token & revalidate from authoritative server
-      if (verifyJson.data?.sessionToken) {
-        document.cookie = `rtrader_session=${verifyJson.data.sessionToken}; path=/; max-age=28800; SameSite=Strict`;
-      }
+      // 5. Revalidate authoritative HttpOnly session from server (never shadow with non-HttpOnly document.cookie)
       await refreshSession();
 
       return { success: true, address: activeAddress };
@@ -190,8 +228,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Listen for MetaMask account & chain changes dynamically (EIP-1193)
   useEffect(() => {
-    if (typeof window !== 'undefined' && (window as any).ethereum) {
-      const ethereum = (window as any).ethereum;
+    const ethereum = resolveInjectedEthereumProvider();
+    if (ethereum) {
 
       const handleAccountsChanged = (accounts: string[]) => {
         if (!accounts || accounts.length === 0) {
