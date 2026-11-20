@@ -19,8 +19,9 @@ interface OverviewData {
 }
 
 export default function OverviewPage() {
-  const { isConnected, userRole, walletAddress, connectMetaMask, isConnecting, chainId } = useAuth();
+  const { isConnected, userRole, planId, credits, walletAddress, connectMetaMask, isConnecting, chainId } = useAuth();
   const [overview, setOverview] = useState<OverviewData | null>(null);
+  const [activeLaunches, setActiveLaunches] = useState<any[]>([]);
   const [connectError, setConnectError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -49,6 +50,16 @@ export default function OverviewPage() {
   };
 
   useEffect(() => {
+    if (isConnected) {
+      fetch('/api/launchpad/tokens')
+        .then((r) => r.json())
+        .then((json) => {
+          if (json.success && Array.isArray(json.data)) {
+            setActiveLaunches(json.data);
+          }
+        })
+        .catch(() => {});
+    }
     // Only fetch telemetry & kill switch state if Admin
     if (userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN') {
       fetchOverview();
@@ -392,53 +403,132 @@ export default function OverviewPage() {
 
 
   // -------------------------
-  // TRADER / CREATOR VIEW
+  // TRADER / CREATOR / LAUNCH_ADMIN VIEW
   // -------------------------
-  if (userRole === 'TRADER' || userRole === 'CREATOR') {
+  if (userRole === 'TRADER' || userRole === 'CREATOR' || userRole === 'LAUNCH_ADMIN') {
+    const activeTier = (planId || 'FREE').toUpperCase();
     return (
       <div className="flex-col gap-lg">
-        <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        {/* Top Welcome & Active Plan Banner */}
+        <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
           <div>
             <h1 style={{ margin: '0 0 8px 0', fontSize: '24px', display: 'flex', alignItems: 'center', gap: '12px' }}>
               Welcome back, {walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : 'User'}
             </h1>
-            <p className="text-muted" style={{ margin: 0 }}>
-              You are authenticated as <strong className="text-accent">{userRole}</strong> via EIP-4361 SIWE.
+            <p className="text-muted" style={{ margin: 0, fontSize: '13px' }}>
+              Authenticated as <strong className="text-accent">{userRole}</strong> via EIP-4361 SIWE · Active Tier:{' '}
+              <strong style={{ color: '#FFC400' }}>{activeTier}</strong> · Balance:{' '}
+              <strong style={{ color: 'var(--color-accent)' }}>{credits.toLocaleString()} Credits</strong>
             </p>
           </div>
-          <div className="flex-row gap-md">
-            <a href="/trading" className="btn-primary" style={{ textDecoration: 'none' }}>
-              <Network size={16} /> Open Trading Terminal
+          <div className="flex-row gap-sm" style={{ flexWrap: 'wrap' }}>
+            <a href="/agent" className="btn-primary" style={{ textDecoration: 'none' }}>
+              <BrainCircuit size={16} /> 5-Agent Trading Desk
             </a>
-            {userRole === 'CREATOR' && (
-              <a href="/launchpad" className="btn-secondary" style={{ textDecoration: 'none' }}>
-                <Rocket size={16} /> Token Launchpad
-              </a>
-            )}
+            <a href="/trading" className="btn-secondary" style={{ textDecoration: 'none' }}>
+              <Network size={16} /> Trading Terminal
+            </a>
+            <a href="/launchpad" className="btn-secondary" style={{ textDecoration: 'none' }}>
+              <Rocket size={16} /> Token Launchpad
+            </a>
+            <a href="/billing" className="btn-secondary" style={{ textDecoration: 'none', borderColor: '#FFC400', color: '#FFC400' }}>
+              <Zap size={16} /> Billing &amp; Upgrade Tier
+            </a>
           </div>
         </div>
 
-        <div className="grid-2">
+        {/* 4 Quick-Launch Command Cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
+          <a href="/agent" className="card" style={{ textDecoration: 'none', borderLeft: '3px solid #A855F7' }}>
+            <div style={{ fontWeight: 900, color: '#C084FC', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+              <BrainCircuit size={16} /> 5-Agent Autonomous Desk
+            </div>
+            <div className="text-muted" style={{ fontSize: '12px' }}>
+              Scanner → Analyst → Brain (BytePlus/Gemini) → Risk → Executor dengan 0 kolisi.
+            </div>
+          </a>
+          <a href="/launchpad" className="card" style={{ textDecoration: 'none', borderLeft: '3px solid #38BDF8' }}>
+            <div style={{ fontWeight: 900, color: '#38BDF8', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+              <Rocket size={16} /> Launchpad &amp; AI Studio
+            </div>
+            <div className="text-muted" style={{ fontSize: '12px' }}>
+              5 mode peluncuran token, AI Identity, Logo IPFS, Growth Pack, &amp; Bonding Curve.
+            </div>
+          </a>
+          <a href="/kol" className="card" style={{ textDecoration: 'none', borderLeft: '3px solid #10B981' }}>
+            <div style={{ fontWeight: 900, color: '#6EE7B7', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+              <Award size={16} /> KOL &amp; Merkle Bounties
+            </div>
+            <div className="text-muted" style={{ fontSize: '12px' }}>
+              Kampanye SocialFi, verifikasi X/Farcaster/World ID, &amp; klaim Merkle on-chain.
+            </div>
+          </a>
+          <a href="/billing" className="card" style={{ textDecoration: 'none', borderLeft: '3px solid #FFC400' }}>
+            <div style={{ fontWeight: 900, color: '#FFC400', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+              <Zap size={16} /> Tier &amp; Credit Ledger
+            </div>
+            <div className="text-muted" style={{ fontSize: '12px' }}>
+              Upgrade FREE → CREATOR / TRADER / AGENT &amp; kelola kuota kredit bulanan.
+            </div>
+          </a>
+        </div>
+
+        {/* 3-Column Security, Subscription/Fee & Live Launchpad Activity */}
+        <div className="grid-3">
           <div className="card">
-            <h3 style={{ margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <ShieldAlert size={20} className="text-accent" /> Security Overview
+            <h3 style={{ margin: '0 0 14px 0', fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <ShieldAlert size={18} className="text-accent" /> Security &amp; Risk Guardrails
             </h3>
-            <ul style={{ paddingLeft: '20px', color: 'var(--color-foreground)', margin: 0 }} className="flex-col gap-sm">
-              <li>Session: <span className="text-accent">Active</span></li>
-              <li>Wallet: <span style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', color: 'var(--color-accent)' }}>{walletAddress ? `${walletAddress.slice(0, 8)}...${walletAddress.slice(-4)}` : '—'}</span></li>
-              <li>Max Order Size: <span>$10,000 <span style={{ color: '#94A3B8', fontSize: '11px' }}>(Platform Default)</span></span></li>
-              <li>Max Slippage Cap: <span>3.0% <span style={{ color: '#94A3B8', fontSize: '11px' }}>(Platform Default)</span></span></li>
+            <ul style={{ paddingLeft: '18px', color: 'var(--color-foreground)', margin: 0, fontSize: '13px' }} className="flex-col gap-sm">
+              <li>Session: <span className="text-accent">Active (HttpOnly SIWE)</span></li>
+              <li>Wallet: <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--color-accent)' }}>{walletAddress ? `${walletAddress.slice(0, 8)}...${walletAddress.slice(-4)}` : '—'}</span></li>
+              <li>Max Order Size: <span>$10,000 <span style={{ color: '#94A3B8', fontSize: '11px' }}>(Risk Gate)</span></span></li>
+              <li>Max Slippage Cap: <span>3.0% <span style={{ color: '#94A3B8', fontSize: '11px' }}>(Immutable)</span></span></li>
             </ul>
           </div>
+
           <div className="card">
-            <h3 style={{ margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Activity size={20} className="text-accent" /> Recent Activity
+            <h3 style={{ margin: '0 0 14px 0', fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px', color: '#FFC400' }}>
+              <Zap size={18} /> Active Tier &amp; Fee Structure
             </h3>
-            <div className="flex-col gap-sm text-muted">
-              <p style={{ margin: 0 }}>No trade intents have been submitted in this session.</p>
-              <p style={{ margin: '4px 0 0 0', fontSize: '11px' }}>Trade intents are logged after submitting a proposal in the Trading Terminal.</p>
-              <a href="/trading" className="text-accent" style={{ textDecoration: 'underline', fontSize: '13px', marginTop: '8px', display: 'inline-block' }}>Open Trading Terminal →</a>
-            </div>
+            <ul style={{ paddingLeft: '18px', color: 'var(--color-foreground)', margin: 0, fontSize: '13px' }} className="flex-col gap-sm">
+              <li>Current Plan: <strong style={{ color: '#FFC400' }}>{activeTier}</strong> ({credits.toLocaleString()} cr)</li>
+              <li>Bonding Curve Fee: <strong>0.50% Treasury / 0.50% Creator</strong></li>
+              <li>Metered Burn: <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>1 cr Scrape · 5 cr Desk · 50 cr Launch</span></li>
+            </ul>
+            <a href="/billing" className="text-accent" style={{ textDecoration: 'underline', fontSize: '12px', marginTop: '10px', display: 'inline-block' }}>
+              Manage Subscription &amp; Credits →
+            </a>
+          </div>
+
+          <div className="card">
+            <h3 style={{ margin: '0 0 14px 0', fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Activity size={18} className="text-accent" /> Live Ecosystem Activity
+            </h3>
+            {activeLaunches.length > 0 ? (
+              <div className="flex-col gap-xs" style={{ fontSize: '12px' }}>
+                <div style={{ color: 'var(--color-foreground)', fontWeight: 700 }}>
+                  {activeLaunches.length} Active Token Launch(es) in SSOT:
+                </div>
+                {activeLaunches.slice(0, 3).map((t: any, idx: number) => (
+                  <div key={t.launchId || idx} style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', color: '#CBD5E1' }}>
+                    <span>${t.ticker || 'TOKEN'} ({t.name || 'Launch'})</span>
+                    <a href={`/trading?token=${t.contractAddress || ''}`} style={{ color: '#38BDF8' }}>Trade →</a>
+                  </div>
+                ))}
+                <a href="/launchpad" className="text-accent" style={{ textDecoration: 'underline', fontSize: '12px', marginTop: '6px', display: 'inline-block' }}>
+                  Explore All Launches →
+                </a>
+              </div>
+            ) : (
+              <div className="flex-col gap-sm text-muted" style={{ fontSize: '12px' }}>
+                <p style={{ margin: 0 }}>Siap menjalankan 5-Agent Trading Desk atau meluncurkan token pertama Anda.</p>
+                <div style={{ display: 'flex', gap: '12px', marginTop: '6px' }}>
+                  <a href="/agent" className="text-accent" style={{ textDecoration: 'underline' }}>Run 5-Agent Desk →</a>
+                  <a href="/launchpad" style={{ color: '#38BDF8', textDecoration: 'underline' }}>Open Launchpad →</a>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -14,6 +14,7 @@ import {
   Wallet,
   BrainCircuit,
   Award,
+  CreditCard,
 } from 'lucide-react';
 import { getNetworkLabel } from '../lib/classifyHostname';
 
@@ -39,6 +40,7 @@ export default function HeaderNav() {
     { href: '/kol', label: 'KOL Hub', icon: Award },
     { href: '/trading', label: 'Trading Terminal', icon: Network },
     { href: '/agent', label: 'AI Proposals', icon: BrainCircuit },
+    { href: '/billing', label: 'Billing & Tiers', icon: CreditCard },
   ];
 
   const isActive = (href: string) => {

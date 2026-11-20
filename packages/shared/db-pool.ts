@@ -4368,11 +4368,37 @@ export class PostgresBillingDbAdapter implements BillingDbAdapter {
   }
 
   async getUserCreditBalance(userId: string): Promise<number> {
+    const pool = getDbPool();
+    if (pool) {
+      try {
+        const validUserId = await ensureUserEntity(pool, userId);
+        const res = await pool.query(
+          `SELECT COALESCE(SUM(amount), 0)::numeric AS balance, COUNT(*)::int AS cnt
+           FROM ledger_entries
+           WHERE user_id = $1 AND currency = 'CREDITS'`,
+          [validUserId]
+        );
+        const cnt = Number(res.rows[0]?.cnt ?? 0);
+        if (cnt > 0) {
+          return Math.max(0, Math.round(Number(res.rows[0]?.balance ?? 0)));
+        }
+        const plan = await this.getUserPlan(userId).catch(() => 'FREE' as PlanId);
+        const defaultCredits: Record<PlanId, number> = {
+          FREE: 100,
+          CREATOR: 2000,
+          TRADER: 5000,
+          AGENT: 15000,
+        };
+        return defaultCredits[plan] ?? 100;
+      } catch {
+        // Fallback to in-memory
+      }
+    }
     const sub = this.inMemorySubscriptions.get(userId);
     return sub?.credits ?? 100;
   }
 
-  async recordLedgerEntry(_entry: {
+  async recordLedgerEntry(entry: {
     userId: string;
     amount: number;
     currency: string;
@@ -4380,11 +4406,77 @@ export class PostgresBillingDbAdapter implements BillingDbAdapter {
     referenceId?: string;
     description: string;
   }): Promise<void> {
-    // Non-blocking in-memory/mock ledger entry
+    const sub = this.inMemorySubscriptions.get(entry.userId);
+    if (sub) {
+      sub.credits = Math.max(0, (sub.credits ?? 0) + entry.amount);
+    }
+    const pool = getDbPool();
+    if (pool) {
+      try {
+        const validUserId = await ensureUserEntity(pool, entry.userId);
+        await pool.query(
+          `INSERT INTO ledger_entries (
+             id, user_id, amount, currency, type, reference_id, description, created_at
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
+          [
+            crypto.randomUUID(),
+            validUserId,
+            entry.amount,
+            entry.currency || 'CREDITS',
+            entry.type,
+            entry.referenceId ?? null,
+            entry.description,
+          ]
+        );
+      } catch (err: any) {
+        console.warn('[PostgresBillingDbAdapter] recordLedgerEntry warning:', err?.message);
+      }
+    }
   }
 
-  async updateUserSubscription(userId: string, planId: PlanId, _stripeSubId?: string): Promise<void> {
-    this.seedSubscription(userId, { planId, status: 'ACTIVE' });
+  async updateUserSubscription(userId: string, planId: PlanId, stripeSubId?: string): Promise<void> {
+    const planCredits: Record<PlanId, number> = {
+      FREE: 100,
+      CREATOR: 2000,
+      TRADER: 5000,
+      AGENT: 15000,
+    };
+    this.seedSubscription(userId, { planId, status: 'ACTIVE', credits: planCredits[planId] ?? 100 });
+    const pool = getDbPool();
+    if (pool) {
+      try {
+        const validUserId = await ensureUserEntity(pool, userId);
+        const priceCents: Record<PlanId, number> = {
+          FREE: 0,
+          CREATOR: 4900,
+          TRADER: 7900,
+          AGENT: 14900,
+        };
+        await pool.query(
+          `INSERT INTO plans (id, name, base_price_cents, monthly_credits, features)
+           VALUES ($1, $2, $3, $4, '{}'::jsonb)
+           ON CONFLICT (id) DO NOTHING`,
+          [planId, `${planId} Tier`, priceCents[planId] ?? 0, planCredits[planId] ?? 100]
+        );
+        await pool.query(
+          `INSERT INTO subscriptions (
+             id, user_id, plan_id, stripe_subscription_id, status,
+             current_period_start, current_period_end, created_at, updated_at
+           ) VALUES ($1, $2, $3, $4, 'ACTIVE', NOW(), NOW() + INTERVAL '30 days', NOW(), NOW())`,
+          [crypto.randomUUID(), validUserId, planId, stripeSubId ?? null]
+        );
+        if (planId === 'CREATOR' || planId === 'AGENT') {
+          await pool.query(
+            `INSERT INTO user_roles (user_id, role, created_at)
+             VALUES ($1, 'CREATOR', NOW())
+             ON CONFLICT (user_id, role) DO NOTHING`,
+            [validUserId]
+          );
+        }
+      } catch (err: any) {
+        console.warn('[PostgresBillingDbAdapter] updateUserSubscription warning:', err?.message);
+      }
+    }
   }
 
   async createAuditLog(_actorId: string, _action: string, _entityId?: string, _reason?: string): Promise<void> {

@@ -15,6 +15,7 @@ export interface AuthContextType {
   userId: string | null;
   isConnected: boolean;
   userRole: UserRole;
+  planId?: 'FREE' | 'CREATOR' | 'TRADER' | 'AGENT';
   credits: number;
   isConnecting: boolean;
   chainId: string | null;
@@ -77,6 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [userId, setUserId] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [userRole, setUserRole] = useState<UserRole>('GUEST');
+  const [planId, setPlanId] = useState<'FREE' | 'CREATOR' | 'TRADER' | 'AGENT'>('FREE');
   const [credits, setCredits] = useState<number>(0);
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
   const [chainId, setChainId] = useState<string | null>(null);
@@ -97,6 +99,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUserId(json.data.userId);
         setIsConnected(true);
         setUserRole(json.data.userRole);
+        setPlanId(json.data.planId || 'FREE');
         setCredits(json.data.credits);
         return;
       }
@@ -106,6 +109,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUserId(null);
       setIsConnected(false);
       setUserRole('GUEST');
+      setPlanId('FREE');
       setCredits(0);
     } catch (e) {
       console.warn('[AuthContext] Session revalidation warning:', e);
@@ -327,6 +331,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         userId,
         isConnected,
         userRole,
+        planId,
         credits,
         isConnecting,
         chainId,
