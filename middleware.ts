@@ -22,7 +22,6 @@ const PUBLIC_API_PATHS = new Set([
   '/api/auth/verify',
   '/api/auth/session',   // Session revalidation is public
   '/api/auth/logout',    // Invalidate HttpOnly session cookie is public
-  '/api/billing/plans',   // Read-only plan listing is public
   '/api/system/overview', // Health check is public
   '/api/market/chart',    // Chart data is public read-only
   '/api/market/macro',    // DefiLlama macro TVL signal is public read-only
@@ -44,7 +43,9 @@ const PUBLIC_API_PATHS = new Set([
 
 // Routes that are publicly accessible ONLY for GET requests (mutating requests like POST require auth session)
 const PUBLIC_GET_ONLY_PATHS = new Set([
+  '/api/billing/plans',      // GET (plan & discount listing) is public; POST (discount update) requires MANAGE_BILLING_PLANS
   '/api/launchpad/graduate', // GET (graduation status read) is public; POST is protected
+  '/api/launchpad/bounty/claim', // GET (Merkle proof eligibility lookup) is public; POST (claim submission) requires SIWE session
 ]);
 
 // Security headers applied to ALL responses

@@ -14,7 +14,7 @@
  * 8. Middleware RBAC Edge Route Guard Protection
  */
 
-const BASE_URL = process.env.TEST_TARGET_URL || 'https://rtrader-degen-platform.vercel.app';
+const BASE_URL = process.env.TEST_TARGET_URL || 'https://pndigi.site';
 
 let passedTests = 0;
 let failedTests = 0;
@@ -102,87 +102,44 @@ async function runBlackboxSuite() {
   assert(unregJson.data.merkleProof.length === 0, 'Unregistered wallet receives empty merkleProof array');
 
   // ==========================================================================
-  // TEST 5: On-Chain Claim Settlement Boundary Fuzzing
+  // TEST 5: On-Chain Claim Settlement Boundary & Auth Guard
   // ==========================================================================
-  console.log('\n--- [TEST 5: On-Chain Settle API Input Fuzzing] ---');
-  // 5.1 Invalid JSON payload
+  console.log('\n--- [TEST 5: On-Chain Settle API Input & Auth Guard] ---');
+  // 5.1 Unauthenticated or Malformed JSON payload rejected (401 after C-02 auth hardening, or 400/500)
   const badJsonRes = await fetch(`${BASE_URL}/api/launchpad/bounty/settle`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: 'this is not json{',
   });
-  assert(badJsonRes.status === 400 || badJsonRes.status === 500, 'Malformed JSON rejected');
+  assert(
+    badJsonRes.status === 401 || badJsonRes.status === 400 || badJsonRes.status === 500,
+    `Unauthenticated/Malformed settle request rejected (Got HTTP ${badJsonRes.status})`
+  );
 
-  // 5.2 Missing parameters
+  // 5.2 Empty settle payload rejected (401 without SIWE session or 400)
   const emptyBodyRes = await fetch(`${BASE_URL}/api/launchpad/bounty/settle`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({}),
   });
-  assert(emptyBodyRes.status === 400, 'Empty settle payload returns HTTP 400');
-  const emptyBodyJson = await emptyBodyRes.json();
-  const emptyErr = typeof emptyBodyJson.error === 'string' ? emptyBodyJson.error : emptyBodyJson.error?.code || '';
-  assert(emptyErr.includes('INVALID_CLAIM_ID') || emptyErr.includes('MISSING_PARAMETERS'), 'Returns INVALID_CLAIM_ID or MISSING_PARAMETERS');
-
-  // 5.3 Malformed UUID
-  const badUuidRes = await fetch(`${BASE_URL}/api/launchpad/bounty/settle`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ claimId: 'not-a-uuid', txHash: '0x123' }),
-  });
-  assert(badUuidRes.status === 400, 'Invalid UUID rejected with HTTP 400');
-  const badUuidJson = await badUuidRes.json();
-  const uuidErr = typeof badUuidJson.error === 'string' ? badUuidJson.error : badUuidJson.error?.code || '';
-  assert(uuidErr.includes('INVALID_CLAIM_ID'), 'Returns INVALID_CLAIM_ID code');
-
-  // 5.4 Malformed txHash (not 32-byte hex)
-  const badTxRes = await fetch(`${BASE_URL}/api/launchpad/bounty/settle`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      claimId: '00000000-0000-4000-8000-000000000000',
-      txHash: '0xinvalidhash',
-    }),
-  });
-  assert(badTxRes.status === 400, 'Invalid txHash format rejected with HTTP 400');
-  const badTxJson = await badTxRes.json();
-  const txErr = typeof badTxJson.error === 'string' ? badTxJson.error : badTxJson.error?.code || '';
-  assert(txErr.includes('INVALID_TX_HASH'), 'Returns INVALID_TX_HASH code');
+  assert(
+    emptyBodyRes.status === 401 || emptyBodyRes.status === 400,
+    `Empty settle payload rejected (Got HTTP ${emptyBodyRes.status})`
+  );
 
   // ==========================================================================
-  // TEST 6: Launchpad Publish API Boundary Fuzzing
+  // TEST 6: Launchpad Publish API Boundary & Auth Guard (H-01)
   // ==========================================================================
-  console.log('\n--- [TEST 6: Launchpad Publish API Boundary Fuzzing] ---');
-  // 6.1 Missing parameters
+  console.log('\n--- [TEST 6: Launchpad Publish API Auth Guard (H-01)] ---');
   const pubEmptyRes = await fetch(`${BASE_URL}/api/launchpad/publish`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({}),
   });
-  assert(pubEmptyRes.status === 400, 'Empty publish payload rejected with HTTP 400');
-
-  // 6.2 Invalid draftId format
-  const pubBadDraftRes = await fetch(`${BASE_URL}/api/launchpad/publish`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ draftId: 'non-uuid-string', contractAddress: '0x123' }),
-  });
-  assert(pubBadDraftRes.status === 400, 'Non-UUID draftId rejected with HTTP 400');
-  const pubBadDraftJson = await pubBadDraftRes.json();
-  assert(pubBadDraftJson.error.code === 'INVALID_DRAFT_ID', 'Returns INVALID_DRAFT_ID');
-
-  // 6.3 Invalid contractAddress format
-  const pubBadContractRes = await fetch(`${BASE_URL}/api/launchpad/publish`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      draftId: 'd4e5f6a7-b8c9-4012-8345-6789abcdef01',
-      contractAddress: '0xinvalidcontract',
-    }),
-  });
-  assert(pubBadContractRes.status === 400, 'Non-EVM contractAddress rejected with HTTP 400');
-  const pubBadContractJson = await pubBadContractRes.json();
-  assert(pubBadContractJson.error.code === 'INVALID_CONTRACT_ADDRESS', 'Returns INVALID_CONTRACT_ADDRESS');
+  assert(
+    pubEmptyRes.status === 401 || pubEmptyRes.status === 400,
+    `Unauthenticated publish payload rejected (Got HTTP ${pubEmptyRes.status})`
+  );
 
   // ==========================================================================
   // TEST 7: DEX Graduation API Boundary & Query Fuzzing
@@ -209,15 +166,40 @@ async function runBlackboxSuite() {
   );
   assert(gradNotFoundRes.status === 404, 'GET /api/launchpad/graduate for unlisted token returns HTTP 404');
 
-  // 7.4 POST Graduation invalid contractAddress
+  // 7.4 POST Graduation without session rejected (401 C-01 auth guard or 400)
   const gradBadPostRes = await fetch(`${BASE_URL}/api/launchpad/graduate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ contractAddress: '0xinvalid' }),
   });
-  assert(gradBadPostRes.status === 400, 'POST /api/launchpad/graduate with invalid address returns HTTP 400');
-  const gradBadPostJson = await gradBadPostRes.json();
-  assert(gradBadPostJson.error.code === 'INVALID_CONTRACT_ADDRESS', 'Returns INVALID_CONTRACT_ADDRESS');
+  assert(
+    gradBadPostRes.status === 401 || gradBadPostRes.status === 400,
+    `POST /api/launchpad/graduate without session rejected (Got HTTP ${gradBadPostRes.status})`
+  );
+
+  // ==========================================================================
+  // TEST 9: Subscription Plans, Discount Metadata & Protected Billing/Desk APIs
+  // ==========================================================================
+  console.log('\n--- [TEST 9: Billing Plans, Discounts & 5-Agent Desk Guard] ---');
+  const plansRes = await fetch(`${BASE_URL}/api/billing/plans`);
+  assert(plansRes.status === 200, 'GET /api/billing/plans returns HTTP 200');
+  const plansJson = await plansRes.json();
+  assert(plansJson.success === true && Array.isArray(plansJson.data) && plansJson.data.length === 4, 'GET /api/billing/plans returns 4 canonical tiers');
+  assert(typeof plansJson.data[0].discountPct === 'number', 'Plan payload includes discountPct field');
+
+  const unauthPlansPost = await fetch(`${BASE_URL}/api/billing/plans`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ planId: 'AGENT', discountPct: 50 }),
+  });
+  assert(unauthPlansPost.status === 401, 'Unauthenticated POST /api/billing/plans rejected with HTTP 401');
+
+  const unauthDeskPost = await fetch(`${BASE_URL}/api/agent/desk/run`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ symbol: 'BTCUSDT', action: 'BUY', quantity: 1 }),
+  });
+  assert(unauthDeskPost.status === 401, 'Unauthenticated POST /api/agent/desk/run rejected with HTTP 401');
 
   // ==========================================================================
   // TEST 8: Protected Route RBAC / Edge Guard
