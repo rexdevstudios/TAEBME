@@ -5,7 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Wallet, ShieldCheck, ShieldAlert, Zap } from 'lucide-react';
 
 export default function LoginPage() {
-  const { isConnected, userRole, walletAddress: currentWallet, isConnecting, connectWallet, connectMetaMask, disconnectWallet } = useAuth();
+  const { isConnected, userRole, walletAddress: currentWallet, isConnecting, refreshSession, connectMetaMask, disconnectWallet } = useAuth();
   const [walletAddress, setWalletAddress] = useState<string>(currentWallet || '');
   const [challengeMessage, setChallengeMessage] = useState<string | null>(null);
   const [nonce, setNonce] = useState<string | null>(null);
@@ -74,21 +74,24 @@ export default function LoginPage() {
     try {
       let signature: string;
 
-      // If MetaMask is installed, request real personal_sign signature
+      // If MetaMask is installed, request real personal_sign signature synchronously on button click
       if (typeof window !== 'undefined' && (window as any).ethereum) {
-        const { ethers } = await import('ethers');
-        const hexMessage = ethers.hexlify(ethers.toUtf8Bytes(challengeMessage));
+        const bytes = new TextEncoder().encode(challengeMessage);
+        let hexMessage = '0x';
+        for (let i = 0; i < bytes.length; i++) {
+          hexMessage += bytes[i].toString(16).padStart(2, '0');
+        }
         signature = await (window as any).ethereum.request({
           method: 'personal_sign',
           params: [hexMessage, walletAddress],
         });
       } else {
-        // Dev fallback mock signature
-        signature = '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1b';
+        throw new Error('Ekstensi dompet Web3 (MetaMask) tidak ditemukan di browser ini.');
       }
       
       const res = await fetch('/api/auth/verify', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           walletAddress,
@@ -101,7 +104,7 @@ export default function LoginPage() {
       const json = await res.json();
       if (json.success && json.data) {
         setSession(json.data);
-        connectWallet(walletAddress, 'TRADER');
+        await refreshSession();
       } else {
         setError(json.error?.message || 'SIWE verification failed');
       }

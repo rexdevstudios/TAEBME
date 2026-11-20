@@ -47,6 +47,31 @@ function isMobileBrowser(): boolean {
   return /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
 }
 
+function utf8ToHex(str: string): string {
+  const bytes = new TextEncoder().encode(str);
+  let hex = '0x';
+  for (let i = 0; i < bytes.length; i++) {
+    hex += bytes[i].toString(16).padStart(2, '0');
+  }
+  return hex;
+}
+
+function requestWithTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
+    promise.then(
+      (val) => {
+        clearTimeout(timer);
+        resolve(val);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      }
+    );
+  });
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
@@ -144,24 +169,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     setIsConnecting(true);
     try {
-      // 1. Request dynamic accounts from wallet provider
-      const accounts: string[] = await ethereum.request({
-        method: 'eth_requestAccounts',
-      });
+      // 1. Check already-permitted accounts first (0ms, avoids double popup); request permission only if empty
+      let accounts: string[] = [];
+      try {
+        accounts = await ethereum.request({ method: 'eth_accounts' });
+      } catch {
+        accounts = [];
+      }
+      if (!accounts || accounts.length === 0) {
+        accounts = await requestWithTimeout<string[]>(
+          ethereum.request({ method: 'eth_requestAccounts' }),
+          30000,
+          'Popup MetaMask belum disetujui. Klik ikon ekstensi MetaMask (🦊) di pojok kanan atas browser Anda untuk membuka popup yang tertunda.'
+        );
+      }
 
       if (!accounts || accounts.length === 0) {
-        throw new Error('No Ethereum account selected in MetaMask.');
+        throw new Error('Tidak ada akun Ethereum yang dipilih di MetaMask.');
       }
 
       const activeAddress = accounts[0];
 
-      // Request Chain ID
-      try {
-        const cId = await ethereum.request({ method: 'eth_chainId' });
-        setChainId(cId);
-      } catch {
-        // chain fetch optional
-      }
+      // Request Chain ID (non-blocking)
+      ethereum
+        .request({ method: 'eth_chainId' })
+        .then((cId: string) => setChainId(cId))
+        .catch(() => {});
 
       // 2. Request SIWE Challenge from backend for this dynamic address
       const challengeRes = await fetch('/api/auth/challenge', {
@@ -173,26 +206,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const challengeJson = await challengeRes.json();
 
       if (!challengeJson.success || !challengeJson.data) {
-        throw new Error(challengeJson.error?.message || 'Failed to obtain SIWE challenge');
+        throw new Error(challengeJson.error?.message || 'Gagal mengambil SIWE challenge dari server.');
       }
 
       const { nonce, messageToSign } = challengeJson.data;
 
-      // 3. Prompt wallet popup to sign challenge (hex first, fallback to raw UTF-8 for wallets that require string)
-      const { ethers } = await import('ethers');
-      const hexMessage = ethers.hexlify(ethers.toUtf8Bytes(messageToSign));
+      // 3. Prompt wallet popup immediately (0ms synchronous hex encoding to preserve browser user gesture)
+      const hexMessage = utf8ToHex(messageToSign);
+      const pendingPopupHint =
+        'Menunggu tanda tangan di MetaMask. Jika popup tidak muncul otomatis, klik ikon ekstensi MetaMask (🦊) di pojok kanan atas browser Anda.';
       let signature: string;
       try {
-        signature = await ethereum.request({
-          method: 'personal_sign',
-          params: [hexMessage, activeAddress],
-        });
+        signature = await requestWithTimeout<string>(
+          ethereum.request({
+            method: 'personal_sign',
+            params: [hexMessage, activeAddress],
+          }),
+          45000,
+          pendingPopupHint
+        );
       } catch (signErr: any) {
-        if (signErr?.code === 4001) throw signErr;
-        signature = await ethereum.request({
-          method: 'personal_sign',
-          params: [messageToSign, activeAddress],
-        });
+        if (signErr?.code === 4001) throw new Error('Tanda tangan SIWE dibatalkan di MetaMask.');
+        if (signErr?.code === -32002) throw new Error(pendingPopupHint);
+        signature = await requestWithTimeout<string>(
+          ethereum.request({
+            method: 'personal_sign',
+            params: [messageToSign, activeAddress],
+          }),
+          45000,
+          pendingPopupHint
+        );
       }
 
       // 4. Verify cryptographic signature on backend (sets HttpOnly Secure rtrader_session cookie)
@@ -211,15 +254,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const verifyJson = await verifyRes.json();
 
       if (!verifyJson.success) {
-        throw new Error(verifyJson.error?.message || 'SIWE cryptographic verification failed');
+        throw new Error(verifyJson.error?.message || 'Verifikasi tanda tangan SIWE gagal.');
       }
 
-      // 5. Revalidate authoritative HttpOnly session from server (never shadow with non-HttpOnly document.cookie)
+      // 5. Immediately hydrate authenticated state from verify response, then confirm via /api/auth/session
+      const verifiedRole = (verifyJson.data?.roles?.[0] as UserRole) || 'TRADER';
+      setWalletAddress(verifyJson.data?.primaryWallet || activeAddress);
+      setUserId(verifyJson.data?.userId || `usr-${activeAddress.slice(0, 10).toLowerCase()}`);
+      setUserRole(verifiedRole);
+      setIsConnected(true);
       await refreshSession();
 
       return { success: true, address: activeAddress };
     } catch (err: any) {
-      const msg = err?.message || 'Wallet connection was cancelled or failed';
+      const msg =
+        err?.code === -32002
+          ? 'Permintaan MetaMask sudah terbuka di latar belakang. Klik ikon ekstensi MetaMask (🦊) di pojok kanan atas browser Anda.'
+          : err?.message || 'Koneksi dompet dibatalkan atau gagal.';
       return { success: false, error: msg };
     } finally {
       setIsConnecting(false);
