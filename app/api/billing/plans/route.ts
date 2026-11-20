@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { ApiResponse } from '@packages/shared/contracts/api-contracts';
 
-export const CANONICAL_PLANS = [
+const CANONICAL_PLANS = [
   {
     id: 'FREE',
     name: 'Free Degen',
