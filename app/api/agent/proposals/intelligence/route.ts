@@ -3,6 +3,7 @@ import { AgentProposalEngine } from '@packages/agent/proposal-engine';
 import { FeatureEngine } from '@packages/intelligence/feature-engine';
 import { intelligenceCache } from '@packages/intelligence/market-data-cache';
 import { fetchDefiLlamaMacroSignal } from '@packages/intelligence/defillama-client';
+import { generateMarketAdvisoryNote } from '@packages/intelligence/llm-advisory-client';
 import { ApiResponse } from '@packages/shared/contracts/api-contracts';
 import { requireCapability } from '@packages/auth/session';
 import { defaultProposalDbAdapter } from '@packages/shared/db-pool';
@@ -39,9 +40,18 @@ export async function POST(req: NextRequest) {
       defaultProposalDbAdapter
     );
 
-    const response: ApiResponse<typeof proposal> = {
+    // 5. Non-blocking LLM Advisory enrichment (BytePlus ModelArk / Gemini / deterministic fallback)
+    const llmAdvisory = await generateMarketAdvisoryNote(signal, {
+      symbol,
+      action,
+      suggestedQty,
+    }).catch(() => null);
+
+    const enrichedProposal = { ...proposal, llmAdvisory };
+
+    const response: ApiResponse<typeof enrichedProposal> = {
       success: true,
-      data: proposal,
+      data: enrichedProposal,
       timestamp: new Date().toISOString(),
     };
 

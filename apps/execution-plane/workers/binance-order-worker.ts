@@ -1,47 +1,9 @@
 import * as crypto from 'crypto';
 import { BinanceCredentialVault, EncryptedPayload } from '../../../packages/trading/binance-vault';
 import { TradeIntentInput, BinanceKeyPermissions } from '../../../packages/shared/types/domain';
+import type { TradeIntentRecord, BinanceExecutionDbAdapter } from '../../../packages/trading/execution-types';
 
-export interface TradeIntentRecord extends TradeIntentInput {
-  id: string;
-  userId: string;
-  status: string;
-  riskDecisionId?: string;
-  riskDecisionReason?: string;
-  createdAt?: string;
-}
-
-export interface BinanceExecutionDbAdapter {
-  getApprovedIntentsQueue(): Promise<TradeIntentRecord[]>;
-  claimIntentAtomic(intentId: string): Promise<boolean>;
-  updateIntentStatus(intentId: string, status: string, riskDecisionId?: string): Promise<void>;
-  getStaleExecutingIntents(staleThresholdMs: number): Promise<TradeIntentRecord[]>;
-  getBinanceCredentials(userId: string): Promise<{
-    id: string;
-    encryptedApiKey: EncryptedPayload | string;
-    encryptedSecretKey: EncryptedPayload | string;
-    iv?: string;
-    authTag?: string;
-    permissions?: BinanceKeyPermissions;
-    isActive?: boolean;
-  } | null>;
-  recordOrderFill(fill: {
-    intentId: string;
-    exchangeOrderId: string;
-    symbol: string;
-    status: string;
-    executedQty: number;
-    cummulativeQuoteQty: number;
-    audit?: {
-      actorId?: string;
-      action: string;
-      reason?: string;
-    };
-  }): Promise<void>;
-  createAuditLog(actorId: string, action: string, entityId?: string, reason?: string): Promise<void>;
-  getActiveKillSwitches(): Promise<any[]>;
-  getActiveTransactionCount?(): number;
-}
+export type { TradeIntentRecord, BinanceExecutionDbAdapter };
 
 export interface BinanceNewOrderParams {
   symbol: string;

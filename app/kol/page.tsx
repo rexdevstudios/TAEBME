@@ -59,8 +59,8 @@ export default function KolHubPage() {
   const [isVerifyingWeb3, setIsVerifyingWeb3] = useState(false);
   const [web3Feedback, setWeb3Feedback] = useState<string | null>(null);
 
-  // Paymaster Gasless State
-  const [isGaslessClaim, setIsGaslessClaim] = useState(true);
+  // Paymaster Gasless State (default false: direct on-chain Base claim; gasless is currently Simulation Harness)
+  const [isGaslessClaim, setIsGaslessClaim] = useState(false);
 
   // Creator Liquid Staking State
   const [isStakingEnabled, setIsStakingEnabled] = useState(true);
@@ -162,10 +162,8 @@ export default function KolHubPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: `usr-${walletAddress.slice(0, 8).toLowerCase()}`,
           walletAddress,
           twitterHandle,
-          followersCount,
         }),
       });
       const json = await res.json();
@@ -198,7 +196,6 @@ export default function KolHubPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             walletAddress,
-            fid: 1, // Basic numeric identifier prompt
             username: farcasterUsername.replace(/^@/, '').trim(),
           }),
         });
@@ -413,7 +410,7 @@ export default function KolHubPage() {
         // Call settlement API to synchronize off-chain SSOT state and audit logs
         if (merkleProofData?.claimId) {
           try {
-            await fetch('/api/launchpad/bounty/settle', {
+            const settleRes = await fetch('/api/launchpad/bounty/settle', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -423,10 +420,18 @@ export default function KolHubPage() {
                 chain: targetChainHex,
               }),
             });
+            if (!settleRes.ok) {
+              const settleErr = await settleRes.json().catch(() => ({}));
+              setClaimFeedback(
+                `✅ Klaim on-chain berhasil (Hash: ${tx.hash}), tetapi sinkronisasi SSOT perlu retry: ${settleErr?.error || `HTTP ${settleRes.status}`}`
+              );
+            }
             // Refresh proof and eligibility status
             checkMerkleProof();
-          } catch {
-            // Non-blocking settlement call
+          } catch (settleCatchErr: any) {
+            setClaimFeedback(
+              `✅ Klaim on-chain berhasil (Hash: ${tx.hash}), tetapi sinkronisasi SSOT gagal: ${settleCatchErr?.message || 'Network error'}`
+            );
           }
         }
       } else {
@@ -451,6 +456,7 @@ export default function KolHubPage() {
           requiredHashtag: newHashtag,
           rewardPerKol: (BigInt(newReward) * 10n ** 18n).toString(),
           minFollowers: newMinFollowers,
+          requiresHumanityProof,
         }),
       });
       const json = await res.json();
@@ -844,6 +850,7 @@ export default function KolHubPage() {
                           onClick={() => {
                             setSelectedCampaignId(c.id);
                             setActiveTab('CLAIM');
+                            checkMerkleProof();
                           }}
                           className="btn-primary"
                           style={{ padding: '6px 12px', fontSize: '12px' }}
@@ -1088,19 +1095,21 @@ export default function KolHubPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setClaimDestination('ARBITRUM')}
-                  className={claimDestination === 'ARBITRUM' ? 'btn-primary' : 'btn-secondary'}
-                  style={{ flex: 1, padding: '6px', fontSize: '11px', justifyContent: 'center' }}
+                  disabled
+                  className="btn-secondary"
+                  style={{ flex: 1, padding: '6px', fontSize: '11px', justifyContent: 'center', opacity: 0.45, cursor: 'not-allowed' }}
+                  title="LayerZero/CCIP cross-chain claim relay belum aktif di live contract — gunakan Base (Direct)."
                 >
-                  Arbitrum
+                  Arbitrum (Soon)
                 </button>
                 <button
                   type="button"
-                  onClick={() => setClaimDestination('OPTIMISM')}
-                  className={claimDestination === 'OPTIMISM' ? 'btn-primary' : 'btn-secondary'}
-                  style={{ flex: 1, padding: '6px', fontSize: '11px', justifyContent: 'center' }}
+                  disabled
+                  className="btn-secondary"
+                  style={{ flex: 1, padding: '6px', fontSize: '11px', justifyContent: 'center', opacity: 0.45, cursor: 'not-allowed' }}
+                  title="LayerZero/CCIP cross-chain claim relay belum aktif di live contract — gunakan Base (Direct)."
                 >
-                  Optimism
+                  Optimism (Soon)
                 </button>
               </div>
             </div>
@@ -1122,10 +1131,10 @@ export default function KolHubPage() {
                 <Zap size={18} color="var(--color-accent, #00E676)" />
                 <div>
                   <div style={{ fontWeight: 800, fontSize: '12px', color: 'var(--color-accent, #00E676)' }}>
-                    ⚡ ERC-4337 Gasless Claim
+                    ⚡ ERC-4337 Gasless Claim (Simulation Harness)
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--color-muted)' }}>
-                    Disponsori penuh oleh RTrader Paymaster (Zero Gas Fee)
+                    Preview tanda tangan Paymaster EIP-191 — matikan toggle ini untuk klaim langsung on-chain via MetaMask.
                   </div>
                 </div>
               </div>
@@ -1146,17 +1155,24 @@ export default function KolHubPage() {
               >
                 <Coins size={16} />
                 <span>
-                  {isClaimingOnChain
-                    ? 'Memproses On-Chain...'
-                    : merkleProofData?.isClaimed
-                    ? '✅ Reward Sudah Diklaim'
-                    : isGaslessClaim
-                    ? '⚡ Klaim 1,000 Token (Gasless)'
-                    : (merkleProofData?.chain?.toLowerCase().includes('robinhood') || campTitle.includes('noir'))
-                    ? 'Klaim 1,000 Token Reward (Robinhood L2)'
-                    : claimDestination === 'BASE'
-                    ? 'Klaim 1,000 Token Reward (Base)'
-                    : `Klaim ke ${claimDestination} (via LayerZero)`}
+                  {(() => {
+                    const formattedReward = (() => {
+                      try {
+                        if (merkleProofData?.tokenAmount && BigInt(merkleProofData.tokenAmount) > 0n) {
+                          return Number(BigInt(merkleProofData.tokenAmount) / 10n ** 18n).toLocaleString();
+                        }
+                      } catch { /* fallback */ }
+                      return '1,000';
+                    })();
+                    if (isClaimingOnChain) return 'Memproses On-Chain...';
+                    if (merkleProofData?.isClaimed) return '✅ Reward Sudah Diklaim';
+                    if (isGaslessClaim) return `⚡ Simulasi Klaim ${formattedReward} Token (Gasless)`;
+                    if (merkleProofData?.chain?.toLowerCase().includes('robinhood') || campTitle.includes('noir')) {
+                      return `Klaim ${formattedReward} Token Reward (Robinhood L2)`;
+                    }
+                    if (claimDestination === 'BASE') return `Klaim ${formattedReward} Token Reward (Base)`;
+                    return `Klaim ${formattedReward} Token ke ${claimDestination} (via LayerZero)`;
+                  })()}
                 </span>
               </button>
             </div>

@@ -4,7 +4,7 @@ import { RbacGuard, UserContext } from '../auth/rbac-middleware';
 import { BinanceCredentialVault } from '../trading/binance-vault';
 import { TradingRiskGate } from '../trading/risk-gate';
 import { AgentProposalEngine } from '../agent/proposal-engine';
-import { DaytonaSandboxRunner } from '../../apps/execution-plane/workers/daytona-sandbox-runner';
+import { DaytonaSandboxRunner } from '../agent/daytona-sandbox-runner';
 import { FirecrawlScraperService } from '../intelligence/firecrawl-scraper';
 import { DualControlManager } from '../admin/dual-control';
 import { KillSwitchManager } from '../admin/kill-switch-manager';

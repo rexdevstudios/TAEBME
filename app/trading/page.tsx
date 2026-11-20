@@ -153,6 +153,44 @@ export default function TradingPage() {
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Controlled order parameters & deep-link context (Launchpad ?token= & Agent ?proposalId=)
+  const [orderSide, setOrderSide] = useState<'BUY' | 'SELL'>('BUY');
+  const [orderType, setOrderType] = useState<'MARKET' | 'LIMIT'>('MARKET');
+  const [orderQty, setOrderQty] = useState<number>(0.1);
+  const [orderSlippagePct, setOrderSlippagePct] = useState<number>(1.5);
+  const [linkedTokenAddress, setLinkedTokenAddress] = useState<string | null>(null);
+  const [linkedProposalId, setLinkedProposalId] = useState<string | null>(null);
+  const [mevQuote, setMevQuote] = useState<{ isSafe: boolean; minAmountOut?: string; maxSlippageBps?: number } | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const tokenParam = params.get('token');
+    const symbolParam = params.get('symbol');
+    const sideParam = params.get('side');
+    const qtyParam = params.get('qty');
+    const proposalParam = params.get('proposalId');
+
+    if (symbolParam) setSymbol(symbolParam);
+    if (sideParam === 'BUY' || sideParam === 'SELL') setOrderSide(sideParam);
+    if (qtyParam && Number(qtyParam) > 0) setOrderQty(Number(qtyParam));
+    if (proposalParam) setLinkedProposalId(proposalParam);
+    if (tokenParam && /^0x[a-fA-F0-9]{40}$/.test(tokenParam)) {
+      setLinkedTokenAddress(tokenParam);
+      fetch(`/api/trading/mev-quote?tokenAddress=${encodeURIComponent(tokenParam)}`)
+        .then((r) => r.json())
+        .then((json) => {
+          if (json.success && json.data) {
+            setMevQuote({
+              isSafe: Boolean(json.data.isSafe),
+              maxSlippageBps: json.data.maxSlippageBps,
+            });
+          }
+        })
+        .catch(() => { /* non-blocking MEV enrichment */ });
+    }
+  }, []);
+
   const fetchMarketData = async () => {
     try {
       const res = await fetch(`/api/market/chart?symbol=${symbol}&interval=${interval}`);
@@ -176,6 +214,8 @@ export default function TradingPage() {
 
   useEffect(() => {
     setLoading(true);
+    setProposalStatus('PENDING');
+    setActionFeedback(null);
     fetchMarketData();
     const timer = window.setInterval(fetchMarketData, 5000);
     return () => window.clearInterval(timer);
@@ -195,10 +235,10 @@ export default function TradingPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           symbol,
-          side: 'BUY',
-          type: 'MARKET',
-          quantity: 0.1,
-          maxSlippagePct: 1.5,
+          side: orderSide,
+          type: orderType,
+          quantity: orderQty > 0 ? orderQty : 0.1,
+          maxSlippagePct: orderSlippagePct > 0 ? orderSlippagePct : 1.5,
           stage: symbol.includes('/') ? 'PAPER' : 'TESTNET',
         }),
       });
@@ -471,16 +511,74 @@ export default function TradingPage() {
           </div>
 
           {/* Proposal-Only Action Gate */}
-          <div className="bg-panel" style={{ padding: '16px', borderRadius: '8px', border: userRole === 'SYSTEM_ADMIN' ? '1px solid #FFD600' : '1px solid var(--color-accent)' }}>
+          <div className="bg-panel" style={{ padding: '16px', borderRadius: '8px', border: (userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN') ? '1px solid #FFD600' : '1px solid var(--color-accent)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <h3 style={{ fontSize: '14px', fontWeight: 800, margin: 0, color: userRole === 'SYSTEM_ADMIN' ? '#FFD600' : 'var(--color-accent)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h3 style={{ fontSize: '14px', fontWeight: 800, margin: 0, color: (userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN') ? '#FFD600' : 'var(--color-accent)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <ShieldAlert size={16} /> Proposal Gate
               </h3>
-              {userRole === 'SYSTEM_ADMIN' && (
+              {(userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN') && (
                 <span className="badge badge-admin">
                   ADMIN OVERRIDE
                 </span>
               )}
+            </div>
+
+            {(linkedTokenAddress || linkedProposalId) && (
+              <div style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', padding: '8px', borderRadius: '6px', backgroundColor: 'rgba(0, 229, 255, 0.08)', border: '1px solid rgba(0, 229, 255, 0.25)', marginBottom: '10px', color: '#80D8FF' }}>
+                {linkedTokenAddress && (
+                  <div>
+                    Target Token: {linkedTokenAddress.slice(0, 10)}...{linkedTokenAddress.slice(-6)}
+                    {mevQuote && ` • MEV Shield: ${mevQuote.isSafe ? 'SAFE' : 'HIGH_RISK'}`}
+                  </div>
+                )}
+                {linkedProposalId && <div>Linked AI Proposal: {linkedProposalId}</div>}
+              </div>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
+              <select
+                aria-label="Order side"
+                value={orderSide}
+                onChange={(e) => setOrderSide(e.target.value as 'BUY' | 'SELL')}
+                className="input"
+                style={{ padding: '6px 8px', fontSize: '11px', fontWeight: 700 }}
+              >
+                <option value="BUY">Side: BUY</option>
+                <option value="SELL">Side: SELL</option>
+              </select>
+              <select
+                aria-label="Order type"
+                value={orderType}
+                onChange={(e) => setOrderType(e.target.value as 'MARKET' | 'LIMIT')}
+                className="input"
+                style={{ padding: '6px 8px', fontSize: '11px', fontWeight: 700 }}
+              >
+                <option value="MARKET">Type: MARKET</option>
+                <option value="LIMIT">Type: LIMIT</option>
+              </select>
+              <input
+                aria-label="Order quantity"
+                type="number"
+                step="0.01"
+                min="0.001"
+                value={orderQty}
+                onChange={(e) => setOrderQty(parseFloat(e.target.value) || 0.1)}
+                className="input"
+                style={{ padding: '6px 8px', fontSize: '11px', fontFamily: 'var(--font-mono)' }}
+                title="Order Quantity"
+              />
+              <input
+                aria-label="Max slippage percentage"
+                type="number"
+                step="0.1"
+                min="0.1"
+                max="10"
+                value={orderSlippagePct}
+                onChange={(e) => setOrderSlippagePct(parseFloat(e.target.value) || 1.5)}
+                className="input"
+                style={{ padding: '6px 8px', fontSize: '11px', fontFamily: 'var(--font-mono)' }}
+                title="Max Slippage (%)"
+              />
             </div>
 
             <p style={{ fontSize: '12px', color: 'var(--color-muted)', marginBottom: '16px' }}>

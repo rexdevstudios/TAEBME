@@ -5,6 +5,8 @@ import { useAuth } from '../context/AuthContext';
 import { Rocket, ShieldAlert, FileText, CheckCircle2, AlertTriangle, TrendingUp, Scale, Wallet, Users, Tag, Sparkles, Coins, Zap } from 'lucide-react';
 import { NutritionLabelCard } from '../components/NutritionLabelCard';
 import { AngelDealRoomModal } from '../components/AngelDealRoomModal';
+import { AdminMerkleSnapshotPanel } from '../components/AdminMerkleSnapshotPanel';
+import { CreatorStudioPanel } from '../components/CreatorStudioPanel';
 import { ethers } from 'ethers';
 import {
   getContractConfiguration,
@@ -123,6 +125,7 @@ export default function LaunchpadPage() {
   const [isRegisteringOnChain, setIsRegisteringOnChain] = useState(false);
   const [onChainFeedback, setOnChainFeedback] = useState<string | null>(null);
   const [publishedTxHash, setPublishedTxHash] = useState<string | null>(null);
+  const [onChainTokenAddress, setOnChainTokenAddress] = useState<string>('');
 
   const handleRegisterOnChain = async () => {
     if (!draftResult) return;
@@ -149,7 +152,22 @@ export default function LaunchpadPage() {
         return;
       }
 
-      // 3. Multi-Chain Network Switching & Validation (Rule 8)
+      // 3. Multi-Chain Network Switching & Validation (Rule 8 — fail closed on unsupported live chains)
+      if (selectedChain === 'arbitrum' || selectedChain === 'arc') {
+        setOnChainFeedback(
+          `⛔ Pendaftaran langsung on-chain untuk ${selectedChain.toUpperCase()} belum aktif di BondingCurveLaunchpad.sol. Gunakan Base L2 atau Robinhood Chain L2.`
+        );
+        return;
+      }
+
+      const trimmedTokenAddr = onChainTokenAddress.trim();
+      if (!trimmedTokenAddr || !ethers.isAddress(trimmedTokenAddr)) {
+        setOnChainFeedback(
+          '⚠️ Masukkan alamat kontrak token ERC-20 yang sudah ter-deploy (0x...) sebelum mendaftarkan ke BondingCurveLaunchpad.'
+        );
+        return;
+      }
+
       const isRobinhood = selectedChain === 'robinhood';
       const targetChainHex = isRobinhood ? '0x1237' : '0x2105';
       const targetChainKey = isRobinhood ? 'robinhood-mainnet' : 'base-mainnet';
@@ -170,25 +188,27 @@ export default function LaunchpadPage() {
         WHITELIST_PRIVATE: 3,
         COMMUNITY_PRELAUNCH: 4,
       };
-      const modeInt = modeMap[draftResult.mode] ?? 1;
+      const draftMode = draftResult.launchMode || draftResult.mode;
+      const draftTicker = draftResult.ticker || draftResult.symbol;
+      const modeInt = modeMap[draftMode] ?? 1;
 
       // 5. Real Contract Call via MetaMask Signer
       setOnChainFeedback(`⏳ Menyiapkan pendaftaran token on-chain di ${chainName}...`);
       const signer = await getBrowserSigner();
       const contract = getLaunchpadContract(signer);
 
-      const derivedTokenAddress = ethers.getCreateAddress({ from: walletAddress, nonce: Math.floor(Math.random() * 100000) });
+      const verifiedTokenAddress = ethers.getAddress(trimmedTokenAddr);
       const totalSupplyWei = ethers.parseEther('1000000000');
       const initialPriceWei = ethers.parseEther('0.00000002');
       const graduationThresholdWei = ethers.parseEther('24');
       const maxPerWalletPct = 100n;
-      const merkleRoot = ethers.ZeroHash;
+      const merkleRoot = draftResult.merkleRoot || ethers.ZeroHash;
 
       setOnChainFeedback('⏳ Menunggu tanda tangan transaksi pendaftaran di MetaMask...');
       const tx = await contract.registerTokenLaunch(
-        derivedTokenAddress,
+        verifiedTokenAddress,
         draftResult.name,
-        draftResult.symbol,
+        draftTicker,
         totalSupplyWei,
         initialPriceWei,
         graduationThresholdWei,
@@ -206,26 +226,36 @@ export default function LaunchpadPage() {
 
         // Persist token launch to PostgreSQL SSOT via /api/launchpad/publish
         try {
-          await fetch('/api/launchpad/publish', {
+          const pubRes = await fetch('/api/launchpad/publish', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              draftId: draftResult.id,
-              contractAddress: derivedTokenAddress,
+              draftId: draftResult.id || draftResult.draftId,
+              contractAddress: verifiedTokenAddress,
               chain: targetChainKey,
               txHash: tx.hash,
               currentSupply: '1000000000',
-              graduationThreshold: 69000,
+              graduationThreshold: isDegenMode ? 2500 : 69000,
             }),
           });
+          if (!pubRes.ok) {
+            const pubErr = await pubRes.json().catch(() => ({}));
+            setOnChainFeedback(
+              `✅ Token $${draftTicker} terdaftar on-chain (Hash: ${tx.hash}), tetapi sinkronisasi SSOT gagal: ${pubErr?.error?.message || `HTTP ${pubRes.status}`}`
+            );
+            return;
+          }
           // Refresh active token fleet in UI
           fetchActiveTokens();
-        } catch {
-          // Non-blocking SSOT sync
+        } catch (pubCatchErr: any) {
+          setOnChainFeedback(
+            `✅ Token $${draftTicker} terdaftar on-chain (Hash: ${tx.hash}), tetapi sinkronisasi SSOT gagal: ${pubCatchErr?.message || 'Network error'}`
+          );
+          return;
         }
 
         setOnChainFeedback(
-          `✅ Token $${draftResult.symbol} BERHASIL DIDAFTARKAN ON-CHAIN! Blok #${receipt.blockNumber}. Hash: ${tx.hash} — Lihat di ${explorerName}: ${explorerLink}`
+          `✅ Token $${draftTicker} BERHASIL DIDAFTARKAN ON-CHAIN! Blok #${receipt.blockNumber}. Hash: ${tx.hash} — Lihat di ${explorerName}: ${explorerLink}`
         );
       } else {
         setOnChainFeedback(`❌ Transaksi gagal dieksekusi di blockchain ${chainName}.`);
@@ -258,7 +288,7 @@ export default function LaunchpadPage() {
           >
             <Users size={14} /> 👑 ANGEL DEAL ROOM
           </button>
-          {userRole === 'SYSTEM_ADMIN' && (
+          {(userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN') && (
             <span className="badge badge-admin">
               👑 LAUNCHPAD CONTROLLER ACTIVE
             </span>
@@ -274,6 +304,17 @@ export default function LaunchpadPage() {
         isOpen={isAngelModalOpen}
         onClose={() => setIsAngelModalOpen(false)}
         connectedWallet={walletAddress}
+      />
+
+      {/* Vercel-Native Creator Asset Studio & Growth Launch Pack */}
+      <CreatorStudioPanel
+        tokenName={tokenName}
+        tokenSymbol={tokenSymbol}
+        selectedChain={selectedChain}
+        onApplyIdentity={(name, ticker) => {
+          setTokenName(name);
+          setTokenSymbol(ticker);
+        }}
       />
 
       <div className="grid-2">
@@ -598,11 +639,6 @@ export default function LaunchpadPage() {
               </div>
             ) : (
               <>
-                {!isConnected ? (
-                  <div style={{ backgroundColor: 'rgba(34, 197, 94, 0.08)', border: '1px solid rgba(34, 197, 94, 0.25)', padding: '10px', borderRadius: '6px', fontSize: '12px', color: '#86EFAC', marginTop: '8px' }}>
-                    💡 Hubungkan dompet Web3 MetaMask Anda untuk membuat draft dan memvalidasi skor kurva.
-                  </div>
-                ) : null}
                 {draftError && (
                   <div style={{ backgroundColor: 'rgba(255, 23, 68, 0.1)', border: '1px solid var(--color-destructive)', padding: '10px', borderRadius: '6px', fontSize: '12px', color: 'var(--color-destructive)', marginTop: '8px' }}>
                     {draftError}
@@ -614,7 +650,7 @@ export default function LaunchpadPage() {
                   className="btn-primary"
                   style={{ padding: '14px', justifyContent: 'center', marginTop: '8px' }}
                 >
-                  {isCreating ? 'Validating Risk Passport...' : isConnected ? '🚀 Create Launch Draft' : '⚡ Connect Wallet & Create Draft'}
+                  {isCreating ? 'Validating Risk Passport...' : '🚀 Create Launch Draft'}
                 </button>
               </>
             )}
@@ -631,15 +667,15 @@ export default function LaunchpadPage() {
             <div className="bg-panel" style={{ padding: '16px', borderRadius: '6px', border: '1px solid var(--color-border)', fontSize: '12px', fontFamily: 'var(--font-mono)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                 <span className="text-muted">Draft ID:</span>
-                <span style={{ color: '#00E5FF', fontWeight: 800 }}>{draftResult.draftId}</span>
+                <span style={{ color: '#00E5FF', fontWeight: 800 }}>{draftResult.id || draftResult.draftId}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                 <span className="text-muted">Token:</span>
-                <span style={{ color: 'var(--color-accent)', fontWeight: 900 }}>{draftResult.name} (${draftResult.symbol})</span>
+                <span style={{ color: 'var(--color-accent)', fontWeight: 900 }}>{draftResult.name} (${draftResult.ticker || draftResult.symbol})</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                 <span className="text-muted">Launch Mode:</span>
-                <span style={{ color: '#D500F9', fontWeight: 800 }}>{draftResult.mode}</span>
+                <span style={{ color: '#D500F9', fontWeight: 800 }}>{draftResult.launchMode || draftResult.mode}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                 <span className="text-muted">Creator Wallet:</span>
@@ -682,6 +718,14 @@ export default function LaunchpadPage() {
                     <p style={{ fontSize: '11px', color: 'var(--color-muted)', marginBottom: '10px' }}>
                       Sebagai <strong>Protocol Admin</strong>, Anda dapat mendaftarkan token ini langsung ke smart contract <code>BondingCurveLaunchpad.sol</code> (<code>onlyOwner</code>).
                     </p>
+                    <input
+                      type="text"
+                      placeholder="Deployed ERC-20 Token Address (0x...)"
+                      value={onChainTokenAddress}
+                      onChange={(e) => setOnChainTokenAddress(e.target.value)}
+                      className="input"
+                      style={{ width: '100%', padding: '8px 10px', fontSize: '11px', fontFamily: 'var(--font-mono)', marginBottom: '8px' }}
+                    />
                     <button
                       type="button"
                       className="btn btn-primary w-full"
@@ -992,6 +1036,14 @@ export default function LaunchpadPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Admin Bounty Merkle Snapshot Console (RBAC: MANAGE_SNAPSHOTS — SUPER_ADMIN / LAUNCH_ADMIN) */}
+      {(userRole === 'SUPER_ADMIN' || userRole === 'LAUNCH_ADMIN') && (
+        <AdminMerkleSnapshotPanel
+          activeTokens={activeTokens}
+          walletAddress={walletAddress}
+        />
       )}
     </div>
   );

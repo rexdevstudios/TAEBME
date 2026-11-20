@@ -63,7 +63,12 @@ async function runSocialFiSimulation() {
   // Test 2: Social Proof Bounty Verification
   console.log('\n[2/3] Testing Social Proof Bounty Verification Engine...');
   const bountyService = new BountyEscrowService(mockDb as any);
-  const claimRes = await bountyService.submitAndVerifyClaim('camp-1', kol, 'https://x.com/cryptoking/status/123456');
+  const claimRes = await bountyService.submitAndVerifyClaim(
+    'camp-1',
+    kol,
+    'https://x.com/cryptoking/status/123456',
+    { tweetTextContent: 'Launching on Base L2 with transparent bonding curve and verified audit! #DEGEN' }
+  );
   if (claimRes.success) {
     console.log('SUCCESS: Bounty claim verified and accepted cleanly!');
   } else {

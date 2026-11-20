@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { SystemOrchestrator } from '@packages/shared/orchestrator';
 import { ModularRpcManager } from '@packages/network-registry/rpc-manager';
-import { DaytonaSandboxRunner } from '@apps/execution-plane/workers/daytona-sandbox-runner';
+import { DaytonaSandboxRunner } from '@packages/agent/daytona-sandbox-runner';
 import { FirecrawlScraperService } from '@packages/intelligence/firecrawl-scraper';
 
 import { ApiResponse } from '@packages/shared/contracts/api-contracts';

@@ -5,6 +5,7 @@
 import { CreateLaunchDraftRequest } from '../shared/contracts/api-contracts';
 import { LaunchRiskPassportService } from './risk-passport';
 import { ethers } from 'ethers';
+import { randomUUID } from 'crypto';
 
 export interface LaunchDraftDbAdapter {
   saveDraft(draft: any): Promise<string>;
@@ -157,7 +158,7 @@ export class LaunchDraftService {
       }
     }
 
-    const draftId = `draft-${Date.now()}`;
+    const draftId = randomUUID();
     const draftRecord = {
       id: draftId,
       creatorId: actorId,

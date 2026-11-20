@@ -8,7 +8,7 @@ import { ethers } from 'ethers';
 import { LaunchDraftDbAdapter } from '../launchpad/launch-draft-service';
 import { KolDbAdapter } from '../social/kol-service';
 import { BountyDbAdapter, BountyClaimItem } from '../launchpad/bounty-escrow';
-import { KolProfile, BountyCampaign, BountyClaim, UserGameFiProfile, QuestDefinition, QuestCompletion, NftItemRecord } from './types/domain';
+import { KolProfile, BountyCampaign, BountyClaim, UserGameFiProfile, QuestDefinition, QuestCompletion, NftItemRecord, NftCollectionRecord } from './types/domain';
 import { normalizeTokenIdentifier } from './token-identifier';
 import { DexPairFactoryService } from '../launchpad/dex-pair-factory';
 import { TrustEvidenceService } from '../social/trust-evidence-service';
@@ -21,7 +21,7 @@ import {
   RpcHealthStatus,
   AuditLogEntry as RpcAuditLogEntry,
 } from '../network-registry/rpc-manager';
-import { BinanceExecutionDbAdapter, TradeIntentRecord } from '../../apps/execution-plane/workers/binance-order-worker';
+import { BinanceExecutionDbAdapter, TradeIntentRecord } from '../trading/execution-types';
 import { ProposalDbAdapter, AgentProposalRecord } from '../agent/proposal-engine';
 import { DualControlDbAdapter, DualControlRequestRecord } from '../admin/dual-control';
 import { PlanId, BillingDbAdapter } from '../billing/subscriptions-engine';
@@ -33,17 +33,43 @@ declare global {
   var _rtraderPgPool: Pool | undefined;
   // eslint-disable-next-line no-var
   var _rtraderPgPoolUrl: string | undefined;
+  // eslint-disable-next-line no-var
+  var _rtraderPgPoolKey: string | undefined;
+  // eslint-disable-next-line no-var
+  var _rtraderPgDrainingPools: Set<Pool> | undefined;
+  // eslint-disable-next-line no-var
+  var _rtraderPgPoolEndPromises: Map<Pool, Promise<void>> | undefined;
 }
 
 /**
  * Returns authoritative PostgreSQL connection string for active environment.
  * - APP_ENV=testnet -> requires DATABASE_URL_TESTNET. Fails closed if missing.
- * - APP_ENV=production -> uses DATABASE_URL. Fails closed in production if missing.
- * - DEV/TEST -> resolves DATABASE_URL_TESTNET || DATABASE_URL || null.
+ * - APP_ENV=production -> uses DATABASE_URL. Fails closed if missing or in non-production runtime.
+ * - APP_ENV=development -> uses DATABASE_URL_DEV || DATABASE_URL_TESTNET || null. NEVER DATABASE_URL.
+ * - APP_ENV=test -> uses DATABASE_URL_TEST || DATABASE_URL_TESTNET || null. NEVER DATABASE_URL.
  */
 export function getDatabaseConnectionString(): string | null {
   const env = getAppEnvironment();
+  const rawNodeEnv = process.env.NODE_ENV;
+  const nodeEnv = typeof rawNodeEnv === 'string' ? rawNodeEnv.trim().toLowerCase() : undefined;
 
+  // 1. Production Environment: Only permitted when NODE_ENV=production AND APP_ENV=production
+  if (env === 'production') {
+    if (nodeEnv !== 'production') {
+      throw new Error(
+        `SECURITY_MISCONFIGURATION: Production database connection is forbidden in non-production runtime (NODE_ENV=${rawNodeEnv || 'development'}).`
+      );
+    }
+    const prodUrl = process.env.DATABASE_URL?.trim();
+    if (!prodUrl || prodUrl.includes('placeholder')) {
+      throw new Error(
+        'CRITICAL_CONFIG_ERROR: DATABASE_URL is not configured in production environment. Refusing to operate unbacked state.'
+      );
+    }
+    return prodUrl;
+  }
+
+  // 2. Testnet Environment: Requires DATABASE_URL_TESTNET unconditionally
   if (env === 'testnet') {
     const testnetUrl = process.env.DATABASE_URL_TESTNET?.trim();
     if (!testnetUrl || testnetUrl.includes('placeholder')) {
@@ -54,41 +80,239 @@ export function getDatabaseConnectionString(): string | null {
     return testnetUrl;
   }
 
-  if (env === 'production') {
-    const prodUrl = process.env.DATABASE_URL?.trim();
-    if (!prodUrl || prodUrl.includes('placeholder')) {
-      if (process.env.NODE_ENV === 'production') {
-        throw new Error(
-          'CRITICAL_CONFIG_ERROR: DATABASE_URL is not configured in production environment. Refusing to operate unbacked state.'
-        );
-      }
-      return null;
-    }
-    return prodUrl;
+  // 3. Defense-in-depth: If NODE_ENV is production, non-production environments are strictly forbidden
+  if (nodeEnv === 'production') {
+    throw new Error(
+      `SECURITY_MISCONFIGURATION: Database connection resolution for non-production environment "${env}" is forbidden in production runtime.`
+    );
   }
 
-  // Development & Test environments
-  const customUrl = process.env.DATABASE_URL_TESTNET?.trim() || process.env.DATABASE_URL?.trim();
-  if (customUrl && !customUrl.includes('placeholder')) {
-    return customUrl;
+  // 4. Development Environment (APP_ENV=development)
+  if (env === 'development') {
+    const devUrl =
+      process.env.DATABASE_URL_DEV?.trim() ||
+      process.env.DATABASE_URL_TESTNET?.trim();
+    if (devUrl && !devUrl.includes('placeholder')) {
+      return devUrl;
+    }
+    // NEVER fall back to DATABASE_URL in development!
+    return null;
+  }
+
+  // 5. Test Environment (APP_ENV=test or NODE_ENV=test)
+  if (env === 'test') {
+    const testUrl =
+      process.env.DATABASE_URL_TEST?.trim() ||
+      process.env.DATABASE_URL_TESTNET?.trim();
+    if (testUrl && !testUrl.includes('placeholder')) {
+      return testUrl;
+    }
+    // NEVER fall back to DATABASE_URL in test!
+    return null;
   }
 
   return null;
 }
 
+function getDrainingPoolsRegistry(): Set<Pool> {
+  if (!global._rtraderPgDrainingPools) {
+    global._rtraderPgDrainingPools = new Set<Pool>();
+  }
+  return global._rtraderPgDrainingPools;
+}
+
+function getPoolEndPromisesMap(): Map<Pool, Promise<void>> {
+  if (!global._rtraderPgPoolEndPromises) {
+    global._rtraderPgPoolEndPromises = new Map<Pool, Promise<void>>();
+  }
+  return global._rtraderPgPoolEndPromises;
+}
+
 /**
- * Reset singleton connection pool (useful for test fixture isolation).
+ * Safe error code allowlist for database pool lifecycle logging.
+ * NEVER prints raw error messages, URLs, hostnames, usernames, or parameters.
+ */
+const SAFE_POOL_ERROR_CODES = new Set([
+  'CONNECTION_TIMEOUT',
+  'SOCKET_HANGUP',
+  'ETIMEDOUT',
+  'ECONNRESET',
+  'ECONNREFUSED',
+  'EPIPE',
+  'EHOSTUNREACH',
+  'ENETUNREACH',
+  'ERR_SOCKET_CLOSED',
+]);
+
+/**
+ * Sanitizes an error into an allowlisted categorical error tag.
+ * Guaranteed to never expose hostnames, IPs, usernames, passwords, or query strings.
+ */
+export function sanitizePoolErrorTag(err: unknown): string {
+  if (!err) return 'POOL_DRAIN_ERROR';
+
+  const code = (err as Record<string, unknown>)?.code;
+  if (typeof code === 'string') {
+    const normalized = code.trim().toUpperCase();
+    if (SAFE_POOL_ERROR_CODES.has(normalized)) {
+      return normalized;
+    }
+  }
+
+  const name = (err as Record<string, unknown>)?.name;
+  if (typeof name === 'string') {
+    const normalizedName = name.trim();
+    if (normalizedName === 'TimeoutError') return 'CONNECTION_TIMEOUT';
+    if (normalizedName === 'AbortError') return 'ABORT_ERROR';
+  }
+
+  return 'POOL_DRAIN_ERROR';
+}
+
+/**
+ * Emits a strictly sanitized warning for detached pool teardown.
+ * Suppresses expected "Called end on pool more than once" double-end errors.
+ */
+function logSanitizedPoolTeardownWarning(err: unknown): void {
+  const errMsg = (err instanceof Error) ? err.message : String(err);
+  if (errMsg.includes('Called end on pool more than once')) {
+    return; // harmless double-end call
+  }
+  if (process.env.NODE_ENV !== 'test') {
+    const errorTag = sanitizePoolErrorTag(err);
+    console.warn(`[Postgres SSOT Pool Teardown Warning]: ${errorTag}`);
+  }
+}
+
+/**
+ * Initiates graceful background shutdown of a retired pool instance.
+ * - Deduplicates pool.end() execution per Pool instance.
+ * - Preserves the UNTOUCHED underlying Promise in _rtraderPgPoolEndPromises for awaited callers.
+ * - Attaches a detached rejection handler immediately to prevent unhandled promise rejections.
+ * - Removes pool from registry and promise map when settled.
+ */
+function drainRetiredPool(pool: Pool): Promise<void> {
+  const registry = getDrainingPoolsRegistry();
+  const promiseMap = getPoolEndPromisesMap();
+  registry.add(pool);
+
+  if (promiseMap.has(pool)) {
+    return promiseMap.get(pool)!;
+  }
+
+  let rawEndPromise: Promise<void>;
+  try {
+    const result = pool.end();
+    if (result && typeof (result as Promise<void>).then === 'function') {
+      rawEndPromise = result as Promise<void>;
+    } else {
+      rawEndPromise = Promise.resolve();
+    }
+  } catch (syncErr: unknown) {
+    rawEndPromise = Promise.reject(syncErr);
+  }
+
+  // Deduplicate using the raw, unadulterated promise
+  promiseMap.set(pool, rawEndPromise);
+
+  // Attach detached rejection handler immediately so detached callers never trigger UnhandledPromiseRejection.
+  // This does NOT mutate rawEndPromise for awaited callers.
+  rawEndPromise
+    .catch((err: unknown) => {
+      logSanitizedPoolTeardownWarning(err);
+    })
+    .finally(() => {
+      registry.delete(pool);
+      promiseMap.delete(pool);
+    });
+
+  return rawEndPromise;
+}
+
+/**
+ * Reset singleton connection pool synchronously (useful for test fixture isolation).
+ * Initiates safe background draining of the active pool without blocking synchronous callers.
  */
 export function resetDbPool(): void {
   if (global._rtraderPgPool) {
-    try {
-      global._rtraderPgPool.end();
-    } catch {
-      /* ignore */
-    }
+    const poolToRetire = global._rtraderPgPool;
     global._rtraderPgPool = undefined;
     global._rtraderPgPoolUrl = undefined;
+    global._rtraderPgPoolKey = undefined;
+    drainRetiredPool(poolToRetire);
   }
+}
+
+export interface PoolCloseResult {
+  pool: Pool;
+  status: 'fulfilled' | 'rejected';
+  errorTag?: string;
+}
+
+export interface PoolTeardownSummary {
+  total: number;
+  closed: number;
+  failed: number;
+  results: PoolCloseResult[];
+}
+
+/**
+ * Deterministically closes the active pool and awaits completion of all in-flight draining pools
+ * captured at snapshot invocation time.
+ *
+ * Snapshot Teardown Semantics:
+ * 1. Snapshot Boundary: Captures active pool (if present) and all currently draining pools in registry.
+ * 2. Active Pool Unset: Atomically unsets global active singleton references immediately.
+ * 3. Outcome Preservation: Awaits the raw underlying pool.end() promises via Promise.allSettled().
+ *    Failures are NEVER converted into silent successes.
+ * 4. Structured Return Contract: Returns a PoolTeardownSummary containing total, closed, failed counts,
+ *    and sanitized categorical error tags per pool.
+ * 5. Concurrent / Future Invocations: Pools retired AFTER this snapshot is captured are tracked in subsequent
+ *    registry snapshots and not awaited by this call. A replacement pool created concurrently remains active.
+ */
+export async function closeDbPoolAsync(): Promise<PoolTeardownSummary> {
+  const registry = getDrainingPoolsRegistry();
+  const poolsToClose: Pool[] = Array.from(registry);
+
+  if (global._rtraderPgPool) {
+    const active = global._rtraderPgPool;
+    global._rtraderPgPool = undefined;
+    global._rtraderPgPoolUrl = undefined;
+    global._rtraderPgPoolKey = undefined;
+    if (!poolsToClose.includes(active)) {
+      poolsToClose.push(active);
+    }
+  }
+
+  const settledResults = await Promise.allSettled(poolsToClose.map((p) => drainRetiredPool(p)));
+
+  const results: PoolCloseResult[] = [];
+  let closed = 0;
+  let failed = 0;
+
+  for (let i = 0; i < poolsToClose.length; i++) {
+    const pool = poolsToClose[i];
+    const settled = settledResults[i];
+
+    if (settled.status === 'fulfilled') {
+      closed++;
+      results.push({ pool, status: 'fulfilled' });
+    } else {
+      failed++;
+      results.push({
+        pool,
+        status: 'rejected',
+        errorTag: sanitizePoolErrorTag(settled.reason),
+      });
+    }
+  }
+
+  return {
+    total: poolsToClose.length,
+    closed,
+    failed,
+    results,
+  };
 }
 
 /**
@@ -181,32 +405,44 @@ export function getDbPool(): Pool | null {
   const connectionString = getDatabaseConnectionString();
 
   if (connectionString) {
-    if (!global._rtraderPgPool || global._rtraderPgPoolUrl !== connectionString) {
+    const env = getAppEnvironment();
+    const [poolConnectionString, sslConfig] = resolvePoolSslConfig(connectionString);
+    const poolKey = `${env}:${connectionString}:${JSON.stringify(sslConfig)}`;
+
+    if (!global._rtraderPgPool || global._rtraderPgPoolKey !== poolKey) {
       if (global._rtraderPgPool) {
-        try {
-          global._rtraderPgPool.end();
-        } catch {
-          /* ignore */
-        }
+        const poolToRetire = global._rtraderPgPool;
+        global._rtraderPgPool = undefined;
+        global._rtraderPgPoolUrl = undefined;
+        global._rtraderPgPoolKey = undefined;
+        drainRetiredPool(poolToRetire);
       }
 
-      const [poolConnectionString, sslConfig] = resolvePoolSslConfig(connectionString);
+      try {
+        const newPool = new Pool({
+          connectionString: poolConnectionString,
+          max: 5,
+          idleTimeoutMillis: 10000,
+          connectionTimeoutMillis: 15000,
+          ssl: sslConfig,
+        });
 
-      global._rtraderPgPool = new Pool({
-        connectionString: poolConnectionString,
-        max: 5,
-        idleTimeoutMillis: 10000,
-        connectionTimeoutMillis: 15000,
-        ssl: sslConfig,
-      });
+        newPool.on('error', (err) => {
+          console.error('[Postgres SSOT Pool Error]:', err.message);
+        });
 
-      // Cache key uses the ORIGINAL raw connectionString (with env params intact)
-      // so environment isolation and singleton reset continue to work correctly.
-      global._rtraderPgPoolUrl = connectionString;
-
-      global._rtraderPgPool.on('error', (err) => {
-        console.error('[Postgres SSOT Pool Error]:', err.message);
-      });
+        // Cache key uses environment, raw connectionString, and TLS config
+        // so environment isolation, SSL transitions, and singleton reset continue to work correctly.
+        global._rtraderPgPool = newPool;
+        global._rtraderPgPoolUrl = connectionString;
+        global._rtraderPgPoolKey = poolKey;
+      } catch (err) {
+        // Failed initialization does not leave an invalid cached pool
+        global._rtraderPgPool = undefined;
+        global._rtraderPgPoolUrl = undefined;
+        global._rtraderPgPoolKey = undefined;
+        throw err;
+      }
     }
     return global._rtraderPgPool;
   }
@@ -1870,7 +2106,12 @@ export class PostgresBountyDbAdapter implements BountyDbAdapter {
           FROM bounty_claims bc
           JOIN bounty_campaigns c ON c.id = bc.campaign_id
           LEFT JOIN kol_profiles kp ON (kp.id = bc.kol_id OR kp.user_id = bc.kol_id)
-          LEFT JOIN wallets w ON w.user_id = kp.user_id
+          LEFT JOIN LATERAL (
+            SELECT address FROM wallets
+            WHERE user_id = kp.user_id AND chain_type = 'EVM'
+            ORDER BY is_primary DESC, created_at ASC, id ASC
+            LIMIT 1
+          ) w ON true
           WHERE bc.verification_status IN ('VERIFIED', 'CLAIMED')
         `;
         const params: any[] = [];
@@ -1878,6 +2119,8 @@ export class PostgresBountyDbAdapter implements BountyDbAdapter {
           params.push(campaignId);
           queryText += ` AND bc.campaign_id = $1`;
         }
+
+        queryText += ` ORDER BY COALESCE(w.address, kp.user_id::text, bc.kol_id::text) ASC, bc.created_at DESC, bc.id ASC`;
 
         const res = await pool.query(queryText, params);
         if (res.rows.length > 0) {
@@ -3463,26 +3706,49 @@ export const defaultBinanceExecutionDbAdapter = new PostgresBinanceExecutionDbAd
 const inMemoryGameFiProfiles = new Map<string, UserGameFiProfile>();
 const inMemoryQuestCompletions: QuestCompletion[] = [];
 const inMemoryNftItems: NftItemRecord[] = [];
+const inMemoryNftCollections: NftCollectionRecord[] = [];
 const inMemorySybilRegistry = new Set<string>();
 const inMemoryTradeRegistry = new Set<string>();
 
 export class PostgresGameFiDbAdapter {
   private poolOverride?: Pool | null;
+  private isExplicitInMemory: boolean = false;
 
-  constructor(poolOverride?: Pool | null) {
+  constructor(poolOverride?: Pool | null, isExplicitInMemory: boolean = false) {
     this.poolOverride = poolOverride;
+    this.isExplicitInMemory = isExplicitInMemory;
+  }
+
+  setExplicitInMemory(enabled: boolean): void {
+    this.isExplicitInMemory = enabled;
   }
 
   private getPool(): Pool | null {
-    return this.poolOverride !== undefined ? this.poolOverride : getDbPool();
+    if (this.isExplicitInMemory) return null;
+    if (this.poolOverride !== undefined) return this.poolOverride;
+    try {
+      return getDbPool();
+    } catch (err) {
+      if (process.env.NODE_ENV === 'production') throw err;
+      return null;
+    }
   }
 
   clearInMemoryStores(): void {
     inMemoryGameFiProfiles.clear();
     inMemoryQuestCompletions.length = 0;
     inMemoryNftItems.length = 0;
+    inMemoryNftCollections.length = 0;
     inMemorySybilRegistry.clear();
     inMemoryTradeRegistry.clear();
+  }
+
+  setMockCollection(collection: NftCollectionRecord): void {
+    const idx = inMemoryNftCollections.findIndex(
+      (c) => c.chain === collection.chain && c.name.toLowerCase() === collection.name.toLowerCase()
+    );
+    if (idx >= 0) inMemoryNftCollections[idx] = collection;
+    else inMemoryNftCollections.push(collection);
   }
 
   setMockSybilEvidence(identifier: string, verified: boolean): void {
@@ -3765,6 +4031,70 @@ export class PostgresGameFiDbAdapter {
     const created: NftItemRecord = { ...item, id: itemId, mintedAt: now };
     inMemoryNftItems.push(created);
     return created;
+  }
+
+  async getCollectionByChainAndName(chain: string, name: string): Promise<NftCollectionRecord | null> {
+    if (this.isExplicitInMemory) {
+      const matches = inMemoryNftCollections.filter(
+        (c) => c.chain === chain && c.name.toLowerCase() === name.toLowerCase() && (c.isActive !== false)
+      );
+      if (matches.length > 1) {
+        throw new Error(
+          `AMBIGUOUS_COLLECTION_REGISTRY: Multiple active collections found for chain "${chain}" and name "${name}". Found ${matches.length} records. Aborting to prevent split-brain execution.`
+        );
+      }
+      return matches[0] || null;
+    }
+
+    let pool: Pool | null = null;
+    try {
+      pool = this.getPool();
+    } catch (poolErr: any) {
+      throw new Error(`DATABASE_UNAVAILABLE: Database connection pool failure: ${poolErr?.message || poolErr}`);
+    }
+
+    if (!pool) {
+      throw new Error(
+        'DATABASE_UNAVAILABLE: PostgreSQL connection pool is unconfigured or unavailable. PostgreSQL SSOT collection resolution failed closed.'
+      );
+    }
+
+    try {
+      const res = await pool.query(
+        `SELECT id, name, symbol, contract_address as "contractAddress", chain, is_active as "isActive", max_supply as "maxSupply", created_at as "createdAt"
+         FROM nft_collections
+         WHERE chain = $1 AND LOWER(name) = LOWER($2) AND is_active = true`,
+        [chain, name]
+      );
+
+      if (res.rows.length === 0) {
+        return null;
+      }
+
+      if (res.rows.length > 1) {
+        throw new Error(
+          `AMBIGUOUS_COLLECTION_REGISTRY: Multiple active collections found for chain "${chain}" and name "${name}". Found ${res.rows.length} records. Aborting to prevent split-brain execution.`
+        );
+      }
+
+      const r = res.rows[0];
+      return {
+        id: r.id,
+        name: r.name,
+        symbol: r.symbol,
+        contractAddress: r.contractAddress || undefined,
+        chain: r.chain,
+        isActive: r.isActive,
+        maxSupply: Number(r.maxSupply),
+        createdAt: r.createdAt,
+      };
+    } catch (err: any) {
+      if (err.message && err.message.startsWith('AMBIGUOUS_COLLECTION_REGISTRY')) {
+        throw err;
+      }
+      console.error('[PostgresGameFiDbAdapter] getCollectionByChainAndName query error:', err?.message || err);
+      throw new Error(`DATABASE_UNAVAILABLE: Failed to query PostgreSQL collection registry: ${err?.message || err}`);
+    }
   }
 }
 
@@ -4218,3 +4548,673 @@ export class PostgresDualControlDbAdapter implements DualControlDbAdapter {
 export const defaultDualControlDbAdapter = new PostgresDualControlDbAdapter();
 
 
+// ============================================================================
+// B3.2 — POSTGRESQL BOUNTY MERKLE SNAPSHOT DB ADAPTER
+// ============================================================================
+//
+// Implements BountyMerkleSnapshotDbAdapter from bounty-merkle-snapshot-service.ts.
+// All DB calls use getDbPool() — fail-closed: throws DATABASE_UNAVAILABLE if pool absent.
+// No live transaction signing or broadcasting occurs here (B3.3 scope).
+// ============================================================================
+
+import {
+  BountyMerkleSnapshotDbAdapter,
+  BountyMerkleSnapshotRecord,
+  BountyMerkleRecipientRecord,
+  BountyMerkleAllocationRecord,
+  BountyMerkleAuditLogRecord,
+  VerifiedClaimSourceItem,
+  TokenLaunchInfo,
+} from '../launchpad/bounty-merkle-snapshot-service';
+
+class PostgresBountyMerkleSnapshotDbAdapter implements BountyMerkleSnapshotDbAdapter {
+  private requirePool(): import('pg').Pool {
+    const pool = getDbPool();
+    if (!pool) throw new Error('DATABASE_UNAVAILABLE: PostgreSQL pool is not initialised');
+    return pool;
+  }
+
+  async getLaunch(launchId: string): Promise<TokenLaunchInfo | null> {
+    const pool = this.requirePool();
+    const res = await pool.query<{
+      id: string;
+      chain_id: string;
+      network_id: string;
+      contract_address: string;
+      token_address: string;
+      name: string | null;
+      symbol: string | null;
+    }>(
+      `SELECT
+         id,
+         COALESCE(chain_id::text, '8453') AS chain_id,
+         COALESCE(network_id, 'base-mainnet') AS network_id,
+         COALESCE(contract_address, '') AS contract_address,
+         COALESCE(token_address, contract_address, '') AS token_address,
+         name,
+         symbol
+       FROM token_launches
+       WHERE id = $1
+       LIMIT 1`,
+      [launchId]
+    );
+    if (res.rows.length === 0) return null;
+    const r = res.rows[0];
+    return {
+      id: r.id,
+      chainId: BigInt(r.chain_id),
+      networkId: r.network_id,
+      contractAddress: r.contract_address,
+      tokenAddress: r.token_address || r.contract_address,
+      name: r.name ?? undefined,
+      symbol: r.symbol ?? undefined,
+    };
+  }
+
+  async getVerifiedClaims(launchId: string, campaignId?: string): Promise<VerifiedClaimSourceItem[]> {
+    const pool = this.requirePool();
+    const params: unknown[] = [launchId];
+    let campaignFilter = '';
+    if (campaignId) {
+      params.push(campaignId);
+      campaignFilter = `AND bc.id = $${params.length}`;
+    }
+    const res = await pool.query<{
+      claim_id: string;
+      campaign_id: string;
+      launch_id: string;
+      kol_id: string;
+      claimant_wallet_id: string;
+      claimant_wallet: string;
+      allocated_amount: string;
+      reward_per_kol: string;
+      verification_status: string;
+    }>(
+      `SELECT
+         bcl.id AS claim_id,
+         bc.id AS campaign_id,
+         bc.launch_id,
+         bcl.kol_id,
+         COALESCE(bcl.kol_id, bcl.id) AS claimant_wallet_id,
+         COALESCE(kp.wallet_address, bcl.kol_id) AS claimant_wallet,
+         bc.reward_per_kol::text AS allocated_amount,
+         bc.reward_per_kol::text AS reward_per_kol,
+         bcl.verification_status
+       FROM bounty_claims bcl
+       JOIN bounty_campaigns bc ON bc.id = bcl.campaign_id
+       LEFT JOIN kol_profiles kp ON kp.id = bcl.kol_id
+       WHERE bc.launch_id = $1
+         AND bcl.verification_status = 'VERIFIED'
+         ${campaignFilter}`,
+      params
+    );
+    return res.rows.map((r) => ({
+      claimId: r.claim_id,
+      campaignId: r.campaign_id,
+      launchId: r.launch_id,
+      kolId: r.kol_id,
+      claimantWalletId: r.claimant_wallet_id,
+      claimantWallet: r.claimant_wallet,
+      allocatedAmount: BigInt(r.allocated_amount),
+      campaignRewardPerKol: BigInt(r.reward_per_kol),
+      verificationStatus: 'VERIFIED' as const,
+    }));
+  }
+
+  async findSnapshotByIdempotencyKey(key: string): Promise<BountyMerkleSnapshotRecord | null> {
+    const pool = this.requirePool();
+    const res = await pool.query(
+      `SELECT * FROM bounty_merkle_snapshots WHERE idempotency_key = $1 LIMIT 1`,
+      [key]
+    );
+    if (res.rows.length === 0) return null;
+    return this._rowToSnapshotRecord(res.rows[0]);
+  }
+
+  async getActivePublishedSnapshot(
+    tokenAddress: string,
+    chainId?: bigint,
+    contractAddress?: string
+  ): Promise<BountyMerkleSnapshotRecord | null> {
+    const pool = this.requirePool();
+    const params: unknown[] = [tokenAddress.toLowerCase()];
+    let extra = '';
+    if (chainId !== undefined) {
+      params.push(chainId.toString());
+      extra += ` AND chain_id = $${params.length}`;
+    }
+    if (contractAddress) {
+      params.push(contractAddress.toLowerCase());
+      extra += ` AND LOWER(contract_address) = $${params.length}`;
+    }
+    const res = await pool.query(
+      `SELECT * FROM bounty_merkle_snapshots
+       WHERE LOWER(token_address) = $1
+         AND status = 'PUBLISHED'
+         ${extra}
+       ORDER BY version DESC
+       LIMIT 1`,
+      params
+    );
+    if (res.rows.length === 0) return null;
+    return this._rowToSnapshotRecord(res.rows[0]);
+  }
+
+  async getLatestSnapshotVersion(
+    chainId: bigint,
+    contractAddress: string,
+    tokenAddress: string,
+    campaignId?: string | null
+  ): Promise<number> {
+    const pool = this.requirePool();
+    const params: unknown[] = [chainId.toString(), contractAddress.toLowerCase(), tokenAddress.toLowerCase()];
+    let campaignFilter = 'AND campaign_id IS NULL';
+    if (campaignId !== undefined && campaignId !== null) {
+      params.push(campaignId);
+      campaignFilter = `AND campaign_id = $${params.length}`;
+    }
+    const res = await pool.query<{ max_version: string | null }>(
+      `SELECT MAX(version) AS max_version
+       FROM bounty_merkle_snapshots
+       WHERE chain_id = $1
+         AND LOWER(contract_address) = $2
+         AND LOWER(token_address) = $3
+         ${campaignFilter}`,
+      params
+    );
+    return Number(res.rows[0]?.max_version ?? 0) + 1;
+  }
+
+  async createDraftSnapshotTransaction(params: {
+    snapshot: BountyMerkleSnapshotRecord;
+    recipients: BountyMerkleRecipientRecord[];
+    allocations: BountyMerkleAllocationRecord[];
+    auditLog?: BountyMerkleAuditLogRecord;
+  }): Promise<BountyMerkleSnapshotRecord> {
+    const pool = this.requirePool();
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // 1. Insert snapshot header
+      await client.query(
+        `INSERT INTO bounty_merkle_snapshots (
+           id, launch_id, campaign_id, network_id, chain_id, contract_address, token_address,
+           version, snapshot_type, total_reward_tokens, total_recipients, total_claims_count,
+           merkle_root, tree_depth, leaf_encoding_version, tree_algorithm, pair_hashing_convention,
+           leaf_sorting_rule, proof_format_version, status, idempotency_key, created_by,
+           created_at, updated_at
+         ) VALUES (
+           $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,NOW(),NOW()
+         )`,
+        [
+          params.snapshot.id,
+          params.snapshot.launch_id,
+          params.snapshot.campaign_id ?? null,
+          params.snapshot.network_id,
+          params.snapshot.chain_id.toString(),
+          params.snapshot.contract_address,
+          params.snapshot.token_address,
+          params.snapshot.version,
+          params.snapshot.snapshot_type,
+          params.snapshot.total_reward_tokens.toString(),
+          params.snapshot.total_recipients,
+          params.snapshot.total_claims_count,
+          params.snapshot.merkle_root ?? null,
+          params.snapshot.tree_depth ?? null,
+          params.snapshot.leaf_encoding_version,
+          params.snapshot.tree_algorithm,
+          params.snapshot.pair_hashing_convention,
+          params.snapshot.leaf_sorting_rule,
+          params.snapshot.proof_format_version,
+          params.snapshot.status,
+          params.snapshot.idempotency_key ?? null,
+          params.snapshot.created_by ?? null,
+        ]
+      );
+
+      // 2. Bulk-insert recipients
+      for (const r of params.recipients) {
+        await client.query(
+          `INSERT INTO bounty_merkle_snapshot_recipients (
+             id, snapshot_id, kol_id, claimant_wallet_id, claimant_wallet,
+             token_amount, leaf_index, leaf_hash, merkle_proof, created_at
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW())`,
+          [
+            r.id,
+            r.snapshot_id,
+            r.kol_id,
+            r.claimant_wallet_id,
+            r.claimant_wallet,
+            r.token_amount.toString(),
+            r.leaf_index ?? null,
+            r.leaf_hash ?? null,
+            r.merkle_proof ? JSON.stringify(r.merkle_proof) : null,
+          ]
+        );
+      }
+
+      // 3. Bulk-insert allocations
+      for (const a of params.allocations) {
+        await client.query(
+          `INSERT INTO bounty_merkle_snapshot_allocations (
+             id, snapshot_id, launch_id, campaign_id, claim_id, recipient_id, kol_id,
+             allocated_amount, created_at
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW())`,
+          [
+            a.id,
+            a.snapshot_id,
+            a.launch_id,
+            a.campaign_id,
+            a.claim_id,
+            a.recipient_id,
+            a.kol_id,
+            a.allocated_amount.toString(),
+          ]
+        );
+      }
+
+      // 4. Optional audit log
+      if (params.auditLog) {
+        await this._insertAuditLog(client, params.auditLog);
+      }
+
+      await client.query('COMMIT');
+
+      // Return fresh copy from DB
+      const saved = await pool.query(`SELECT * FROM bounty_merkle_snapshots WHERE id = $1`, [params.snapshot.id]);
+      return this._rowToSnapshotRecord(saved.rows[0]);
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  async rollbackDraftSnapshotTransaction(idempotencyKey?: string | null): Promise<void> {
+    if (!idempotencyKey) return;
+    const pool = this.requirePool();
+    // Only deletes DRAFT snapshots with the given idempotency key.
+    // Finalized/Published snapshots are protected by fn_prevent_physical_delete trigger.
+    await pool.query(
+      `DELETE FROM bounty_merkle_snapshots
+       WHERE idempotency_key = $1 AND status = 'DRAFT'`,
+      [idempotencyKey]
+    );
+  }
+
+  async getSnapshot(snapshotId: string): Promise<BountyMerkleSnapshotRecord | null> {
+    const pool = this.requirePool();
+    const res = await pool.query(`SELECT * FROM bounty_merkle_snapshots WHERE id = $1`, [snapshotId]);
+    if (res.rows.length === 0) return null;
+    return this._rowToSnapshotRecord(res.rows[0]);
+  }
+
+  async getSnapshotRecipients(snapshotId: string): Promise<BountyMerkleRecipientRecord[]> {
+    const pool = this.requirePool();
+    const res = await pool.query(
+      `SELECT * FROM bounty_merkle_snapshot_recipients WHERE snapshot_id = $1 ORDER BY leaf_index ASC NULLS LAST`,
+      [snapshotId]
+    );
+    return res.rows.map((r) => ({
+      id: r.id,
+      snapshot_id: r.snapshot_id,
+      kol_id: r.kol_id,
+      claimant_wallet_id: r.claimant_wallet_id,
+      claimant_wallet: r.claimant_wallet,
+      token_amount: BigInt(r.token_amount),
+      leaf_index: r.leaf_index ?? null,
+      leaf_hash: r.leaf_hash ?? null,
+      merkle_proof: r.merkle_proof ? (typeof r.merkle_proof === 'string' ? JSON.parse(r.merkle_proof) : r.merkle_proof) : null,
+      created_at: r.created_at,
+    }));
+  }
+
+  async getSnapshotAllocations(snapshotId: string): Promise<BountyMerkleAllocationRecord[]> {
+    const pool = this.requirePool();
+    const res = await pool.query(
+      `SELECT * FROM bounty_merkle_snapshot_allocations WHERE snapshot_id = $1`,
+      [snapshotId]
+    );
+    return res.rows.map((r) => ({
+      id: r.id,
+      snapshot_id: r.snapshot_id,
+      launch_id: r.launch_id,
+      campaign_id: r.campaign_id,
+      claim_id: r.claim_id,
+      recipient_id: r.recipient_id,
+      kol_id: r.kol_id,
+      allocated_amount: BigInt(r.allocated_amount),
+      created_at: r.created_at,
+    }));
+  }
+
+  async finalizeSnapshotTransaction(params: {
+    snapshotId: string;
+    merkleRoot: string;
+    treeDepth: number;
+    recipientsWithProofs: { id: string; leafIndex: number; leafHash: string; merkleProof: string[] }[];
+    finalizedBy?: string;
+    finalizedAt?: Date;
+    auditLog?: BountyMerkleAuditLogRecord;
+  }): Promise<BountyMerkleSnapshotRecord> {
+    const pool = this.requirePool();
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // 1. Update recipient rows with leaf proofs FIRST while parent snapshot is still DRAFT
+      // (SQL trigger trg_bmsr_mutation_guard rejects detail mutations once status != 'DRAFT')
+      for (const rp of params.recipientsWithProofs) {
+        await client.query(
+          `UPDATE bounty_merkle_snapshot_recipients
+           SET leaf_index = $2, leaf_hash = $3, merkle_proof = $4
+           WHERE id = $1`,
+          [rp.id, rp.leafIndex, rp.leafHash, JSON.stringify(rp.merkleProof)]
+        );
+      }
+
+      // 2. Seal snapshot header to FINALIZED (triggers fn_bms_finalization_check)
+      await client.query(
+        `UPDATE bounty_merkle_snapshots
+         SET status = 'FINALIZED',
+             merkle_root = $2,
+             tree_depth = $3,
+             finalized_by = $4,
+             finalized_at = $5,
+             updated_at = NOW()
+         WHERE id = $1`,
+        [
+          params.snapshotId,
+          params.merkleRoot,
+          params.treeDepth,
+          params.finalizedBy ?? null,
+          params.finalizedAt ?? new Date(),
+        ]
+      );
+
+      // 3. Audit log
+      if (params.auditLog) {
+        await this._insertAuditLog(client, params.auditLog);
+      }
+
+      await client.query('COMMIT');
+
+      const updated = await pool.query(`SELECT * FROM bounty_merkle_snapshots WHERE id = $1`, [params.snapshotId]);
+      return this._rowToSnapshotRecord(updated.rows[0]);
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  async markSnapshotPublished(
+    snapshotId: string,
+    txHash: string,
+    options?: { confirmedBlockNumber?: bigint; confirmedRoot?: string; publishedBy?: string | null; auditLog?: BountyMerkleAuditLogRecord }
+  ): Promise<BountyMerkleSnapshotRecord> {
+    const pool = this.requirePool();
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const snapRes = await client.query(
+        `SELECT * FROM bounty_merkle_snapshots WHERE id = $1 FOR UPDATE`,
+        [snapshotId]
+      );
+      if (snapRes.rows.length === 0) {
+        throw new Error(`SNAPSHOT_NOT_FOUND: Snapshot ${snapshotId} does not exist`);
+      }
+      const snap = snapRes.rows[0];
+      if (snap.status !== 'FINALIZED') {
+        throw new Error(`INVALID_STATUS_TRANSITION: Cannot publish snapshot in status ${snap.status}`);
+      }
+
+      // Supersede any prior PUBLISHED snapshot for the same (chain_id, contract_address, token_address)
+      // to satisfy partial unique index uq_bms_single_active_published.
+      await client.query(
+        `UPDATE bounty_merkle_snapshots
+         SET status = 'SUPERSEDED', updated_at = NOW()
+         WHERE id != $1
+           AND chain_id = $2
+           AND LOWER(contract_address) = LOWER($3)
+           AND LOWER(token_address) = LOWER($4)
+           AND status = 'PUBLISHED'`,
+        [snapshotId, snap.chain_id, snap.contract_address, snap.token_address]
+      );
+
+      await client.query(
+        `UPDATE bounty_merkle_snapshots
+         SET status = 'PUBLISHED',
+             publication_tx_hash = $2,
+             confirmed_block_number = $3,
+             confirmed_root = $4,
+             published_by = $5,
+             published_at = NOW(),
+             publication_status = 'CONFIRMED',
+             finality_status = 'SEQUENCER_CONFIRMED',
+             updated_at = NOW()
+         WHERE id = $1`,
+        [
+          snapshotId,
+          txHash,
+          options?.confirmedBlockNumber !== undefined ? options.confirmedBlockNumber.toString() : null,
+          options?.confirmedRoot ?? snap.merkle_root ?? null,
+          options?.publishedBy ?? null,
+        ]
+      );
+
+      if (options?.auditLog) {
+        await this._insertAuditLog(client, options.auditLog);
+      }
+
+      await client.query('COMMIT');
+
+      const updated = await pool.query(`SELECT * FROM bounty_merkle_snapshots WHERE id = $1`, [snapshotId]);
+      return this._rowToSnapshotRecord(updated.rows[0]);
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  async listActivePublishedSnapshots(networkId?: string): Promise<
+    Array<{
+      id: string;
+      token_address: string;
+      contract_address: string;
+      network_id: string;
+      chain_id: bigint;
+      merkle_root: string;
+      confirmed_block_number: bigint | null;
+    }>
+  > {
+    const pool = this.requirePool();
+    const res = networkId
+      ? await pool.query(
+          `SELECT id, token_address, contract_address, network_id, chain_id, merkle_root, confirmed_block_number
+           FROM bounty_merkle_snapshots
+           WHERE status = 'PUBLISHED' AND merkle_root IS NOT NULL AND network_id = $1
+           ORDER BY published_at DESC`,
+          [networkId]
+        )
+      : await pool.query(
+          `SELECT id, token_address, contract_address, network_id, chain_id, merkle_root, confirmed_block_number
+           FROM bounty_merkle_snapshots
+           WHERE status = 'PUBLISHED' AND merkle_root IS NOT NULL
+           ORDER BY published_at DESC`
+        );
+
+    return res.rows.map((r: any) => ({
+      id: r.id,
+      token_address: r.token_address,
+      contract_address: r.contract_address,
+      network_id: r.network_id,
+      chain_id: BigInt(r.chain_id),
+      merkle_root: r.merkle_root,
+      confirmed_block_number: r.confirmed_block_number != null ? BigInt(r.confirmed_block_number) : null,
+    }));
+  }
+
+  async markSnapshotReorgDetected(snapshotId: string, reason: string): Promise<void> {
+    const pool = this.requirePool();
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const cur = await client.query(
+        `SELECT status FROM bounty_merkle_snapshots WHERE id = $1 FOR UPDATE`,
+        [snapshotId]
+      );
+      if (cur.rows.length === 0) {
+        throw new Error(`SNAPSHOT_NOT_FOUND: Snapshot ${snapshotId} does not exist`);
+      }
+      if (cur.rows[0].status !== 'PUBLISHED') {
+        throw new Error(
+          `INVALID_TRANSITION: markSnapshotReorgDetected requires snapshot.status = PUBLISHED (got ${cur.rows[0].status})`
+        );
+      }
+
+      await client.query(
+        `UPDATE bounty_merkle_snapshots
+         SET status = 'REORG_DETECTED', updated_at = NOW()
+         WHERE id = $1`,
+        [snapshotId]
+      );
+
+      await client.query(
+        `INSERT INTO bounty_merkle_audit_logs (
+           snapshot_id, event_type, event_source, old_state, new_state, metadata, severity, created_at
+         ) VALUES ($1, 'REORG_DETECTED', 'VERCEL_CRON_SWEEPER', $2, $3, $4, 'CRITICAL', NOW())`,
+        [
+          snapshotId,
+          JSON.stringify({ status: 'PUBLISHED' }),
+          JSON.stringify({ status: 'REORG_DETECTED' }),
+          JSON.stringify({ reason }),
+        ]
+      );
+
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  async abandonSnapshotTransaction(params: {
+    snapshotId: string;
+    reason: string;
+    abandonedBy?: string;
+    auditLog?: BountyMerkleAuditLogRecord;
+  }): Promise<BountyMerkleSnapshotRecord> {
+    const pool = this.requirePool();
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      await client.query(
+        `UPDATE bounty_merkle_snapshots
+         SET status = 'ABANDONED', updated_at = NOW()
+         WHERE id = $1`,
+        [params.snapshotId]
+      );
+
+      if (params.auditLog) {
+        await this._insertAuditLog(client, params.auditLog);
+      }
+
+      await client.query('COMMIT');
+
+      const updated = await pool.query(`SELECT * FROM bounty_merkle_snapshots WHERE id = $1`, [params.snapshotId]);
+      return this._rowToSnapshotRecord(updated.rows[0]);
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  async createAuditLog(auditLog: BountyMerkleAuditLogRecord): Promise<void> {
+    const pool = getDbPool();
+    if (!pool) return; // Non-blocking: audit logs are best-effort when pool absent
+    const client = await pool.connect();
+    try {
+      await this._insertAuditLog(client, auditLog);
+    } finally {
+      client.release();
+    }
+  }
+
+  // ── Private helpers ────────────────────────────────────────────────────────
+
+  private async _insertAuditLog(
+    client: import('pg').PoolClient,
+    auditLog: BountyMerkleAuditLogRecord
+  ): Promise<void> {
+    await client.query(
+      `INSERT INTO bounty_merkle_audit_logs (
+         id, snapshot_id, event_type, event_source, old_state, new_state, metadata, severity, created_at
+       ) VALUES (
+         gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, NOW()
+       )`,
+      [
+        auditLog.snapshot_id ?? null,
+        auditLog.event_type,
+        auditLog.event_source,
+        auditLog.old_state ? JSON.stringify(auditLog.old_state) : null,
+        auditLog.new_state ? JSON.stringify(auditLog.new_state) : null,
+        auditLog.metadata ? JSON.stringify(auditLog.metadata) : null,
+        auditLog.severity,
+      ]
+    );
+  }
+
+  private _rowToSnapshotRecord(r: Record<string, unknown>): BountyMerkleSnapshotRecord {
+    return {
+      id: r.id as string,
+      launch_id: r.launch_id as string,
+      campaign_id: (r.campaign_id as string | null) ?? null,
+      network_id: r.network_id as string,
+      chain_id: BigInt(r.chain_id as string),
+      contract_address: r.contract_address as string,
+      token_address: r.token_address as string,
+      version: Number(r.version),
+      snapshot_type: r.snapshot_type as BountyMerkleSnapshotRecord['snapshot_type'],
+      total_reward_tokens: BigInt(r.total_reward_tokens as string),
+      total_recipients: Number(r.total_recipients),
+      total_claims_count: Number(r.total_claims_count),
+      merkle_root: (r.merkle_root as string | null) ?? null,
+      tree_depth: r.tree_depth !== null && r.tree_depth !== undefined ? Number(r.tree_depth) : null,
+      leaf_encoding_version: r.leaf_encoding_version as string,
+      tree_algorithm: r.tree_algorithm as string,
+      pair_hashing_convention: r.pair_hashing_convention as string,
+      leaf_sorting_rule: r.leaf_sorting_rule as string,
+      proof_format_version: r.proof_format_version as string,
+      status: r.status as BountyMerkleSnapshotRecord['status'],
+      idempotency_key: (r.idempotency_key as string | null) ?? null,
+      created_by: (r.created_by as string | null) ?? null,
+      published_by: (r.published_by as string | null) ?? null,
+      published_at: r.published_at ? new Date(r.published_at as string) : null,
+      publication_tx_hash: (r.publication_tx_hash as string | null) ?? null,
+      confirmed_block_number: r.confirmed_block_number !== null && r.confirmed_block_number !== undefined
+        ? BigInt(r.confirmed_block_number as string)
+        : null,
+      confirmed_root: (r.confirmed_root as string | null) ?? null,
+      publication_status: (r.publication_status as string | null) ?? null,
+      finality_status: (r.finality_status as string | null) ?? null,
+      created_at: new Date(r.created_at as string),
+      updated_at: new Date(r.updated_at as string),
+      finalized_at: r.finalized_at ? new Date(r.finalized_at as string) : null,
+      finalized_by: (r.finalized_by as string | null) ?? null,
+    };
+  }
+}
+
+export const defaultBountyMerkleSnapshotDbAdapter = new PostgresBountyMerkleSnapshotDbAdapter();

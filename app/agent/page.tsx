@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Bot, ShieldAlert, Settings2, FileCode2, Target, BrainCircuit, Activity, BarChart3, Wallet } from 'lucide-react';
+import { FiveAgentDeskPanel } from '../components/FiveAgentDeskPanel';
 
 export default function AgentPage() {
   const { isConnected, userRole, connectMetaMask, isConnecting } = useAuth();
@@ -36,7 +37,6 @@ export default function AgentPage() {
           targetSymbol: symbol,
           action,
           suggestedQty: qty,
-          userId: 'usr-agent-tester',
           agentId: 'agent-alpha-v1',
         }),
       });
@@ -67,7 +67,7 @@ export default function AgentPage() {
           </p>
         </div>
         <div className="flex-row gap-sm items-center">
-          {userRole === 'SYSTEM_ADMIN' && (
+          {(userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN') && (
             <span className="badge badge-admin">
               👑 FEATURE WEIGHT ADMIN ACTIVE
             </span>
@@ -85,6 +85,14 @@ export default function AgentPage() {
           <strong>Advisory Only — No Auto-Execution.</strong> AI proposals are recommendations only and require explicit human approval via the Trading Terminal. No trade is submitted or executed from this page.
         </span>
       </div>
+
+      {/* 5-Agent Autonomous Trading Desk (100% Vercel-Native) */}
+      <FiveAgentDeskPanel
+        isConnected={isConnected}
+        defaultSymbol={symbol}
+        defaultAction={action}
+        defaultQty={qty}
+      />
 
       <div className="grid-2">
         {/* Left Card: Interactive Proposal Generator */}
@@ -217,9 +225,16 @@ export default function AgentPage() {
                   {proposal.intelligenceSignal?.rationale || 'N/A'}
                 </div>
               </div>
-              <div style={{ fontSize: '11px', color: 'var(--color-muted)', fontWeight: 700, padding: '8px', backgroundColor: 'var(--color-panel)', borderRadius: '4px', textAlign: 'center' }}>
+              <div style={{ fontSize: '11px', color: 'var(--color-muted)', fontWeight: 700, padding: '8px', backgroundColor: 'var(--color-panel)', borderRadius: '4px', textAlign: 'center', marginBottom: '12px' }}>
                 Status: PROPOSAL_ONLY • Approval Required: YES
               </div>
+              <a
+                href={`/trading?symbol=${encodeURIComponent(symbol)}&side=${encodeURIComponent(action)}&qty=${encodeURIComponent(String(qty))}&proposalId=${encodeURIComponent(String(proposal.proposalId || proposal.id || ''))}`}
+                className="btn-primary"
+                style={{ width: '100%', justifyContent: 'center', padding: '10px', textDecoration: 'none', fontSize: '12px' }}
+              >
+                Review & Approve in Trading Terminal →
+              </a>
             </div>
           ) : (
             <div className="bg-panel flex-col items-center justify-center" style={{ padding: '3rem 2rem', textAlign: 'center', color: 'var(--color-muted)', borderRadius: '6px', border: '1px dashed var(--color-border)', fontSize: '13px' }}>

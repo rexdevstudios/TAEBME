@@ -211,6 +211,36 @@ export const AngelDealRoomModal: React.FC<AngelDealRoomModalProps> = ({
           >
             <ShieldCheck size={16} /> Verify Merkle Whitelist Eligibility
           </button>
+        ) : !whitelistCheck.isEligible ? (
+          <div className="flex-col gap-sm">
+            <div
+              style={{
+                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                border: '1px solid #EF4444',
+                borderRadius: '8px',
+                padding: '12px',
+                fontSize: '11px',
+                color: '#FCA5A5',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#EF4444', fontWeight: 800 }}>
+                <AlertCircle size={14} /> Not Eligible — Wallet Not in Merkle Whitelist
+              </div>
+              <div style={{ marginTop: '6px' }}>
+                {actionFeedback || 'Dompet Anda tidak terdaftar dalam whitelist alokasi kampanye ini.'}
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                setWhitelistCheck(null);
+                setActionFeedback(null);
+              }}
+              className="btn-secondary"
+              style={{ width: '100%', padding: '10px', justifyContent: 'center' }}
+            >
+              Cek Ulang Alamat Token Lain
+            </button>
+          </div>
         ) : (
           <div className="flex-col gap-sm">
             <div

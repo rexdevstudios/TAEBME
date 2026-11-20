@@ -17,6 +17,18 @@
     {
       "path": "/api/launchpad/keeper",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/reorg-sweep",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/reconcile-orders",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/market-sync",
+      "schedule": "0 0 * * *"
     }
   ]
 }

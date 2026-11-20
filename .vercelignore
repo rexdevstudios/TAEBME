@@ -1,34 +1,44 @@
-# Vercel Ignore — Only upload Web Control Plane files
-.next/
-node_modules/
-*.db*
-vault.db*
-.env*
-.git/
-.github/
-.agents/
-.eliza/
-/wallets/
-/scratch/
+# ============================================================================
+# VERCEL CONTROL PLANE ISOLATION (.vercelignore)
+# ============================================================================
+# Leading '/' anchors each rule strictly to the repository root so nested
+# folders like packages/launchpad/contracts/ and packages/shared/contracts/
+# are NEVER accidentally excluded.
+# Enforces AGENTS.md Rule 1 (Control Plane Isolation) & Rule 3 (Non-Custodial).
+# ============================================================================
+
+# Local Environment & Secrets (NEVER upload local .env to Vercel)
+/.env
+/.env.*
+
+# Legacy Omnichain CLI Bot & Daemon Artifacts
+/src/
 /scripts/
-/tests/
 /sites/
-/characters/
-/contracts/
+/wallets/
 /promotions/
-/templates/
-*.bat
-*.sh
-*.py
-*.log
+/characters/
+/.eliza/
+/.wrangler/
 /logs/
-.tempmediaStorage/
-tsconfig.bot.json
-README*.md
-GUIDE.md
-SSOT.md
-ADR.md
-AGENTS.md
-API_MAP.md
-DOMAIN_MAP.md
-MASTER_PROMPT.md
+/cache/
+/out/
+/scratch/
+/services/
+/templates/
+
+# Execution Plane (100% decoupled from Vercel Control Plane)
+/apps/execution-plane/
+
+# Root Smart Contract Sources & Local Deployments
+/contracts/
+/deployments/
+
+# Tests & Documentation
+/tests/
+/test/
+/docs/
+/design-system/
+/*.md
+!README.md
+tsconfig.tsbuildinfo

@@ -3,7 +3,7 @@ import { ApiResponse } from '@packages/shared/contracts/api-contracts';
 import { defaultDraftDbAdapter } from '@packages/shared/db-pool';
 import { DexPairFactoryService } from '@packages/launchpad/dex-pair-factory';
 import { requireCapability } from '@packages/auth/session';
-import { verifyEvmTransactionReceipt } from '@/src/modules/reconciliation/evm-verifier';
+import { verifyEvmTransactionReceipt } from '@packages/launchpad/evm-verifier';
 import { ethers } from 'ethers';
 
 export const dynamic = 'force-dynamic';

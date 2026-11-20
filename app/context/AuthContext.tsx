@@ -6,6 +6,7 @@ export type UserRole =
   | 'GUEST'
   | 'TRADER'
   | 'CREATOR'
+  | 'LAUNCH_ADMIN'
   | 'SYSTEM_ADMIN'
   | 'SUPER_ADMIN';
 
@@ -19,7 +20,7 @@ export interface AuthContextType {
   chainId: string | null;
   connectWallet: (address: string, role?: UserRole) => void;
   connectMetaMask: () => Promise<{ success: boolean; address?: string; error?: string }>;
-  disconnectWallet: () => void;
+  disconnectWallet: () => void | Promise<void>;
   switchRole: (role: UserRole) => void;
   refreshSession: () => Promise<void>;
 }
@@ -71,7 +72,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refreshSession();
   }, [refreshSession]);
 
-  const disconnectWallet = useCallback(() => {
+  const disconnectWallet = useCallback(async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch (err) {
+      console.warn('[AuthContext] Failed to call logout endpoint:', err);
+    }
     document.cookie = 'rtrader_session=; path=/; max-age=0; SameSite=Strict';
     localStorage.removeItem('rtrader_role');
 
@@ -190,9 +196,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const handleAccountsChanged = (accounts: string[]) => {
         if (!accounts || accounts.length === 0) {
           disconnectWallet();
-        } else if (accounts[0].toLowerCase() !== walletAddress?.toLowerCase()) {
-          // Dynamic account switch requires fresh SIWE re-authentication
-          refreshSession();
+        } else if (walletAddress && accounts[0].toLowerCase() !== walletAddress.toLowerCase()) {
+          // Dynamic account switch in MetaMask: clear old HttpOnly session so user cleanly re-authenticates via SIWE
+          disconnectWallet();
         }
       };
 

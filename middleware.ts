@@ -21,6 +21,7 @@ const PUBLIC_API_PATHS = new Set([
   '/api/auth/challenge',
   '/api/auth/verify',
   '/api/auth/session',   // Session revalidation is public
+  '/api/auth/logout',    // Invalidate HttpOnly session cookie is public
   '/api/billing/plans',   // Read-only plan listing is public
   '/api/system/overview', // Health check is public
   '/api/market/chart',    // Chart data is public read-only
@@ -34,6 +35,10 @@ const PUBLIC_API_PATHS = new Set([
   '/api/launchpad/bounty', // Public bounty campaigns list from Neon SSOT
   '/api/launchpad/curve-volatility', // Public curve slope parameters
   '/api/launchpad/keeper', // Keeper automation handles CRON_SECRET internally
+  '/api/cron/reorg-sweep', // Vercel Cron reorg sweeper handles CRON_SECRET internally
+  '/api/cron/reconcile-orders', // Vercel Cron order reconciler handles CRON_SECRET internally
+  '/api/cron/market-sync', // Vercel Cron market sync handles CRON_SECRET internally
+  '/api/telegram/webhook', // Telegram webhook handles X-Telegram-Bot-Api-Secret-Token internally
   '/api/launchpad/webhook', // Webhook receiver handles signature/secret internally
 ]);
 

@@ -6,7 +6,7 @@ import {
   verifyEvmTransactionReceipt,
   verifyEvmDeploymentAttribution,
   getEvmPublicClient,
-} from '@/src/modules/reconciliation/evm-verifier';
+} from '@packages/launchpad/evm-verifier';
 import { ethers } from 'ethers';
 
 export const dynamic = 'force-dynamic';
