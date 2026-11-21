@@ -17,8 +17,9 @@ import {
   annotateKeysWithQuotaStatus,
   computeEffectiveVaultCapacity,
 } from '@packages/billing/subscriptions-engine';
+import { assertSafeWebhookUrl } from '@packages/notifications/webhook-dispatcher';
 
-const ALLOWED_VAULT_PROVIDERS = new Set(['BANKR', 'GEMINI', 'OPENAI']);
+const ALLOWED_VAULT_PROVIDERS = new Set(['BANKR', 'GEMINI', 'OPENAI', 'WEBHOOK']);
 
 export const dynamic = 'force-dynamic';
 
@@ -44,7 +45,7 @@ export async function GET(req: NextRequest) {
     const provider = (searchParams.get('provider') || 'BANKR').toUpperCase();
     if (!ALLOWED_VAULT_PROVIDERS.has(provider)) {
       return NextResponse.json(
-        { success: false, error: `INVALID_PROVIDER: Allowed providers are BANKR, GEMINI, OPENAI`, timestamp: new Date().toISOString() },
+        { success: false, error: `INVALID_PROVIDER: Allowed providers are BANKR, GEMINI, OPENAI, WEBHOOK`, timestamp: new Date().toISOString() },
         { status: 400 }
       );
     }
@@ -113,9 +114,12 @@ export async function POST(req: NextRequest) {
     const provider = typeof body?.provider === 'string' ? body.provider.trim().toUpperCase() : 'BANKR';
     if (!ALLOWED_VAULT_PROVIDERS.has(provider)) {
       return NextResponse.json(
-        { success: false, error: `INVALID_PROVIDER: Allowed providers are BANKR, GEMINI, OPENAI`, timestamp: new Date().toISOString() },
+        { success: false, error: `INVALID_PROVIDER: Allowed providers are BANKR, GEMINI, OPENAI, WEBHOOK`, timestamp: new Date().toISOString() },
         { status: 400 }
       );
+    }
+    if (provider === 'WEBHOOK') {
+      assertSafeWebhookUrl(apiKey);
     }
     const chainScope = typeof body?.chainScope === 'string' ? body.chainScope.trim().toLowerCase() : 'all';
     const isDefault = Boolean(body?.isDefault);
@@ -151,6 +155,8 @@ export async function POST(req: NextRequest) {
     const isBadInput =
       msg.startsWith('FORBIDDEN_PRIVATE_KEY') ||
       msg.startsWith('INVALID_') ||
+      msg.startsWith('UNSAFE_WEBHOOK') ||
+      msg.startsWith('SSRF_BLOCKED') ||
       msg.startsWith('MAX_KEYS_REACHED');
     return NextResponse.json(
       { success: false, error: msg, timestamp: new Date().toISOString() },

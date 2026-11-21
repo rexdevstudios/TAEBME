@@ -23,6 +23,7 @@ const PUBLIC_API_PATHS = new Set([
   '/api/auth/session',   // Session revalidation is public
   '/api/auth/logout',    // Invalidate HttpOnly session cookie is public
   '/api/system/overview', // Health check is public
+  '/api/providers/registry', // Public read-only modular provider registry metadata
   '/api/market/chart',    // Chart data is public read-only
   '/api/market/macro',    // DefiLlama macro TVL signal is public read-only
   '/api/launchpad/tokens', // Public active token list from Neon SSOT

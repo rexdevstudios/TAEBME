@@ -294,6 +294,12 @@ async function runBlackboxSuite() {
   assert(agentPlan?.capacities?.maxBankrKeys === 25, `Live AGENT plan exposes maxBankrKeys === 25 (Got ${agentPlan?.capacities?.maxBankrKeys})`);
   assert(agentPlan?.capacities?.maxBinanceAccounts === 15, `Live AGENT plan exposes maxBinanceAccounts === 15 (Got ${agentPlan?.capacities?.maxBinanceAccounts})`);
 
+  const registryRes = await fetch(`${BASE_URL}/api/providers/registry`);
+  assert(registryRes.status === 200, `GET /api/providers/registry returns HTTP 200 (Got ${registryRes.status})`);
+  const registryJson: any = await registryRes.json();
+  assert(registryJson?.data?.defaultLlm?.primary === 'BYTEPLUS' || registryJson?.data?.defaultLlm?.primary === 'GEMINI', 'Provider registry exposes authoritative defaultLlm primary engine');
+  assert(Array.isArray(registryJson?.data?.providers) && registryJson.data.providers.length >= 6, 'Provider registry exposes modular CEX, Launchpad, LLM & Webhook providers');
+
   console.log('\n================================================================');
   console.log(`  🎉 BLACKBOX SUITE COMPLETED: ${passedTests} PASSED, ${failedTests} FAILED`);
   console.log('================================================================\n');
