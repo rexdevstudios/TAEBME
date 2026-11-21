@@ -15,6 +15,7 @@ export interface PlanCapacities {
   monthlyCredits: number;
   maxBankrKeys: number;
   maxBinanceAccounts: number;
+  maxCustomAgents: number;
   allowMainnetBinance: boolean;
   maxOrderValueUsd: number;
   maxDailyLossUsd: number;
@@ -222,6 +223,7 @@ export class SubscriptionsEngine {
       monthlyCredits: 100,
       maxBankrKeys: 1,
       maxBinanceAccounts: 1,
+      maxCustomAgents: 1,
       allowMainnetBinance: false,
       maxOrderValueUsd: 250,
       maxDailyLossUsd: 50,
@@ -231,6 +233,7 @@ export class SubscriptionsEngine {
       monthlyCredits: 5000,
       maxBankrKeys: 15,
       maxBinanceAccounts: 2,
+      maxCustomAgents: 3,
       allowMainnetBinance: false,
       maxOrderValueUsd: 1000,
       maxDailyLossUsd: 200,
@@ -240,6 +243,7 @@ export class SubscriptionsEngine {
       monthlyCredits: 5000,
       maxBankrKeys: 3,
       maxBinanceAccounts: 5,
+      maxCustomAgents: 5,
       allowMainnetBinance: true,
       maxOrderValueUsd: 10000,
       maxDailyLossUsd: 1000,
@@ -249,6 +253,7 @@ export class SubscriptionsEngine {
       monthlyCredits: 15000,
       maxBankrKeys: 25,
       maxBinanceAccounts: 15,
+      maxCustomAgents: 15,
       allowMainnetBinance: true,
       maxOrderValueUsd: 25000,
       maxDailyLossUsd: 2500,

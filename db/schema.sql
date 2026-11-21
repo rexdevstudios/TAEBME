@@ -330,10 +330,14 @@ CREATE TABLE agent_profiles (
     strategy_description TEXT,
     system_prompt TEXT NOT NULL,
     risk_tolerance_level VARCHAR(20) DEFAULT 'MODERATE', -- LOW, MODERATE, HIGH, DEGEN
+    enabled_skills JSONB NOT NULL DEFAULT '["SKILL_CEX_TRADE","SKILL_DEX_SWAP"]'::jsonb,
+    strategy_profile VARCHAR(40) NOT NULL DEFAULT 'MOMENTUM_BREAKOUT',
+    target_symbols TEXT[] NOT NULL DEFAULT ARRAY['BTCUSDT','ETHUSDT']::TEXT[],
     status VARCHAR(50) DEFAULT 'IDLE', -- IDLE, RUNNING_SANDBOX, PAUSED
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+CREATE INDEX IF NOT EXISTS idx_agent_profiles_owner ON agent_profiles (owner_id, updated_at DESC);
 
 CREATE TABLE agent_sandbox_runs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

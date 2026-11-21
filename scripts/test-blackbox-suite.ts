@@ -272,6 +272,9 @@ async function runBlackboxSuite() {
   const unauthActivity = await fetch(`${BASE_URL}/api/user/activity`);
   assert(unauthActivity.status === 401, 'Unauthenticated GET /api/user/activity strictly rejected with HTTP 401');
 
+  const unauthAgentProfiles = await fetch(`${BASE_URL}/api/agent/profiles`);
+  assert(unauthAgentProfiles.status === 401, 'Unauthenticated GET /api/agent/profiles strictly rejected with HTTP 401');
+
   // -------------------------------------------------------------------------
   // TEST 12: Canonical Frontend Route Integrity & Live Billing Capacity Contract
   // -------------------------------------------------------------------------

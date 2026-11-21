@@ -10,6 +10,8 @@ interface FiveAgentDeskPanelProps {
   defaultSymbol: string;
   defaultAction: 'BUY' | 'SELL';
   defaultQty: number;
+  selectedAgentId?: string | null;
+  selectedAgentName?: string | null;
 }
 
 const AGENT_META: Record<string, { color: string; icon: React.ReactNode; subtitle: string }> = {
@@ -25,6 +27,8 @@ export function FiveAgentDeskPanel({
   defaultSymbol,
   defaultAction,
   defaultQty,
+  selectedAgentId,
+  selectedAgentName,
 }: FiveAgentDeskPanelProps) {
   const { refreshSession } = useAuth();
   const [targetSource, setTargetSource] = useState<'CEX' | 'LAUNCHPAD' | 'EXTERNAL_DEX'>('CEX');
@@ -84,6 +88,7 @@ export function FiveAgentDeskPanel({
           tokenAddress: effectiveAddr,
           dexNetwork: targetSource === 'CEX' ? undefined : dexNetwork,
           strategyProfile,
+          ...(selectedAgentId ? { agentId: selectedAgentId } : {}),
         }),
       });
       const json = await res.json();
@@ -398,6 +403,38 @@ export function FiveAgentDeskPanel({
               </div>
               <div style={{ color: '#E2E8F0', marginBottom: '4px' }}>{report.llmAdvisory.summary}</div>
               <div style={{ color: '#FDE047' }}>⚠ {report.llmAdvisory.caution}</div>
+            </div>
+          )}
+
+          {report?.agentActionCards?.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={{ fontSize: '10px', fontWeight: 800, color: '#38BDF8', fontFamily: 'var(--font-mono)', letterSpacing: '0.05em' }}>
+                {selectedAgentName ? `SKILL ACTION CARDS (${selectedAgentName.toUpperCase()})` : 'MODULAR SKILL ACTION CARDS'}
+              </div>
+              {report.agentActionCards.map((card: any) => (
+                <a
+                  key={card.skillId}
+                  href={card.href}
+                  className="btn-secondary"
+                  style={{
+                    fontSize: '11px',
+                    padding: '8px 10px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: '8px',
+                    textDecoration: 'none',
+                  }}
+                >
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', textAlign: 'left' }}>
+                    <strong style={{ color: 'var(--color-foreground)' }}>{card.title}</strong>
+                    <span className="text-muted" style={{ fontSize: '10px' }}>{card.subtitle}</span>
+                  </div>
+                  <span style={{ fontSize: '9px', fontWeight: 800, fontFamily: 'var(--font-mono)', color: '#38BDF8', flexShrink: 0 }}>
+                    {card.badge} →
+                  </span>
+                </a>
+              ))}
             </div>
           )}
 

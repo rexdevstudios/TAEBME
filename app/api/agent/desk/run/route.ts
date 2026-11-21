@@ -15,10 +15,12 @@ import {
   defaultDraftDbAdapter,
   defaultKillSwitchDbAdapter,
   defaultBillingDbAdapter,
+  defaultCustomAgentAdapter,
   saveTradeIntent,
   getDbPool,
 } from '@packages/shared/db-pool';
 import { SubscriptionsEngine } from '@packages/billing/subscriptions-engine';
+import { buildAgentActionCards } from '@packages/agent/skill-registry';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,10 +57,15 @@ export async function POST(req: NextRequest) {
     const chainId = body?.chainId !== undefined ? Number(body.chainId) : undefined;
     const dexNetwork = typeof body?.dexNetwork === 'string' ? body.dexNetwork.trim().toLowerCase() : undefined;
     const allowedStrategies = new Set(['EARLY_SNIPER', 'MOMENTUM_BREAKOUT', 'DIP_ACCUMULATOR', 'CONSERVATIVE_DCA']);
+    const agentId = typeof body?.agentId === 'string' && body.agentId.trim() ? body.agentId.trim() : undefined;
+    const customAgent = agentId
+      ? await defaultCustomAgentAdapter.getUserAgentById(auth.walletAddress, agentId).catch(() => null)
+      : null;
+
     const strategyProfile =
       typeof body?.strategyProfile === 'string' && allowedStrategies.has(body.strategyProfile.trim().toUpperCase())
         ? (body.strategyProfile.trim().toUpperCase() as 'EARLY_SNIPER' | 'MOMENTUM_BREAKOUT' | 'DIP_ACCUMULATOR' | 'CONSERVATIVE_DCA')
-        : undefined;
+        : customAgent?.strategyProfile;
 
     if (!Number.isFinite(quantity) || quantity <= 0) {
       return NextResponse.json(
@@ -109,10 +116,28 @@ export async function POST(req: NextRequest) {
       // Non-blocking in unit test environments without DB
     }
 
+    const agentActionCards = buildAgentActionCards({
+      skills: customAgent?.enabledSkills || ['SKILL_CEX_TRADE', 'SKILL_DEX_SWAP', 'SKILL_TOKEN_DEPLOY'],
+      symbol,
+      action,
+      quantity,
+      agentName: customAgent?.name,
+    });
+
     return NextResponse.json({
       success: true,
       data: {
         ...report,
+        activeAgent: customAgent
+          ? {
+              id: customAgent.id,
+              name: customAgent.name,
+              strategyProfile: customAgent.strategyProfile,
+              riskToleranceLevel: customAgent.riskToleranceLevel,
+              enabledSkills: customAgent.enabledSkills,
+            }
+          : null,
+        agentActionCards,
         creditsBurned: deskCost,
         remainingCredits,
       },

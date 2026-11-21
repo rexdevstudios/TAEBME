@@ -6,6 +6,8 @@ import { Bot, ShieldAlert, Settings2, FileCode2, Target, BrainCircuit, Activity,
 import { FiveAgentDeskPanel } from '../components/FiveAgentDeskPanel';
 import { PageWorkflowBanner } from '../components/PageWorkflowBanner';
 import { UserRiskPolicyPanel } from '../components/UserRiskPolicyPanel';
+import { CustomAgentBuilderPanel } from '../components/CustomAgentBuilderPanel';
+import type { CustomAgentProfile } from '@packages/agent/skill-registry';
 
 export default function AgentPage() {
   const { isConnected, userRole, hasCapability, entitlements, connectMetaMask, isConnecting, refreshSession } = useAuth();
@@ -13,6 +15,7 @@ export default function AgentPage() {
   const [symbol, setSymbol] = useState('BTCUSDT');
   const [action, setAction] = useState<'BUY' | 'SELL'>('BUY');
   const [qty, setQty] = useState(100);
+  const [selectedCustomAgent, setSelectedCustomAgent] = useState<CustomAgentProfile | null>(null);
   const [proposal, setProposal] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -168,6 +171,16 @@ export default function AgentPage() {
         ]}
       />
 
+      {/* Custom AI Agent Builder & Modular Skill Registry */}
+      <CustomAgentBuilderPanel
+        isConnected={isConnected}
+        selectedAgentId={selectedCustomAgent?.id || null}
+        onSelectAgent={(ag) => {
+          setSelectedCustomAgent(ag);
+          if (ag?.targetSymbols?.[0]) setSymbol(ag.targetSymbols[0]);
+        }}
+      />
+
       {/* Non-Custodial Personal Risk Guard (Reused from /trading, Clamped to Billing Tier) */}
       <UserRiskPolicyPanel isConnected={isConnected} />
 
@@ -177,6 +190,8 @@ export default function AgentPage() {
         defaultSymbol={symbol}
         defaultAction={action}
         defaultQty={qty}
+        selectedAgentId={selectedCustomAgent?.id || null}
+        selectedAgentName={selectedCustomAgent?.name || null}
       />
 
       <div className="grid-2">
