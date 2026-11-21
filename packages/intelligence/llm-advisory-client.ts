@@ -14,7 +14,49 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { z } from 'zod';
 import type { IntelligenceSignal } from './feature-engine';
 
-export type AdvisoryLlmProvider = 'bytedance-modelark' | 'gemini' | 'byok-gemini' | 'byok-openai' | 'deterministic-fallback';
+export type ByokLlmProvider = 'GEMINI' | 'OPENAI' | 'ANTHROPIC';
+
+export type AdvisoryLlmProvider =
+  | 'bytedance-modelark'
+  | 'gemini'
+  | 'byok-gemini'
+  | 'byok-openai'
+  | 'byok-anthropic'
+  | 'deterministic-fallback';
+
+export interface ByokModelOption {
+  id: string;
+  label: string;
+  tier: 'fast' | 'balanced' | 'deep';
+  recommended?: boolean;
+  timeoutMs: number;
+}
+
+export const BYOK_LLM_MODELS: Record<ByokLlmProvider, readonly ByokModelOption[]> = {
+  GEMINI: [
+    { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (Cepat · Rekomendasi)', tier: 'fast', recommended: true, timeoutMs: 6000 },
+    { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (Deep Analysis)', tier: 'deep', timeoutMs: 9000 },
+  ],
+  OPENAI: [
+    { id: 'gpt-4o-mini', label: 'GPT-4o Mini (Cepat · Rekomendasi)', tier: 'fast', recommended: true, timeoutMs: 6000 },
+    { id: 'gpt-4o', label: 'GPT-4o (Deep Analysis)', tier: 'deep', timeoutMs: 9000 },
+  ],
+  ANTHROPIC: [
+    { id: 'claude-3-5-sonnet-latest', label: 'Claude 3.5 Sonnet (Seimbang · Rekomendasi)', tier: 'balanced', recommended: true, timeoutMs: 7000 },
+    { id: 'claude-3-5-haiku-latest', label: 'Claude 3.5 Haiku (Ultra-Cepat)', tier: 'fast', timeoutMs: 6000 },
+    { id: 'claude-opus-4-20250514', label: 'Claude Opus 4 (Deep · Latensi & Biaya Tinggi)', tier: 'deep', timeoutMs: 9000 },
+  ],
+};
+
+export function resolveByokLlmModel(provider: ByokLlmProvider, requestedModel?: string): ByokModelOption {
+  const catalog = BYOK_LLM_MODELS[provider];
+  const clean = (requestedModel || '').trim();
+  if (clean) {
+    const matched = catalog.find((m) => m.id === clean);
+    if (matched) return matched;
+  }
+  return catalog.find((m) => m.recommended) || catalog[0];
+}
 
 export const MarketAdvisorySchema = z.object({
   summary: z.string().min(10).max(320),
@@ -23,6 +65,7 @@ export const MarketAdvisorySchema = z.object({
 
 export interface MarketAdvisoryNote {
   provider: AdvisoryLlmProvider;
+  model?: string;
   summary: string;
   caution: string;
   latencyMs: number;
@@ -34,8 +77,9 @@ export interface MarketAdvisoryContext {
   suggestedQty: number;
   customSystemPrompt?: string;
   byokLlm?: {
-    provider: 'GEMINI' | 'OPENAI';
+    provider: ByokLlmProvider;
     apiKey: string;
+    model?: string;
   };
 }
 
@@ -98,7 +142,8 @@ async function callBytePlusAdvisory(
   apiKey: string,
   endpoint: string,
   baseUrl: string,
-  systemPrompt: string = ADVISORY_SYSTEM_PROMPT
+  systemPrompt: string = ADVISORY_SYSTEM_PROMPT,
+  timeoutMs: number = 6000
 ): Promise<{ summary: string; caution: string } | null> {
   try {
     const res = await fetch(`${baseUrl.replace(/\/+$/, '')}/chat/completions`, {
@@ -116,7 +161,7 @@ async function callBytePlusAdvisory(
         temperature: 0.3,
         response_format: { type: 'json_object' },
       }),
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
 
     if (!res.ok) return null;
@@ -132,17 +177,62 @@ async function callBytePlusAdvisory(
   }
 }
 
+async function callAnthropicAdvisory(
+  sanitizedPayload: string,
+  apiKey: string,
+  modelId: string,
+  systemPrompt: string = ADVISORY_SYSTEM_PROMPT,
+  timeoutMs: number = 7000
+): Promise<{ summary: string; caution: string } | null> {
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: modelId,
+        max_tokens: 300,
+        temperature: 0.3,
+        system: systemPrompt,
+        messages: [
+          {
+            role: 'user',
+            content: `Analyze these metrics and return pure JSON only:\n${sanitizedPayload}`,
+          },
+        ],
+      }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+
+    if (!res.ok) return null;
+    const data = (await res.json()) as { content?: Array<{ type?: string; text?: string }> };
+    const raw = data?.content?.find((b) => b.type === 'text' && typeof b.text === 'string')?.text?.trim();
+    if (!raw) return null;
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+    const parsed = MarketAdvisorySchema.safeParse(JSON.parse(match[0]));
+    return parsed.success ? { summary: parsed.data.summary, caution: parsed.data.caution } : null;
+  } catch {
+    return null;
+  }
+}
+
 async function callGeminiAdvisory(
   sanitizedPayload: string,
   apiKey: string,
-  systemPrompt: string = ADVISORY_SYSTEM_PROMPT
+  systemPrompt: string = ADVISORY_SYSTEM_PROMPT,
+  modelId: string = 'gemini-2.5-flash',
+  timeoutMs: number = 6000
 ): Promise<{ summary: string; caution: string } | null> {
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const model = genAI.getGenerativeModel({ model: modelId });
     const result = await Promise.race([
       model.generateContent(`${systemPrompt}\n\nMetrics:\n${sanitizedPayload}`),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('LLM_TIMEOUT')), 6000)),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('LLM_TIMEOUT')), timeoutMs)),
     ]);
     const text = result.response.text()?.trim();
     if (!text) return null;
@@ -167,13 +257,21 @@ export async function generateMarketAdvisoryNote(
   const sanitizedPrompt = buildSanitizedAdvisoryPrompt(signal, ctx);
   const systemPrompt = resolveSystemPrompt(ctx.customSystemPrompt);
 
-  // 0. Prioritize user's own BYOK LLM key if provided
+  // 0. Prioritize user's own BYOK LLM key if provided (TRADER & AGENT exclusive — gated at API layer)
   if (ctx.byokLlm?.apiKey && !ctx.byokLlm.apiKey.startsWith('mock_')) {
+    const chosenModel = resolveByokLlmModel(ctx.byokLlm.provider, ctx.byokLlm.model);
     if (ctx.byokLlm.provider === 'GEMINI') {
-      const res = await callGeminiAdvisory(sanitizedPrompt, ctx.byokLlm.apiKey, systemPrompt);
+      const res = await callGeminiAdvisory(
+        sanitizedPrompt,
+        ctx.byokLlm.apiKey,
+        systemPrompt,
+        chosenModel.id,
+        chosenModel.timeoutMs
+      );
       if (res) {
         return {
           provider: 'byok-gemini',
+          model: chosenModel.id,
           summary: res.summary,
           caution: res.caution,
           latencyMs: Math.round(performance.now() - startMs),
@@ -183,13 +281,32 @@ export async function generateMarketAdvisoryNote(
       const res = await callBytePlusAdvisory(
         sanitizedPrompt,
         ctx.byokLlm.apiKey,
-        'gpt-4o-mini',
+        chosenModel.id,
         'https://api.openai.com/v1',
-        systemPrompt
+        systemPrompt,
+        chosenModel.timeoutMs
       );
       if (res) {
         return {
           provider: 'byok-openai',
+          model: chosenModel.id,
+          summary: res.summary,
+          caution: res.caution,
+          latencyMs: Math.round(performance.now() - startMs),
+        };
+      }
+    } else if (ctx.byokLlm.provider === 'ANTHROPIC') {
+      const res = await callAnthropicAdvisory(
+        sanitizedPrompt,
+        ctx.byokLlm.apiKey,
+        chosenModel.id,
+        systemPrompt,
+        chosenModel.timeoutMs
+      );
+      if (res) {
+        return {
+          provider: 'byok-anthropic',
+          model: chosenModel.id,
           summary: res.summary,
           caution: res.caution,
           latencyMs: Math.round(performance.now() - startMs),

@@ -19,7 +19,19 @@ import {
 } from '@packages/billing/subscriptions-engine';
 import { assertSafeWebhookUrl } from '@packages/notifications/webhook-dispatcher';
 
-const ALLOWED_VAULT_PROVIDERS = new Set(['BANKR', 'GEMINI', 'OPENAI', 'WEBHOOK']);
+const ALLOWED_VAULT_PROVIDERS = new Set(['BANKR', 'GEMINI', 'OPENAI', 'ANTHROPIC', 'WEBHOOK']);
+const LLM_VAULT_PROVIDERS = new Set(['GEMINI', 'OPENAI', 'ANTHROPIC']);
+
+function resolveEffectiveMaxKeys(
+  provider: string,
+  effCap: { maxBankrKeys: number },
+  baseCap: { maxLlmKeys: number }
+): number {
+  if (provider === 'BANKR') return effCap.maxBankrKeys;
+  if (LLM_VAULT_PROVIDERS.has(provider)) return baseCap.maxLlmKeys;
+  // WEBHOOK quota is decoupled from BYOK LLM so FREE/CREATOR users keep webhook alert access
+  return 2;
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -45,7 +57,7 @@ export async function GET(req: NextRequest) {
     const provider = (searchParams.get('provider') || 'BANKR').toUpperCase();
     if (!ALLOWED_VAULT_PROVIDERS.has(provider)) {
       return NextResponse.json(
-        { success: false, error: `INVALID_PROVIDER: Allowed providers are BANKR, GEMINI, OPENAI, WEBHOOK`, timestamp: new Date().toISOString() },
+        { success: false, error: `INVALID_PROVIDER: Allowed providers are BANKR, GEMINI, OPENAI, ANTHROPIC, WEBHOOK`, timestamp: new Date().toISOString() },
         { status: 400 }
       );
     }
@@ -56,7 +68,7 @@ export async function GET(req: NextRequest) {
     ]);
     const effCap = computeEffectiveVaultCapacity(planId, addonSlots);
     const baseCap = SubscriptionsEngine.getPlanCapacities(planId);
-    const effectiveMaxKeys = provider === 'BANKR' ? effCap.maxBankrKeys : baseCap.maxLlmKeys;
+    const effectiveMaxKeys = resolveEffectiveMaxKeys(provider, effCap, baseCap);
     const keys = annotateKeysWithQuotaStatus(rawKeys, { maxActive: effectiveMaxKeys });
 
     return NextResponse.json(
@@ -114,7 +126,7 @@ export async function POST(req: NextRequest) {
     const provider = typeof body?.provider === 'string' ? body.provider.trim().toUpperCase() : 'BANKR';
     if (!ALLOWED_VAULT_PROVIDERS.has(provider)) {
       return NextResponse.json(
-        { success: false, error: `INVALID_PROVIDER: Allowed providers are BANKR, GEMINI, OPENAI, WEBHOOK`, timestamp: new Date().toISOString() },
+        { success: false, error: `INVALID_PROVIDER: Allowed providers are BANKR, GEMINI, OPENAI, ANTHROPIC, WEBHOOK`, timestamp: new Date().toISOString() },
         { status: 400 }
       );
     }
@@ -130,7 +142,19 @@ export async function POST(req: NextRequest) {
     ]);
     const effCap = computeEffectiveVaultCapacity(planId, addonSlots);
     const baseCap = SubscriptionsEngine.getPlanCapacities(planId);
-    const effectiveMaxKeys = provider === 'BANKR' ? effCap.maxBankrKeys : baseCap.maxLlmKeys;
+    const effectiveMaxKeys = resolveEffectiveMaxKeys(provider, effCap, baseCap);
+
+    if (LLM_VAULT_PROVIDERS.has(provider) && effectiveMaxKeys <= 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'PLAN_BYOK_LLM_REQUIRED: BYOK LLM Vault (Gemini, OpenAI, Anthropic Claude) is exclusive to Pro Terminal Trader (TRADER) and AI Autonomous Desk (AGENT) plans.',
+          timestamp: new Date().toISOString(),
+        },
+        { status: 403 }
+      );
+    }
 
     const created = await defaultProviderKeyVaultAdapter.addKey({
       userIdentifier: auth.walletAddress,

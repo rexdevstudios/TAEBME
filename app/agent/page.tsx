@@ -7,7 +7,7 @@ import { FiveAgentDeskPanel } from '../components/FiveAgentDeskPanel';
 import { PageWorkflowBanner } from '../components/PageWorkflowBanner';
 import { UserRiskPolicyPanel } from '../components/UserRiskPolicyPanel';
 import { CustomAgentBuilderPanel } from '../components/CustomAgentBuilderPanel';
-import { ByokLlmVaultPanel } from '../components/ByokLlmVaultPanel';
+import { ByokLlmVaultPanel, type SelectedLlmProvider } from '../components/ByokLlmVaultPanel';
 import type { CustomAgentProfile } from '@packages/agent/skill-registry';
 
 export default function AgentPage() {
@@ -17,7 +17,8 @@ export default function AgentPage() {
   const [action, setAction] = useState<'BUY' | 'SELL'>('BUY');
   const [qty, setQty] = useState(100);
   const [selectedCustomAgent, setSelectedCustomAgent] = useState<CustomAgentProfile | null>(null);
-  const [selectedLlmProvider, setSelectedLlmProvider] = useState<'PLATFORM' | 'GEMINI' | 'OPENAI'>('PLATFORM');
+  const [selectedLlmProvider, setSelectedLlmProvider] = useState<SelectedLlmProvider>('PLATFORM');
+  const [selectedLlmModel, setSelectedLlmModel] = useState<string>('');
   const [proposal, setProposal] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -183,11 +184,13 @@ export default function AgentPage() {
         }}
       />
 
-      {/* BYOK LLM Provider Vault (GEMINI / OPENAI — Reuses user_provider_api_keys) */}
+      {/* BYOK LLM Provider Vault (GEMINI / OPENAI / ANTHROPIC — TRADER & AGENT Exclusive) */}
       <ByokLlmVaultPanel
         isConnected={isConnected}
         selectedLlmProvider={selectedLlmProvider}
         onSelectLlmProvider={setSelectedLlmProvider}
+        selectedLlmModel={selectedLlmModel}
+        onSelectLlmModel={setSelectedLlmModel}
       />
 
       {/* Non-Custodial Personal Risk Guard (Reused from /trading, Clamped to Billing Tier) */}
@@ -202,6 +205,7 @@ export default function AgentPage() {
         selectedAgentId={selectedCustomAgent?.id || null}
         selectedAgentName={selectedCustomAgent?.name || null}
         selectedLlmProvider={selectedLlmProvider}
+        selectedLlmModel={selectedLlmModel}
       />
 
       <div className="grid-2">

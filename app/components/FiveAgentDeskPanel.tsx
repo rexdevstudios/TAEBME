@@ -12,7 +12,8 @@ interface FiveAgentDeskPanelProps {
   defaultQty: number;
   selectedAgentId?: string | null;
   selectedAgentName?: string | null;
-  selectedLlmProvider?: 'PLATFORM' | 'GEMINI' | 'OPENAI';
+  selectedLlmProvider?: 'PLATFORM' | 'GEMINI' | 'OPENAI' | 'ANTHROPIC';
+  selectedLlmModel?: string;
 }
 
 const AGENT_META: Record<string, { color: string; icon: React.ReactNode; subtitle: string }> = {
@@ -31,6 +32,7 @@ export function FiveAgentDeskPanel({
   selectedAgentId,
   selectedAgentName,
   selectedLlmProvider = 'PLATFORM',
+  selectedLlmModel,
 }: FiveAgentDeskPanelProps) {
   const { refreshSession } = useAuth();
   const [targetSource, setTargetSource] = useState<'CEX' | 'LAUNCHPAD' | 'EXTERNAL_DEX'>('CEX');
@@ -91,7 +93,9 @@ export function FiveAgentDeskPanel({
           dexNetwork: targetSource === 'CEX' ? undefined : dexNetwork,
           strategyProfile,
           ...(selectedAgentId ? { agentId: selectedAgentId } : {}),
-          ...(selectedLlmProvider && selectedLlmProvider !== 'PLATFORM' ? { llmProvider: selectedLlmProvider } : {}),
+          ...(selectedLlmProvider && selectedLlmProvider !== 'PLATFORM'
+            ? { llmProvider: selectedLlmProvider, ...(selectedLlmModel ? { llmModel: selectedLlmModel } : {}) }
+            : {}),
         }),
       });
       const json = await res.json();

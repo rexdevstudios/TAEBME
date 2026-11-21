@@ -51,6 +51,7 @@ const CANONICAL_PLANS = [
       'Live Trading Terminal (DEX & CEX Single-Shot)',
       'MEV Slippage Guard (<= 3.0% Cap)',
       'Deterministic Risk Gate & Kill-Switch Protection',
+      'BYOK LLM Vault (3 Keys: Gemini / OpenAI / Claude · Hemat 60% Credits)',
     ],
   },
   {
@@ -67,6 +68,7 @@ const CANONICAL_PLANS = [
     features: [
       'Full Creator + Pro Trader Entitlements',
       '5-Agent Autonomous Trading Desk (BytePlus / Gemini)',
+      'BYOK LLM Vault (5 Keys: Gemini / OpenAI / Claude · Hemat 60% Credits)',
       'Arkham Wallet Profiling & Firecrawl Priority',
       'Daytona Strategy Sandbox & Backtester',
     ],

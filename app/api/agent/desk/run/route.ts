@@ -22,7 +22,10 @@ import {
 } from '@packages/shared/db-pool';
 import { SubscriptionsEngine } from '@packages/billing/subscriptions-engine';
 import { buildAgentActionCards } from '@packages/agent/skill-registry';
-import { generateMarketAdvisoryNote } from '@packages/intelligence/llm-advisory-client';
+import {
+  generateMarketAdvisoryNote,
+  type ByokLlmProvider,
+} from '@packages/intelligence/llm-advisory-client';
 
 export const dynamic = 'force-dynamic';
 
@@ -78,8 +81,22 @@ export async function POST(req: NextRequest) {
 
     const platformCfg = await defaultBillingDbAdapter.getPlatformFeeAndRiskConfig().catch(() => null);
     const requestedLlm = typeof body?.llmProvider === 'string' ? body.llmProvider.trim().toUpperCase() : 'PLATFORM';
-    let byokLlm: { provider: 'GEMINI' | 'OPENAI'; apiKey: string } | undefined;
-    if (requestedLlm === 'GEMINI' || requestedLlm === 'OPENAI') {
+    const requestedLlmModel = typeof body?.llmModel === 'string' ? body.llmModel.trim() : undefined;
+    let byokLlm: { provider: ByokLlmProvider; apiKey: string; model?: string } | undefined;
+    if (requestedLlm === 'GEMINI' || requestedLlm === 'OPENAI' || requestedLlm === 'ANTHROPIC') {
+      const userPlan = await defaultBillingDbAdapter.getUserPlan(auth.walletAddress).catch(() => 'FREE' as const);
+      const planCap = SubscriptionsEngine.getPlanCapacities(userPlan);
+      if (planCap.maxLlmKeys <= 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              'PLAN_BYOK_LLM_REQUIRED: BYOK LLM execution is exclusive to Pro Terminal Trader (TRADER) and AI Autonomous Desk (AGENT) plans.',
+            timestamp: new Date().toISOString(),
+          },
+          { status: 403 }
+        );
+      }
       const resolved = await defaultProviderKeyVaultAdapter
         .resolveDecryptedKeyForDeploy({
           userIdentifier: auth.walletAddress,
@@ -88,7 +105,7 @@ export async function POST(req: NextRequest) {
         })
         .catch(() => null);
       if (resolved?.apiKey) {
-        byokLlm = { provider: requestedLlm, apiKey: resolved.apiKey };
+        byokLlm = { provider: requestedLlm, apiKey: resolved.apiKey, model: requestedLlmModel };
       }
     }
 

@@ -43,9 +43,9 @@ describe('Phase Y1–Y3: BYOK LLM Vault & Non-Custodial ERC-4337/7715 Session Al
     }
   });
 
-  it('[Y1.2] Billing tier SSOT defines maxLlmKeys across all 4 tiers', () => {
-    expect(SubscriptionsEngine.getPlanCapacities('FREE').maxLlmKeys).toBe(1);
-    expect(SubscriptionsEngine.getPlanCapacities('CREATOR').maxLlmKeys).toBe(2);
+  it('[Y1.2] Billing tier SSOT restricts maxLlmKeys exclusively to TRADER & AGENT tiers', () => {
+    expect(SubscriptionsEngine.getPlanCapacities('FREE').maxLlmKeys).toBe(0);
+    expect(SubscriptionsEngine.getPlanCapacities('CREATOR').maxLlmKeys).toBe(0);
     expect(SubscriptionsEngine.getPlanCapacities('TRADER').maxLlmKeys).toBe(3);
     expect(SubscriptionsEngine.getPlanCapacities('AGENT').maxLlmKeys).toBe(5);
   });
