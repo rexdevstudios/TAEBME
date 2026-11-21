@@ -34,6 +34,35 @@ export default function OverviewPage() {
   const [killSwitchReason, setKillSwitchReason] = useState('Routine platform risk evaluation');
   const [dualControlRequestId, setDualControlRequestId] = useState('');
   const [adminFeedback, setAdminFeedback] = useState<string | null>(null);
+  const [auditLogs, setAuditLogs] = useState<
+    Array<{ id: string; actorId: string; action: string; entityId: string | null; reason: string | null; createdAt: string }>
+  >([]);
+  const [auditFilter, setAuditFilter] = useState<string>('ALL');
+  const [auditLoading, setAuditLoading] = useState<boolean>(false);
+
+  const isAdminDashboardRole =
+    userRole === 'SYSTEM_ADMIN' ||
+    userRole === 'SUPER_ADMIN' ||
+    userRole === 'RISK_ADMIN' ||
+    userRole === 'LAUNCH_ADMIN' ||
+    userRole === 'BILLING_ADMIN';
+
+  const fetchAuditLogs = async (filterVal: string = auditFilter) => {
+    setAuditLoading(true);
+    try {
+      const qs = filterVal && filterVal !== 'ALL' ? `&action=${encodeURIComponent(filterVal)}` : '';
+      const res = await fetch(`/api/admin/audit-logs?limit=20${qs}`, { credentials: 'same-origin' });
+      if (!res.ok) return;
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data?.entries)) {
+        setAuditLogs(json.data.entries);
+      }
+    } catch {
+      // Non-blocking fallback
+    } finally {
+      setAuditLoading(false);
+    }
+  };
 
   const fetchOverview = async () => {
     try {
@@ -72,9 +101,10 @@ export default function OverviewPage() {
         })
         .catch(() => {});
     }
-    // Only fetch telemetry & kill switch state if Admin
-    if (userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN' || userRole === 'RISK_ADMIN') {
+    // Only fetch telemetry, audit logs & kill switch state if Admin
+    if (isAdminDashboardRole) {
       fetchOverview();
+      fetchAuditLogs('ALL');
       fetch('/api/admin/kill-switch')
         .then((r) => r.json())
         .then((json) => {
@@ -98,11 +128,13 @@ export default function OverviewPage() {
     });
     setKillSwitchActive(result.isNowActive);
     setAdminFeedback(result.feedbackMessage);
+    fetchAuditLogs(auditFilter);
   };
 
-  const handleFlushTelemetry = () => {
-    // Telemetry flush not yet wired to a backend endpoint — no operation performed.
-    setAdminFeedback('⚠️ Telemetry flush is not yet integrated with a backend endpoint. No data was sent.');
+  const handleRefreshTelemetryAndAudit = async () => {
+    setAdminFeedback('⏳ Memuat ulang telemetry live & audit_logs dari PostgreSQL SSOT...');
+    await Promise.all([fetchOverview(), fetchAuditLogs(auditFilter)]);
+    setAdminFeedback('✅ Live telemetry & Governance Audit Logs berhasil disinkronkan.');
   };
 
   const handleCompleteQuest = async (questId: string) => {
@@ -770,41 +802,109 @@ export default function OverviewPage() {
             </div>
           </div>
 
-          {/* 3. Telemetry Flush & Redis Heartbeat */}
+          {/* 3. Live Telemetry & Governance Audit Sync */}
           <div className="bg-panel" style={{ padding: '16px', borderRadius: '6px' }}>
-            <div style={{ color: '#D500F9', fontSize: '12px', fontWeight: 800, marginBottom: '8px' }}><Server size={14} className="inline mr-1" style={{display:'inline', marginRight:'4px', verticalAlign:'text-bottom'}}/> TELEMETRY & REDIS SIDECAR</div>
+            <div style={{ color: '#D500F9', fontSize: '12px', fontWeight: 800, marginBottom: '8px' }}><Server size={14} className="inline mr-1" style={{display:'inline', marginRight:'4px', verticalAlign:'text-bottom'}}/> TELEMETRY &amp; AUDIT SSOT</div>
             <div className="flex-col gap-sm" style={{ fontSize: '12px', color: 'var(--color-foreground)', marginBottom: '16px' }}>
               <div>Redis Sidecar: <strong style={{ color: 'var(--color-accent)' }}>ONLINE (REST)</strong></div>
-              <div>Ring Buffer: <strong style={{ color: '#00E5FF' }}>18 Events Cached</strong></div>
+              <div>Governance Logs: <strong style={{ color: '#00E5FF' }}>{auditLogs.length} Recent Entries</strong></div>
             </div>
             <button
-              onClick={handleFlushTelemetry}
+              type="button"
+              onClick={handleRefreshTelemetryAndAudit}
+              disabled={auditLoading}
               className="btn-secondary"
-              disabled={true}
-              style={{ width: '100%', justifyContent: 'center', cursor: 'not-allowed', opacity: 0.5 }}
-              title="Telemetry flush is not yet integrated with a backend endpoint."
-              aria-label="Telemetry flush not yet available"
+              style={{ width: '100%', justifyContent: 'center' }}
+              title="Muat ulang live telemetry dan audit_logs dari PostgreSQL SSOT"
             >
-              Flush Telemetry (Not Wired)
+              {auditLoading ? 'Syncing Telemetry...' : 'Refresh Telemetry & Audit Logs'}
             </button>
           </div>
         </div>
 
-        {/* RBAC Matrix Inspector */}
+        {/* Governance Audit Log Viewer (SSOT `audit_logs`) */}
+        <div className="bg-panel" style={{ padding: '16px', borderRadius: '6px', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
+            <div style={{ color: '#00E5FF', fontSize: '12px', fontWeight: 800 }}>
+              📜 Governance Audit Trail (`audit_logs` — PostgreSQL SSOT)
+            </div>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              {(['ALL', 'BILLING', 'KILL_SWITCH', 'LAUNCH', 'SNAPSHOT'] as const).map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => {
+                    setAuditFilter(f);
+                    fetchAuditLogs(f);
+                  }}
+                  className={auditFilter === f ? 'btn-primary' : 'btn-secondary'}
+                  style={{ padding: '3px 8px', fontSize: '10px', fontFamily: 'var(--font-mono)' }}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+          </div>
+          {auditLogs.length === 0 ? (
+            <div className="text-muted" style={{ fontSize: '12px', padding: '8px 0' }}>
+              {auditLoading ? 'Memuat log tata kelola dari PostgreSQL...' : 'Belum ada entri audit_logs untuk filter ini.'}
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--color-border)', color: 'var(--color-muted)', textAlign: 'left' }}>
+                    <th style={{ padding: '6px 8px' }}>Timestamp</th>
+                    <th style={{ padding: '6px 8px' }}>Action</th>
+                    <th style={{ padding: '6px 8px' }}>Actor</th>
+                    <th style={{ padding: '6px 8px' }}>Entity</th>
+                    <th style={{ padding: '6px 8px' }}>Reason</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {auditLogs.map((log) => (
+                    <tr key={log.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <td style={{ padding: '6px 8px', color: 'var(--color-muted)', whiteSpace: 'nowrap' }}>
+                        {new Date(log.createdAt).toLocaleString()}
+                      </td>
+                      <td style={{ padding: '6px 8px', fontWeight: 800, color: '#FFD600' }}>{log.action}</td>
+                      <td style={{ padding: '6px 8px', color: '#38BDF8' }}>
+                        {log.actorId.length > 16 ? `${log.actorId.slice(0, 8)}...${log.actorId.slice(-4)}` : log.actorId}
+                      </td>
+                      <td style={{ padding: '6px 8px', color: 'var(--color-muted)' }}>
+                        {log.entityId ? (log.entityId.length > 14 ? `${log.entityId.slice(0, 14)}...` : log.entityId) : '—'}
+                      </td>
+                      <td style={{ padding: '6px 8px', color: 'var(--color-foreground)', fontFamily: 'var(--font-sans)' }}>
+                        {log.reason || '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* RBAC Matrix Inspector (Synced 100% with packages/auth/rbac-middleware.ts) */}
         <div className="bg-panel" style={{ padding: '16px', borderRadius: '6px' }}>
           <div style={{ color: '#FFD600', fontSize: '12px', fontWeight: 800, marginBottom: '12px' }}>
-            🛡️ RBAC Domain Capabilities Matrix
+            🛡️ RBAC Domain Capabilities Matrix (8 Roles × 13 Capabilities)
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '8px', fontSize: '11px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(165px, 1fr))', gap: '8px', fontSize: '11px' }}>
             {[
-              { cap: 'VIEW_TOKENS', roles: 'ALL', dual: false },
-              { cap: 'TRADE_MANUALLY', roles: 'ADMIN, TRADER', dual: false },
-              { cap: 'ENABLE_LIVE_AGENT', roles: 'ADMIN, TRADER', dual: false },
-              { cap: 'CREATE_LAUNCH', roles: 'ADMIN, CREATOR', dual: false },
-              { cap: 'FREEZE_TOKEN', roles: 'ADMIN, MOD', dual: false },
-              { cap: 'REVIEW_FLAGGED', roles: 'ADMIN, RISK', dual: false },
-              { cap: 'MANAGE_BILLING', roles: 'SUPER_ADMIN', dual: true },
-              { cap: 'OVERRIDE_RISK', roles: 'SUPER_ADMIN', dual: true },
+              { cap: 'VIEW_TOKENS', roles: 'ALL 8 ROLES', dual: false },
+              { cap: 'CONNECT_WALLET', roles: 'ALL 8 ROLES', dual: false },
+              { cap: 'CREATE_LAUNCH_DRAFT', roles: 'SUPER, LAUNCH, CREATOR, TRADER', dual: false },
+              { cap: 'PUBLISH_LAUNCH', roles: 'SUPER, LAUNCH, CREATOR', dual: false },
+              { cap: 'GRADUATE_LAUNCH', roles: 'SUPER, LAUNCH_ADMIN', dual: false },
+              { cap: 'TRADE_MANUALLY', roles: 'SUPER, TRADER, CREATOR', dual: false },
+              { cap: 'ENABLE_LIVE_AGENT', roles: 'SUPER, TRADER', dual: false },
+              { cap: 'REVIEW_FLAGGED_TOKEN', roles: 'SUPER, MOD, RISK_ADMIN', dual: false },
+              { cap: 'FREEZE_TOKEN', roles: 'SUPER, MOD, RISK_ADMIN', dual: false },
+              { cap: 'SETTLE_BOUNTY_CLAIM', roles: 'SUPER, SYSTEM, TRADER, CREATOR', dual: false },
+              { cap: 'MANAGE_SNAPSHOTS', roles: 'SUPER, LAUNCH_ADMIN', dual: false },
+              { cap: 'MANAGE_BILLING_PLANS', roles: 'SUPER, SYSTEM, BILLING_ADMIN', dual: true },
+              { cap: 'OVERRIDE_RISK_ENGINE', roles: 'SUPER_ADMIN', dual: true },
             ].map((item) => (
               <div key={item.cap} className="bg-panel" style={{ padding: '8px', borderRadius: '4px' }}>
                 <div style={{ fontWeight: 800, color: 'var(--color-foreground)' }}>{item.cap}</div>

@@ -215,6 +215,9 @@ async function runBlackboxSuite() {
   const unauthJson = await unauthRes.json();
   assert(unauthJson.success === false, 'Rejection response contains success: false');
 
+  const unauthAuditRes = await fetch(`${BASE_URL}/api/admin/audit-logs`);
+  assert(unauthAuditRes.status === 401, 'Unauthenticated GET /api/admin/audit-logs strictly rejected with HTTP 401');
+
   console.log('\n================================================================');
   console.log(`  🎉 BLACKBOX SUITE COMPLETED: ${passedTests} PASSED, ${failedTests} FAILED`);
   console.log('================================================================\n');

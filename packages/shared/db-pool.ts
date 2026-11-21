@@ -5646,3 +5646,52 @@ class PostgresBountyMerkleSnapshotDbAdapter implements BountyMerkleSnapshotDbAda
 }
 
 export const defaultBountyMerkleSnapshotDbAdapter = new PostgresBountyMerkleSnapshotDbAdapter();
+
+// ----------------------------------------------------------------------------
+// GOVERNANCE AUDIT LOGS READER (SSOT `audit_logs`)
+// ----------------------------------------------------------------------------
+export interface AuditLogRecord {
+  id: string;
+  actorId: string;
+  action: string;
+  entityId: string | null;
+  reason: string | null;
+  createdAt: string;
+}
+
+export async function listRecentAuditLogs(
+  limit: number = 20,
+  actionFilter?: string
+): Promise<AuditLogRecord[]> {
+  const safeLimit = Math.max(1, Math.min(50, Math.round(Number(limit) || 20)));
+  const pool = getDbPool();
+  if (!pool) return [];
+
+  try {
+    const cleanFilter = typeof actionFilter === 'string' ? actionFilter.trim().toUpperCase() : '';
+    const hasFilter = cleanFilter.length > 0 && cleanFilter !== 'ALL';
+    const sql = hasFilter
+      ? `SELECT id, actor_id, action, entity_id, reason, created_at
+         FROM audit_logs
+         WHERE UPPER(action) LIKE $1
+         ORDER BY created_at DESC
+         LIMIT $2`
+      : `SELECT id, actor_id, action, entity_id, reason, created_at
+         FROM audit_logs
+         ORDER BY created_at DESC
+         LIMIT $1`;
+    const params = hasFilter ? [`%${cleanFilter}%`, safeLimit] : [safeLimit];
+    const res = await pool.query(sql, params);
+    return res.rows.map((r: any) => ({
+      id: String(r.id),
+      actorId: String(r.actor_id || 'system'),
+      action: String(r.action || 'UNKNOWN'),
+      entityId: r.entity_id ? String(r.entity_id) : null,
+      reason: r.reason ? String(r.reason) : null,
+      createdAt: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString(),
+    }));
+  } catch (err: any) {
+    console.warn('[listRecentAuditLogs] Non-blocking read warning:', err?.message);
+    return [];
+  }
+}
