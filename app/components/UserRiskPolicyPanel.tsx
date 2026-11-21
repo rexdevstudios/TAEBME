@@ -15,6 +15,11 @@ export function UserRiskPolicyPanel({ isConnected }: UserRiskPolicyPanelProps) {
   const [maxDailyLoss, setMaxDailyLoss] = useState<number>(50);
   const [maxSlippage, setMaxSlippage] = useState<number>(1.5);
   const [allowedSymbolsText, setAllowedSymbolsText] = useState<string>('');
+  const [exposure24h, setExposure24h] = useState<{ currentDailyLossUsd: number; currentOpenPositions: number; maxOpenPositions: number }>({
+    currentDailyLossUsd: 0,
+    currentOpenPositions: 0,
+    maxOpenPositions: 5,
+  });
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
@@ -34,6 +39,13 @@ export function UserRiskPolicyPanel({ isConnected }: UserRiskPolicyPanelProps) {
           setMaxDailyLoss(eff.maxDailyLossUsd);
           setMaxSlippage(eff.maxSlippagePct);
           setAllowedSymbolsText(Array.isArray(eff.allowedSymbols) ? eff.allowedSymbols.join(', ') : '');
+        }
+        if (json.data.exposure24h) {
+          setExposure24h({
+            currentDailyLossUsd: Number(json.data.exposure24h.currentDailyLossUsd || 0),
+            currentOpenPositions: Number(json.data.exposure24h.currentOpenPositions || 0),
+            maxOpenPositions: Number(json.data.exposure24h.maxOpenPositions || 5),
+          });
         }
       }
     } catch {
@@ -110,6 +122,36 @@ export function UserRiskPolicyPanel({ isConnected }: UserRiskPolicyPanelProps) {
         <ShieldCheck size={11} style={{ display: 'inline', marginRight: '4px', color: '#10B981', verticalAlign: 'middle' }} />
         Aktif: Order ≤ ${maxOrder.toLocaleString()} · Daily Loss ≤ ${maxDailyLoss.toLocaleString()} · Slippage ≤ {maxSlippage}%
       </div>
+      {isConnected && (
+        <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--color-muted)' }}>
+            <span>
+              24h Loss Used:{' '}
+              <strong style={{ color: maxDailyLoss > 0 && exposure24h.currentDailyLossUsd / maxDailyLoss >= 0.8 ? '#EF4444' : 'var(--color-foreground)' }}>
+                ${exposure24h.currentDailyLossUsd.toLocaleString()} / ${maxDailyLoss.toLocaleString()}
+              </strong>
+            </span>
+            <span>
+              Open Intents: <strong style={{ color: 'var(--color-foreground)' }}>{exposure24h.currentOpenPositions}/{exposure24h.maxOpenPositions}</strong>
+            </span>
+          </div>
+          <div style={{ width: '100%', height: '4px', borderRadius: '999px', background: 'rgba(148, 163, 184, 0.2)', overflow: 'hidden' }}>
+            <div
+              style={{
+                width: `${Math.min(100, maxDailyLoss > 0 ? Math.round((exposure24h.currentDailyLossUsd / maxDailyLoss) * 100) : 0)}%`,
+                height: '100%',
+                background:
+                  maxDailyLoss > 0 && exposure24h.currentDailyLossUsd / maxDailyLoss >= 0.8
+                    ? '#EF4444'
+                    : maxDailyLoss > 0 && exposure24h.currentDailyLossUsd / maxDailyLoss >= 0.5
+                    ? '#F59E0B'
+                    : '#10B981',
+                transition: 'width 200ms ease',
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       {expanded && (
         <div style={{ marginTop: '10px' }}>

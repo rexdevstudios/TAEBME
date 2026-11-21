@@ -29,10 +29,14 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const [planId, userPolicy, globalCfg] = await Promise.all([
+    const [planId, userPolicy, globalCfg, exposure24h] = await Promise.all([
       defaultBillingDbAdapter.getUserPlan(auth.walletAddress).catch(() => 'FREE' as const),
       defaultBillingDbAdapter.getUserRiskPolicy(auth.walletAddress).catch(() => null),
       defaultBillingDbAdapter.getPlatformFeeAndRiskConfig().catch(() => null),
+      defaultBillingDbAdapter.getUser24hRiskExposure(auth.user.userId).catch(() => ({
+        currentDailyLossUsd: 0,
+        currentOpenPositions: 0,
+      })),
     ]);
 
     const tierCeiling = SubscriptionsEngine.getPlanCapacities(planId);
@@ -54,6 +58,10 @@ export async function GET(req: NextRequest) {
           },
           userPolicy,
           effectiveLimits,
+          exposure24h: {
+            ...exposure24h,
+            maxOpenPositions: 5,
+          },
         },
         timestamp: new Date().toISOString(),
       },
