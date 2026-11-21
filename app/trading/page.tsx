@@ -6,6 +6,7 @@ import { Activity, ShieldAlert, BarChart3, Clock, AlertTriangle, Lightbulb, Wall
 import { NutritionLabelCard } from '../components/NutritionLabelCard';
 import { PageWorkflowBanner } from '../components/PageWorkflowBanner';
 import { BinanceKeyVaultPanel } from '../components/BinanceKeyVaultPanel';
+import { UserRiskPolicyPanel } from '../components/UserRiskPolicyPanel';
 
 interface Candle {
   timestamp: number;
@@ -663,6 +664,8 @@ export default function TradingPage() {
                 <option value="CEX_SINGLE_SHOT">Mode: CEX_SINGLE_SHOT (Stateless Binance Trade — TRADER/AGENT)</option>
               </select>
             </div>
+
+            <UserRiskPolicyPanel isConnected={isConnected} />
 
             {executionMode === 'CEX_SINGLE_SHOT' && (
               <BinanceKeyVaultPanel

@@ -273,6 +273,9 @@ export function BankrKeyVaultPanel({
                   >
                     SCOPE: {k.chainScope.toUpperCase()}
                   </span>
+                  <span style={{ fontSize: '9px', color: 'var(--color-muted)', fontFamily: 'var(--font-mono)' }}>
+                    {k.lastUsedAt ? `Dipakai: ${new Date(k.lastUsedAt).toLocaleString()}` : 'Belum dipakai'}
+                  </span>
                   {k.isDefault && (
                     <span
                       style={{

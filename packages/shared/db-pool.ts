@@ -26,7 +26,7 @@ import { BinanceCredentialVault } from '../trading/binance-vault';
 import { validateBinancePermissions, BinanceKeyPermissions } from './types/domain';
 import { ProposalDbAdapter, AgentProposalRecord } from '../agent/proposal-engine';
 import { DualControlDbAdapter, DualControlRequestRecord } from '../admin/dual-control';
-import { PlanId, BillingDbAdapter } from '../billing/subscriptions-engine';
+import { PlanId, BillingDbAdapter, UserRiskPolicy } from '../billing/subscriptions-engine';
 
 import { getAppEnvironment } from './env-config';
 
@@ -3722,6 +3722,25 @@ export class PostgresBinanceExecutionDbAdapter implements BinanceExecutionDbAdap
     return true;
   }
 
+  async touchBinanceCredentialLastUsed(credentialId: string): Promise<void> {
+    if (!credentialId) return;
+    if (this.isExplicitInMemory) {
+      const target = this.inMemoryBinanceVault.find((c) => c.id === credentialId);
+      if (target) {
+        target.lastUsedAt = new Date().toISOString();
+      }
+      return;
+    }
+
+    const pool = this.getPool();
+    if (!pool) return;
+    try {
+      await pool.query(`UPDATE binance_credentials SET last_used_at = NOW(), updated_at = NOW() WHERE id = $1`, [credentialId]);
+    } catch {
+      // Non-blocking telemetry update
+    }
+  }
+
   async recordOrderFill(fill: {
     intentId: string;
     exchangeOrderId: string;
@@ -4805,6 +4824,82 @@ export class PostgresBillingDbAdapter implements BillingDbAdapter {
     }
 
     return updated;
+  }
+
+  private inMemoryUserRiskPolicies = new Map<string, UserRiskPolicy>();
+
+  async getUserRiskPolicy(userId: string): Promise<UserRiskPolicy | null> {
+    const norm = userId.toLowerCase();
+    const pool = getDbPool();
+    if (pool) {
+      try {
+        const validUserId = await ensureUserEntity(pool, userId);
+        const res = await pool.query(
+          `SELECT max_order_value_usd, max_daily_loss_usd, max_slippage_pct, allowed_symbols, updated_at
+           FROM user_risk_limits
+           WHERE user_id = $1
+           LIMIT 1`,
+          [validUserId]
+        );
+        if (res.rows.length > 0) {
+          const r = res.rows[0];
+          return {
+            maxOrderValueUsd: Number(r.max_order_value_usd),
+            maxDailyLossUsd: Number(r.max_daily_loss_usd),
+            maxSlippagePct: Number(r.max_slippage_pct),
+            allowedSymbols: Array.isArray(r.allowed_symbols) ? r.allowed_symbols.map(String) : [],
+            updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : undefined,
+          };
+        }
+        return null;
+      } catch (err: any) {
+        console.warn('[PostgresBillingDbAdapter] getUserRiskPolicy fallback:', err?.message);
+      }
+    }
+    return this.inMemoryUserRiskPolicies.get(norm) || null;
+  }
+
+  async upsertUserRiskPolicy(userId: string, policy: UserRiskPolicy): Promise<UserRiskPolicy> {
+    const norm = userId.toLowerCase();
+    const clean: UserRiskPolicy = {
+      maxOrderValueUsd: Math.max(1, Number(policy.maxOrderValueUsd)),
+      maxDailyLossUsd: Math.max(1, Number(policy.maxDailyLossUsd)),
+      maxSlippagePct: Math.max(0.1, Math.min(10, Number(policy.maxSlippagePct))),
+      allowedSymbols: Array.isArray(policy.allowedSymbols)
+        ? policy.allowedSymbols.map((s) => String(s).trim().toUpperCase()).filter(Boolean).slice(0, 20)
+        : [],
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.inMemoryUserRiskPolicies.set(norm, clean);
+
+    const pool = getDbPool();
+    if (pool) {
+      try {
+        const validUserId = await ensureUserEntity(pool, userId);
+        await pool.query(
+          `INSERT INTO user_risk_limits (user_id, max_order_value_usd, max_daily_loss_usd, max_slippage_pct, allowed_symbols, updated_at)
+           VALUES ($1, $2, $3, $4, $5::text[], NOW())
+           ON CONFLICT (user_id) DO UPDATE SET
+             max_order_value_usd = EXCLUDED.max_order_value_usd,
+             max_daily_loss_usd = EXCLUDED.max_daily_loss_usd,
+             max_slippage_pct = EXCLUDED.max_slippage_pct,
+             allowed_symbols = EXCLUDED.allowed_symbols,
+             updated_at = NOW()`,
+          [validUserId, clean.maxOrderValueUsd, clean.maxDailyLossUsd, clean.maxSlippagePct, clean.allowedSymbols]
+        );
+        await this.createAuditLog(
+          validUserId,
+          'USER_RISK_POLICY_UPDATED',
+          validUserId,
+          `Updated risk policy: maxOrder=$${clean.maxOrderValueUsd}, maxDailyLoss=$${clean.maxDailyLossUsd}, maxSlippage=${clean.maxSlippagePct}%`
+        );
+      } catch (err: any) {
+        console.warn('[PostgresBillingDbAdapter] upsertUserRiskPolicy fallback:', err?.message);
+      }
+    }
+
+    return clean;
   }
 
   async getPlanDiscounts(): Promise<

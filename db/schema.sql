@@ -279,6 +279,15 @@ CREATE TABLE binance_credentials (
 );
 CREATE INDEX IF NOT EXISTS idx_binance_creds_user_active ON binance_credentials (user_id, is_active);
 
+CREATE TABLE IF NOT EXISTS user_risk_limits (
+    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    max_order_value_usd NUMERIC(18, 2) NOT NULL DEFAULT 250,
+    max_daily_loss_usd NUMERIC(18, 2) NOT NULL DEFAULT 50,
+    max_slippage_pct NUMERIC(5, 2) NOT NULL DEFAULT 1.50,
+    allowed_symbols TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TYPE trade_stage AS ENUM ('PAPER', 'TESTNET', 'LIVE');
 CREATE TYPE order_side AS ENUM ('BUY', 'SELL');
 CREATE TYPE order_type AS ENUM ('LIMIT', 'MARKET', 'STOP_LOSS', 'TAKE_PROFIT');

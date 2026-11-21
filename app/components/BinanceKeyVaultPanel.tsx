@@ -322,7 +322,7 @@ export function BinanceKeyVaultPanel({
                         </span>
                       </div>
                       <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--color-muted)' }}>
-                        {acc.maskedApiKey}
+                        {acc.maskedApiKey} · {acc.lastUsedAt ? `Dipakai: ${new Date(acc.lastUsedAt).toLocaleString()}` : 'Belum dipakai'}
                       </span>
                       {pingStatusMap[acc.id] && (
                         <span

@@ -75,6 +75,8 @@ export async function POST(req: NextRequest) {
       environment: creds.environment === 'MAINNET' ? 'MAINNET' : 'TESTNET',
     });
 
+    await adapter.touchBinanceCredentialLastUsed(creds.id);
+
     await adapter.createAuditLog(
       auth.walletAddress,
       'BINANCE_CREDENTIAL_VERIFIED',

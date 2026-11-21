@@ -15,6 +15,7 @@ import { rateLimiter } from '@packages/auth/rate-limiter';
 import { TradingRiskGate } from '@packages/trading/risk-gate';
 import { MevProtectionService } from '@packages/trading/mev-protection';
 import { validateBinancePermissions } from '@packages/shared/types/domain';
+import { computeEffectiveUserRiskLimits } from '@packages/billing/subscriptions-engine';
 import {
   getDbPool,
   saveTradeIntent,
@@ -69,10 +70,48 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 1. Authoritative Kill Switch, Entitlement & Deterministic Risk Gate (Fail-Closed)
-    const activeKillSwitches = await defaultKillSwitchDbAdapter.getActiveKillSwitches();
-    const userEntitlement = await defaultBillingDbAdapter.getUserEntitlement(auth.user.userId);
-    const dynamicRiskCfg = await defaultBillingDbAdapter.getPlatformFeeAndRiskConfig().catch(() => null);
+    // 1. Authoritative Kill Switch, Entitlement, Per-User Clamped Risk Policy & Deterministic Risk Gate (Fail-Closed)
+    const [activeKillSwitches, userEntitlement, dynamicRiskCfg, userRiskPolicy] = await Promise.all([
+      defaultKillSwitchDbAdapter.getActiveKillSwitches(),
+      defaultBillingDbAdapter.getUserEntitlement(auth.user.userId),
+      defaultBillingDbAdapter.getPlatformFeeAndRiskConfig().catch(() => null),
+      defaultBillingDbAdapter.getUserRiskPolicy(auth.walletAddress).catch(() => null),
+    ]);
+
+    const effectiveLimits = computeEffectiveUserRiskLimits({
+      planId: userEntitlement.planId,
+      userPolicy: userRiskPolicy,
+      platformGlobalCap: dynamicRiskCfg,
+    });
+
+    if (effectiveLimits.allowedSymbols.length > 0) {
+      const normalizedTarget = symbol.replace('/', '').toUpperCase();
+      const matched = effectiveLimits.allowedSymbols.some(
+        (allowed) => allowed.replace('/', '').toUpperCase() === normalizedTarget
+      );
+      if (!matched) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `SYMBOL_NOT_WHITELISTED: Symbol "${symbol}" is outside your personal allowedSymbols policy (${effectiveLimits.allowedSymbols.join(', ')}).`,
+            timestamp: new Date().toISOString(),
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (maxSlippagePct > effectiveLimits.maxSlippagePct) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `SLIPPAGE_EXCEEDS_POLICY: Requested slippage ${maxSlippagePct}% exceeds your effective risk limit (${effectiveLimits.maxSlippagePct}%).`,
+          timestamp: new Date().toISOString(),
+        },
+        { status: 400 }
+      );
+    }
+
     const { status: gateStatus, decision } = TradingRiskGate.evaluateIntent(
       {
         userId: auth.user.userId,
@@ -86,8 +125,8 @@ export async function POST(req: NextRequest) {
         idempotencyKey,
       },
       {
-        maxOrderValueUsd: dynamicRiskCfg?.maxOrderValueUsd ?? 10000,
-        maxDailyLossUsd: dynamicRiskCfg?.maxDailyLossUsd ?? 1000,
+        maxOrderValueUsd: effectiveLimits.maxOrderValueUsd,
+        maxDailyLossUsd: effectiveLimits.maxDailyLossUsd,
         currentDailyLossUsd: 0,
         maxOpenPositions: 5,
         currentOpenPositions: 0,
@@ -191,6 +230,7 @@ export async function POST(req: NextRequest) {
       if (creds.permissions) {
         validateBinancePermissions(creds.permissions);
       }
+      await execDb.touchBinanceCredentialLastUsed(creds.id);
 
       const tradeIntentId = await saveTradeIntent({
         userId: auth.user.userId,

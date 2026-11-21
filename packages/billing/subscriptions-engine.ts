@@ -20,6 +20,83 @@ export interface PlanCapacities {
   maxDailyLossUsd: number;
 }
 
+export interface UserRiskPolicy {
+  maxOrderValueUsd: number;
+  maxDailyLossUsd: number;
+  maxSlippagePct: number;
+  allowedSymbols: string[];
+  updatedAt?: string;
+}
+
+export interface EffectiveUserRiskLimits {
+  planId: PlanId;
+  maxOrderValueUsd: number;
+  maxDailyLossUsd: number;
+  maxSlippagePct: number;
+  allowedSymbols: string[];
+}
+
+/**
+ * Pure deterministic clamping function (Defense-in-Depth):
+ * Users can tighten their own risk limits, but can NEVER exceed their billing tier ceiling
+ * or the global platform admin risk cap.
+ */
+export function computeEffectiveUserRiskLimits(params: {
+  planId?: string | null;
+  userPolicy?: Partial<UserRiskPolicy> | null;
+  platformGlobalCap?: {
+    maxOrderValueUsd?: number;
+    maxDailyLossUsd?: number;
+    maxSlippagePct?: number;
+  } | null;
+}): EffectiveUserRiskLimits {
+  const tier = SubscriptionsEngine.getPlanCapacities(params.planId);
+  const globalMaxOrder = Number.isFinite(Number(params.platformGlobalCap?.maxOrderValueUsd))
+    ? Math.max(10, Number(params.platformGlobalCap?.maxOrderValueUsd))
+    : 10000;
+  const globalMaxDailyLoss = Number.isFinite(Number(params.platformGlobalCap?.maxDailyLossUsd))
+    ? Math.max(10, Number(params.platformGlobalCap?.maxDailyLossUsd))
+    : 1000;
+  const globalMaxSlippage = Number.isFinite(Number(params.platformGlobalCap?.maxSlippagePct))
+    ? Math.max(0.1, Math.min(10, Number(params.platformGlobalCap?.maxSlippagePct)))
+    : 3.0;
+
+  const ceilingOrder = Math.min(tier.maxOrderValueUsd, globalMaxOrder);
+  const ceilingLoss = Math.min(tier.maxDailyLossUsd, globalMaxDailyLoss);
+  const ceilingSlippage = globalMaxSlippage;
+
+  const userOrder =
+    params.userPolicy?.maxOrderValueUsd !== undefined && Number.isFinite(Number(params.userPolicy.maxOrderValueUsd))
+      ? Math.max(1, Number(params.userPolicy.maxOrderValueUsd))
+      : ceilingOrder;
+  const userLoss =
+    params.userPolicy?.maxDailyLossUsd !== undefined && Number.isFinite(Number(params.userPolicy.maxDailyLossUsd))
+      ? Math.max(1, Number(params.userPolicy.maxDailyLossUsd))
+      : ceilingLoss;
+  const userSlippage =
+    params.userPolicy?.maxSlippagePct !== undefined && Number.isFinite(Number(params.userPolicy.maxSlippagePct))
+      ? Math.max(0.1, Number(params.userPolicy.maxSlippagePct))
+      : Math.min(1.5, ceilingSlippage);
+
+  const allowedSymbols = Array.isArray(params.userPolicy?.allowedSymbols)
+    ? Array.from(
+        new Set(
+          params.userPolicy.allowedSymbols
+            .map((s) => String(s || '').trim().toUpperCase())
+            .filter((s) => s.length >= 2 && s.length <= 24)
+        )
+      ).slice(0, 20)
+    : [];
+
+  return {
+    planId: tier.planId,
+    maxOrderValueUsd: Math.round(Math.min(userOrder, ceilingOrder) * 100) / 100,
+    maxDailyLossUsd: Math.round(Math.min(userLoss, ceilingLoss) * 100) / 100,
+    maxSlippagePct: Math.round(Math.min(userSlippage, ceilingSlippage) * 100) / 100,
+    allowedSymbols,
+  };
+}
+
 export interface BillingDbAdapter {
   getUserPlan(userId: string): Promise<PlanId>;
   getUserCreditBalance(userId: string): Promise<number>;
