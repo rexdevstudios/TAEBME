@@ -182,7 +182,7 @@ export default function TokenActionsClient({
       <div
         className="card"
         style={{
-          background: 'linear-gradient(180deg, rgba(30, 41, 59, 0.6) 0%, rgba(15, 23, 42, 0.9) 100%)',
+          backgroundColor: 'var(--color-surface-elevated)',
           border: '1px solid #334155',
           borderRadius: '12px',
           padding: '20px',
@@ -205,7 +205,7 @@ export default function TokenActionsClient({
             style={{
               flex: 1,
               minWidth: '220px',
-              backgroundColor: '#020617',
+              backgroundColor: 'var(--color-surface-subtle)',
               border: '1px solid #334155',
               borderRadius: '8px',
               padding: '10px 14px',
@@ -266,7 +266,7 @@ export default function TokenActionsClient({
       <div
         className="card"
         style={{
-          background: 'linear-gradient(180deg, rgba(30, 41, 59, 0.4) 0%, rgba(15, 23, 42, 0.8) 100%)',
+          backgroundColor: 'var(--color-surface-elevated)',
           border: '1px solid #334155',
           borderRadius: '12px',
           padding: '24px',
@@ -304,7 +304,7 @@ export default function TokenActionsClient({
         <div
           style={{
             display: 'flex',
-            backgroundColor: '#020617',
+            backgroundColor: 'var(--color-surface-subtle)',
             borderRadius: '8px',
             padding: '4px',
             marginBottom: '16px',
@@ -352,7 +352,7 @@ export default function TokenActionsClient({
         {/* Input box */}
         <div
           style={{
-            backgroundColor: '#020617',
+            backgroundColor: 'var(--color-surface-subtle)',
             border: '1px solid #334155',
             borderRadius: '8px',
             padding: '12px 16px',
@@ -382,7 +382,7 @@ export default function TokenActionsClient({
             />
             <span
               style={{
-                backgroundColor: '#1E293B',
+                backgroundColor: 'var(--color-surface-inset)',
                 color: '#F8FAFC',
                 padding: '4px 10px',
                 borderRadius: '6px',
@@ -405,7 +405,7 @@ export default function TokenActionsClient({
               onClick={() => setSwapAmount(amt)}
               style={{
                 padding: '4px 10px',
-                backgroundColor: '#1E293B',
+                backgroundColor: 'var(--color-surface-inset)',
                 border: '1px solid #334155',
                 borderRadius: '6px',
                 color: '#94A3B8',
@@ -426,7 +426,7 @@ export default function TokenActionsClient({
               width: '28px',
               height: '28px',
               borderRadius: '50%',
-              backgroundColor: '#1E293B',
+              backgroundColor: 'var(--color-surface-inset)',
               border: '1px solid #334155',
               display: 'flex',
               alignItems: 'center',
@@ -440,7 +440,7 @@ export default function TokenActionsClient({
         {/* Output box */}
         <div
           style={{
-            backgroundColor: '#020617',
+            backgroundColor: 'var(--color-surface-subtle)',
             border: '1px solid #334155',
             borderRadius: '8px',
             padding: '12px 16px',
@@ -556,7 +556,7 @@ export default function TokenActionsClient({
                 placeholder="Opsional: KOL Referral Wallet 0x... (0.25% On-Chain Rebate)"
                 style={{
                   flex: '1 1 200px',
-                  backgroundColor: '#020617',
+                  backgroundColor: 'var(--color-surface-subtle)',
                   border: '1px solid #334155',
                   borderRadius: '6px',
                   padding: '7px 10px',

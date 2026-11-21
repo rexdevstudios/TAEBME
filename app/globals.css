@@ -242,9 +242,60 @@
   .poolnet-marquee-track {
     animation: none;
   }
-  .spotlight-card:hover {
+  .spotlight-card:hover,
+  .token-card-interactive:hover {
     transform: none;
   }
+  .skeleton-shimmer {
+    animation: none;
+  }
+}
+
+/* Interactive Token Card Micro-Interactions */
+.token-card-interactive {
+  transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1), border-color 200ms ease, box-shadow 200ms ease;
+}
+.token-card-interactive:hover {
+  transform: translateY(-3px);
+  border-color: var(--color-accent) !important;
+  box-shadow: var(--shadow-md);
+}
+
+/* Discovery Filter Pills (Chain / Timeframe / Sort) */
+.filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 9999px;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface-subtle);
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+.filter-pill:hover {
+  border-color: var(--color-accent);
+  color: var(--color-foreground);
+}
+.filter-pill[data-active="true"] {
+  background-color: var(--color-badge-info-bg);
+  border-color: var(--color-badge-info-border);
+  color: var(--color-badge-info-text);
+}
+
+/* Subtle Loading Shimmer */
+@keyframes poolnet-shimmer {
+  0% { opacity: 0.65; }
+  50% { opacity: 1; }
+  100% { opacity: 0.65; }
+}
+.skeleton-shimmer {
+  background-color: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  animation: poolnet-shimmer 1.6s ease-in-out infinite;
 }
 
 * {

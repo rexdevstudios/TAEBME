@@ -1,13 +1,14 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Rocket, ShieldAlert, FileText, CheckCircle2, AlertTriangle, TrendingUp, Scale, Wallet, Users, Tag, Sparkles, Coins, Zap } from 'lucide-react';
+import { Rocket, ShieldAlert, FileText, CheckCircle2, AlertTriangle, TrendingUp, Scale, Wallet, Users, Tag, Sparkles, Coins, Zap, Search, Copy, Check } from 'lucide-react';
 import { NutritionLabelCard } from '../components/NutritionLabelCard';
 import { AngelDealRoomModal } from '../components/AngelDealRoomModal';
 import { AdminMerkleSnapshotPanel } from '../components/AdminMerkleSnapshotPanel';
 import { CreatorStudioPanel } from '../components/CreatorStudioPanel';
 import { PageWorkflowBanner } from '../components/PageWorkflowBanner';
+import { TokenAvatar } from '../components/TokenAvatar';
 import { ethers } from 'ethers';
 import {
   getContractConfiguration,
@@ -18,6 +19,12 @@ import {
   getExplorerUrl,
 } from '@packages/launchpad/web3-provider';
 import { normalizeChainName } from '@packages/shared/token-identifier';
+import {
+  filterAndSortLaunchTokens,
+  normalizeDiscoveryChain,
+  computeGraduationProgressPct,
+  LaunchpadSortMode,
+} from '@packages/shared/launchpad-discovery';
 
 export type LaunchModeType = 'BONDING_CURVE' | 'FAIR_LAUNCH' | 'WHITELIST_PRIVATE' | 'FIXED_PRICE' | 'COMMUNITY_PRELAUNCH';
 
@@ -37,6 +44,31 @@ export default function LaunchpadPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [activeTokens, setActiveTokens] = useState<any[]>([]);
   const [isLoadingTokens, setIsLoadingTokens] = useState(false);
+
+  // Discovery Filter & Sort State (Live Token Fleet)
+  const [tokenSearch, setTokenSearch] = useState('');
+  const [chainFilter, setChainFilter] = useState<string>('all');
+  const [sortMode, setSortMode] = useState<LaunchpadSortMode>('trending');
+  const [copiedAddr, setCopiedAddr] = useState<string | null>(null);
+
+  const chainCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: activeTokens.length };
+    for (const t of activeTokens) {
+      const c = normalizeDiscoveryChain(t.chain);
+      counts[c] = (counts[c] || 0) + 1;
+    }
+    return counts;
+  }, [activeTokens]);
+
+  const filteredTokens = useMemo(
+    () =>
+      filterAndSortLaunchTokens(activeTokens, {
+        search: tokenSearch,
+        chain: chainFilter,
+        sort: sortMode,
+      }),
+    [activeTokens, tokenSearch, chainFilter, sortMode]
+  );
 
   // 4 Launchpad Alignment Dimensions (Chain, Pairing, Degen Mode, Vesting)
   const [selectedChain, setSelectedChain] = useState<'base' | 'robinhood' | 'arbitrum' | 'arc'>('base');
@@ -98,7 +130,7 @@ export default function LaunchpadPage() {
           name: tokenName,
           ticker: tokenSymbol.toUpperCase(),
           description: `Launch draft for ${tokenName} on ${mode} (${selectedChain.toUpperCase()})`,
-          imageUrl: '/token-default.png',
+          imageUrl: '/token-default.svg',
           launchMode: mode,
           targetChain: selectedChain === 'base' ? 'base-mainnet' : `${selectedChain}-mainnet`,
           totalSupply: '1000000000',
@@ -950,15 +982,15 @@ export default function LaunchpadPage() {
         </div>
       </div>
 
-      {/* Live Deployed Tokens & Active Bonding Curves (Neon SSOT Stream) */}
-      <div className="bg-panel" style={{ borderRadius: '8px', padding: '24px', border: '1px solid var(--color-border)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+      {/* Live Deployed Tokens & Active Bonding Curves */}
+      <div className="bg-panel" style={{ borderRadius: '14px', padding: '24px', border: '1px solid var(--color-border)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
           <h2 style={{ color: 'var(--color-foreground)', margin: 0, fontSize: '16px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Rocket size={18} style={{ color: 'var(--color-accent)' }} /> Live Deployed Tokens & Bonding Curves
+            <Rocket size={18} style={{ color: 'var(--color-accent)' }} /> Live Deployed Tokens &amp; Bonding Curves
           </h2>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <span className="badge" style={{ backgroundColor: 'var(--color-badge-info-bg)', color: 'var(--color-badge-info-text)', border: '1px solid var(--color-badge-info-border)', fontSize: '11px', fontWeight: 800 }}>
-              {activeTokens.length} LIVE TOKENS (MULTI-CHAIN)
+              {filteredTokens.length} / {activeTokens.length} TOKEN AKTIF
             </span>
             <button
               type="button"
@@ -967,17 +999,139 @@ export default function LaunchpadPage() {
               style={{ padding: '6px 12px', fontSize: '11px' }}
               disabled={isLoadingTokens}
             >
-              {isLoadingTokens ? 'Refreshing...' : '🔄 Refresh Daftar'}
+              {isLoadingTokens ? 'Memuat...' : '🔄 Refresh Daftar'}
             </button>
           </div>
         </div>
 
-        {activeTokens.length > 0 ? (
+        {/* Discovery Filter & Sort Toolbar */}
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px',
+            marginBottom: '18px',
+            padding: '12px 14px',
+            borderRadius: '12px',
+            backgroundColor: 'var(--color-surface-subtle)',
+            border: '1px solid var(--color-border)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+            {/* Search Box */}
+            <div style={{ position: 'relative', flex: '1 1 240px', maxWidth: '380px' }}>
+              <Search
+                size={14}
+                style={{
+                  position: 'absolute',
+                  left: '11px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: 'var(--color-muted)',
+                  pointerEvents: 'none',
+                }}
+              />
+              <input
+                type="text"
+                value={tokenSearch}
+                onChange={(e) => setTokenSearch(e.target.value)}
+                placeholder="Cari nama token, $TICKER, atau 0x..."
+                className="input"
+                style={{ width: '100%', padding: '7px 12px 7px 32px', fontSize: '12px', borderRadius: '9999px' }}
+              />
+            </div>
+
+            {/* Sort / Category Tabs */}
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              {[
+                { id: 'trending' as LaunchpadSortMode, label: '🔥 Sedang Ramai' },
+                { id: 'newest' as LaunchpadSortMode, label: '🆕 Terbaru' },
+                { id: 'graduating' as LaunchpadSortMode, label: '🎓 Hampir Graduasi' },
+                { id: 'safest' as LaunchpadSortMode, label: '🛡️ Skor Aman' },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setSortMode(tab.id)}
+                  className="filter-pill"
+                  data-active={sortMode === tab.id ? 'true' : 'false'}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Chain Filter Pills */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '11px', color: 'var(--color-muted)', fontWeight: 700, marginRight: '4px' }}>
+              Jaringan:
+            </span>
+            {[
+              { id: 'all', label: 'Semua' },
+              { id: 'base', label: 'Base' },
+              { id: 'robinhood', label: 'Robinhood' },
+              { id: 'solana', label: 'Solana' },
+              { id: 'arbitrum', label: 'Arbitrum' },
+              { id: 'arc', label: 'Arc' },
+            ].map((ch) => {
+              const count = chainCounts[ch.id] || 0;
+              return (
+                <button
+                  key={ch.id}
+                  type="button"
+                  onClick={() => setChainFilter(ch.id)}
+                  className="filter-pill"
+                  data-active={chainFilter === ch.id ? 'true' : 'false'}
+                >
+                  <span>{ch.label}</span>
+                  <span style={{ opacity: 0.75, fontFamily: 'var(--font-mono)', fontSize: '10px' }}>
+                    ({count})
+                  </span>
+                </button>
+              );
+            })}
+            {(tokenSearch || chainFilter !== 'all' || sortMode !== 'trending') && (
+              <button
+                type="button"
+                onClick={() => {
+                  setTokenSearch('');
+                  setChainFilter('all');
+                  setSortMode('trending');
+                }}
+                style={{
+                  marginLeft: 'auto',
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--color-accent)',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  textDecoration: 'underline',
+                }}
+              >
+                Reset Filter
+              </button>
+            )}
+          </div>
+        </div>
+
+        {isLoadingTokens && activeTokens.length === 0 ? (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
-            {activeTokens.map((token: any) => {
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="skeleton-shimmer" style={{ height: '190px', borderRadius: '12px' }} />
+            ))}
+          </div>
+        ) : filteredTokens.length > 0 ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: '16px' }}>
+            {filteredTokens.map((token: any) => {
               const raised = Number(token.raisedAmount || 0);
               const target = Number(token.graduationThreshold || 69000);
-              const progressPct = Math.min(100, Math.round((raised / target) * 100));
+              const progressPct = computeGraduationProgressPct(token);
+              const isHot = progressPct >= 25 || raised >= 10000;
+              const isNew = token.publishedAt
+                ? Date.now() - new Date(token.publishedAt).getTime() < 7 * 24 * 60 * 60 * 1000
+                : false;
               const tokenChainSlug = normalizeChainName(token.chain);
               const portalUrl = `/token/${tokenChainSlug}/${token.contractAddress}`;
               const explorerUrl = (() => {
@@ -1006,31 +1160,54 @@ export default function LaunchpadPage() {
               return (
                 <div
                   key={token.launchId || token.contractAddress}
-                  className="bg-panel"
+                  className="bg-panel token-card-interactive"
                   style={{
                     padding: '16px',
-                    borderRadius: '12px',
+                    borderRadius: '14px',
                     border: '1px solid var(--color-border)',
                     backgroundColor: 'var(--color-surface-elevated)',
                     boxShadow: 'var(--shadow-sm)',
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                    <div>
-                      <a
-                        href={portalUrl}
-                        style={{ textDecoration: 'none', color: 'inherit' }}
-                        title={`Buka Portal Token ${token.name}`}
-                      >
-                        <div style={{ fontWeight: 900, color: 'var(--color-foreground)', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          {token.name}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', marginBottom: '10px' }}>
+                    <a
+                      href={portalUrl}
+                      style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}
+                      title={`Buka Portal Token ${token.name}`}
+                    >
+                      <TokenAvatar
+                        src={token.imageUrl}
+                        name={token.name}
+                        ticker={token.ticker}
+                        seed={token.contractAddress}
+                        size={42}
+                        borderRadius={11}
+                      />
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 900, color: 'var(--color-foreground)', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <span>{token.name}</span>
                           <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>↗</span>
                         </div>
-                        <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, color: 'var(--color-accent)', fontSize: '12px' }}>
-                          ${token.ticker}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                          <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, color: 'var(--color-accent)', fontSize: '12px' }}>
+                            ${token.ticker}
+                          </span>
+                          {token.isGraduated ? (
+                            <span style={{ fontSize: '9px', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', backgroundColor: 'var(--color-badge-success-bg)', color: 'var(--color-badge-success-text)' }}>
+                              🎓 GRAD
+                            </span>
+                          ) : isHot ? (
+                            <span style={{ fontSize: '9px', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', backgroundColor: 'var(--color-badge-warning-bg)', color: 'var(--color-badge-warning-text)' }}>
+                              🔥 HOT
+                            </span>
+                          ) : isNew ? (
+                            <span style={{ fontSize: '9px', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', backgroundColor: 'var(--color-badge-purple-bg)', color: 'var(--color-badge-purple-text)' }}>
+                              ✨ NEW
+                            </span>
+                          ) : null}
                         </div>
-                      </a>
-                    </div>
+                      </div>
+                    </a>
                     <span
                       style={{
                         padding: '2px 8px',
@@ -1040,14 +1217,42 @@ export default function LaunchpadPage() {
                         backgroundColor: 'var(--color-badge-info-bg)',
                         color: 'var(--color-badge-info-text)',
                         border: '1px solid var(--color-badge-info-border)',
+                        flexShrink: 0,
                       }}
                     >
                       {token.chain?.toUpperCase() || 'BASE'}
                     </span>
                   </div>
 
-                  <div style={{ fontSize: '11px', color: 'var(--color-muted)', marginBottom: '8px', fontFamily: 'var(--font-mono)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>CA: {token.contractAddress.slice(0, 8)}...{token.contractAddress.slice(-6)}</span>
+                  <div style={{ fontSize: '11px', color: 'var(--color-muted)', marginBottom: '8px', fontFamily: 'var(--font-mono)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard?.writeText(token.contractAddress).catch(() => {});
+                        setCopiedAddr(token.contractAddress);
+                        setTimeout(() => setCopiedAddr((cur) => (cur === token.contractAddress ? null : cur)), 1500);
+                      }}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        background: 'transparent',
+                        border: 'none',
+                        padding: 0,
+                        color: 'var(--color-muted)',
+                        fontSize: '11px',
+                        fontFamily: 'var(--font-mono)',
+                        cursor: 'pointer',
+                      }}
+                      title="Salin Contract Address"
+                    >
+                      <span>CA: {token.contractAddress.slice(0, 8)}...{token.contractAddress.slice(-6)}</span>
+                      {copiedAddr === token.contractAddress ? (
+                        <Check size={11} style={{ color: 'var(--color-badge-success-text)' }} />
+                      ) : (
+                        <Copy size={11} />
+                      )}
+                    </button>
                     <a
                       href={`https://gmgn.ai/${tokenChainSlug === 'solana' ? 'sol' : tokenChainSlug}/token/${token.contractAddress}`}
                       target="_blank"
@@ -1174,8 +1379,26 @@ export default function LaunchpadPage() {
             })}
           </div>
         ) : (
-          <div style={{ textAlign: 'center', padding: '24px', color: 'var(--color-muted)', fontSize: '12px' }}>
-            Belum ada token yang terdaftar di PostgreSQL SSOT. Jalankan deployment via Multibot atau buat draft di atas untuk mendaftarkan token pertama!
+          <div style={{ textAlign: 'center', padding: '28px 16px', color: 'var(--color-muted)', fontSize: '12px' }}>
+            {activeTokens.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                <span>Tidak ada token yang cocok dengan pencarian atau filter jaringan saat ini.</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTokenSearch('');
+                    setChainFilter('all');
+                    setSortMode('trending');
+                  }}
+                  className="btn-secondary"
+                  style={{ padding: '6px 14px', fontSize: '11px' }}
+                >
+                  Tampilkan Semua Token ({activeTokens.length})
+                </button>
+              </div>
+            ) : (
+              'Belum ada token yang diluncurkan. Buat draft di atas untuk mendaftarkan token pertama Anda!'
+            )}
           </div>
         )}
       </div>

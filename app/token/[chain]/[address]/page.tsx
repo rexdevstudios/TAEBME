@@ -18,6 +18,8 @@ import {
 } from 'lucide-react';
 import { defaultDraftDbAdapter, defaultBountyDbAdapter, defaultBillingDbAdapter } from '@packages/shared/db-pool';
 import { normalizeTokenIdentifier, SupportedChainId } from '@packages/shared/token-identifier';
+import { TokenAvatar } from '../../../components/TokenAvatar';
+import { TokenMarketChartPanel } from '../../../components/TokenMarketChartPanel';
 import TokenActionsClient from './TokenActionsClient';
 
 interface PageProps {
@@ -49,7 +51,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     openGraph: {
       title: `$${ticker} (${name}) — Verified Protocol`,
       description: `Explore live charts, security audit, and 1-click swap for $${ticker} on ${chainName}.`,
-      images: [tokenLaunch?.imageUrl || '/token-default.png'],
+      images: [tokenLaunch?.imageUrl || '/token-default.svg'],
     },
     twitter: {
       card: 'summary_large_image',
@@ -117,7 +119,7 @@ export default async function TokenPortalPage({ params }: PageProps) {
   const tokenTicker = dbLaunch?.ticker || (isSol ? `SOL-${lookupAddress.slice(0, 4)}` : 'TOKEN');
   const tokenDescription = dbLaunch?.description ||
     `Autonomous decentralized protocol deployed on ${norm.chain.toUpperCase()}. Verified on-chain liquidity, 0% tax policy, and anti-MEV protection.`;
-  const tokenImageUrl = dbLaunch?.imageUrl || '/token-default.png';
+  const tokenImageUrl = dbLaunch?.imageUrl || '/token-default.svg';
   const launchMode = dbLaunch?.launchMode || (isSol ? 'PUMP_FUN' : 'BONDING_CURVE');
   const riskScore = dbLaunch?.riskScore ?? 94;
   const raisedAmount = dbLaunch?.raisedAmount ?? 12500;
@@ -175,10 +177,10 @@ export default async function TokenPortalPage({ params }: PageProps) {
       {/* Telemetry Strip */}
       <div
         style={{
-          backgroundColor: '#030712',
-          borderBottom: '1px solid #1F2937',
+          backgroundColor: 'var(--color-surface-elevated)',
+          border: '1px solid var(--color-border)',
           padding: '10px 16px',
-          borderRadius: '8px',
+          borderRadius: '12px',
           marginBottom: '24px',
           display: 'flex',
           alignItems: 'center',
@@ -187,6 +189,7 @@ export default async function TokenPortalPage({ params }: PageProps) {
           gap: '12px',
           fontSize: '12px',
           fontFamily: 'monospace',
+          boxShadow: 'var(--shadow-sm)',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -201,24 +204,24 @@ export default async function TokenPortalPage({ params }: PageProps) {
               display: 'inline-block',
             }}
           />
-          <span style={{ color: '#F8FAFC', fontWeight: 700 }}>
+          <span style={{ color: 'var(--color-foreground)', fontWeight: 700 }}>
             {norm.chain.toUpperCase()} PROTOCOL TELEMETRY
           </span>
           <span className="badge-live" style={{ marginLeft: '8px', fontSize: '10px' }}>LIVE</span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', color: '#94A3B8', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', color: 'var(--color-muted)', flexWrap: 'wrap' }}>
           <span>
-            TAX: <strong style={{ color: '#22C55E' }}>0% BUY / 0% SELL</strong>
+            TAX: <strong style={{ color: 'var(--color-badge-success-text)' }}>0% BUY / 0% SELL</strong>
           </span>
           <span>
-            LIQUIDITY: <strong style={{ color: '#38BDF8' }}>LOCKED &amp; VERIFIED</strong>
+            LIQUIDITY: <strong style={{ color: 'var(--color-badge-info-text)' }}>LOCKED &amp; VERIFIED</strong>
           </span>
           <span>
-            AUDIT: <strong style={{ color: '#22C55E' }}>{riskScore}/100 SAFE</strong>
+            AUDIT: <strong style={{ color: 'var(--color-badge-success-text)' }}>{riskScore}/100 SAFE</strong>
           </span>
           <span>
-            ROUTER: <strong style={{ color: '#A855F7' }}>{isSol ? 'PUMP.FUN / RAYDIUM' : 'DOPPLER SETTLER AMM'}</strong>
+            ROUTER: <strong style={{ color: 'var(--color-badge-purple-text)' }}>{isSol ? 'PUMP.FUN / RAYDIUM' : 'DOPPLER SETTLER AMM'}</strong>
           </span>
         </div>
       </div>
@@ -236,64 +239,60 @@ export default async function TokenPortalPage({ params }: PageProps) {
         {/* Hero Left: Token Information */}
         <div className="glass-panel" style={{ padding: '28px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '20px' }}>
-            <img
-              src={tokenImageUrl}
-              alt={tokenName}
-              style={{
-                width: '64px',
-                height: '64px',
-                borderRadius: '16px',
-                border: '2px solid #334155',
-                objectFit: 'cover',
-                backgroundColor: '#0F172A',
-              }}
+            <TokenAvatar
+              src={dbLaunch?.imageUrl || tokenImageUrl}
+              name={tokenName}
+              ticker={tokenTicker}
+              seed={lookupAddress}
+              size={64}
+              borderRadius={16}
             />
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 800, color: '#F8FAFC' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 800, color: 'var(--color-foreground)' }}>
                   {tokenName}
                 </h1>
                 <span
                   className="badge"
                   style={{
-                    backgroundColor: 'rgba(34, 197, 94, 0.1)',
-                    color: '#22C55E',
-                    border: '1px solid rgba(34, 197, 94, 0.3)',
+                    backgroundColor: 'var(--color-badge-success-bg)',
+                    color: 'var(--color-badge-success-text)',
+                    border: '1px solid var(--color-badge-success-border)',
                     fontWeight: 700,
                   }}
                 >
                   ${tokenTicker}
                 </span>
               </div>
-              <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#94A3B8' }}>
+              <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--color-muted)' }}>
                 Deployed on {norm.chain.toUpperCase()} • {launchMode.replace(/_/g, ' ')}
               </p>
             </div>
           </div>
 
-          <p style={{ color: '#CBD5E1', fontSize: '14px', lineHeight: '1.6', marginBottom: '24px' }}>
+          <p style={{ color: 'var(--color-muted)', fontSize: '14px', lineHeight: '1.6', marginBottom: '24px' }}>
             {tokenDescription}
           </p>
 
           {/* Bonding Curve Graduation Progress & DEX Pair */}
           <div
             style={{
-              backgroundColor: isGraduated ? 'rgba(34, 197, 94, 0.08)' : '#020617',
-              border: `1px solid ${isGraduated ? 'rgba(34, 197, 94, 0.4)' : '#334155'}`,
-              borderRadius: '10px',
+              backgroundColor: isGraduated ? 'var(--color-badge-success-bg)' : 'var(--color-surface-subtle)',
+              border: `1px solid ${isGraduated ? 'var(--color-badge-success-border)' : 'var(--color-border)'}`,
+              borderRadius: '12px',
               padding: '16px',
               marginBottom: '20px',
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '8px' }}>
-              <span style={{ color: isGraduated ? '#4ADE80' : '#94A3B8', fontWeight: isGraduated ? 700 : 400, display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ color: isGraduated ? 'var(--color-badge-success-text)' : 'var(--color-muted)', fontWeight: isGraduated ? 700 : 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
                 {isGraduated ? '🎓 Graduated to DEX (Liquidity Locked)' : 'Bonding Curve Graduation'}
               </span>
-              <span style={{ color: '#22C55E', fontWeight: 700 }}>
+              <span style={{ color: 'var(--color-badge-success-text)', fontWeight: 700 }}>
                 {isGraduated ? '100% (COMPLETED)' : `${graduationProgress}%`}
               </span>
             </div>
-            <div style={{ width: '100%', height: '8px', backgroundColor: '#1E293B', borderRadius: '4px', overflow: 'hidden' }}>
+            <div style={{ width: '100%', height: '8px', backgroundColor: 'var(--color-surface-inset)', borderRadius: '4px', overflow: 'hidden' }}>
               <div
                 style={{
                   width: `${isGraduated ? 100 : graduationProgress}%`,
@@ -303,18 +302,18 @@ export default async function TokenPortalPage({ params }: PageProps) {
                 }}
               />
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#64748B', marginTop: '6px', fontFamily: 'monospace' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--color-muted)', marginTop: '6px', fontFamily: 'monospace' }}>
               <span>${raisedAmount.toLocaleString()} Raised</span>
               <span>Goal: ${graduationThreshold.toLocaleString()}</span>
             </div>
             {isGraduated && dexPairAddress && (
-              <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px dashed rgba(34, 197, 94, 0.25)', fontSize: '11px', color: '#94A3B8' }}>
-                <span style={{ color: '#86EFAC', fontWeight: 600 }}>DEX Pair Pool:</span>{' '}
+              <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px dashed var(--color-badge-success-border)', fontSize: '11px', color: 'var(--color-muted)' }}>
+                <span style={{ color: 'var(--color-badge-success-text)', fontWeight: 600 }}>DEX Pair Pool:</span>{' '}
                 <a
                   href={`https://dexscreener.com/${norm.chain}/${lookupAddress}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ color: '#38BDF8', fontFamily: 'monospace', textDecoration: 'underline' }}
+                  style={{ color: 'var(--color-accent)', fontFamily: 'monospace', textDecoration: 'underline' }}
                 >
                   {dexPairAddress}
                 </a>
@@ -324,7 +323,7 @@ export default async function TokenPortalPage({ params }: PageProps) {
 
           {/* Terminal Quick Sniper Routing */}
           <div>
-            <span style={{ fontSize: '11px', fontFamily: 'monospace', color: '#64748B', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>
+            <span style={{ fontSize: '11px', fontFamily: 'monospace', color: 'var(--color-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>
               Sniper Bots &amp; Trading Terminals
             </span>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
@@ -334,39 +333,34 @@ export default async function TokenPortalPage({ params }: PageProps) {
                   href={link.url}
                   target="_blank"
                   rel="noopener noreferrer"
+                  className="btn-secondary"
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '4px',
                     padding: '6px 12px',
-                    borderRadius: '6px',
-                    backgroundColor: '#1E293B',
-                    border: '1px solid #334155',
-                    color: '#F8FAFC',
+                    borderRadius: '8px',
                     fontSize: '11px',
                     fontFamily: 'monospace',
                     fontWeight: 600,
                     textDecoration: 'none',
-                    transition: 'border-color 0.2s',
                   }}
                 >
                   <span>{link.name}</span>
-                  <ArrowUpRight size={12} color="#38BDF8" />
+                  <ArrowUpRight size={12} style={{ color: 'var(--color-accent)' }} />
                 </a>
               ))}
               <a
                 href={getExplorerUrl()}
                 target="_blank"
                 rel="noopener noreferrer"
+                className="btn-secondary"
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '4px',
                   padding: '6px 12px',
-                  borderRadius: '6px',
-                  backgroundColor: '#1E293B',
-                  border: '1px solid #334155',
-                  color: '#F8FAFC',
+                  borderRadius: '8px',
                   fontSize: '11px',
                   fontFamily: 'monospace',
                   fontWeight: 600,
@@ -374,7 +368,7 @@ export default async function TokenPortalPage({ params }: PageProps) {
                 }}
               >
                 <span>Explorer</span>
-                <ExternalLink size={12} color="#94A3B8" />
+                <ExternalLink size={12} style={{ color: 'var(--color-muted)' }} />
               </a>
             </div>
           </div>
@@ -401,23 +395,21 @@ export default async function TokenPortalPage({ params }: PageProps) {
         style={{
           padding: '24px',
           marginBottom: '32px',
-          border: '1px solid #1E293B',
-          background: 'linear-gradient(180deg, rgba(15, 23, 42, 0.8) 0%, rgba(3, 7, 18, 0.95) 100%)',
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Sparkles size={20} color="#38BDF8" />
-              <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#F8FAFC' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <Sparkles size={20} style={{ color: 'var(--color-accent)' }} />
+              <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: 'var(--color-foreground)' }}>
                 Active SocialFi &amp; Loyalty Flywheel
               </h2>
               <span
                 className="badge"
                 style={{
-                  backgroundColor: 'rgba(56, 189, 248, 0.15)',
-                  color: '#38BDF8',
-                  border: '1px solid rgba(56, 189, 248, 0.3)',
+                  backgroundColor: 'var(--color-badge-info-bg)',
+                  color: 'var(--color-badge-info-text)',
+                  border: '1px solid var(--color-badge-info-border)',
                   fontSize: '11px',
                   fontWeight: 700,
                 }}
@@ -425,7 +417,7 @@ export default async function TokenPortalPage({ params }: PageProps) {
                 {tokenCampaigns.length} Active Programs
               </span>
             </div>
-            <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#94A3B8' }}>
+            <p className="text-muted" style={{ margin: '4px 0 0', fontSize: '12px' }}>
               Participate in on-chain community rewards: HODL incentives, Liquid Staking yield vaults, and Viral Raids.
             </p>
           </div>
@@ -566,12 +558,12 @@ export default async function TokenPortalPage({ params }: PageProps) {
             style={{
               padding: '24px',
               textAlign: 'center',
-              backgroundColor: 'rgba(15, 23, 42, 0.4)',
+              backgroundColor: 'var(--color-surface-subtle)',
               borderRadius: '10px',
-              border: '1px dashed #334155',
+              border: '1px dashed var(--color-border)',
             }}
           >
-            <p style={{ color: '#94A3B8', fontSize: '13px', margin: '0 0 12px 0' }}>
+            <p className="text-muted" style={{ fontSize: '13px', margin: '0 0 12px 0' }}>
               No active SocialFi campaigns yet for ${tokenTicker}. Launch community raid bounties, loyalty programs, or staking vaults to incentivize holders!
             </p>
             <Link
@@ -586,56 +578,16 @@ export default async function TokenPortalPage({ params }: PageProps) {
         )}
       </div>
 
-      {/* Live Market Chart Embed */}
-      <div
-        className="card"
-        style={{
-          padding: '24px',
-          marginBottom: '32px',
-          border: '1px solid #334155',
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#F8FAFC', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <BarChart2 size={20} color="#38BDF8" />
-              Live Market Telemetry &amp; Candlesticks
-            </h2>
-            <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#94A3B8' }}>
-              Real-time decentralized orderbook powered by DexScreener Public API.
-            </p>
-          </div>
-          <a
-            href={`https://dexscreener.com/${dexscreenerChain}/${lookupAddress}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn btn-secondary"
-            style={{ fontSize: '12px', padding: '8px 14px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-          >
-            <span>Open in Fullscreen DexScreener</span>
-            <ExternalLink size={14} />
-          </a>
-        </div>
-
-        <div
-          style={{
-            position: 'relative',
-            width: '100%',
-            height: '520px',
-            borderRadius: '8px',
-            overflow: 'hidden',
-            border: '1px solid #1E293B',
-            backgroundColor: '#020617',
-          }}
-        >
-          <iframe
-            src={dexscreenerUrl}
-            title={`${tokenName} DexScreener Chart`}
-            style={{ width: '100%', height: '100%', border: 'none' }}
-            loading="lazy"
-          />
-        </div>
-      </div>
+      {/* Live Market Chart Panel (Native Fast Candlestick + Optional DexScreener) */}
+      <TokenMarketChartPanel
+        chain={norm.chain}
+        contractAddress={lookupAddress}
+        tokenName={tokenName}
+        tokenTicker={tokenTicker}
+        raisedAmount={raisedAmount}
+        graduationThreshold={graduationThreshold}
+        isGraduated={isGraduated}
+      />
 
       {/* 4-Pillar Economic Flywheel & Security Grid */}
       <div
@@ -647,69 +599,69 @@ export default async function TokenPortalPage({ params }: PageProps) {
       >
         <div className="stat-card" style={{ padding: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-            <div style={{ padding: '8px', borderRadius: '8px', backgroundColor: 'rgba(239, 68, 68, 0.1)' }}>
+            <div style={{ padding: '8px', borderRadius: '8px', backgroundColor: 'rgba(239, 68, 68, 0.12)' }}>
               <Flame size={20} color="#EF4444" />
             </div>
             <div>
-              <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#F8FAFC' }}>
+              <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: 'var(--color-foreground)' }}>
                 Deflationary Burn
               </h3>
-              <span style={{ fontSize: '11px', color: '#64748B' }}>Perpetual Buyback &amp; Burn</span>
+              <span className="text-muted" style={{ fontSize: '11px' }}>Perpetual Buyback &amp; Burn</span>
             </div>
           </div>
-          <p style={{ fontSize: '12px', color: '#94A3B8', margin: 0, lineHeight: '1.5' }}>
+          <p className="text-muted" style={{ fontSize: '12px', margin: 0, lineHeight: '1.5' }}>
             Portion of AMM swap fees are automatically routed into the burn contract, reducing circulating supply with every trade.
           </p>
         </div>
 
         <div className="stat-card" style={{ padding: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-            <div style={{ padding: '8px', borderRadius: '8px', backgroundColor: 'rgba(34, 197, 94, 0.1)' }}>
-              <ShieldCheck size={20} color="#22C55E" />
+            <div style={{ padding: '8px', borderRadius: '8px', backgroundColor: 'var(--color-badge-success-bg)' }}>
+              <ShieldCheck size={20} style={{ color: 'var(--color-badge-success-text)' }} />
             </div>
             <div>
-              <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#F8FAFC' }}>
+              <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: 'var(--color-foreground)' }}>
                 0% Friction Tax
               </h3>
-              <span style={{ fontSize: '11px', color: '#64748B' }}>Clean ERC20 / SPL Standard</span>
+              <span className="text-muted" style={{ fontSize: '11px' }}>Clean ERC20 / SPL Standard</span>
             </div>
           </div>
-          <p style={{ fontSize: '12px', color: '#94A3B8', margin: 0, lineHeight: '1.5' }}>
+          <p className="text-muted" style={{ fontSize: '12px', margin: 0, lineHeight: '1.5' }}>
             Zero transaction taxes on buys or sells. Unrestricted trading compatible with all DEX aggregators, snipers, and MEV relays.
           </p>
         </div>
 
         <div className="stat-card" style={{ padding: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-            <div style={{ padding: '8px', borderRadius: '8px', backgroundColor: 'rgba(56, 189, 248, 0.1)' }}>
-              <Coins size={20} color="#38BDF8" />
+            <div style={{ padding: '8px', borderRadius: '8px', backgroundColor: 'var(--color-badge-info-bg)' }}>
+              <Coins size={20} style={{ color: 'var(--color-badge-info-text)' }} />
             </div>
             <div>
-              <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#F8FAFC' }}>
+              <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: 'var(--color-foreground)' }}>
                 Doppler Settler AMM
               </h3>
-              <span style={{ fontSize: '11px', color: '#64748B' }}>Decentralized Liquidity</span>
+              <span className="text-muted" style={{ fontSize: '11px' }}>Decentralized Liquidity</span>
             </div>
           </div>
-          <p style={{ fontSize: '12px', color: '#94A3B8', margin: 0, lineHeight: '1.5' }}>
+          <p className="text-muted" style={{ fontSize: '12px', margin: 0, lineHeight: '1.5' }}>
             On-chain liquidity pools automatically lock and burn upon bonding curve graduation, ensuring permanent trading depth.
           </p>
         </div>
 
         <div className="stat-card" style={{ padding: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-            <div style={{ padding: '8px', borderRadius: '8px', backgroundColor: 'rgba(168, 85, 247, 0.1)' }}>
-              <Sparkles size={20} color="#A855F7" />
+            <div style={{ padding: '8px', borderRadius: '8px', backgroundColor: 'var(--color-badge-purple-bg)' }}>
+              <Sparkles size={20} style={{ color: 'var(--color-badge-purple-text)' }} />
             </div>
             <div>
-              <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#F8FAFC' }}>
+              <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: 'var(--color-foreground)' }}>
                 Non-Custodial Architecture
               </h3>
-              <span style={{ fontSize: '11px', color: '#64748B' }}>Postgres SSOT &amp; Pure Web3</span>
+              <span className="text-muted" style={{ fontSize: '11px' }}>Verified On-Chain Settlement</span>
             </div>
           </div>
-          <p style={{ fontSize: '12px', color: '#94A3B8', margin: 0, lineHeight: '1.5' }}>
-            No private keys or custody stored on the control plane. All actions settled directly via smart contract logic.
+          <p className="text-muted" style={{ fontSize: '12px', margin: 0, lineHeight: '1.5' }}>
+            No private keys or custody stored on the platform. All actions settled directly via smart contract logic.
           </p>
         </div>
       </div>
