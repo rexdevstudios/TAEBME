@@ -236,19 +236,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     setIsConnecting(true);
     try {
-      // 1. Check already-permitted accounts first (0ms, avoids double popup); request permission only if empty
+      // 1. Always authorize account via EIP-1102 eth_requestAccounts on explicit Connect Wallet click
+      // (Returns immediately in <5ms with no extra popup if already authorized, and prevents EIP-1193 4100 unauthorized errors)
       let accounts: string[] = [];
       try {
-        accounts = await ethereum.request({ method: 'eth_accounts' });
-      } catch {
-        accounts = [];
-      }
-      if (!accounts || accounts.length === 0) {
         accounts = await requestWithTimeout<string[]>(
           ethereum.request({ method: 'eth_requestAccounts' }),
           30000,
           'Popup MetaMask belum disetujui. Klik ikon ekstensi MetaMask (🦊) di pojok kanan atas browser Anda untuk membuka popup yang tertunda.'
         );
+      } catch (reqErr: any) {
+        if (reqErr?.code === 4001) throw new Error('Koneksi dompet dibatalkan di MetaMask.');
+        if (reqErr?.code === -32002) {
+          throw new Error('Permintaan koneksi sudah terbuka di MetaMask. Klik ikon ekstensi MetaMask (🦊) di pojok kanan atas browser Anda.');
+        }
+        // Fallback to eth_accounts only if eth_requestAccounts is unsupported by a legacy wallet
+        accounts = await ethereum.request({ method: 'eth_accounts' }).catch(() => []);
       }
 
       if (!accounts || accounts.length === 0) {
@@ -293,16 +296,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           pendingPopupHint
         );
       } catch (signErr: any) {
-        if (signErr?.code === 4001) throw new Error('Tanda tangan SIWE dibatalkan di MetaMask.');
+        if (signErr?.code === 4001) throw new Error('Tanda tangan login dibatalkan di MetaMask.');
         if (signErr?.code === -32002) throw new Error(pendingPopupHint);
-        signature = await requestWithTimeout<string>(
-          ethereum.request({
-            method: 'personal_sign',
-            params: [messageToSign, activeAddress],
-          }),
-          45000,
-          pendingPopupHint
-        );
+        const isUnauthorized4100 =
+          signErr?.code === 4100 ||
+          String(signErr?.message || '').toLowerCase().includes('not been authorized');
+        if (isUnauthorized4100) {
+          // Re-request EIP-1102 permission and retry personal_sign once
+          const reAuthAccounts: string[] = await requestWithTimeout<string[]>(
+            ethereum.request({ method: 'eth_requestAccounts' }),
+            30000,
+            pendingPopupHint
+          );
+          const reAuthAddr = reAuthAccounts?.[0] || activeAddress;
+          signature = await requestWithTimeout<string>(
+            ethereum.request({
+              method: 'personal_sign',
+              params: [hexMessage, reAuthAddr],
+            }),
+            45000,
+            pendingPopupHint
+          );
+        } else {
+          signature = await requestWithTimeout<string>(
+            ethereum.request({
+              method: 'personal_sign',
+              params: [messageToSign, activeAddress],
+            }),
+            45000,
+            pendingPopupHint
+          );
+        }
       }
 
       // 4. Verify cryptographic signature on backend (sets HttpOnly Secure rtrader_session cookie)
