@@ -353,3 +353,93 @@ export async function generateMarketAdvisoryNote(
 
   return buildDeterministicFallback(signal, ctx, startMs);
 }
+
+export interface ByokLlmVerifyResult {
+  connected: boolean;
+  provider: ByokLlmProvider;
+  statusCode?: number;
+  latencyMs: number;
+  error?: string;
+}
+
+/**
+ * Stateless, zero-token live connectivity verifier for BYOK LLM API keys (GEMINI, OPENAI, ANTHROPIC).
+ * Uses read-only model listing endpoints so users incur $0 token cost during verification.
+ * NEVER echoes raw API keys or query-string secrets in responses or errors.
+ */
+export async function verifyByokLlmKeyLive(params: {
+  provider: ByokLlmProvider;
+  apiKey: string;
+  fetchImpl?: typeof fetch;
+}): Promise<ByokLlmVerifyResult> {
+  const startMs = performance.now();
+  const doFetch = params.fetchImpl || fetch;
+  const cleanKey = (params.apiKey || '').trim();
+  if (!cleanKey || cleanKey.startsWith('mock_')) {
+    return {
+      connected: false,
+      provider: params.provider,
+      latencyMs: Math.round(performance.now() - startMs),
+      error: 'INVALID_OR_MOCK_API_KEY',
+    };
+  }
+
+  let url = '';
+  let headers: Record<string, string> = {};
+  if (params.provider === 'GEMINI') {
+    url = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(cleanKey)}&pageSize=1`;
+  } else if (params.provider === 'OPENAI') {
+    url = 'https://api.openai.com/v1/models';
+    headers = { Authorization: `Bearer ${cleanKey}` };
+  } else if (params.provider === 'ANTHROPIC') {
+    url = 'https://api.anthropic.com/v1/models';
+    headers = {
+      'x-api-key': cleanKey,
+      'anthropic-version': '2023-06-01',
+    };
+  }
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
+    let res: Response;
+    try {
+      res = await doFetch(url, {
+        method: 'GET',
+        headers,
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+
+    const latencyMs = Math.round(performance.now() - startMs);
+    if (res.ok) {
+      return {
+        connected: true,
+        provider: params.provider,
+        statusCode: res.status,
+        latencyMs,
+      };
+    }
+
+    const reason =
+      res.status === 401 || res.status === 403
+        ? `AUTH_REJECTED_HTTP_${res.status}`
+        : `PROVIDER_HTTP_${res.status}`;
+    return {
+      connected: false,
+      provider: params.provider,
+      statusCode: res.status,
+      latencyMs,
+      error: reason,
+    };
+  } catch (err: any) {
+    return {
+      connected: false,
+      provider: params.provider,
+      latencyMs: Math.round(performance.now() - startMs),
+      error: err?.name === 'AbortError' ? 'PROVIDER_TIMEOUT' : 'PROVIDER_NETWORK_ERROR',
+    };
+  }
+}

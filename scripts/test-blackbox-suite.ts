@@ -275,6 +275,13 @@ async function runBlackboxSuite() {
   const unauthAgentProfiles = await fetch(`${BASE_URL}/api/agent/profiles`);
   assert(unauthAgentProfiles.status === 401, 'Unauthenticated GET /api/agent/profiles strictly rejected with HTTP 401');
 
+  const unauthProviderVerify = await fetch(`${BASE_URL}/api/user/provider-keys/verify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ keyId: 'test', provider: 'ANTHROPIC' }),
+  });
+  assert(unauthProviderVerify.status === 401, 'Unauthenticated POST /api/user/provider-keys/verify strictly rejected with HTTP 401');
+
   // -------------------------------------------------------------------------
   // TEST 12: Canonical Frontend Route Integrity & Live Billing Capacity Contract
   // -------------------------------------------------------------------------

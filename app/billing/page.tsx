@@ -7,6 +7,7 @@ import { ethers } from 'ethers';
 import { ensureBaseNetwork, getBrowserSigner, normalizeWeb3Error, resolveBrowserEthereumProvider } from '@packages/launchpad/web3-provider';
 import { PageWorkflowBanner } from '../components/PageWorkflowBanner';
 import { BillingAddonStorePanel } from '../components/BillingAddonStorePanel';
+import { UserWebhookVaultPanel } from '../components/UserWebhookVaultPanel';
 import { UserSecurityActivityPanel } from '../components/UserSecurityActivityPanel';
 
 interface LedgerEntry {
@@ -772,6 +773,9 @@ export default function BillingPage() {
           </div>
         </div>
       </div>
+
+      {/* Outbound Alert Webhooks (SSRF-Safe HTTPS · Discord / Custom Endpoint + Test Ping) */}
+      <UserWebhookVaultPanel isConnected={isConnected} />
 
       {/* User-Scoped Security Activity Feed (10 Latest Audit Events) */}
       <UserSecurityActivityPanel isConnected={isConnected} />

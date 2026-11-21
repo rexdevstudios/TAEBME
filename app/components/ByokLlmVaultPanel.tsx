@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { KeyRound, ShieldCheck, Plus, Trash2, Lock, Crown } from 'lucide-react';
+import { KeyRound, ShieldCheck, Plus, Trash2, Lock, Crown, Wifi } from 'lucide-react';
 
 export type SelectedLlmProvider = 'PLATFORM' | 'GEMINI' | 'OPENAI' | 'ANTHROPIC';
 export type ByokVaultTab = 'GEMINI' | 'OPENAI' | 'ANTHROPIC';
@@ -58,6 +58,7 @@ export function ByokLlmVaultPanel({
   const [label, setLabel] = useState<string>('');
   const [apiKey, setApiKey] = useState<string>('');
   const [saving, setSaving] = useState<boolean>(false);
+  const [testingKeyId, setTestingKeyId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const isByokAllowed = maxKeys > 0;
@@ -134,6 +135,31 @@ export function ByokLlmVaultPanel({
       setFeedback(`⚠️ ${err?.message || 'Network error'}`);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleTestKey = async (k: LlmKeyItem) => {
+    setTestingKeyId(k.id);
+    setFeedback(null);
+    try {
+      const res = await fetch('/api/user/provider-keys/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keyId: k.id, provider: activeTab }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json?.success) {
+        setFeedback(`⚠️ Test ${k.label} gagal: ${json?.error || `HTTP ${res.status}`}`);
+      } else if (json.data?.connected) {
+        setFeedback(`✅ ${activeTab} Key "${k.label}" terverifikasi live (${json.data.latencyMs}ms · $0 token cost).`);
+        await loadKeys(activeTab);
+      } else {
+        setFeedback(`⚠️ ${activeTab} Key "${k.label}" ditolak provider: ${json.data?.error || 'Auth failed'} (${json.data?.latencyMs ?? 0}ms).`);
+      }
+    } catch (err: any) {
+      setFeedback(`⚠️ ${err?.message || 'Network error'}`);
+    } finally {
+      setTestingKeyId(null);
     }
   };
 
@@ -337,6 +363,18 @@ export function ByokLlmVaultPanel({
               <code style={{ fontSize: '10px', color: 'var(--color-muted)' }}>{k.maskedKey}</code>
               {k.quotaStatus === 'FROZEN_OVER_QUOTA' && (
                 <span style={{ fontSize: '9px', fontWeight: 800, color: '#F59E0B' }}>FROZEN</span>
+              )}
+              {isByokAllowed && k.quotaStatus !== 'FROZEN_OVER_QUOTA' && (
+                <button
+                  type="button"
+                  onClick={() => handleTestKey(k)}
+                  disabled={testingKeyId === k.id}
+                  className="btn-secondary"
+                  style={{ padding: '2px 6px', fontSize: '10px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                  aria-label={`Test ${k.label}`}
+                >
+                  <Wifi size={10} /> {testingKeyId === k.id ? '...' : 'Test'}
+                </button>
               )}
               <button
                 type="button"
