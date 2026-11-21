@@ -25,8 +25,10 @@ import {
   saveTradeIntent,
   defaultKillSwitchDbAdapter,
   defaultBillingDbAdapter,
+  defaultProviderKeyVaultAdapter,
   PostgresBinanceExecutionDbAdapter,
 } from '@packages/shared/db-pool';
+import { notifyUserWebhookBestEffort } from '@packages/notifications/webhook-dispatcher';
 
 export const dynamic = 'force-dynamic';
 
@@ -143,7 +145,36 @@ export async function POST(req: NextRequest) {
       activeKillSwitches
     );
 
+    const resolveUserWebhookUrl = async () => {
+      const hook = await defaultProviderKeyVaultAdapter
+        .resolveDecryptedKeyForDeploy({
+          userIdentifier: auth.walletAddress,
+          targetChain: 'all',
+          provider: 'WEBHOOK',
+        })
+        .catch(() => null);
+      return hook?.apiKey || null;
+    };
+
     if (!decision.isApproved) {
+      const reasonStr = String(decision.reason || '');
+      if (reasonStr.toUpperCase().includes('DAILY_LOSS') || reasonStr.toUpperCase().includes('LOSS')) {
+        await notifyUserWebhookBestEffort({
+          resolveWebhookUrl: resolveUserWebhookUrl,
+          payload: {
+            event: 'DAILY_LOSS_WARNING',
+            title: `Risk Gate Blocked: ${side} ${symbol}`,
+            message: `${reasonStr} (24h loss: $${riskExposure24h.currentDailyLossUsd.toFixed(2)} / cap $${effectiveLimits.maxDailyLossUsd.toFixed(2)})`,
+            metadata: {
+              symbol,
+              side,
+              executionMode,
+              currentDailyLossUsd: riskExposure24h.currentDailyLossUsd,
+              maxDailyLossUsd: effectiveLimits.maxDailyLossUsd,
+            },
+          },
+        });
+      }
       return NextResponse.json(
         {
           success: false,
@@ -190,6 +221,16 @@ export async function POST(req: NextRequest) {
         idempotencyKey,
         status: 'APPROVED',
         riskDecisionReason: decision.reason,
+      });
+
+      await notifyUserWebhookBestEffort({
+        resolveWebhookUrl: resolveUserWebhookUrl,
+        payload: {
+          event: 'ORDER_APPROVED',
+          title: `DEX Order Approved: ${side} ${symbol}`,
+          message: `Intent ${tradeIntentId} siap ditandatangani (Qty ${quantity}, MEV Safe).`,
+          metadata: { tradeIntentId, symbol, side, quantity, executionMode },
+        },
       });
 
       return NextResponse.json({
@@ -283,6 +324,16 @@ export async function POST(req: NextRequest) {
         idempotencyKey,
         status: 'APPROVED',
         riskDecisionReason: decision.reason,
+      });
+
+      await notifyUserWebhookBestEffort({
+        resolveWebhookUrl: resolveUserWebhookUrl,
+        payload: {
+          event: 'ORDER_APPROVED',
+          title: `CEX Order Approved: ${side} ${symbol}`,
+          message: `Intent ${tradeIntentId} (${creds.environment || 'TESTNET'} · ${creds.label || 'Binance Primary'}) lolos Risk Gate.`,
+          metadata: { tradeIntentId, symbol, side, quantity, executionMode, environment: creds.environment || 'TESTNET' },
+        },
       });
 
       return NextResponse.json({

@@ -110,3 +110,38 @@ export async function dispatchOutboundAlert(params: {
     };
   }
 }
+
+/**
+ * Strictly non-blocking best-effort helper for wiring live operational events
+ * (ORDER_APPROVED, DAILY_LOSS_WARNING, TOKEN_DEPLOYED) into a user's default WEBHOOK vault entry.
+ * Never throws and never blocks core trading or launchpad transactions.
+ */
+export async function notifyUserWebhookBestEffort(params: {
+  resolveWebhookUrl: () => Promise<string | null>;
+  payload: OutboundAlertPayload;
+  fetchImpl?: typeof fetch;
+}): Promise<{ attempted: boolean; delivered: boolean; statusCode?: number; error?: string }> {
+  try {
+    const url = await params.resolveWebhookUrl().catch(() => null);
+    if (!url) {
+      return { attempted: false, delivered: false };
+    }
+    const res = await dispatchOutboundAlert({
+      webhookUrl: url,
+      payload: params.payload,
+      fetchImpl: params.fetchImpl,
+    });
+    return {
+      attempted: true,
+      delivered: res.delivered,
+      ...(res.statusCode !== undefined ? { statusCode: res.statusCode } : {}),
+      ...(res.error ? { error: res.error } : {}),
+    };
+  } catch (err: any) {
+    return {
+      attempted: true,
+      delivered: false,
+      error: err?.message || 'WEBHOOK_BEST_EFFORT_ERROR',
+    };
+  }
+}

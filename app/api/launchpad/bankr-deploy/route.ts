@@ -22,6 +22,7 @@ import {
   getDbPool,
 } from '@packages/shared/db-pool';
 import { validateMultiChainFeeRecipient } from '@packages/shared/credential-vault';
+import { notifyUserWebhookBestEffort } from '@packages/notifications/webhook-dispatcher';
 
 export const dynamic = 'force-dynamic';
 
@@ -190,6 +191,33 @@ export async function POST(req: NextRequest) {
         }
       } catch {
         // Non-blocking fallback
+      }
+
+      if (auth?.walletAddress) {
+        await notifyUserWebhookBestEffort({
+          resolveWebhookUrl: async () => {
+            const hook = await defaultProviderKeyVaultAdapter
+              .resolveDecryptedKeyForDeploy({
+                userIdentifier: auth.walletAddress,
+                targetChain: 'all',
+                provider: 'WEBHOOK',
+              })
+              .catch(() => null);
+            return hook?.apiKey || null;
+          },
+          payload: {
+            event: 'TOKEN_DEPLOYED',
+            title: `Token Deployed: $${tokenSymbol} (${chain})`,
+            message: `Contract ${result.tokenAddress || 'pending'} berhasil di-deploy via ${resolvedByok ? 'BYOK_VAULT' : 'PLATFORM_ENV'}.`,
+            metadata: {
+              symbol: tokenSymbol,
+              chain,
+              tokenAddress: result.tokenAddress || '',
+              txHash: result.txHash || '',
+              keySource: resolvedByok ? 'BYOK_VAULT' : 'PLATFORM_ENV',
+            },
+          },
+        });
       }
     }
 

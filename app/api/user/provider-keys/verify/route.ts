@@ -114,6 +114,18 @@ export async function POST(req: NextRequest) {
           },
         },
       });
+      const latencyMs = Math.round(performance.now() - startMs);
+      await defaultBillingDbAdapter
+        .createAuditLog(
+          auth.walletAddress,
+          'PROVIDER_KEY_VERIFIED',
+          resolved.keyId,
+          delivery.delivered
+            ? `WEBHOOK "${resolved.label}" ping OK (HTTP ${delivery.statusCode || 200}, ${latencyMs}ms)`
+            : `WEBHOOK "${resolved.label}" ping FAILED (${delivery.error || 'unknown'}, ${latencyMs}ms)`
+        )
+        .catch(() => {});
+
       return NextResponse.json(
         {
           success: true,
@@ -123,7 +135,7 @@ export async function POST(req: NextRequest) {
             provider: 'WEBHOOK',
             connected: delivery.delivered,
             statusCode: delivery.statusCode,
-            latencyMs: Math.round(performance.now() - startMs),
+            latencyMs,
             ...(delivery.error ? { error: delivery.error } : {}),
           },
           timestamp: new Date().toISOString(),
@@ -136,6 +148,17 @@ export async function POST(req: NextRequest) {
       provider: provider as ByokLlmProvider,
       apiKey: resolved.apiKey,
     });
+
+    await defaultBillingDbAdapter
+      .createAuditLog(
+        auth.walletAddress,
+        'PROVIDER_KEY_VERIFIED',
+        resolved.keyId,
+        ping.connected
+          ? `${provider} "${resolved.label}" ping OK (HTTP ${ping.statusCode || 200}, ${ping.latencyMs}ms)`
+          : `${provider} "${resolved.label}" ping FAILED (${ping.error || 'unknown'}, ${ping.latencyMs}ms)`
+      )
+      .catch(() => {});
 
     return NextResponse.json(
       {
