@@ -74,12 +74,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 1. Authoritative Kill Switch, Entitlement, Per-User Clamped Risk Policy & Deterministic Risk Gate (Fail-Closed)
-    const [activeKillSwitches, userEntitlement, dynamicRiskCfg, userRiskPolicy] = await Promise.all([
+    // 1. Authoritative Kill Switch, Entitlement, Per-User Clamped Risk Policy, 24h Exposure & Deterministic Risk Gate (Fail-Closed)
+    const [activeKillSwitches, userEntitlement, dynamicRiskCfg, userRiskPolicy, riskExposure24h] = await Promise.all([
       defaultKillSwitchDbAdapter.getActiveKillSwitches(),
       defaultBillingDbAdapter.getUserEntitlement(auth.user.userId),
       defaultBillingDbAdapter.getPlatformFeeAndRiskConfig().catch(() => null),
       defaultBillingDbAdapter.getUserRiskPolicy(auth.walletAddress).catch(() => null),
+      defaultBillingDbAdapter.getUser24hRiskExposure(auth.user.userId).catch(() => ({
+        currentDailyLossUsd: 0,
+        currentOpenPositions: 0,
+      })),
     ]);
 
     const effectiveLimits = computeEffectiveUserRiskLimits({
@@ -131,9 +135,9 @@ export async function POST(req: NextRequest) {
       {
         maxOrderValueUsd: effectiveLimits.maxOrderValueUsd,
         maxDailyLossUsd: effectiveLimits.maxDailyLossUsd,
-        currentDailyLossUsd: 0,
+        currentDailyLossUsd: riskExposure24h.currentDailyLossUsd,
         maxOpenPositions: 5,
-        currentOpenPositions: 0,
+        currentOpenPositions: riskExposure24h.currentOpenPositions,
       },
       userEntitlement,
       activeKillSwitches

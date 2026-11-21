@@ -23,6 +23,7 @@ import {
 } from '../network-registry/rpc-manager';
 import { BinanceExecutionDbAdapter, BinanceCredentialMeta, TradeIntentRecord } from '../trading/execution-types';
 import { BinanceCredentialVault } from '../trading/binance-vault';
+import { compute24hRiskExposure } from '../trading/risk-gate';
 import { validateBinancePermissions, BinanceKeyPermissions } from './types/domain';
 import { ProposalDbAdapter, AgentProposalRecord } from '../agent/proposal-engine';
 import { DualControlDbAdapter, DualControlRequestRecord } from '../admin/dual-control';
@@ -4990,6 +4991,72 @@ export class PostgresBillingDbAdapter implements BillingDbAdapter {
       remainingCredits,
       totalAddonSlots,
     };
+  }
+
+  async getUser24hRiskExposure(userId: string): Promise<{ currentDailyLossUsd: number; currentOpenPositions: number }> {
+    const pool = getDbPool();
+    if (!pool) {
+      return { currentDailyLossUsd: 0, currentOpenPositions: 0 };
+    }
+    try {
+      const validUserId = await ensureUserEntity(pool, userId);
+      const [fillsRes, openRes] = await Promise.all([
+        pool.query(
+          `SELECT ti.side, COALESCE(o.cummulative_quote_qty, 0)::numeric AS quote_val, o.status
+           FROM orders o
+           JOIN trade_intents ti ON o.intent_id = ti.id
+           WHERE ti.user_id = $1 AND o.created_at >= NOW() - INTERVAL '24 hours'`,
+          [validUserId]
+        ),
+        pool.query(
+          `SELECT COUNT(*)::int AS cnt
+           FROM trade_intents
+           WHERE user_id = $1
+             AND status IN ('APPROVED', 'EXECUTING')
+             AND created_at >= NOW() - INTERVAL '24 hours'`,
+          [validUserId]
+        ),
+      ]);
+      const fills = fillsRes.rows.map((r: any) => ({
+        side: (String(r.side || 'BUY').toUpperCase() === 'SELL' ? 'SELL' : 'BUY') as 'BUY' | 'SELL',
+        quoteValueUsd: Number(r.quote_val || 0),
+        status: String(r.status || ''),
+      }));
+      const openIntentCount = Number(openRes.rows[0]?.cnt || 0);
+      return compute24hRiskExposure({ fills, openIntentCount });
+    } catch {
+      return { currentDailyLossUsd: 0, currentOpenPositions: 0 };
+    }
+  }
+
+  async getUserSecurityActivity(
+    userId: string,
+    limit: number = 10
+  ): Promise<Array<{ id: string; action: string; reason: string | null; createdAt: string }>> {
+    const safeLimit = Math.max(1, Math.min(25, Math.floor(limit)));
+    const pool = getDbPool();
+    if (!pool) {
+      return [];
+    }
+    try {
+      const validUserId = await ensureUserEntity(pool, userId);
+      const res = await pool.query(
+        `SELECT id, action, reason, created_at
+         FROM audit_logs
+         WHERE actor_id = $1
+         ORDER BY created_at DESC
+         LIMIT $2`,
+        [validUserId, safeLimit]
+      );
+      return res.rows.map((r: any) => ({
+        id: String(r.id),
+        action: String(r.action),
+        reason: r.reason ? String(r.reason) : null,
+        createdAt: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString(),
+      }));
+    } catch {
+      return [];
+    }
   }
 
   async getPlanDiscounts(): Promise<

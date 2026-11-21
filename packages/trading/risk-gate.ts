@@ -69,3 +69,35 @@ export class TradingRiskGate {
     return { status, decision };
   }
 }
+
+export interface DailyOrderFillSample {
+  side: 'BUY' | 'SELL';
+  quoteValueUsd: number;
+  status: string;
+}
+
+/**
+ * Pure deterministic 24h realized daily loss & open-position exposure calculator.
+ * Computes realized daily deficit when closed/sold volume is below corresponding buy outlay,
+ * and counts active open intents (`APPROVED` / `EXECUTING`).
+ */
+export function compute24hRiskExposure(params: {
+  fills: DailyOrderFillSample[];
+  openIntentCount: number;
+}): { currentDailyLossUsd: number; currentOpenPositions: number } {
+  let buyQuote = 0;
+  let sellQuote = 0;
+  for (const f of params.fills) {
+    const st = String(f.status || '').toUpperCase();
+    if (st !== 'FILLED' && st !== 'EXECUTED') continue;
+    const val = Number.isFinite(Number(f.quoteValueUsd)) ? Math.max(0, Number(f.quoteValueUsd)) : 0;
+    if (f.side === 'BUY') buyQuote += val;
+    if (f.side === 'SELL') sellQuote += val;
+  }
+
+  const realizedLoss = sellQuote > 0 && buyQuote > sellQuote ? Math.round((buyQuote - sellQuote) * 100) / 100 : 0;
+  return {
+    currentDailyLossUsd: realizedLoss,
+    currentOpenPositions: Math.max(0, Math.floor(Number(params.openIntentCount || 0))),
+  };
+}

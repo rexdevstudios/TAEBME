@@ -7,6 +7,7 @@ import { ethers } from 'ethers';
 import { ensureBaseNetwork, getBrowserSigner, normalizeWeb3Error, resolveBrowserEthereumProvider } from '@packages/launchpad/web3-provider';
 import { PageWorkflowBanner } from '../components/PageWorkflowBanner';
 import { BillingAddonStorePanel } from '../components/BillingAddonStorePanel';
+import { UserSecurityActivityPanel } from '../components/UserSecurityActivityPanel';
 
 interface LedgerEntry {
   id: string;
@@ -771,6 +772,9 @@ export default function BillingPage() {
           </div>
         </div>
       </div>
+
+      {/* User-Scoped Security Activity Feed (10 Latest Audit Events) */}
+      <UserSecurityActivityPanel isConnected={isConnected} />
 
       {/* Admin Billing Rail Diagnostics Console (SYSTEM_ADMIN / SUPER_ADMIN / BILLING_ADMIN Exclusive) */}
       {(hasCapability('MANAGE_BILLING_PLANS') || userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN' || userRole === 'BILLING_ADMIN') && (
