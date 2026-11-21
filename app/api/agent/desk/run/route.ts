@@ -53,6 +53,12 @@ export async function POST(req: NextRequest) {
     const mode = body?.mode === 'LIVE_ADVISORY' ? 'LIVE_ADVISORY' : 'PAPER';
     const tokenAddress = typeof body?.tokenAddress === 'string' ? body.tokenAddress.trim() : undefined;
     const chainId = body?.chainId !== undefined ? Number(body.chainId) : undefined;
+    const dexNetwork = typeof body?.dexNetwork === 'string' ? body.dexNetwork.trim().toLowerCase() : undefined;
+    const allowedStrategies = new Set(['EARLY_SNIPER', 'MOMENTUM_BREAKOUT', 'DIP_ACCUMULATOR', 'CONSERVATIVE_DCA']);
+    const strategyProfile =
+      typeof body?.strategyProfile === 'string' && allowedStrategies.has(body.strategyProfile.trim().toUpperCase())
+        ? (body.strategyProfile.trim().toUpperCase() as 'EARLY_SNIPER' | 'MOMENTUM_BREAKOUT' | 'DIP_ACCUMULATOR' | 'CONSERVATIVE_DCA')
+        : undefined;
 
     if (!Number.isFinite(quantity) || quantity <= 0) {
       return NextResponse.json(
@@ -60,6 +66,8 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+
+    const platformCfg = await defaultBillingDbAdapter.getPlatformFeeAndRiskConfig().catch(() => null);
 
     const report = await runFiveAgentDeskCycle(
       {
@@ -71,6 +79,9 @@ export async function POST(req: NextRequest) {
         mode,
         tokenAddress,
         chainId,
+        dexNetwork,
+        strategyProfile,
+        aiFeatureWeights: platformCfg?.aiFeatureWeights,
       },
       {
         proposalDb: defaultProposalDbAdapter,
@@ -82,11 +93,9 @@ export async function POST(req: NextRequest) {
     );
 
     let remainingCredits: number | undefined;
-    let deskCost = 5;
+    let deskCost = platformCfg?.deskCostCr ?? 5;
     try {
       if (getDbPool()) {
-        const cfg = await defaultBillingDbAdapter.getPlatformFeeAndRiskConfig().catch(() => null);
-        deskCost = cfg?.deskCostCr ?? 5;
         await SubscriptionsEngine.deductMeteredCredits(
           auth.walletAddress,
           deskCost,

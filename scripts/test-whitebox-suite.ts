@@ -21,6 +21,7 @@ import {
 import { DexPairFactoryService } from '../packages/launchpad/dex-pair-factory';
 import { TradingRiskGate } from '../packages/trading/risk-gate';
 import { computePassTier, getUtcDailyQuestKey } from '../packages/gamefi/gamefi-service';
+import { evaluateDexStrategyFit } from '../packages/intelligence/dex-market-scanner';
 import {
   getDbPool,
   defaultDraftDbAdapter,
@@ -368,6 +369,31 @@ async function runWhiteboxSuite() {
   const dayC = getUtcDailyQuestKey(new Date('2026-11-22T00:00:01Z'));
   assert(dayA === dayB, 'Same UTC date produces identical daily_checkin idempotency key');
   assert(dayA !== dayC, 'Next UTC date rolls over to distinct daily_checkin idempotency key');
+
+  const dexFitLowLiq = evaluateDexStrategyFit(
+    {
+      tokenAddress: '0x4200000000000000000000000000000000000006',
+      symbol: 'TEST',
+      name: 'Test Token',
+      chainId: 'base',
+      dexId: 'uniswap',
+      priceUsd: 0.01,
+      liquidityUsd: 1500,
+      volume24hUsd: 2000,
+      fdvUsd: 10000,
+      priceChange1h: 5,
+      priceChange24h: 10,
+      buys24h: 10,
+      sells24h: 10,
+      buyRatioPct: 50,
+      pairUrl: 'https://dexscreener.com/base/0x4200000000000000000000000000000000000006',
+      geckoTerminalUrl: 'https://www.geckoterminal.com/base/tokens/0x4200000000000000000000000000000000000006',
+      source: 'DEXSCREENER',
+      fetchedAt: new Date().toISOString(),
+    },
+    'CONSERVATIVE_DCA'
+  );
+  assert(dexFitLowLiq.riskFlags.includes('LOW_DEX_LIQUIDITY'), 'DEX strategy evaluator flags LOW_DEX_LIQUIDITY for shallow pools');
 
   console.log('\n================================================================');
   console.log(`  🎉 WHITEBOX SUITE COMPLETED: ${passedAssertions} PASSED, ${failedAssertions} FAILED`);

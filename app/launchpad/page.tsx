@@ -43,6 +43,7 @@ export default function LaunchpadPage() {
   const [poolPairing, setPoolPairing] = useState<'WETH' | 'MORE_TOKENS' | 'STOCKS'>('WETH');
   const [isDegenMode, setIsDegenMode] = useState<boolean>(true);
   const [creatorVesting, setCreatorVesting] = useState<'NONE' | '15_PERCENT'>('NONE');
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState<boolean>(false);
 
   const fetchActiveTokens = async () => {
     setIsLoadingTokens(true);
@@ -557,21 +558,34 @@ export default function LaunchpadPage() {
 
               {selectedChain === 'robinhood' && (
                 <div style={{ backgroundColor: '#2A0808', border: '1px solid #FF5252', padding: '8px 10px', borderRadius: '4px', fontSize: '11px', color: '#FF8A80' }}>
-                  ⛔ <strong>Robinhood Live Blocked:</strong> Bankr Relayer hanya mensubsidi gas di Base. Eksekusi on-chain live diblokir (<code>GAS_SPONSORSHIP_POLICY_VIOLATION</code>) untuk melindungi gas wallet operator. Tersedia hanya pada mode simulasi.
+                  ℹ️ <strong>Subsidi Gas Khusus Base L2:</strong> Deploy gratis tanpa gas saat ini khusus di Base L2. Untuk Robinhood L2, silakan gunakan Mode Simulasi atau deploy memakai dompet Anda sendiri.
                 </div>
               )}
               {selectedChain === 'arbitrum' && (
                 <div style={{ backgroundColor: '#2A0808', border: '1px solid #FF5252', padding: '8px 10px', borderRadius: '4px', fontSize: '11px', color: '#FF8A80' }}>
-                  ⛔ <strong>Arbitrum Live Blocked:</strong> Bankr Relayer belum mengaktifkan gas sponsorship di Arbitrum. Eksekusi live diblokir oleh Safety Gate. Tersedia hanya pada mode simulasi.
+                  ℹ️ <strong>Subsidi Gas Khusus Base L2:</strong> Untuk Arbitrum, saat ini tersedia dalam Mode Simulasi atau deploy memakai dompet Anda sendiri.
                 </div>
               )}
               {selectedChain === 'arc' && (
                 <div style={{ backgroundColor: '#071A2E', border: '1px solid #00E5FF', padding: '8px 10px', borderRadius: '4px', fontSize: '11px', color: '#80D8FF' }}>
-                  ⚡ <strong>Arc Network Native:</strong> Terhubung dengan smart contract <code>ArcPad.sol</code> di RPC 5042. Jalur Bankr Relayer untuk Arc diblokir secara live tanpa gas sponsorship.
+                  ⚡ <strong>Arc Network:</strong> Siap untuk peluncuran simulasi maupun kontrak native Arc Network.
                 </div>
               )}
             </div>
 
+            {/* Accordion Toggle for Advanced Settings (Simple Mode by default) */}
+            <button
+              type="button"
+              onClick={() => setShowAdvancedOptions((v) => !v)}
+              className="btn-secondary"
+              style={{ width: '100%', justifyContent: 'space-between', padding: '8px 12px', fontSize: '11px', color: '#94A3B8' }}
+            >
+              <span>⚙️ Pengaturan Lanjutan (Pairing: {poolPairing} · {isDegenMode ? 'Degen $2.5k' : 'Standard $69k'} · Vesting: {creatorVesting === 'NONE' ? '0%' : '15%'})</span>
+              <span>{showAdvancedOptions ? '▲ Sembunyikan' : '▼ Ubah'}</span>
+            </button>
+
+            {showAdvancedOptions && (
+              <div className="flex-col gap-md" style={{ padding: '12px', borderRadius: '6px', border: '1px solid var(--color-border)', backgroundColor: 'rgba(15, 23, 42, 0.45)' }}>
             {/* Pool Pairing & Launch Profile */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div className="flex-col gap-xs">
@@ -666,9 +680,11 @@ export default function LaunchpadPage() {
                 </button>
               </div>
               <span style={{ fontSize: '10px', color: 'var(--color-muted)' }}>
-                * Bankr REST API menggunakan template kurva pabrik bawaan tanpa parameter vesting kustom. Field ini tidak dikirim ke REST API Bankr.
+                * Vesting kustom berlaku untuk deploy via Smart Contract Launchpad.
               </span>
             </div>
+              </div>
+            )}
 
             <div className="flex-col gap-xs">
               <label style={{ color: 'var(--color-muted)', fontSize: '12px', fontWeight: 700 }}>Creator Wallet Address</label>
@@ -725,10 +741,44 @@ export default function LaunchpadPage() {
           </form>
         </div>
 
-        {/* Right Column: Draft & Risk Passport Inspector */}
+        {/* Right Column: Live Token Card Preview + Draft & Risk Passport Inspector */}
         <div className="bg-panel" style={{ borderRadius: '8px', padding: '24px' }}>
+          {/* Live Token Card Preview */}
+          <div
+            style={{
+              marginBottom: '16px',
+              padding: '14px',
+              borderRadius: '8px',
+              border: '1px solid rgba(0, 229, 255, 0.28)',
+              background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(2, 6, 23, 0.95) 100%)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: '12px',
+              flexWrap: 'wrap',
+            }}
+          >
+            <div>
+              <div style={{ fontSize: '10px', color: '#38BDF8', fontFamily: 'var(--font-mono)', fontWeight: 800, marginBottom: '4px' }}>
+                LIVE TOKEN CARD PREVIEW
+              </div>
+              <div style={{ fontSize: '16px', fontWeight: 900, color: '#F8FAFC' }}>
+                {tokenName.trim() || 'Nama Token Anda'}{' '}
+                <span style={{ color: 'var(--color-accent)', fontFamily: 'var(--font-mono)' }}>
+                  ${(tokenSymbol.trim() || 'TICKER').toUpperCase()}
+                </span>
+              </div>
+              <div className="text-muted" style={{ fontSize: '11px', marginTop: '2px' }}>
+                Chain: <strong style={{ color: '#E2E8F0' }}>{selectedChain.toUpperCase()}</strong> · Mode: <strong style={{ color: '#E2E8F0' }}>{mode.replace(/_/g, ' ')}</strong> · Tax: <strong style={{ color: '#22C55E' }}>0%</strong>
+              </div>
+            </div>
+            <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', padding: '4px 8px', borderRadius: '6px', backgroundColor: 'rgba(34, 197, 94, 0.12)', color: '#86EFAC', border: '1px solid rgba(34, 197, 94, 0.3)' }}>
+              {isDegenMode ? 'Degen $2.5k Cap' : 'Standard $69k Cap'}
+            </span>
+          </div>
+
           <h2 style={{ color: 'var(--color-foreground)', marginTop: 0, fontSize: '16px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-            <ShieldAlert size={18} /> Risk Passport & Draft Summary
+            <ShieldAlert size={18} /> Skor Keamanan &amp; Ringkasan Draft
           </h2>
 
           {draftResult ? (

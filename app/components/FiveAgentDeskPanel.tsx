@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Radar, Microscope, BrainCircuit, ShieldCheck, Zap, AlertTriangle, ArrowRight, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Radar, Microscope, BrainCircuit, ShieldCheck, Zap, AlertTriangle, ArrowRight, CheckCircle2, ExternalLink } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { STRATEGY_PROFILES, type StrategyProfileId } from '@packages/intelligence/dex-market-scanner';
 
 interface FiveAgentDeskPanelProps {
   isConnected: boolean;
@@ -26,31 +27,68 @@ export function FiveAgentDeskPanel({
   defaultQty,
 }: FiveAgentDeskPanelProps) {
   const { refreshSession } = useAuth();
+  const [targetSource, setTargetSource] = useState<'CEX' | 'LAUNCHPAD' | 'EXTERNAL_DEX'>('CEX');
+  const [launchpadTokens, setLaunchpadTokens] = useState<any[]>([]);
+  const [tokenAddress, setTokenAddress] = useState<string>('');
+  const [dexNetwork, setDexNetwork] = useState<string>('base');
+  const [strategyProfile, setStrategyProfile] = useState<StrategyProfileId>('MOMENTUM_BREAKOUT');
   const [mode, setMode] = useState<'PAPER' | 'LIVE_ADVISORY'>('PAPER');
   const [symbol, setSymbol] = useState(defaultSymbol || 'BTCUSDT');
   const [action, setAction] = useState<'BUY' | 'SELL'>(defaultAction || 'BUY');
   const [quantity, setQuantity] = useState<number>(defaultQty || 100);
-  const [maxSlippagePct, setMaxSlippagePct] = useState<number>(1.0);
+  const [maxSlippagePct, setMaxSlippagePct] = useState<number>(1.5);
   const [running, setRunning] = useState(false);
   const [report, setReport] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    fetch('/api/launchpad/tokens')
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.success && Array.isArray(json.data)) {
+          setLaunchpadTokens(json.data);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleSelectStrategy = (id: StrategyProfileId) => {
+    setStrategyProfile(id);
+    const cfg = STRATEGY_PROFILES[id];
+    if (cfg) setMaxSlippagePct(cfg.recommendedSlippagePct);
+  };
+
   const handleRunDesk = async () => {
     if (!isConnected) {
-      setError('Hubungkan dompet Web3 (SIWE) terlebih dahulu untuk menjalankan 5-Agent Trading Desk.');
+      setError('Hubungkan dompet Web3 (MetaMask) terlebih dahulu untuk menjalankan AI Trading Desk.');
+      return;
+    }
+    if (targetSource === 'EXTERNAL_DEX' && !tokenAddress.trim()) {
+      setError('Tempel Contract Address (0x... / Solana Mint) dari GeckoTerminal atau DexScreener terlebih dahulu.');
       return;
     }
     setRunning(true);
     setError(null);
     try {
+      const effectiveSymbol = targetSource === 'EXTERNAL_DEX' ? 'TOKEN' : symbol;
+      const effectiveAddr = targetSource === 'CEX' ? undefined : tokenAddress.trim() || undefined;
       const res = await fetch('/api/agent/desk/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symbol, action, quantity, maxSlippagePct, mode }),
+        body: JSON.stringify({
+          symbol: effectiveSymbol,
+          action,
+          quantity,
+          maxSlippagePct,
+          mode,
+          tokenAddress: effectiveAddr,
+          dexNetwork: targetSource === 'CEX' ? undefined : dexNetwork,
+          strategyProfile,
+        }),
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
-        setError(`5-Agent Desk (${res.status}): ${json.error || 'Gagal menjalankan siklus desk'}`);
+        setError(`AI Trading Desk (${res.status}): ${json.error || 'Gagal menjalankan siklus analisis'}`);
         return;
       }
       setReport(json.data);
@@ -83,10 +121,10 @@ export function FiveAgentDeskPanel({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '16px' }}>
         <div>
           <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 900, color: '#E2E8F0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <BrainCircuit size={18} color="#A855F7" /> 5-Agent Autonomous Trading Desk (100% Vercel-Native)
+            <BrainCircuit size={18} color="#A855F7" /> AI Trading Desk (5 Agen Modular)
           </h2>
           <p className="text-muted" style={{ margin: '2px 0 0 0', fontSize: '11px' }}>
-            Scanner → Analyst → Brain (BytePlus/Gemini) → Risk (Immutable) → Executor · One Rule: No agent can modify trading rules.
+            Analisa token Launchpad kita, token eksternal GeckoTerminal / DexScreener (paste CA), maupun pair CEX — dilindungi Risk Gate permanen.
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
@@ -104,15 +142,101 @@ export function FiveAgentDeskPanel({
         </div>
       </div>
 
+      {/* Universal Target Source Tabs (Launchpad Kita / External DEX CA / Major CEX) */}
+      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
+        {[
+          { id: 'LAUNCHPAD' as const, label: `🚀 Token Launchpad Kita (${launchpadTokens.length})` },
+          { id: 'EXTERNAL_DEX' as const, label: '🦎 Paste CA Eksternal (GeckoTerminal / DexScreener)' },
+          { id: 'CEX' as const, label: '📊 Major CEX Pair' },
+        ].map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => {
+              setTargetSource(t.id);
+              if (t.id === 'LAUNCHPAD' && launchpadTokens.length > 0) {
+                const first = launchpadTokens[0];
+                setSymbol(first.ticker || 'TOKEN');
+                setTokenAddress(first.contractAddress || '');
+                setDexNetwork((first.chain || 'base').replace('-mainnet', '').replace('-sepolia', ''));
+              } else if (t.id === 'CEX') {
+                setSymbol('BTCUSDT');
+                setTokenAddress('');
+              }
+            }}
+            className={targetSource === t.id ? 'btn-primary' : 'btn-secondary'}
+            style={{ padding: '5px 10px', fontSize: '11px' }}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
       {/* Controls */}
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '16px' }}>
-        <input
-          type="text"
-          value={symbol}
-          onChange={(e) => setSymbol(e.target.value.toUpperCase())}
-          placeholder="Symbol (BTCUSDT)"
-          style={{ width: '120px', padding: '7px 10px', borderRadius: '6px', backgroundColor: '#0B1220', border: '1px solid var(--color-border)', color: 'var(--color-foreground)', fontSize: '12px', fontFamily: 'var(--font-mono)' }}
-        />
+        {targetSource === 'LAUNCHPAD' ? (
+          <select
+            value={tokenAddress}
+            onChange={(e) => {
+              const ca = e.target.value;
+              setTokenAddress(ca);
+              const found = launchpadTokens.find((tk) => tk.contractAddress === ca);
+              if (found) {
+                setSymbol(found.ticker || 'TOKEN');
+                setDexNetwork((found.chain || 'base').replace('-mainnet', '').replace('-sepolia', ''));
+              }
+            }}
+            style={{ minWidth: '185px', padding: '7px 10px', borderRadius: '6px', backgroundColor: '#0B1220', border: '1px solid var(--color-border)', color: 'var(--color-foreground)', fontSize: '12px', fontFamily: 'var(--font-mono)' }}
+          >
+            {launchpadTokens.length === 0 && <option value="">Belum ada token aktif</option>}
+            {launchpadTokens.map((tk: any, idx: number) => (
+              <option key={tk.launchId || idx} value={tk.contractAddress || ''}>
+                ${tk.ticker || 'TOKEN'} ({tk.name || 'Launch'}) · {tk.chain || 'base'}
+              </option>
+            ))}
+          </select>
+        ) : targetSource === 'EXTERNAL_DEX' ? (
+          <>
+            <select
+              value={dexNetwork}
+              onChange={(e) => setDexNetwork(e.target.value)}
+              style={{ padding: '7px 10px', borderRadius: '6px', backgroundColor: '#0B1220', border: '1px solid var(--color-border)', color: 'var(--color-foreground)', fontSize: '12px' }}
+            >
+              <option value="base">Base</option>
+              <option value="arbitrum">Arbitrum</option>
+              <option value="eth">Ethereum</option>
+              <option value="solana">Solana</option>
+              <option value="bsc">BSC</option>
+            </select>
+            <input
+              type="text"
+              value={tokenAddress}
+              onChange={(e) => setTokenAddress(e.target.value)}
+              placeholder="Paste Contract Address (0x... / Solana Mint)"
+              style={{ minWidth: '220px', flex: '1 1 220px', padding: '7px 10px', borderRadius: '6px', backgroundColor: '#0B1220', border: '1px solid var(--color-border)', color: 'var(--color-foreground)', fontSize: '12px', fontFamily: 'var(--font-mono)' }}
+            />
+          </>
+        ) : (
+          <input
+            type="text"
+            value={symbol}
+            onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+            placeholder="Symbol (BTCUSDT)"
+            style={{ width: '120px', padding: '7px 10px', borderRadius: '6px', backgroundColor: '#0B1220', border: '1px solid var(--color-border)', color: 'var(--color-foreground)', fontSize: '12px', fontFamily: 'var(--font-mono)' }}
+          />
+        )}
+        <select
+          value={strategyProfile}
+          onChange={(e) => handleSelectStrategy(e.target.value as StrategyProfileId)}
+          title={STRATEGY_PROFILES[strategyProfile]?.description}
+          style={{ padding: '7px 10px', borderRadius: '6px', backgroundColor: '#0B1220', border: '1px solid rgba(168, 85, 247, 0.45)', color: '#E9D5FF', fontSize: '12px', fontWeight: 700 }}
+        >
+          {Object.values(STRATEGY_PROFILES).map((sp) => (
+            <option key={sp.id} value={sp.id}>
+              Strategi: {sp.label}
+            </option>
+          ))}
+        </select>
         <select
           value={action}
           onChange={(e) => setAction(e.target.value as 'BUY' | 'SELL')}
@@ -225,6 +349,39 @@ export function FiveAgentDeskPanel({
               <div className="text-muted">Jalankan 1 siklus 5-Agent Desk untuk melihat log READ-BACK real-time tanpa kolisi.</div>
             )}
           </div>
+
+          {report?.dexSnapshot && (
+            <div
+              style={{
+                backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                border: '1px solid rgba(16, 185, 129, 0.35)',
+                borderRadius: '6px',
+                padding: '10px 12px',
+                fontSize: '11px',
+                fontFamily: 'var(--font-mono)',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <span style={{ fontWeight: 800, color: '#6EE7B7' }}>
+                  Live DEX Telemetry: ${report.dexSnapshot.symbol} ({report.dexSnapshot.source})
+                </span>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <a href={report.dexSnapshot.pairUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#38BDF8', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                    DexScreener <ExternalLink size={10} />
+                  </a>
+                  <a href={report.dexSnapshot.geckoTerminalUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#A7F3D0', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                    GeckoTerminal <ExternalLink size={10} />
+                  </a>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', color: '#E2E8F0' }}>
+                <div>Price: <strong>${report.dexSnapshot.priceUsd < 0.01 ? report.dexSnapshot.priceUsd.toExponential(2) : report.dexSnapshot.priceUsd.toFixed(4)}</strong></div>
+                <div>Liq: <strong>${Math.round(report.dexSnapshot.liquidityUsd).toLocaleString()}</strong></div>
+                <div>Vol 24h: <strong>${Math.round(report.dexSnapshot.volume24hUsd).toLocaleString()}</strong></div>
+                <div>Buys: <strong>{report.dexSnapshot.buyRatioPct}%</strong></div>
+              </div>
+            </div>
+          )}
 
           {report?.llmAdvisory && (
             <div

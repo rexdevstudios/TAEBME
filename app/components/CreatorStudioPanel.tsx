@@ -152,10 +152,10 @@ export function CreatorStudioPanel({
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
         <div style={{ fontSize: '13px', fontWeight: 900, color: '#38BDF8', display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <Sparkles size={15} /> Vercel-Native Creator Asset Studio &amp; Growth Launch Pack
+          <Sparkles size={15} /> AI Token Studio &amp; Marketing Kit
         </div>
         <span style={{ fontSize: '10px', color: '#6EE7B7', fontFamily: 'var(--font-mono)' }}>
-          STATELESS · RBAC: CREATE_LAUNCH_DRAFT
+          Biaya: 1 Kredit per Aksi
         </span>
       </div>
 

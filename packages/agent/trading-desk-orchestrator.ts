@@ -17,10 +17,16 @@
  */
 
 import { ethers } from 'ethers';
-import { FeatureEngine, type IntelligenceSignal } from '../intelligence/feature-engine';
+import { FeatureEngine, type FeatureWeights, type IntelligenceSignal } from '../intelligence/feature-engine';
 import { intelligenceCache } from '../intelligence/market-data-cache';
 import { fetchDefiLlamaMacroSignal, type DefiLlamaMacroSignal } from '../intelligence/defillama-client';
 import { generateMarketAdvisoryNote, type MarketAdvisoryNote } from '../intelligence/llm-advisory-client';
+import {
+  fetchDexTokenSnapshot,
+  evaluateDexStrategyFit,
+  type DexTokenSnapshot,
+  type StrategyProfileId,
+} from '../intelligence/dex-market-scanner';
 import { AgentProposalEngine, type AgentProposalRecord, type ProposalDbAdapter } from './proposal-engine';
 import { TradingRiskGate } from '../trading/risk-gate';
 import { MevProtectionService } from '../trading/mev-protection';
@@ -55,6 +61,9 @@ export interface FiveAgentDeskInput {
   mode: 'PAPER' | 'LIVE_ADVISORY';
   tokenAddress?: string;
   chainId?: number;
+  dexNetwork?: string;
+  strategyProfile?: StrategyProfileId;
+  aiFeatureWeights?: Partial<FeatureWeights> | null;
   idempotencyKey?: string;
 }
 
@@ -75,6 +84,7 @@ export interface FiveAgentDeskDeps {
     riskDecisionReason?: string;
   }) => Promise<string>;
   fetchMacroSignal?: () => Promise<DefiLlamaMacroSignal | null>;
+  fetchDexSnapshot?: (tokenAddress: string, dexNetwork?: string) => Promise<DexTokenSnapshot | null>;
   generateAdvisory?: (signal: IntelligenceSignal, ctx: { symbol: string; action: 'BUY' | 'SELL'; suggestedQty: number }) => Promise<MarketAdvisoryNote>;
 }
 
@@ -84,6 +94,8 @@ export interface FiveAgentDeskReport {
   action: OrderSide;
   quantity: number;
   mode: 'PAPER' | 'LIVE_ADVISORY';
+  strategyProfile?: StrategyProfileId;
+  dexSnapshot?: DexTokenSnapshot | null;
   collisions: 0;
   rulesImmutable: true;
   agents: DeskAgentCard[];
@@ -125,16 +137,23 @@ export async function runFiveAgentDeskCycle(
   };
 
   // -------------------------------------------------------------------------
-  // AGENT 1: SCANNER — Active launches + DefiLlama Macro TVL
+  // AGENT 1: SCANNER — Active launches + DefiLlama Macro TVL + Live DEX Snapshot
   // -------------------------------------------------------------------------
   const s1 = performance.now();
-  const [macroRes, launchesRes] = await Promise.allSettled([
+  const [macroRes, launchesRes, dexRes] = await Promise.allSettled([
     (deps.fetchMacroSignal ?? fetchDefiLlamaMacroSignal)(),
     deps.getActiveLaunchesCount(),
+    input.tokenAddress
+      ? (deps.fetchDexSnapshot ?? fetchDexTokenSnapshot)(input.tokenAddress, input.dexNetwork || 'base')
+      : Promise.resolve(null),
   ]);
   const macroSignal = macroRes.status === 'fulfilled' ? macroRes.value : null;
   const activeLaunchesCount = launchesRes.status === 'fulfilled' ? launchesRes.value : 0;
-  const scannerSummary = `Scanned ${activeLaunchesCount} SSOT launches & macro TVL (${macroSignal ? `${macroSignal.topChains.length} chains` : 'neutral'}) for ${input.symbol}.`;
+  const dexSnapshot = dexRes.status === 'fulfilled' ? dexRes.value : null;
+  const resolvedSymbol = dexSnapshot?.symbol && input.symbol === 'TOKEN' ? dexSnapshot.symbol : input.symbol;
+  const scannerSummary = dexSnapshot
+    ? `Scanned ${dexSnapshot.symbol} on ${dexSnapshot.chainId.toUpperCase()} (${dexSnapshot.source}) · Liq $${Math.round(dexSnapshot.liquidityUsd).toLocaleString()} · Vol24h $${Math.round(dexSnapshot.volume24hUsd).toLocaleString()} · Buys ${dexSnapshot.buyRatioPct}%`
+    : `Scanned ${activeLaunchesCount} active launches & macro TVL (${macroSignal ? `${macroSignal.topChains.length} chains` : 'neutral'}) for ${resolvedSymbol}.`;
   agents.push({
     agent: 'SCANNER',
     role: 'Finds pairs & macro regime',
@@ -142,15 +161,34 @@ export async function runFiveAgentDeskCycle(
     summary: scannerSummary,
     elapsedMs: Math.round(performance.now() - s1),
   });
-  log('SCANNER', 'MARKET_SCANNED', scannerSummary, true);
+  log('SCANNER', dexSnapshot ? 'DEX_TOKEN_SCANNED' : 'MARKET_SCANNED', scannerSummary, true);
 
   // -------------------------------------------------------------------------
-  // AGENT 2: ANALYST — Quantitative FeatureEngine signal & risk flags
+  // AGENT 2: ANALYST — Quantitative FeatureEngine signal & Strategy Fit
   // -------------------------------------------------------------------------
   const s2 = performance.now();
-  const signal = FeatureEngine.computeSignal(input.symbol, intelligenceCache, null, null, macroSignal);
+  const baseSignal = FeatureEngine.computeSignal(
+    resolvedSymbol,
+    intelligenceCache,
+    null,
+    null,
+    macroSignal,
+    input.aiFeatureWeights
+  );
+  const strategyFit = dexSnapshot ? evaluateDexStrategyFit(dexSnapshot, input.strategyProfile) : null;
+  const signal: IntelligenceSignal = strategyFit
+    ? {
+        ...baseSignal,
+        computedConfidenceScore: Math.max(
+          0,
+          Math.min(1, Math.round((baseSignal.computedConfidenceScore + strategyFit.scoreDelta) * 100) / 100)
+        ),
+        riskFlags: [...baseSignal.riskFlags, ...strategyFit.riskFlags],
+        rationale: `${strategyFit.rationale} | ${baseSignal.rationale}`,
+      }
+    : baseSignal;
   const counterpartyBlocked = signal.riskFlags.includes('COUNTERPARTY_BLOCKED');
-  const analystSummary = `Confidence ${(signal.computedConfidenceScore * 100).toFixed(1)}% | Sentiment=${signal.inputs.webSentiment} | Volatility=${signal.inputs.marketVolatility} | Flags=${signal.riskFlags.length}`;
+  const analystSummary = `Confidence ${(signal.computedConfidenceScore * 100).toFixed(1)}% | Sentiment=${signal.inputs.webSentiment} | Volatility=${signal.inputs.marketVolatility} | Flags=${signal.riskFlags.length}${strategyFit ? ` · Strategy=${strategyFit.strategyProfile}` : ''}`;
   agents.push({
     agent: 'ANALYST',
     role: 'Evaluates tokens & risk flags',
@@ -287,10 +325,12 @@ export async function runFiveAgentDeskCycle(
     log('EXECUTOR', 'ORDER_BLOCKED', 'Risk Gate vetoed execution cleanly', false);
     return {
       runId,
-      symbol: input.symbol,
+      symbol: resolvedSymbol,
       action: input.action,
       quantity: input.quantity,
       mode: input.mode,
+      strategyProfile: input.strategyProfile,
+      dexSnapshot,
       collisions: 0,
       rulesImmutable: true,
       agents,
@@ -305,13 +345,13 @@ export async function runFiveAgentDeskCycle(
     };
   }
 
-  const handoffUrl = `/trading?symbol=${encodeURIComponent(input.symbol)}&side=${input.action}&qty=${input.quantity}&proposalId=${encodeURIComponent(proposal.id)}${input.tokenAddress ? `&token=${encodeURIComponent(input.tokenAddress)}` : ''}`;
+  const handoffUrl = `/trading?symbol=${encodeURIComponent(resolvedSymbol)}&side=${input.action}&qty=${input.quantity}&proposalId=${encodeURIComponent(proposal.id)}${input.tokenAddress ? `&token=${encodeURIComponent(input.tokenAddress)}` : ''}`;
 
   if (input.mode === 'PAPER') {
     const tradeIntentId = await deps.saveTradeIntent({
       userId: input.userId,
       stage: 'PAPER',
-      symbol: input.symbol,
+      symbol: resolvedSymbol,
       side: input.action,
       type: 'MARKET',
       quantity: input.quantity,
@@ -331,10 +371,12 @@ export async function runFiveAgentDeskCycle(
 
     return {
       runId,
-      symbol: input.symbol,
+      symbol: resolvedSymbol,
       action: input.action,
       quantity: input.quantity,
       mode: input.mode,
+      strategyProfile: input.strategyProfile,
+      dexSnapshot,
       collisions: 0,
       rulesImmutable: true,
       agents,
@@ -362,10 +404,12 @@ export async function runFiveAgentDeskCycle(
 
   return {
     runId,
-    symbol: input.symbol,
+    symbol: resolvedSymbol,
     action: input.action,
     quantity: input.quantity,
     mode: input.mode,
+    strategyProfile: input.strategyProfile,
+    dexSnapshot,
     collisions: 0,
     rulesImmutable: true,
     agents,
