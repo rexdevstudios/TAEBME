@@ -9,6 +9,7 @@ import {
   getBrowserSigner,
   getLaunchpadContract,
   normalizeWeb3Error,
+  resolveBrowserEthereumProvider,
 } from '@packages/launchpad/web3-provider';
 
 interface TokenActionsClientProps {
@@ -19,6 +20,7 @@ interface TokenActionsClientProps {
   isSolana: boolean;
   dexPairAddress?: string | null;
   isGraduated?: boolean;
+  launchpadContractAddress?: string | null;
 }
 
 export default function TokenActionsClient({
@@ -29,6 +31,7 @@ export default function TokenActionsClient({
   isSolana,
   dexPairAddress,
   isGraduated,
+  launchpadContractAddress,
 }: TokenActionsClientProps) {
   const [copied, setCopied] = useState(false);
   const [walletNotice, setWalletNotice] = useState<string | null>(null);
@@ -51,7 +54,7 @@ export default function TokenActionsClient({
 
   const handleOnChainCurveBuy = async () => {
     setOnChainSwapMsg(null);
-    const contractCfg = getContractConfiguration();
+    const contractCfg = getContractConfiguration(launchpadContractAddress);
     if (!contractCfg.isConfigured || !contractCfg.contractAddress) {
       setOnChainSwapMsg(`⚠️ ${contractCfg.message}`);
       return;
@@ -72,7 +75,7 @@ export default function TokenActionsClient({
       }
 
       const signer = await getBrowserSigner();
-      const contract = getLaunchpadContract(signer);
+      const contract = getLaunchpadContract(signer, launchpadContractAddress);
       const tokenAmtWei = ethers.parseEther(String(Math.max(1, Math.floor(ethVal * 2500000))));
       const valueWei = ethers.parseEther(swapAmount);
 
@@ -125,9 +128,10 @@ export default function TokenActionsClient({
       return;
     }
 
-    if (typeof window !== 'undefined' && (window as any).ethereum) {
+    const ethereum = resolveBrowserEthereumProvider();
+    if (ethereum) {
       try {
-        const wasAdded = await (window as any).ethereum.request({
+        const wasAdded = await ethereum.request({
           method: 'wallet_watchAsset',
           params: {
             type: 'ERC20',

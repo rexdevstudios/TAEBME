@@ -4,9 +4,10 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Bot, ShieldAlert, Settings2, FileCode2, Target, BrainCircuit, Activity, BarChart3, Wallet } from 'lucide-react';
 import { FiveAgentDeskPanel } from '../components/FiveAgentDeskPanel';
+import { PageWorkflowBanner } from '../components/PageWorkflowBanner';
 
 export default function AgentPage() {
-  const { isConnected, userRole, connectMetaMask, isConnecting, refreshSession } = useAuth();
+  const { isConnected, userRole, entitlements, connectMetaMask, isConnecting, refreshSession } = useAuth();
   const [connectError, setConnectError] = useState<string | null>(null);
   const [symbol, setSymbol] = useState('BTCUSDT');
   const [action, setAction] = useState<'BUY' | 'SELL'>('BUY');
@@ -86,6 +87,20 @@ export default function AgentPage() {
           <strong>Advisory Only — No Auto-Execution.</strong> AI proposals are recommendations only and require explicit human approval via the Trading Terminal. No trade is submitted or executed from this page.
         </span>
       </div>
+
+      {/* Workflow & Plan Entitlement Guide */}
+      <PageWorkflowBanner
+        title="Alur AI Autonomous Desk (Proposal-Only)"
+        isUnlocked={Boolean(entitlements.aiProposals)}
+        requiredPlanLabel="AGENT"
+        creditSummary="5-Agent Desk: -5 cr · Single Proposal: -1 cr"
+        steps={[
+          { step: '1', label: 'Jalankan 5-Agent Trading Desk', cost: '-5 cr' },
+          { step: '2', label: 'Tinjau Skor Risiko & Rasional AI' },
+          { step: '3', label: 'Klik Review in Trading Terminal →' },
+          { step: '4', label: 'Persetujuan Manual di /trading' },
+        ]}
+      />
 
       {/* 5-Agent Autonomous Trading Desk (100% Vercel-Native) */}
       <FiveAgentDeskPanel

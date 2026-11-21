@@ -7,6 +7,7 @@ import { NutritionLabelCard } from '../components/NutritionLabelCard';
 import { AngelDealRoomModal } from '../components/AngelDealRoomModal';
 import { AdminMerkleSnapshotPanel } from '../components/AdminMerkleSnapshotPanel';
 import { CreatorStudioPanel } from '../components/CreatorStudioPanel';
+import { PageWorkflowBanner } from '../components/PageWorkflowBanner';
 import { ethers } from 'ethers';
 import {
   getContractConfiguration,
@@ -21,7 +22,7 @@ import { normalizeChainName } from '@packages/shared/token-identifier';
 export type LaunchModeType = 'BONDING_CURVE' | 'FAIR_LAUNCH' | 'WHITELIST_PRIVATE' | 'FIXED_PRICE' | 'COMMUNITY_PRELAUNCH';
 
 export default function LaunchpadPage() {
-  const { isConnected, userRole, walletAddress, connectMetaMask, isConnecting, refreshSession, switchNetwork } = useAuth();
+  const { isConnected, userRole, entitlements, walletAddress, connectMetaMask, isConnecting, refreshSession, switchNetwork } = useAuth();
   const [connectError, setConnectError] = useState<string | null>(null);
   const [ssotFactoryAddress, setSsotFactoryAddress] = useState<string>('');
   const [isAngelModalOpen, setIsAngelModalOpen] = useState(false);
@@ -351,6 +352,20 @@ export default function LaunchpadPage() {
           </span>
         </div>
       </div>
+
+      {/* Workflow & Plan Entitlement Guide */}
+      <PageWorkflowBanner
+        title="Alur Peluncuran Token"
+        isUnlocked={Boolean(entitlements.createLaunch)}
+        requiredPlanLabel="CREATOR / AGENT"
+        creditSummary="Studio: -1 cr · Draft: Gratis · Deploy: -50 cr"
+        steps={[
+          { step: '1', label: 'AI Creator Studio', cost: '-1 cr' },
+          { step: '2', label: 'Buat Draft & Risk Passport', cost: 'Gratis' },
+          { step: '3', label: 'Bankr Deploy / On-Chain Contract', cost: '-50 cr / Gas' },
+          { step: '4', label: 'Token Portal & KOL Bounty', cost: 'Live' },
+        ]}
+      />
 
       {/* Angel Deal Room Modal */}
       <AngelDealRoomModal

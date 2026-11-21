@@ -16,7 +16,7 @@ import {
   ArrowUpRight,
   Sparkles,
 } from 'lucide-react';
-import { defaultDraftDbAdapter, defaultBountyDbAdapter } from '@packages/shared/db-pool';
+import { defaultDraftDbAdapter, defaultBountyDbAdapter, defaultBillingDbAdapter } from '@packages/shared/db-pool';
 import { normalizeTokenIdentifier, SupportedChainId } from '@packages/shared/token-identifier';
 import TokenActionsClient from './TokenActionsClient';
 
@@ -107,6 +107,10 @@ export default async function TokenPortalPage({ params }: PageProps) {
   const tokenCampaigns = dbLaunch?.launchId
     ? await defaultBountyDbAdapter.listCampaigns(dbLaunch.launchId)
     : [];
+
+  // Query SSOT Launchpad Contract Address override from PostgreSQL platform config
+  const platformCfg = await defaultBillingDbAdapter.getPlatformFeeAndRiskConfig().catch(() => null);
+  const ssotLaunchpadContract = platformCfg?.launchpadContractAddress || null;
 
   // Extract or fallback metadata
   const tokenName = dbLaunch?.name || (isSol ? `Solana Token ${lookupAddress.slice(0, 4)}` : `Base Token ${lookupAddress.slice(0, 6)}`);
@@ -386,6 +390,7 @@ export default async function TokenPortalPage({ params }: PageProps) {
             isSolana={isSol}
             dexPairAddress={dexPairAddress}
             isGraduated={isGraduated}
+            launchpadContractAddress={ssotLaunchpadContract}
           />
         </div>
       </div>

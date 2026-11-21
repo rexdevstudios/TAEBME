@@ -7,15 +7,40 @@ export type UserRole =
   | 'GUEST'
   | 'TRADER'
   | 'CREATOR'
+  | 'MODERATOR'
+  | 'BILLING_ADMIN'
+  | 'RISK_ADMIN'
   | 'LAUNCH_ADMIN'
   | 'SYSTEM_ADMIN'
   | 'SUPER_ADMIN';
+
+export interface UserEntitlements {
+  paperTrading: boolean;
+  viewLaunchpad: boolean;
+  createLaunch: boolean;
+  liveTrading: boolean;
+  aiProposals: boolean;
+  priorityScrape: boolean;
+}
+
+const DEFAULT_GUEST_ENTITLEMENTS: UserEntitlements = {
+  paperTrading: true,
+  viewLaunchpad: true,
+  createLaunch: false,
+  liveTrading: false,
+  aiProposals: false,
+  priorityScrape: false,
+};
 
 export interface AuthContextType {
   walletAddress: string | null;
   userId: string | null;
   isConnected: boolean;
   userRole: UserRole;
+  roles: string[];
+  capabilities: string[];
+  hasCapability: (capability: string) => boolean;
+  entitlements: UserEntitlements;
   planId?: 'FREE' | 'CREATOR' | 'TRADER' | 'AGENT';
   credits: number;
   isConnecting: boolean;
@@ -73,10 +98,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [userId, setUserId] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [userRole, setUserRole] = useState<UserRole>('GUEST');
+  const [roles, setRoles] = useState<string[]>([]);
+  const [capabilities, setCapabilities] = useState<string[]>([]);
+  const [entitlements, setEntitlements] = useState<UserEntitlements>(DEFAULT_GUEST_ENTITLEMENTS);
   const [planId, setPlanId] = useState<'FREE' | 'CREATOR' | 'TRADER' | 'AGENT'>('FREE');
   const [credits, setCredits] = useState<number>(0);
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
   const [chainId, setChainId] = useState<string | null>(null);
+
+  const hasCapability = useCallback(
+    (capability: string) => capabilities.includes(capability),
+    [capabilities]
+  );
 
   // Server-Side Session Revalidation (SSOT)
   const refreshSession = useCallback(async () => {
@@ -94,6 +127,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUserId(json.data.userId);
         setIsConnected(true);
         setUserRole(json.data.userRole);
+        setRoles(Array.isArray(json.data.roles) ? json.data.roles : []);
+        setCapabilities(Array.isArray(json.data.capabilities) ? json.data.capabilities : []);
+        setEntitlements(json.data.entitlements || DEFAULT_GUEST_ENTITLEMENTS);
         setPlanId(json.data.planId || 'FREE');
         setCredits(json.data.credits);
         return;
@@ -104,12 +140,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUserId(null);
       setIsConnected(false);
       setUserRole('GUEST');
+      setRoles([]);
+      setCapabilities([]);
+      setEntitlements(DEFAULT_GUEST_ENTITLEMENTS);
       setPlanId('FREE');
       setCredits(0);
     } catch (e) {
       console.warn('[AuthContext] Session revalidation warning:', e);
       setIsConnected(false);
       setUserRole('GUEST');
+      setRoles([]);
+      setCapabilities([]);
+      setEntitlements(DEFAULT_GUEST_ENTITLEMENTS);
     }
   }, []);
 
@@ -153,6 +195,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUserId(null);
     setIsConnected(false);
     setUserRole('GUEST');
+    setRoles([]);
+    setCapabilities([]);
+    setEntitlements(DEFAULT_GUEST_ENTITLEMENTS);
+    setPlanId('FREE');
     setCredits(0);
   }, []);
 
@@ -348,6 +394,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         userId,
         isConnected,
         userRole,
+        roles,
+        capabilities,
+        hasCapability,
+        entitlements,
         planId,
         credits,
         isConnecting,

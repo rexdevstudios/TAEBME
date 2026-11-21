@@ -24,6 +24,7 @@ export default function HeaderNav() {
     walletAddress,
     isConnected,
     userRole,
+    planId,
     credits,
     isConnecting,
     chainId,
@@ -202,10 +203,10 @@ export default function HeaderNav() {
       <div className="flex-row items-center gap-sm">
         {isConnected ? (
           <>
-            {userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN' ? (
-              <span className="badge badge-admin" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            {userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN' || userRole === 'LAUNCH_ADMIN' || userRole === 'RISK_ADMIN' || userRole === 'BILLING_ADMIN' ? (
+              <span className="badge badge-admin" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }} title={`Active RBAC Role: ${userRole}`}>
                 <ShieldAlert size={12} />
-                ADMIN
+                {userRole === 'SUPER_ADMIN' || userRole === 'SYSTEM_ADMIN' ? 'ADMIN' : userRole.replace('_ADMIN', '')}
               </span>
             ) : userRole === 'CREATOR' ? (
               <span className="badge badge-creator" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
@@ -219,17 +220,25 @@ export default function HeaderNav() {
               </span>
             ) : null}
 
-            <div
+            <Link
+              href="/billing"
               className="badge"
               style={{
                 border: '1px solid var(--color-border)',
                 backgroundColor: 'rgba(15, 23, 42, 0.6)',
                 color: '#94A3B8',
-                fontSize: '12px',
+                fontSize: '11px',
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
               }}
+              title={`Active Subscription Tier: ${planId || 'FREE'} · Available Credits: ${credits.toLocaleString()}`}
             >
-              Credits: {credits.toLocaleString()}
-            </div>
+              <span style={{ color: '#FFC400', fontWeight: 900 }}>{planId || 'FREE'}</span>
+              <span>·</span>
+              <span>{credits.toLocaleString()} cr</span>
+            </Link>
 
             <div
               style={{

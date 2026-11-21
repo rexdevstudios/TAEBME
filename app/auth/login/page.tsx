@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Wallet, ShieldCheck, ShieldAlert, Zap } from 'lucide-react';
+import { resolveBrowserEthereumProvider } from '@packages/launchpad/web3-provider';
 
 export default function LoginPage() {
   const { isConnected, userRole, walletAddress: currentWallet, isConnecting, refreshSession, connectMetaMask, disconnectWallet } = useAuth();
@@ -14,12 +15,13 @@ export default function LoginPage() {
   const [hasMetaMask, setHasMetaMask] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Detect MetaMask on client
+  // Detect MetaMask on client (prioritizing MetaMask in multi-wallet browsers)
   useEffect(() => {
-    if (typeof window !== 'undefined' && (window as any).ethereum) {
+    const ethereum = resolveBrowserEthereumProvider();
+    if (ethereum) {
       setHasMetaMask(true);
       // Try to check if already connected
-      (window as any).ethereum.request({ method: 'eth_accounts' })
+      ethereum.request({ method: 'eth_accounts' })
         .then((accounts: string[]) => {
           if (accounts && accounts.length > 0 && !walletAddress) {
             setWalletAddress(accounts[0]);
@@ -75,13 +77,14 @@ export default function LoginPage() {
       let signature: string;
 
       // If MetaMask is installed, request real personal_sign signature synchronously on button click
-      if (typeof window !== 'undefined' && (window as any).ethereum) {
+      const ethereum = resolveBrowserEthereumProvider();
+      if (ethereum) {
         const bytes = new TextEncoder().encode(challengeMessage);
         let hexMessage = '0x';
         for (let i = 0; i < bytes.length; i++) {
           hexMessage += bytes[i].toString(16).padStart(2, '0');
         }
-        signature = await (window as any).ethereum.request({
+        signature = await ethereum.request({
           method: 'personal_sign',
           params: [hexMessage, walletAddress],
         });

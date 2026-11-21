@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { CreditCard, CheckCircle2, ShieldAlert, Zap, TrendingUp, Wallet, Banknote, Scale, History, RefreshCw } from 'lucide-react';
 import { ethers } from 'ethers';
 import { ensureBaseNetwork, getBrowserSigner, normalizeWeb3Error } from '@packages/launchpad/web3-provider';
+import { PageWorkflowBanner } from '../components/PageWorkflowBanner';
 
 interface LedgerEntry {
   id: string;
@@ -35,7 +36,7 @@ interface Plan {
 }
 
 export default function BillingPage() {
-  const { isConnected, userRole, planId, credits, connectMetaMask, isConnecting, refreshSession } = useAuth();
+  const { isConnected, userRole, hasCapability, planId, credits, connectMetaMask, isConnecting, refreshSession } = useAuth();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [activePlanId, setActivePlanId] = useState<string>('FREE');
@@ -220,6 +221,7 @@ export default function BillingPage() {
       setPaymentFeedback(`📡 Transaksi terkirim (${tx.hash.slice(0, 12)}...). Menunggu 1 konfirmasi blok Base...`);
       await tx.wait(1);
 
+      const settledChain = netCheck.hexChainId === '0x14a34' ? 'base-sepolia' : 'base-mainnet';
       const res = await fetch('/api/billing/subscribe', {
         method: 'POST',
         credentials: 'same-origin',
@@ -227,7 +229,7 @@ export default function BillingPage() {
         body: JSON.stringify({
           planId: targetPlanId,
           txHash: tx.hash,
-          chain: 'base-mainnet',
+          chain: settledChain,
         }),
       });
       const json = await res.json();
@@ -327,6 +329,19 @@ export default function BillingPage() {
           </span>
         </div>
       </div>
+
+      {/* Workflow & Plan Entitlement Guide */}
+      <PageWorkflowBanner
+        title="Alur Paket, Pembayaran & Ledger Kredit"
+        isUnlocked={true}
+        creditSummary={`Burn Saat Ini: Studio ${studioCostCr} cr · Desk ${deskCostCr} cr · Launch ${launchCostCr} cr`}
+        steps={[
+          { step: '1', label: 'Pilih Paket (FREE / CREATOR / TRADER / AGENT)' },
+          { step: '2', label: 'Bayar 1-Click ETH via MetaMask / Promo Diskon' },
+          { step: '3', label: 'Role & Kredit Otomatis Aktif di SSOT' },
+          { step: '4', label: 'Pantau Mutasi di Ledger Statement' },
+        ]}
+      />
 
       {/* Optional On-Chain Payment TxHash Bar for Mainnet Upgrades */}
       {isConnected && (
@@ -628,7 +643,7 @@ export default function BillingPage() {
       )}
 
       {/* Admin Billing Rail Diagnostics Console (SYSTEM_ADMIN / SUPER_ADMIN / BILLING_ADMIN Exclusive) */}
-      {(userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN' || (userRole as string) === 'BILLING_ADMIN') && (
+      {(hasCapability('MANAGE_BILLING_PLANS') || userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN' || userRole === 'BILLING_ADMIN') && (
         <div className="bg-panel" style={{ border: '1px solid #FF9100', borderRadius: '8px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div>
             <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#FFD600', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>

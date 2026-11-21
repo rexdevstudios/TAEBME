@@ -73,7 +73,7 @@ export default function OverviewPage() {
         .catch(() => {});
     }
     // Only fetch telemetry & kill switch state if Admin
-    if (userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN') {
+    if (userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN' || userRole === 'RISK_ADMIN') {
       fetchOverview();
       fetch('/api/admin/kill-switch')
         .then((r) => r.json())
@@ -88,7 +88,7 @@ export default function OverviewPage() {
     } else {
       setLoading(false);
     }
-  }, [userRole]);
+  }, [isConnected, userRole]);
 
   const handleToggleKillSwitch = async () => {
     const result = await executeKillSwitchToggle({

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Activity, ShieldAlert, BarChart3, Clock, AlertTriangle, Lightbulb, Wallet, BrainCircuit, ActivitySquare, Lock } from 'lucide-react';
 import { NutritionLabelCard } from '../components/NutritionLabelCard';
+import { PageWorkflowBanner } from '../components/PageWorkflowBanner';
 
 interface Candle {
   timestamp: number;
@@ -139,7 +140,7 @@ function CandlestickChart({ candles }: { candles: Candle[] }) {
 }
 
 export default function TradingPage() {
-  const { isConnected, userRole, connectMetaMask, isConnecting } = useAuth();
+  const { isConnected, userRole, planId, entitlements, chainId, connectMetaMask, isConnecting } = useAuth();
   const [connectError, setConnectError] = useState<string | null>(null);
   const [symbol, setSymbol] = useState('BTCUSDT');
   const [interval, setInterval] = useState('1h');
@@ -231,6 +232,7 @@ export default function TradingPage() {
     setIsSubmitting(true);
     setActionFeedback(null);
     try {
+      const parsedChainId = chainId ? parseInt(chainId, 16) || 8453 : 8453;
       const stage = executionMode === 'PAPER' || symbol.includes('/') ? 'PAPER' : 'TESTNET';
       const res = await fetch('/api/trading/execute', {
         method: 'POST',
@@ -244,7 +246,7 @@ export default function TradingPage() {
           quantity: orderQty > 0 ? orderQty : 0.1,
           maxSlippagePct: orderSlippagePct > 0 ? orderSlippagePct : 1.5,
           tokenAddress: linkedTokenAddress || '0x4200000000000000000000000000000000000006',
-          chainId: 8453,
+          chainId: parsedChainId,
         }),
       });
       const json = await res.json();
@@ -314,6 +316,20 @@ export default function TradingPage() {
           </span>
         </div>
       </div>
+
+      {/* Workflow & Plan Entitlement Guide */}
+      <PageWorkflowBanner
+        title="Alur Trading Terminal & Risk Gate"
+        isUnlocked={executionMode === 'PAPER' ? true : Boolean(entitlements.liveTrading)}
+        requiredPlanLabel="TRADER / AGENT"
+        creditSummary="Paper Trading: Gratis · Live DEX/CEX: Paket TRADER/AGENT"
+        steps={[
+          { step: '1', label: 'Pilih Pair & Analisa Chart/RSI' },
+          { step: '2', label: 'Pilih Mode (Paper / DEX / CEX)' },
+          { step: '3', label: 'Validasi TradingRiskGate & MEV Cap' },
+          { step: '4', label: 'Approve Intent / Sign di MetaMask' },
+        ]}
+      />
 
       {/* Main Grid Layout */}
       <div className="grid-3" style={{ gridTemplateColumns: '2fr 1fr' }}>

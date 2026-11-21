@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { PageWorkflowBanner } from '../components/PageWorkflowBanner';
 import {
   Award,
   ShieldCheck,
@@ -45,7 +46,7 @@ interface BountyCampaignView {
 }
 
 export default function KolHubPage() {
-  const { walletAddress, isConnected } = useAuth();
+  const { walletAddress, isConnected, entitlements } = useAuth();
 
   const [activeTab, setActiveTab] = useState<'PASSPORT' | 'MARKET' | 'CLAIM' | 'CREATOR'>('PASSPORT');
   const [twitterHandle, setTwitterHandle] = useState('');
@@ -530,6 +531,22 @@ export default function KolHubPage() {
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Workflow & Plan Entitlement Guide */}
+      <div style={{ marginTop: '16px' }}>
+        <PageWorkflowBanner
+          title="Alur KOL & SocialFi Bounty"
+          isUnlocked={activeTab === 'CREATOR' ? Boolean(entitlements.createLaunch) : true}
+          requiredPlanLabel="CREATOR / AGENT"
+          creditSummary="KOL Passport & Klaim: Gratis · Buat Kampanye: Paket CREATOR/AGENT"
+          steps={[
+            { step: '1', label: 'Verifikasi KOL Passport', cost: 'Gratis' },
+            { step: '2', label: 'Pilih Bounty (Share/Hold/Stake)' },
+            { step: '3', label: 'Submit Bukti & Audit AI' },
+            { step: '4', label: 'Klaim Merkle Proof On-Chain' },
+          ]}
+        />
       </div>
 
       {/* TAB 1: KOL PASSPORT */}

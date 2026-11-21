@@ -71,6 +71,20 @@ export class RbacGuard {
   }
 
   /**
+   * Mengembalikan seluruh kapabilitas yang dimiliki kombinasi roles user (SSOT dari RBAC_MATRIX).
+   */
+  static getCapabilitiesForRoles(roles: Role[]): Capability[] {
+    if (!Array.isArray(roles) || roles.length === 0) return [];
+    const caps: Capability[] = [];
+    for (const [cap, allowedRoles] of Object.entries(RBAC_MATRIX) as Array<[Capability, Role[]]>) {
+      if (roles.some((r) => allowedRoles.includes(r))) {
+        caps.push(cap);
+      }
+    }
+    return caps;
+  }
+
+  /**
    * Memeriksa apakah suatu aksi membutuhkan Dual-Control (Multi-Admin approval)
    */
   static requiresDualControl(capability: Capability): boolean {
