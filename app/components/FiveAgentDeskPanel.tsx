@@ -402,13 +402,31 @@ export function FiveAgentDeskPanel({
           )}
 
           {report?.execution?.handoffUrl && (
-            <a
-              href={report.execution.handoffUrl}
-              className="btn-primary"
-              style={{ fontSize: '12px', padding: '9px 14px', justifyContent: 'center', display: 'inline-flex', alignItems: 'center', gap: '6px', textDecoration: 'none' }}
-            >
-              <CheckCircle2 size={14} /> Open Approved Plan in Trading Terminal <ArrowRight size={14} />
-            </a>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <a
+                href={report.execution.handoffUrl}
+                className="btn-primary"
+                style={{ fontSize: '12px', padding: '9px 14px', justifyContent: 'center', display: 'inline-flex', alignItems: 'center', gap: '6px', textDecoration: 'none' }}
+              >
+                <CheckCircle2 size={14} /> Open Approved Plan in Trading Terminal <ArrowRight size={14} />
+              </a>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                <a
+                  href={`/trading?symbol=${encodeURIComponent(symbol)}&side=${encodeURIComponent(action)}&qty=${encodeURIComponent(String(quantity))}&mode=CEX_SINGLE_SHOT`}
+                  className="btn-secondary"
+                  style={{ fontSize: '11px', padding: '7px 10px', justifyContent: 'center', display: 'inline-flex', alignItems: 'center', gap: '5px', textDecoration: 'none' }}
+                >
+                  ⚡ Execute via Binance CEX →
+                </a>
+                <a
+                  href={`/launchpad?name=${encodeURIComponent(symbol.replace(/USDT|USD|WETH|ETH|\//gi, '') || symbol)}&symbol=${encodeURIComponent((symbol.replace(/USDT|USD|WETH|ETH|\//gi, '') || symbol).slice(0, 8))}`}
+                  className="btn-secondary"
+                  style={{ fontSize: '11px', padding: '7px 10px', justifyContent: 'center', display: 'inline-flex', alignItems: 'center', gap: '5px', textDecoration: 'none' }}
+                >
+                  🚀 Deploy via Bankr Vault →
+                </a>
+              </div>
+            </div>
           )}
         </div>
       </div>

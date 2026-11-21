@@ -249,6 +249,29 @@ async function runBlackboxSuite() {
   });
   assert(unauthByokPost.status === 401, 'Unauthenticated POST /api/user/provider-keys strictly rejected with HTTP 401');
 
+  // -------------------------------------------------------------------------
+  // TEST 11: Multi-Account Binance Vault, Risk Policy, Add-Ons & Activity Guards
+  // -------------------------------------------------------------------------
+  console.log('\n--- [TEST 11: Multi-Account Vaults, Risk Policy, Add-Ons & Activity Guards] ---');
+  const unauthBinanceGet = await fetch(`${BASE_URL}/api/user/binance-credentials`);
+  assert(unauthBinanceGet.status === 401, 'Unauthenticated GET /api/user/binance-credentials strictly rejected with HTTP 401');
+
+  const unauthBinanceVerify = await fetch(`${BASE_URL}/api/user/binance-credentials/verify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ credentialId: '00000000-0000-0000-0000-000000000001' }),
+  });
+  assert(unauthBinanceVerify.status === 401, 'Unauthenticated POST /api/user/binance-credentials/verify strictly rejected with HTTP 401');
+
+  const unauthRiskPolicy = await fetch(`${BASE_URL}/api/user/risk-policy`);
+  assert(unauthRiskPolicy.status === 401, 'Unauthenticated GET /api/user/risk-policy strictly rejected with HTTP 401');
+
+  const unauthAddons = await fetch(`${BASE_URL}/api/billing/addons`);
+  assert(unauthAddons.status === 401, 'Unauthenticated GET /api/billing/addons strictly rejected with HTTP 401');
+
+  const unauthActivity = await fetch(`${BASE_URL}/api/user/activity`);
+  assert(unauthActivity.status === 401, 'Unauthenticated GET /api/user/activity strictly rejected with HTTP 401');
+
   console.log('\n================================================================');
   console.log(`  🎉 BLACKBOX SUITE COMPLETED: ${passedTests} PASSED, ${failedTests} FAILED`);
   console.log('================================================================\n');
