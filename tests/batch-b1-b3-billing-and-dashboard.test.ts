@@ -107,6 +107,13 @@ describe('Batch B1–B3 — Billing Tiers, Credit Ledger SSOT & Post-Login Dashb
       const cfgJson = await cfgRes.json();
       expect(cfgJson.data.deskCostCr).toBe(10);
       expect(cfgJson.data.maxOrderValueUsd).toBe(25000);
+
+      const { getContractConfiguration, SUPPORTED_BASE_CHAINS } = await import('../packages/launchpad/web3-provider');
+      expect(SUPPORTED_BASE_CHAINS.ARBITRUM_MAINNET.hexChainId).toBe('0xa4b1');
+      expect(SUPPORTED_BASE_CHAINS.ARC_MAINNET.hexChainId).toBe('0x13b2');
+      const customContractCfg = getContractConfiguration('0x4200000000000000000000000000000000000006');
+      expect(customContractCfg.isConfigured).toBe(true);
+      expect(customContractCfg.contractAddress).toBe('0x4200000000000000000000000000000000000006');
     } finally {
       if (origAdmin !== undefined) process.env.ADMIN_WALLET_PUBLIC_ADDRESS = origAdmin;
       else delete process.env.ADMIN_WALLET_PUBLIC_ADDRESS;

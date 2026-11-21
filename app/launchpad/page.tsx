@@ -21,8 +21,9 @@ import { normalizeChainName } from '@packages/shared/token-identifier';
 export type LaunchModeType = 'BONDING_CURVE' | 'FAIR_LAUNCH' | 'WHITELIST_PRIVATE' | 'FIXED_PRICE' | 'COMMUNITY_PRELAUNCH';
 
 export default function LaunchpadPage() {
-  const { isConnected, userRole, walletAddress, connectMetaMask, isConnecting, refreshSession } = useAuth();
+  const { isConnected, userRole, walletAddress, connectMetaMask, isConnecting, refreshSession, switchNetwork } = useAuth();
   const [connectError, setConnectError] = useState<string | null>(null);
+  const [ssotFactoryAddress, setSsotFactoryAddress] = useState<string>('');
   const [isAngelModalOpen, setIsAngelModalOpen] = useState(false);
   const [tokenName, setTokenName] = useState('');
   const [tokenSymbol, setTokenSymbol] = useState('');
@@ -59,6 +60,18 @@ export default function LaunchpadPage() {
 
   useEffect(() => {
     fetchActiveTokens();
+    fetch('/api/billing/plans')
+      .then((r) => r.json())
+      .then((json) => {
+        const addr = json?.platformConfig?.launchpadContractAddress;
+        if (typeof addr === 'string' && addr.trim()) {
+          setSsotFactoryAddress(addr.trim());
+          if (typeof window !== 'undefined') {
+            (window as any).__RTRADER_LAUNCHPAD_CONTRACT__ = addr.trim();
+          }
+        }
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -185,9 +198,9 @@ export default function LaunchpadPage() {
       }
 
       // 2. Contract Configuration Verification Gate (Rule 6)
-      const contractConfig = getContractConfiguration();
+      const contractConfig = getContractConfiguration(ssotFactoryAddress);
       if (!contractConfig.isConfigured || !contractConfig.contractAddress) {
-        setOnChainFeedback(`❌ ${contractConfig.message} Pendaftaran on-chain dinonaktifkan demi keamanan.`);
+        setOnChainFeedback(`❌ ${contractConfig.message}`);
         return;
       }
 
@@ -234,7 +247,7 @@ export default function LaunchpadPage() {
       // 5. Real Contract Call via MetaMask Signer
       setOnChainFeedback(`⏳ Menyiapkan pendaftaran token on-chain di ${chainName}...`);
       const signer = await getBrowserSigner();
-      const contract = getLaunchpadContract(signer);
+      const contract = getLaunchpadContract(signer, ssotFactoryAddress);
 
       const verifiedTokenAddress = ethers.getAddress(trimmedTokenAddr);
       const totalSupplyWei = ethers.parseEther('1000000000');
@@ -721,11 +734,34 @@ export default function LaunchpadPage() {
                 <span className="text-muted">Creator Wallet:</span>
                 <span style={{ color: 'var(--color-foreground)', fontWeight: 800 }}>{draftResult.creatorWallet.slice(0, 10)}...</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', alignItems: 'center' }}>
                 <span className="text-muted">Target Chain:</span>
-                <span style={{ color: selectedChain === 'base' ? 'var(--color-accent)' : '#FFAB00', fontWeight: 800 }}>
-                  {draftResult.targetChain?.toUpperCase() || selectedChain.toUpperCase()}
-                  {selectedChain === 'base' ? ' (SPONSORED)' : ' (POLICY RESTRICTED)'}
+                <span style={{ color: selectedChain === 'base' ? 'var(--color-accent)' : '#FFAB00', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                  <span>
+                    {`${selectedChain.toUpperCase()}-MAINNET`}
+                    {selectedChain === 'base' ? ' (SPONSORED)' : ' (POLICY RESTRICTED)'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const hexMap: Record<string, string> = {
+                        base: '0x2105',
+                        robinhood: '0x1237',
+                        arbitrum: '0xa4b1',
+                        arc: '0x13b2',
+                      };
+                      const res = await switchNetwork(hexMap[selectedChain] || '0x2105');
+                      if (res.success) {
+                        setOnChainFeedback(`✅ Jaringan MetaMask berhasil berpindah ke ${selectedChain.toUpperCase()}.`);
+                      } else if (res.error) {
+                        setOnChainFeedback(`⚠️ ${res.error}`);
+                      }
+                    }}
+                    className="btn-secondary"
+                    style={{ padding: '2px 7px', fontSize: '10px', borderColor: '#38BDF8', color: '#38BDF8' }}
+                  >
+                    ⚡ Switch MetaMask
+                  </button>
                 </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>

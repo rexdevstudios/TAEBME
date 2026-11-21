@@ -41,6 +41,22 @@ export const SUPPORTED_BASE_CHAINS: Record<string, ChainConfig> = {
     rpcUrl: 'https://rpc.mainnet.chain.robinhood.com',
     explorerUrl: 'https://robinhoodchain.blockscout.com',
   },
+  ARBITRUM_MAINNET: {
+    chainId: 42161,
+    hexChainId: '0xa4b1',
+    name: 'Arbitrum One',
+    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+    rpcUrl: 'https://arb1.arbitrum.io/rpc',
+    explorerUrl: 'https://arbiscan.io',
+  },
+  ARC_MAINNET: {
+    chainId: 5042,
+    hexChainId: '0x13b2',
+    name: 'Arc Network',
+    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+    rpcUrl: 'https://rpc.arcnetwork.io',
+    explorerUrl: 'https://arcscan.io',
+  },
 };
 
 // Known dummy / simulation addresses that MUST NEVER be permitted for live write transactions
@@ -61,15 +77,19 @@ export interface ContractConfigStatus {
  * Validates configured contract address against Rule 6 hard security constraints.
  * Rejects missing, zero, malformed, or dummy addresses.
  */
-export function getContractConfiguration(): ContractConfigStatus {
-  const envAddress = process.env.NEXT_PUBLIC_LAUNCHPAD_CONTRACT_ADDRESS?.trim();
+export function getContractConfiguration(overrideAddress?: string | null): ContractConfigStatus {
+  const winOverride =
+    typeof window !== 'undefined' && typeof (window as any).__RTRADER_LAUNCHPAD_CONTRACT__ === 'string'
+      ? (window as any).__RTRADER_LAUNCHPAD_CONTRACT__.trim()
+      : '';
+  const envAddress = (overrideAddress?.trim() || winOverride || process.env.NEXT_PUBLIC_LAUNCHPAD_CONTRACT_ADDRESS?.trim()) || '';
 
   if (!envAddress) {
     return {
       isConfigured: false,
       status: 'BLOCKED_UNVERIFIED',
       contractAddress: null,
-      message: 'BLOCKED — Smart contract belum ter-deploy atau NEXT_PUBLIC_LAUNCHPAD_CONTRACT_ADDRESS belum diset.',
+      message: 'BLOCKED — Smart contract belum ter-deploy atau NEXT_PUBLIC_LAUNCHPAD_CONTRACT_ADDRESS belum diset. Anda dapat menyetel alamat kontrak di halaman Billing & Tiers (Admin Configurator) atau gunakan tombol Bankr Deploy di atas.',
     };
   }
 
@@ -155,7 +175,7 @@ export async function ensureBaseNetwork(
 
   try {
     const currentChainHex: string = await ethereum.request({ method: 'eth_chainId' });
-    if (currentChainHex && currentChainHex.toLowerCase() === targetHexChainId.toLowerCase()) {
+    if (currentChainHex && currentChainHex.toLowerCase() === hexChain.toLowerCase()) {
       return { success: true, chainId: targetConfig.chainId };
     }
 
@@ -163,7 +183,7 @@ export async function ensureBaseNetwork(
     try {
       await ethereum.request({
         method: 'wallet_switchEthereumChain',
-        params: [{ chainId: targetHexChainId }],
+        params: [{ chainId: hexChain }],
       });
       return { success: true, chainId: targetConfig.chainId };
     } catch (switchErr: any) {
@@ -204,9 +224,10 @@ export async function ensureBaseNetwork(
  * Throws an explicit error if the contract is not verified or blocked.
  */
 export function getLaunchpadContract(
-  signerOrProvider: ethers.Signer | ethers.Provider
+  signerOrProvider: ethers.Signer | ethers.Provider,
+  overrideAddress?: string | null
 ): ethers.Contract {
-  const config = getContractConfiguration();
+  const config = getContractConfiguration(overrideAddress);
   if (!config.isConfigured || !config.contractAddress) {
     throw new Error(config.message);
   }

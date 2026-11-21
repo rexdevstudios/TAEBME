@@ -26,9 +26,30 @@ export default function HeaderNav() {
     userRole,
     credits,
     isConnecting,
+    chainId,
     connectMetaMask,
     disconnectWallet,
+    switchNetwork,
   } = useAuth();
+
+  const [isSwitchingChain, setIsSwitchingChain] = React.useState(false);
+
+  const CHAIN_OPTIONS = [
+    { hex: '0x2105', label: 'Base Mainnet (8453)' },
+    { hex: '0x14a34', label: 'Base Sepolia (84532)' },
+    { hex: '0x1237', label: 'Robinhood L2 (4663)' },
+    { hex: '0xa4b1', label: 'Arbitrum One (42161)' },
+    { hex: '0x13b2', label: 'Arc Network (5042)' },
+  ];
+
+  const normChainHex = (chainId || '').toLowerCase();
+  const defaultHexForHost =
+    typeof window !== 'undefined' && window.location.hostname === 'testnet.pndigi.site'
+      ? '0x14a34'
+      : '0x2105';
+  const selectedChainHex = CHAIN_OPTIONS.some((c) => c.hex === normChainHex)
+    ? normChainHex
+    : defaultHexForHost;
 
   const truncatedAddress = walletAddress
     ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
@@ -108,6 +129,41 @@ export default function HeaderNav() {
           }} />
           {networkLabel}
         </div>
+        <select
+          aria-label="Universal Network Switcher"
+          title="Switch active Web3 / MetaMask blockchain network"
+          value={selectedChainHex}
+          disabled={isSwitchingChain}
+          onChange={async (e) => {
+            const targetHex = e.target.value;
+            setIsSwitchingChain(true);
+            try {
+              const res = await switchNetwork(targetHex);
+              if (!res.success && res.error) {
+                alert(`Network Switch: ${res.error}`);
+              }
+            } finally {
+              setIsSwitchingChain(false);
+            }
+          }}
+          style={{
+            backgroundColor: '#0B1220',
+            border: '1px solid var(--color-border)',
+            color: '#38BDF8',
+            borderRadius: '8px',
+            padding: '4px 8px',
+            fontSize: '11px',
+            fontWeight: 700,
+            fontFamily: 'var(--font-mono)',
+            cursor: 'pointer',
+          }}
+        >
+          {CHAIN_OPTIONS.map((c) => (
+            <option key={c.hex} value={c.hex}>
+              ⚡ {c.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* Dynamic Navigation Links */}
@@ -167,7 +223,7 @@ export default function HeaderNav() {
                 fontSize: '12px',
               }}
             >
-              Credits: {userRole === 'SYSTEM_ADMIN' ? '∞' : `${credits.toLocaleString()}`}
+              Credits: {credits.toLocaleString()}
             </div>
 
             <div

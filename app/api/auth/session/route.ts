@@ -48,17 +48,16 @@ export async function GET(req: NextRequest) {
 
     const isAdmin = userRole === 'SUPER_ADMIN' || userRole === 'SYSTEM_ADMIN';
     let planId: PlanId = isAdmin ? 'AGENT' : 'FREE';
-    let credits = isAdmin ? 999999 : 15000;
+    let credits = 15000;
 
-    if (!isAdmin) {
-      try {
-        if (getDbPool()) {
-          planId = await defaultBillingDbAdapter.getUserPlan(session.walletAddress);
-          credits = await defaultBillingDbAdapter.getUserCreditBalance(session.walletAddress);
-        }
-      } catch {
-        // Fallback when DB unavailable or unconfigured in test
+    try {
+      if (getDbPool()) {
+        const dbPlan = await defaultBillingDbAdapter.getUserPlan(session.walletAddress);
+        planId = isAdmin && dbPlan === 'FREE' ? 'AGENT' : dbPlan;
+        credits = await defaultBillingDbAdapter.getUserCreditBalance(session.walletAddress);
       }
+    } catch {
+      // Fallback when DB unavailable or unconfigured in test
     }
 
     const response: ApiResponse<SessionData> = {

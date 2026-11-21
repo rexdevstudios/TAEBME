@@ -60,6 +60,7 @@ export default function BillingPage() {
   const [maxDailyLossUsd, setMaxDailyLossUsd] = useState<number>(1000);
   const [maxSlippagePct, setMaxSlippagePct] = useState<number>(3.0);
   const [treasuryWallet, setTreasuryWallet] = useState<string>('0x0c9f4a82b5ae258e8e65ca40ac4f1abc455c34b6');
+  const [launchpadContractAddress, setLaunchpadContractAddress] = useState<string>('');
   const [configSaving, setConfigSaving] = useState<boolean>(false);
   const [configFeedback, setConfigFeedback] = useState<string | null>(null);
 
@@ -79,6 +80,7 @@ export default function BillingPage() {
         if (typeof cfg.maxDailyLossUsd === 'number') setMaxDailyLossUsd(cfg.maxDailyLossUsd);
         if (typeof cfg.maxSlippagePct === 'number') setMaxSlippagePct(cfg.maxSlippagePct);
         if (typeof cfg.treasuryWallet === 'string' && cfg.treasuryWallet) setTreasuryWallet(cfg.treasuryWallet);
+        if (typeof cfg.launchpadContractAddress === 'string') setLaunchpadContractAddress(cfg.launchpadContractAddress);
       }
     } catch (err) {
       console.warn('[Billing UI] API fetch error (using fallback plans):', (err as Error).message);
@@ -170,6 +172,7 @@ export default function BillingPage() {
           maxDailyLossUsd,
           maxSlippagePct,
           treasuryWallet,
+          launchpadContractAddress: launchpadContractAddress.trim(),
         }),
       });
       const json = await res.json();
@@ -815,12 +818,23 @@ export default function BillingPage() {
               </div>
             </div>
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-              <div className="flex-col gap-xs" style={{ flex: '1 1 300px' }}>
+              <div className="flex-col gap-xs" style={{ flex: '1 1 260px' }}>
                 <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-muted)' }}>Protocol Treasury Public Wallet (Base L2 Subscription Receiver)</label>
                 <input
                   type="text"
                   value={treasuryWallet}
                   onChange={(e) => setTreasuryWallet(e.target.value)}
+                  className="input"
+                  style={{ padding: '7px 10px', fontSize: '12px', fontFamily: 'var(--font-mono)' }}
+                />
+              </div>
+              <div className="flex-col gap-xs" style={{ flex: '1 1 260px' }}>
+                <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-muted)' }}>BondingCurveLaunchpad.sol Factory Contract Address (Optional Override)</label>
+                <input
+                  type="text"
+                  placeholder="0x... (Deployed BondingCurveLaunchpad.sol)"
+                  value={launchpadContractAddress}
+                  onChange={(e) => setLaunchpadContractAddress(e.target.value)}
                   className="input"
                   style={{ padding: '7px 10px', fontSize: '12px', fontFamily: 'var(--font-mono)' }}
                 />

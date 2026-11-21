@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { ensureBaseNetwork } from '@packages/launchpad/web3-provider';
 
 export type UserRole =
   | 'GUEST'
@@ -23,6 +24,7 @@ export interface AuthContextType {
   connectMetaMask: () => Promise<{ success: boolean; address?: string; error?: string }>;
   disconnectWallet: () => void | Promise<void>;
   switchRole: (role: UserRole) => void;
+  switchNetwork: (targetHexChainId: string) => Promise<{ success: boolean; chainId?: number; error?: string }>;
   refreshSession: () => Promise<void>;
 }
 
@@ -121,7 +123,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Initial load
   useEffect(() => {
     refreshSession();
+    const ethereum = resolveInjectedEthereumProvider();
+    if (ethereum) {
+      ethereum
+        .request({ method: 'eth_chainId' })
+        .then((cId: string) => {
+          if (cId) setChainId(cId);
+        })
+        .catch(() => {});
+    }
   }, [refreshSession]);
+
+  const switchNetwork = useCallback(
+    async (targetHexChainId: string): Promise<{ success: boolean; chainId?: number; error?: string }> => {
+      const res = await ensureBaseNetwork(targetHexChainId);
+      if (res.success) {
+        setChainId(targetHexChainId.toLowerCase());
+      }
+      return res;
+    },
+    []
+  );
 
   const disconnectWallet = useCallback(async () => {
     try {
@@ -339,6 +361,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         connectMetaMask,
         disconnectWallet,
         switchRole,
+        switchNetwork,
         refreshSession,
       }}
     >

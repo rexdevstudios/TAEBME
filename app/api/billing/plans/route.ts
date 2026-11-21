@@ -162,6 +162,8 @@ export async function POST(req: NextRequest) {
         maxDailyLossUsd: body.maxDailyLossUsd !== undefined ? Number(body.maxDailyLossUsd) : undefined,
         maxSlippagePct: body.maxSlippagePct !== undefined ? Number(body.maxSlippagePct) : undefined,
         treasuryWallet: typeof body.treasuryWallet === 'string' ? body.treasuryWallet.trim() : undefined,
+        launchpadContractAddress:
+          typeof body.launchpadContractAddress === 'string' ? body.launchpadContractAddress.trim() : undefined,
         actorId: auth.walletAddress || auth.user.userId,
       });
 

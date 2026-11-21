@@ -4302,6 +4302,7 @@ export interface PlatformFeeAndRiskConfig {
   maxDailyLossUsd: number;
   maxSlippagePct: number;
   treasuryWallet: string;
+  launchpadContractAddress?: string;
   updatedBy?: string;
   updatedAt?: string;
 }
@@ -4372,6 +4373,9 @@ export class PostgresBillingDbAdapter implements BillingDbAdapter {
             if (typeof cfg.treasuryWallet === 'string' && /^0x[a-fA-F0-9]{40}$/.test(cfg.treasuryWallet)) {
               base.treasuryWallet = cfg.treasuryWallet;
             }
+            if (typeof cfg.launchpadContractAddress === 'string' && /^0x[a-fA-F0-9]{40}$/.test(cfg.launchpadContractAddress)) {
+              base.launchpadContractAddress = cfg.launchpadContractAddress;
+            }
             if (typeof cfg.updatedBy === 'string') base.updatedBy = cfg.updatedBy;
             if (typeof cfg.updatedAt === 'string') base.updatedAt = cfg.updatedAt;
           }
@@ -4398,6 +4402,12 @@ export class PostgresBillingDbAdapter implements BillingDbAdapter {
         typeof params.treasuryWallet === 'string' && /^0x[a-fA-F0-9]{40}$/.test(params.treasuryWallet)
           ? params.treasuryWallet
           : current.treasuryWallet,
+      launchpadContractAddress:
+        typeof params.launchpadContractAddress === 'string' && /^0x[a-fA-F0-9]{40}$/.test(params.launchpadContractAddress)
+          ? params.launchpadContractAddress
+          : params.launchpadContractAddress === ''
+          ? undefined
+          : current.launchpadContractAddress,
       updatedBy: params.actorId,
       updatedAt: new Date().toISOString(),
     };
