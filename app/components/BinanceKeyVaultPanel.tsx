@@ -16,6 +16,7 @@ export interface BinanceAccountMetaItem {
   isDefault: boolean;
   lastUsedAt: string | null;
   createdAt: string;
+  quotaStatus?: 'ACTIVE' | 'FROZEN_OVER_QUOTA' | 'FROZEN_MAINNET_LOCKED';
 }
 
 interface BinanceKeyVaultPanelProps {
@@ -271,11 +272,14 @@ export function BinanceKeyVaultPanel({
                 className="input"
                 style={{ width: '100%', padding: '6px 8px', fontSize: '11px', fontWeight: 700 }}
               >
-                {accounts.map((acc) => (
-                  <option key={acc.id} value={acc.id}>
-                    {acc.label} ({acc.maskedApiKey}) — {acc.environment} {acc.isDefault ? '★ Default' : ''}
-                  </option>
-                ))}
+                {accounts.map((acc) => {
+                  const isFrozen = Boolean(acc.quotaStatus && acc.quotaStatus !== 'ACTIVE');
+                  return (
+                    <option key={acc.id} value={acc.id} disabled={isFrozen}>
+                      {isFrozen ? '🔒 [FROZEN] ' : ''}{acc.label} ({acc.maskedApiKey}) — {acc.environment} {acc.isDefault ? '★ Default' : ''}
+                    </option>
+                  );
+                })}
               </select>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginTop: '4px' }}>
@@ -320,6 +324,21 @@ export function BinanceKeyVaultPanel({
                         >
                           NO-WITHDRAW
                         </span>
+                        {acc.quotaStatus && acc.quotaStatus !== 'ACTIVE' && (
+                          <span
+                            style={{
+                              fontSize: '9px',
+                              fontWeight: 800,
+                              padding: '1px 5px',
+                              borderRadius: '4px',
+                              background: 'rgba(245,158,11,0.18)',
+                              color: '#F59E0B',
+                            }}
+                            title="Akun aman tersimpan namun terkunci sementara sesuai paket aktif. Perpanjang atau beli slot di /billing."
+                          >
+                            {acc.quotaStatus === 'FROZEN_MAINNET_LOCKED' ? '🔒 MAINNET LOCKED' : '🔒 FROZEN'}
+                          </span>
+                        )}
                       </div>
                       <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--color-muted)' }}>
                         {acc.maskedApiKey} · {acc.lastUsedAt ? `Dipakai: ${new Date(acc.lastUsedAt).toLocaleString()}` : 'Belum dipakai'}

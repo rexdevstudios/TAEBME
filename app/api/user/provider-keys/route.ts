@@ -12,7 +12,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireCapability } from '@packages/auth/session';
 import { rateLimiter } from '@packages/auth/rate-limiter';
 import { defaultBillingDbAdapter, defaultProviderKeyVaultAdapter } from '@packages/shared/db-pool';
-import { SubscriptionsEngine } from '@packages/billing/subscriptions-engine';
+import {
+  annotateKeysWithQuotaStatus,
+  computeEffectiveVaultCapacity,
+} from '@packages/billing/subscriptions-engine';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,19 +39,22 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const provider = (searchParams.get('provider') || 'BANKR').toUpperCase();
-    const [keys, planId] = await Promise.all([
+    const [rawKeys, planId, addonSlots] = await Promise.all([
       defaultProviderKeyVaultAdapter.listKeys(auth.walletAddress, provider),
       defaultBillingDbAdapter.getUserPlan(auth.walletAddress).catch(() => 'FREE' as const),
+      defaultBillingDbAdapter.getUserAddonSlots(auth.walletAddress).catch(() => ({ bankrExtraSlots: 0, binanceExtraSlots: 0 })),
     ]);
-    const capacities = SubscriptionsEngine.getPlanCapacities(planId);
+    const effCap = computeEffectiveVaultCapacity(planId, addonSlots);
+    const keys = annotateKeysWithQuotaStatus(rawKeys, { maxActive: effCap.maxBankrKeys });
 
     return NextResponse.json(
       {
         success: true,
         data: {
           provider,
-          planId: capacities.planId,
-          maxKeys: capacities.maxBankrKeys,
+          planId: effCap.planId,
+          maxKeys: effCap.maxBankrKeys,
+          addonSlots: effCap.bankrExtraSlots,
           keys,
           platformFallbackAvailable: Boolean(process.env.BANKR_API_KEY && !process.env.BANKR_API_KEY.startsWith('mock_')),
         },
@@ -94,8 +100,11 @@ export async function POST(req: NextRequest) {
     const chainScope = typeof body?.chainScope === 'string' ? body.chainScope.trim().toLowerCase() : 'all';
     const isDefault = Boolean(body?.isDefault);
 
-    const planId = await defaultBillingDbAdapter.getUserPlan(auth.walletAddress).catch(() => 'FREE' as const);
-    const capacities = SubscriptionsEngine.getPlanCapacities(planId);
+    const [planId, addonSlots] = await Promise.all([
+      defaultBillingDbAdapter.getUserPlan(auth.walletAddress).catch(() => 'FREE' as const),
+      defaultBillingDbAdapter.getUserAddonSlots(auth.walletAddress).catch(() => ({ bankrExtraSlots: 0, binanceExtraSlots: 0 })),
+    ]);
+    const effCap = computeEffectiveVaultCapacity(planId, addonSlots);
 
     const created = await defaultProviderKeyVaultAdapter.addKey({
       userIdentifier: auth.walletAddress,
@@ -104,7 +113,7 @@ export async function POST(req: NextRequest) {
       rawApiKey: apiKey,
       chainScope,
       isDefault,
-      maxAllowed: capacities.maxBankrKeys,
+      maxAllowed: effCap.maxBankrKeys,
     });
 
     return NextResponse.json(

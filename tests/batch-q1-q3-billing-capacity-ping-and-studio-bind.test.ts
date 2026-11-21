@@ -25,7 +25,7 @@ describe('Phase Q1–Q3: Billing Capacity SSOT, Tier Quotas & Binance Live Ping 
     expect(freeCap.allowMainnetBinance).toBe(false);
     expect(freeCap.maxOrderValueUsd).toBe(250);
 
-    expect(creatorCap.maxBankrKeys).toBe(5);
+    expect(creatorCap.maxBankrKeys).toBe(15);
     expect(creatorCap.maxBinanceAccounts).toBe(2);
     expect(creatorCap.allowMainnetBinance).toBe(false);
 
@@ -34,8 +34,8 @@ describe('Phase Q1–Q3: Billing Capacity SSOT, Tier Quotas & Binance Live Ping 
     expect(traderCap.allowMainnetBinance).toBe(true);
     expect(traderCap.maxOrderValueUsd).toBe(10000);
 
-    expect(agentCap.maxBankrKeys).toBe(10);
-    expect(agentCap.maxBinanceAccounts).toBe(10);
+    expect(agentCap.maxBankrKeys).toBe(25);
+    expect(agentCap.maxBinanceAccounts).toBe(15);
     expect(agentCap.allowMainnetBinance).toBe(true);
     expect(agentCap.maxOrderValueUsd).toBe(25000);
   });

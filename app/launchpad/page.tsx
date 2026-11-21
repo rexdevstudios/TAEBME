@@ -52,6 +52,15 @@ export default function LaunchpadPage() {
   const [tokenSymbol, setTokenSymbol] = useState('');
   const [tokenDescription, setTokenDescription] = useState('');
   const [tokenImageUrl, setTokenImageUrl] = useState('');
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const nameParam = params.get('name');
+    const symbolParam = params.get('symbol');
+    if (nameParam) setTokenName(nameParam);
+    if (symbolParam) setTokenSymbol(symbolParam.toUpperCase());
+  }, []);
+
   const [mode, setMode] = useState<LaunchModeType>('BONDING_CURVE');
   const [creatorWallet, setCreatorWallet] = useState(walletAddress || '');
   const [whitelistWallets, setWhitelistWallets] = useState('');

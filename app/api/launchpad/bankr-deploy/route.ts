@@ -10,7 +10,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireCapability } from '@packages/auth/session';
 import { rateLimiter } from '@packages/auth/rate-limiter';
 import { deployTokenViaBankrApi, type BankrSupportedChain } from '@packages/launchpad/bankr-client';
-import { SubscriptionsEngine } from '@packages/billing/subscriptions-engine';
+import {
+  SubscriptionsEngine,
+  annotateKeysWithQuotaStatus,
+  computeEffectiveVaultCapacity,
+} from '@packages/billing/subscriptions-engine';
 import {
   defaultBillingDbAdapter,
   defaultDraftDbAdapter,
@@ -83,6 +87,25 @@ export async function POST(req: NextRequest) {
     let resolvedByok: { apiKey: string; keyId: string; label: string; maskedKey: string } | null = null;
     try {
       if (providerKeyId) {
+        const [allUserKeys, userPlan, addonSlots] = await Promise.all([
+          defaultProviderKeyVaultAdapter.listKeys(auth.walletAddress, 'BANKR'),
+          defaultBillingDbAdapter.getUserPlan(auth.walletAddress).catch(() => 'FREE' as const),
+          defaultBillingDbAdapter.getUserAddonSlots(auth.walletAddress).catch(() => ({ bankrExtraSlots: 0, binanceExtraSlots: 0 })),
+        ]);
+        const effCap = computeEffectiveVaultCapacity(userPlan, addonSlots);
+        const annotated = annotateKeysWithQuotaStatus(allUserKeys, { maxActive: effCap.maxBankrKeys });
+        const targetMeta = annotated.find((k) => k.id === providerKeyId);
+        if (targetMeta && targetMeta.quotaStatus !== 'ACTIVE') {
+          return NextResponse.json(
+            {
+              success: false,
+              error: `KEY_FROZEN_OVER_QUOTA: API Key "${targetMeta.label}" terkunci karena kuota aktif paket ${effCap.planId} adalah ${effCap.maxBankrKeys} key. Jadikan Default atau perpanjang/beli slot di /billing.`,
+              timestamp: new Date().toISOString(),
+            },
+            { status: 403 }
+          );
+        }
+
         resolvedByok = await defaultProviderKeyVaultAdapter.resolveDecryptedKeyForDeploy({
           userIdentifier: auth.walletAddress,
           targetChain: chain,

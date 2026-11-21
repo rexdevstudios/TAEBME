@@ -258,11 +258,15 @@ export default function TradingPage() {
     const symbolParam = params.get('symbol');
     const sideParam = params.get('side');
     const qtyParam = params.get('qty');
+    const modeParam = params.get('mode');
     const proposalParam = params.get('proposalId');
 
     if (symbolParam) setSymbol(symbolParam);
     if (sideParam === 'BUY' || sideParam === 'SELL') setOrderSide(sideParam);
     if (qtyParam && Number(qtyParam) > 0) setOrderQty(Number(qtyParam));
+    if (modeParam === 'CEX_SINGLE_SHOT' || modeParam === 'DEX_NON_CUSTODIAL' || modeParam === 'PAPER') {
+      setExecutionMode(modeParam);
+    }
     if (proposalParam) setLinkedProposalId(proposalParam);
     if (tokenParam && /^0x[a-fA-F0-9]{40}$/.test(tokenParam)) {
       setLinkedTokenAddress(tokenParam);

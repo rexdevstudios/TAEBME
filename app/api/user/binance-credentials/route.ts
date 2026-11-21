@@ -13,7 +13,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireCapability } from '@packages/auth/session';
 import { rateLimiter } from '@packages/auth/rate-limiter';
 import { defaultBillingDbAdapter, getDbPool, PostgresBinanceExecutionDbAdapter } from '@packages/shared/db-pool';
-import { SubscriptionsEngine } from '@packages/billing/subscriptions-engine';
+import {
+  annotateKeysWithQuotaStatus,
+  computeEffectiveVaultCapacity,
+} from '@packages/billing/subscriptions-engine';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,20 +47,26 @@ export async function GET(req: NextRequest) {
     }
 
     const adapter = getAdapterOrFail();
-    const [accounts, planId] = await Promise.all([
+    const [rawAccounts, planId, addonSlots] = await Promise.all([
       adapter.listBinanceCredentials(auth.walletAddress),
       defaultBillingDbAdapter.getUserPlan(auth.walletAddress).catch(() => 'FREE' as const),
+      defaultBillingDbAdapter.getUserAddonSlots(auth.walletAddress).catch(() => ({ bankrExtraSlots: 0, binanceExtraSlots: 0 })),
     ]);
-    const capacities = SubscriptionsEngine.getPlanCapacities(planId);
+    const effCap = computeEffectiveVaultCapacity(planId, addonSlots);
+    const accounts = annotateKeysWithQuotaStatus(rawAccounts, {
+      maxActive: effCap.maxBinanceAccounts,
+      allowMainnet: effCap.allowMainnetBinance,
+    });
 
     return NextResponse.json(
       {
         success: true,
         data: {
           provider: 'BINANCE',
-          planId: capacities.planId,
-          maxAccounts: capacities.maxBinanceAccounts,
-          allowMainnet: capacities.allowMainnetBinance,
+          planId: effCap.planId,
+          maxAccounts: effCap.maxBinanceAccounts,
+          addonSlots: effCap.binanceExtraSlots,
+          allowMainnet: effCap.allowMainnetBinance,
           accounts,
         },
         timestamp: new Date().toISOString(),
@@ -109,14 +118,17 @@ export async function POST(req: NextRequest) {
       withdraw: Boolean(body?.permissions?.withdraw),
     };
 
-    const planId = await defaultBillingDbAdapter.getUserPlan(auth.walletAddress).catch(() => 'FREE' as const);
-    const capacities = SubscriptionsEngine.getPlanCapacities(planId);
+    const [planId, addonSlots] = await Promise.all([
+      defaultBillingDbAdapter.getUserPlan(auth.walletAddress).catch(() => 'FREE' as const),
+      defaultBillingDbAdapter.getUserAddonSlots(auth.walletAddress).catch(() => ({ bankrExtraSlots: 0, binanceExtraSlots: 0 })),
+    ]);
+    const effCap = computeEffectiveVaultCapacity(planId, addonSlots);
 
-    if (environment === 'MAINNET' && !capacities.allowMainnetBinance) {
+    if (environment === 'MAINNET' && !effCap.allowMainnetBinance) {
       return NextResponse.json(
         {
           success: false,
-          error: `PLAN_MAINNET_REQUIRED: Paket ${capacities.planId} hanya mendukung Binance TESTNET. Upgrade ke TRADER atau AGENT di /billing untuk akun MAINNET.`,
+          error: `PLAN_MAINNET_REQUIRED: Paket ${effCap.planId} hanya mendukung Binance TESTNET. Upgrade ke TRADER atau AGENT di /billing untuk akun MAINNET.`,
           timestamp: new Date().toISOString(),
         },
         { status: 403 }
@@ -132,7 +144,7 @@ export async function POST(req: NextRequest) {
       environment,
       permissions,
       isDefault,
-      maxAllowed: capacities.maxBinanceAccounts,
+      maxAllowed: effCap.maxBinanceAccounts,
     });
 
     return NextResponse.json(

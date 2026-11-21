@@ -24,7 +24,7 @@ const CANONICAL_PLANS = [
     priceUsd: 49,
     monthlyPriceUsd: 49,
     priceEth: '0.015',
-    monthlyCredits: 2000,
+    monthlyCredits: 5000,
     hasLiveTrading: false,
     hasCreatorAccess: true,
     hasAgentAccess: false,

@@ -6,6 +6,7 @@ import { CreditCard, CheckCircle2, ShieldAlert, Zap, TrendingUp, Wallet, Banknot
 import { ethers } from 'ethers';
 import { ensureBaseNetwork, getBrowserSigner, normalizeWeb3Error, resolveBrowserEthereumProvider } from '@packages/launchpad/web3-provider';
 import { PageWorkflowBanner } from '../components/PageWorkflowBanner';
+import { BillingAddonStorePanel } from '../components/BillingAddonStorePanel';
 
 interface LedgerEntry {
   id: string;
@@ -708,6 +709,9 @@ export default function BillingPage() {
           )}
         </div>
       )}
+
+      {/* Permanent Capacity Add-On Store (Reuses ledger_entries, Zero Data Loss) */}
+      <BillingAddonStorePanel isConnected={isConnected} onPurchased={() => { refreshSession().catch(() => {}); }} />
 
       {/* Connected Multi-Account Vaults & Non-Custodial Guardrail Overview */}
       <div

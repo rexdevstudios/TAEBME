@@ -26,7 +26,15 @@ import { BinanceCredentialVault } from '../trading/binance-vault';
 import { validateBinancePermissions, BinanceKeyPermissions } from './types/domain';
 import { ProposalDbAdapter, AgentProposalRecord } from '../agent/proposal-engine';
 import { DualControlDbAdapter, DualControlRequestRecord } from '../admin/dual-control';
-import { PlanId, BillingDbAdapter, UserRiskPolicy } from '../billing/subscriptions-engine';
+import {
+  PlanId,
+  BillingDbAdapter,
+  UserRiskPolicy,
+  UserAddonSlots,
+  CapacityAddonType,
+  CAPACITY_ADDON_CATALOG,
+  SubscriptionsEngine,
+} from '../billing/subscriptions-engine';
 
 import { getAppEnvironment } from './env-config';
 
@@ -3475,7 +3483,7 @@ export class PostgresBinanceExecutionDbAdapter implements BinanceExecutionDbAdap
     }
   }
 
-  private static readonly MAX_ACTIVE_BINANCE_ACCOUNTS = 10;
+  private static readonly MAX_ACTIVE_BINANCE_ACCOUNTS = 50;
   private inMemoryBinanceVault: Array<
     BinanceCredentialMeta & { encryptedApiKey: string; encryptedSecretKey: string }
   > = [];
@@ -3550,7 +3558,7 @@ export class PostgresBinanceExecutionDbAdapter implements BinanceExecutionDbAdap
       1,
       Math.min(
         PostgresBinanceExecutionDbAdapter.MAX_ACTIVE_BINANCE_ACCOUNTS,
-        Number(params.maxAllowed ?? PostgresBinanceExecutionDbAdapter.MAX_ACTIVE_BINANCE_ACCOUNTS)
+        Number(params.maxAllowed ?? 10)
       )
     );
 
@@ -4902,6 +4910,88 @@ export class PostgresBillingDbAdapter implements BillingDbAdapter {
     return clean;
   }
 
+  private inMemoryAddonSlots = new Map<string, UserAddonSlots>();
+
+  async getUserAddonSlots(userId: string): Promise<UserAddonSlots> {
+    const norm = userId.toLowerCase();
+    const pool = getDbPool();
+    if (pool) {
+      try {
+        const validUserId = await ensureUserEntity(pool, userId);
+        const res = await pool.query(
+          `SELECT type, COALESCE(SUM(amount), 0)::int AS total_slots
+           FROM ledger_entries
+           WHERE user_id = $1 AND currency = 'SLOTS'
+             AND type IN ('ADDON_BANKR_SLOTS', 'ADDON_BINANCE_SLOTS')
+           GROUP BY type`,
+          [validUserId]
+        );
+        let bankrExtraSlots = 0;
+        let binanceExtraSlots = 0;
+        for (const r of res.rows) {
+          if (r.type === 'ADDON_BANKR_SLOTS') bankrExtraSlots = Math.max(0, Number(r.total_slots || 0));
+          if (r.type === 'ADDON_BINANCE_SLOTS') binanceExtraSlots = Math.max(0, Number(r.total_slots || 0));
+        }
+        return { bankrExtraSlots, binanceExtraSlots };
+      } catch (err: any) {
+        console.warn('[PostgresBillingDbAdapter] getUserAddonSlots fallback:', err?.message);
+      }
+    }
+    return this.inMemoryAddonSlots.get(norm) || { bankrExtraSlots: 0, binanceExtraSlots: 0 };
+  }
+
+  async purchaseCapacityAddon(
+    userId: string,
+    addonType: CapacityAddonType
+  ): Promise<{ addonType: CapacityAddonType; slotsAdded: number; creditsCharged: number; remainingCredits: number; totalAddonSlots: UserAddonSlots }> {
+    const item = CAPACITY_ADDON_CATALOG[addonType];
+    if (!item) {
+      throw new Error(`INVALID_ADDON_TYPE: Unknown add-on "${addonType}"`);
+    }
+
+    const refId = `addon-${addonType.toLowerCase()}-${Date.now()}`;
+    // 1. Deduct credits atomically via SSOT SubscriptionsEngine (fails closed if insufficient credits)
+    await SubscriptionsEngine.deductMeteredCredits(userId, item.creditCost, addonType, refId, this);
+
+    // 2. Grant permanent slots in existing `ledger_entries` (currency = 'SLOTS', 0 new tables!)
+    await this.recordLedgerEntry({
+      userId,
+      amount: item.slotsAdded,
+      currency: 'SLOTS',
+      type: addonType,
+      referenceId: refId,
+      description: `Permanent slot add-on: ${item.name}`,
+    });
+
+    const norm = userId.toLowerCase();
+    const cur = this.inMemoryAddonSlots.get(norm) || { bankrExtraSlots: 0, binanceExtraSlots: 0 };
+    const nextMem: UserAddonSlots = {
+      bankrExtraSlots: cur.bankrExtraSlots + (addonType === 'ADDON_BANKR_SLOTS' ? item.slotsAdded : 0),
+      binanceExtraSlots: cur.binanceExtraSlots + (addonType === 'ADDON_BINANCE_SLOTS' ? item.slotsAdded : 0),
+    };
+    this.inMemoryAddonSlots.set(norm, nextMem);
+
+    await this.createAuditLog(
+      userId,
+      'ADDON_SLOT_PURCHASED',
+      addonType,
+      `Purchased ${item.name} (+${item.slotsAdded} slots) for ${item.creditCost} Credits`
+    );
+
+    const [remainingCredits, totalAddonSlots] = await Promise.all([
+      this.getUserCreditBalance(userId),
+      this.getUserAddonSlots(userId),
+    ]);
+
+    return {
+      addonType,
+      slotsAdded: item.slotsAdded,
+      creditsCharged: item.creditCost,
+      remainingCredits,
+      totalAddonSlots,
+    };
+  }
+
   async getPlanDiscounts(): Promise<
     Record<PlanId, { discountPct: number; promoLabel?: string; updatedBy?: string; updatedAt?: string }>
   > {
@@ -6158,7 +6248,7 @@ interface InMemoryProviderKeyRow extends UserProviderKeyMeta {
 const inMemoryProviderKeys: InMemoryProviderKeyRow[] = [];
 
 export class PostgresProviderKeyVaultAdapter {
-  private static readonly MAX_ACTIVE_KEYS_PER_USER = 10;
+  private static readonly MAX_ACTIVE_KEYS_PER_USER = 50;
 
   async listKeys(userIdentifier: string, provider: string = 'BANKR'): Promise<UserProviderKeyMeta[]> {
     const cleanProvider = (provider || 'BANKR').trim().toUpperCase();
@@ -6215,7 +6305,7 @@ export class PostgresProviderKeyVaultAdapter {
       1,
       Math.min(
         PostgresProviderKeyVaultAdapter.MAX_ACTIVE_KEYS_PER_USER,
-        Number(params.maxAllowed ?? PostgresProviderKeyVaultAdapter.MAX_ACTIVE_KEYS_PER_USER)
+        Number(params.maxAllowed ?? 10)
       )
     );
     const chainScope = validateChainScope(params.chainScope);

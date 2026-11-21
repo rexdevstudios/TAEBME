@@ -15,7 +15,11 @@ import { rateLimiter } from '@packages/auth/rate-limiter';
 import { TradingRiskGate } from '@packages/trading/risk-gate';
 import { MevProtectionService } from '@packages/trading/mev-protection';
 import { validateBinancePermissions } from '@packages/shared/types/domain';
-import { computeEffectiveUserRiskLimits } from '@packages/billing/subscriptions-engine';
+import {
+  annotateKeysWithQuotaStatus,
+  computeEffectiveUserRiskLimits,
+  computeEffectiveVaultCapacity,
+} from '@packages/billing/subscriptions-engine';
 import {
   getDbPool,
   saveTradeIntent,
@@ -225,6 +229,38 @@ export async function POST(req: NextRequest) {
             timestamp: new Date().toISOString(),
           },
           { status: 422 }
+        );
+      }
+
+      // Soft-Freeze Anti-Loophole Enforcement (Zero Data Loss)
+      const [allBinanceAccounts, addonSlots] = await Promise.all([
+        execDb.listBinanceCredentials(auth.walletAddress).catch(() => []),
+        defaultBillingDbAdapter.getUserAddonSlots(auth.walletAddress).catch(() => ({ bankrExtraSlots: 0, binanceExtraSlots: 0 })),
+      ]);
+      const effVaultCap = computeEffectiveVaultCapacity(userEntitlement.planId, addonSlots);
+      const annotatedBinance = annotateKeysWithQuotaStatus(allBinanceAccounts, {
+        maxActive: effVaultCap.maxBinanceAccounts,
+        allowMainnet: effVaultCap.allowMainnetBinance,
+      });
+      const matchedMeta = annotatedBinance.find((a) => a.id === creds.id);
+      if (matchedMeta && matchedMeta.quotaStatus === 'FROZEN_MAINNET_LOCKED') {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `KEY_FROZEN_MAINNET_LOCKED: Akun Binance Mainnet "${matchedMeta.label}" terkunci pada paket ${effVaultCap.planId}. Perpanjang TRADER/AGENT di /billing untuk membuka kembali.`,
+            timestamp: new Date().toISOString(),
+          },
+          { status: 403 }
+        );
+      }
+      if (matchedMeta && matchedMeta.quotaStatus === 'FROZEN_OVER_QUOTA') {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `KEY_FROZEN_OVER_QUOTA: Akun Binance "${matchedMeta.label}" terkunci karena kuota aktif paket ${effVaultCap.planId} adalah ${effVaultCap.maxBinanceAccounts} akun. Jadikan Default atau tambah slot di /billing.`,
+            timestamp: new Date().toISOString(),
+          },
+          { status: 403 }
         );
       }
       if (creds.permissions) {

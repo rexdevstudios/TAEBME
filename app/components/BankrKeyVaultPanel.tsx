@@ -11,6 +11,7 @@ export interface ProviderKeyItem {
   isDefault: boolean;
   lastUsedAt: string | null;
   createdAt: string;
+  quotaStatus?: 'ACTIVE' | 'FROZEN_OVER_QUOTA' | 'FROZEN_MAINNET_LOCKED';
 }
 
 interface BankrKeyVaultPanelProps {
@@ -276,6 +277,22 @@ export function BankrKeyVaultPanel({
                   <span style={{ fontSize: '9px', color: 'var(--color-muted)', fontFamily: 'var(--font-mono)' }}>
                     {k.lastUsedAt ? `Dipakai: ${new Date(k.lastUsedAt).toLocaleString()}` : 'Belum dipakai'}
                   </span>
+                  {k.quotaStatus && k.quotaStatus !== 'ACTIVE' && (
+                    <span
+                      style={{
+                        fontSize: '9px',
+                        fontWeight: 800,
+                        padding: '1px 6px',
+                        borderRadius: '4px',
+                        backgroundColor: 'rgba(245, 158, 11, 0.18)',
+                        color: '#F59E0B',
+                        border: '1px solid rgba(245, 158, 11, 0.45)',
+                      }}
+                      title="Key aman tersimpan, tetapi terkunci sementara karena melebihi kuota paket aktif. Klik Set Default untuk menukar ke slot aktif atau tambah slot di /billing."
+                    >
+                      🔒 FROZEN (OVER-QUOTA)
+                    </span>
+                  )}
                   {k.isDefault && (
                     <span
                       style={{

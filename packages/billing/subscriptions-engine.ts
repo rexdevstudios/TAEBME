@@ -112,10 +112,106 @@ export interface BillingDbAdapter {
   createAuditLog(actorId: string, action: string, entityId?: string, reason?: string): Promise<void>;
 }
 
+export type VaultKeyQuotaStatus = 'ACTIVE' | 'FROZEN_OVER_QUOTA' | 'FROZEN_MAINNET_LOCKED';
+export type CapacityAddonType = 'ADDON_BANKR_SLOTS' | 'ADDON_BINANCE_SLOTS';
+
+export interface UserAddonSlots {
+  bankrExtraSlots: number;
+  binanceExtraSlots: number;
+}
+
+export const CAPACITY_ADDON_CATALOG: Record<
+  CapacityAddonType,
+  {
+    type: CapacityAddonType;
+    name: string;
+    description: string;
+    slotsAdded: number;
+    creditCost: number;
+    targetVault: 'BANKR' | 'BINANCE';
+  }
+> = {
+  ADDON_BANKR_SLOTS: {
+    type: 'ADDON_BANKR_SLOTS',
+    name: '+5 Permanent Bankr Key Slots',
+    description: 'Tambahan 5 slot API Key Bankr permanen (tidak hangus saat ganti bulan atau downgrade).',
+    slotsAdded: 5,
+    creditCost: 250,
+    targetVault: 'BANKR',
+  },
+  ADDON_BINANCE_SLOTS: {
+    type: 'ADDON_BINANCE_SLOTS',
+    name: '+5 Permanent Binance CEX Slots',
+    description: 'Tambahan 5 slot akun Binance CEX permanen (akses Mainnet tetap mengikuti tier TRADER/AGENT).',
+    slotsAdded: 5,
+    creditCost: 300,
+    targetVault: 'BINANCE',
+  },
+};
+
+export function computeEffectiveVaultCapacity(
+  planId?: string | null,
+  addonSlots?: Partial<UserAddonSlots> | null
+): {
+  planId: PlanId;
+  baseBankrKeys: number;
+  baseBinanceAccounts: number;
+  bankrExtraSlots: number;
+  binanceExtraSlots: number;
+  maxBankrKeys: number;
+  maxBinanceAccounts: number;
+  allowMainnetBinance: boolean;
+} {
+  const base = SubscriptionsEngine.getPlanCapacities(planId);
+  const bankrExtra = Math.max(0, Math.floor(Number(addonSlots?.bankrExtraSlots || 0)));
+  const binanceExtra = Math.max(0, Math.floor(Number(addonSlots?.binanceExtraSlots || 0)));
+  return {
+    planId: base.planId,
+    baseBankrKeys: base.maxBankrKeys,
+    baseBinanceAccounts: base.maxBinanceAccounts,
+    bankrExtraSlots: bankrExtra,
+    binanceExtraSlots: binanceExtra,
+    maxBankrKeys: Math.min(50, base.maxBankrKeys + bankrExtra),
+    maxBinanceAccounts: Math.min(50, base.maxBinanceAccounts + binanceExtra),
+    allowMainnetBinance: base.allowMainnetBinance,
+  };
+}
+
+/**
+ * Pure deterministic Soft-Freeze annotator (Zero Data Loss):
+ * Keys ordered by `isDefault DESC, createdAt DESC` fill active slots first.
+ * Excess keys are marked `FROZEN_OVER_QUOTA`, and Mainnet Binance keys on non-Mainnet tiers
+ * are marked `FROZEN_MAINNET_LOCKED`.
+ */
+export function annotateKeysWithQuotaStatus<
+  T extends { id: string; isDefault: boolean; createdAt: string; environment?: 'TESTNET' | 'MAINNET' }
+>(
+  keys: T[],
+  opts: { maxActive: number; allowMainnet?: boolean }
+): Array<T & { quotaStatus: VaultKeyQuotaStatus }> {
+  const ordered = [...keys].sort((a, b) => {
+    const defDiff = Number(Boolean(b.isDefault)) - Number(Boolean(a.isDefault));
+    if (defDiff !== 0) return defDiff;
+    return Date.parse(b.createdAt || '0') - Date.parse(a.createdAt || '0');
+  });
+
+  let activeUsed = 0;
+  return ordered.map((item) => {
+    if (item.environment === 'MAINNET' && opts.allowMainnet === false) {
+      return { ...item, quotaStatus: 'FROZEN_MAINNET_LOCKED' as VaultKeyQuotaStatus };
+    }
+    if (activeUsed < opts.maxActive) {
+      activeUsed += 1;
+      return { ...item, quotaStatus: 'ACTIVE' as VaultKeyQuotaStatus };
+    }
+    return { ...item, quotaStatus: 'FROZEN_OVER_QUOTA' as VaultKeyQuotaStatus };
+  });
+}
+
 export class SubscriptionsEngine {
   private static readonly PLAN_MONTHLY_CREDITS: Record<PlanId, number> = {
     FREE: 100,
-    CREATOR: 2000,
+    CREATOR: 5000,
     TRADER: 5000,
     AGENT: 15000,
   };
@@ -132,8 +228,8 @@ export class SubscriptionsEngine {
     },
     CREATOR: {
       planId: 'CREATOR',
-      monthlyCredits: 2000,
-      maxBankrKeys: 5,
+      monthlyCredits: 5000,
+      maxBankrKeys: 15,
       maxBinanceAccounts: 2,
       allowMainnetBinance: false,
       maxOrderValueUsd: 1000,
@@ -151,8 +247,8 @@ export class SubscriptionsEngine {
     AGENT: {
       planId: 'AGENT',
       monthlyCredits: 15000,
-      maxBankrKeys: 10,
-      maxBinanceAccounts: 10,
+      maxBankrKeys: 25,
+      maxBinanceAccounts: 15,
       allowMainnetBinance: true,
       maxOrderValueUsd: 25000,
       maxDailyLossUsd: 2500,
