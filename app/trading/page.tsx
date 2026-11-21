@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { Activity, ShieldAlert, BarChart3, Clock, AlertTriangle, Lightbulb, Wallet, BrainCircuit, ActivitySquare, Lock } from 'lucide-react';
 import { NutritionLabelCard } from '../components/NutritionLabelCard';
 import { PageWorkflowBanner } from '../components/PageWorkflowBanner';
+import { BinanceKeyVaultPanel } from '../components/BinanceKeyVaultPanel';
 
 interface Candle {
   timestamp: number;
@@ -240,6 +241,7 @@ export default function TradingPage() {
 
   // Controlled order parameters & deep-link context (Launchpad ?token= & Agent ?proposalId=)
   const [executionMode, setExecutionMode] = useState<'PAPER' | 'DEX_NON_CUSTODIAL' | 'CEX_SINGLE_SHOT'>('PAPER');
+  const [selectedBinanceCredentialId, setSelectedBinanceCredentialId] = useState<string>('DEFAULT');
   const [orderSide, setOrderSide] = useState<'BUY' | 'SELL'>('BUY');
   const [orderType, setOrderType] = useState<'MARKET' | 'LIMIT'>('MARKET');
   const [orderQty, setOrderQty] = useState<number>(0.1);
@@ -331,6 +333,9 @@ export default function TradingPage() {
           maxSlippagePct: orderSlippagePct > 0 ? orderSlippagePct : 1.5,
           tokenAddress: linkedTokenAddress || '0x4200000000000000000000000000000000000006',
           chainId: parsedChainId,
+          ...(executionMode === 'CEX_SINGLE_SHOT' && selectedBinanceCredentialId !== 'DEFAULT'
+            ? { credentialId: selectedBinanceCredentialId }
+            : {}),
         }),
       });
       const json = await res.json();
@@ -658,6 +663,14 @@ export default function TradingPage() {
                 <option value="CEX_SINGLE_SHOT">Mode: CEX_SINGLE_SHOT (Stateless Binance Trade — TRADER/AGENT)</option>
               </select>
             </div>
+
+            {executionMode === 'CEX_SINGLE_SHOT' && (
+              <BinanceKeyVaultPanel
+                isConnected={isConnected}
+                selectedCredentialId={selectedBinanceCredentialId}
+                onSelectCredentialId={setSelectedBinanceCredentialId}
+              />
+            )}
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
               <select

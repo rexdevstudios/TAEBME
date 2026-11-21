@@ -10,13 +10,28 @@ export interface TradeIntentRecord extends TradeIntentInput {
   createdAt?: string;
 }
 
+export interface BinanceCredentialMeta {
+  id: string;
+  userId: string;
+  label: string;
+  maskedApiKey: string;
+  environment: 'TESTNET' | 'MAINNET';
+  permissions: BinanceKeyPermissions;
+  isDefault: boolean;
+  isActive: boolean;
+  lastUsedAt: string | null;
+  createdAt: string;
+}
+
 export interface BinanceExecutionDbAdapter {
   getApprovedIntentsQueue(): Promise<TradeIntentRecord[]>;
   claimIntentAtomic(intentId: string): Promise<boolean>;
   updateIntentStatus(intentId: string, status: string, riskDecisionId?: string): Promise<void>;
   getStaleExecutingIntents(staleThresholdMs: number): Promise<TradeIntentRecord[]>;
-  getBinanceCredentials(userId: string): Promise<{
+  getBinanceCredentials(userId: string, credentialId?: string): Promise<{
     id: string;
+    label?: string;
+    environment?: 'TESTNET' | 'MAINNET';
     encryptedApiKey: EncryptedPayload | string;
     encryptedSecretKey: EncryptedPayload | string;
     iv?: string;

@@ -21,7 +21,9 @@ import {
   RpcHealthStatus,
   AuditLogEntry as RpcAuditLogEntry,
 } from '../network-registry/rpc-manager';
-import { BinanceExecutionDbAdapter, TradeIntentRecord } from '../trading/execution-types';
+import { BinanceExecutionDbAdapter, BinanceCredentialMeta, TradeIntentRecord } from '../trading/execution-types';
+import { BinanceCredentialVault } from '../trading/binance-vault';
+import { validateBinancePermissions, BinanceKeyPermissions } from './types/domain';
 import { ProposalDbAdapter, AgentProposalRecord } from '../agent/proposal-engine';
 import { DualControlDbAdapter, DualControlRequestRecord } from '../admin/dual-control';
 import { PlanId, BillingDbAdapter } from '../billing/subscriptions-engine';
@@ -3051,6 +3053,7 @@ export class PostgresBinanceExecutionDbAdapter implements BinanceExecutionDbAdap
   clearInMemoryState(): void {
     this.inMemoryIntents.clear();
     this.inMemoryCredentials.clear();
+    this.inMemoryBinanceVault = [];
     this.inMemoryFills = [];
     this.inMemoryAuditLogs = [];
     this.intentMutexMap.clear();
@@ -3393,8 +3396,40 @@ export class PostgresBinanceExecutionDbAdapter implements BinanceExecutionDbAdap
     }
   }
 
-  async getBinanceCredentials(userId: string): Promise<any> {
+  async getBinanceCredentials(userId: string, credentialId?: string): Promise<any> {
     if (this.isExplicitInMemory) {
+      if (credentialId) {
+        const found = this.inMemoryBinanceVault.find(
+          (c) => c.userId === userId.toLowerCase() && c.id === credentialId && c.isActive
+        );
+        if (found) {
+          return {
+            id: found.id,
+            label: found.label,
+            environment: found.environment,
+            encryptedApiKey: found.encryptedApiKey,
+            encryptedSecretKey: found.encryptedSecretKey,
+            permissions: found.permissions,
+            isActive: found.isActive,
+          };
+        }
+        return null;
+      }
+      const userVault = this.inMemoryBinanceVault
+        .filter((c) => c.userId === userId.toLowerCase() && c.isActive)
+        .sort((a, b) => Number(b.isDefault) - Number(a.isDefault));
+      if (userVault.length > 0) {
+        const top = userVault[0];
+        return {
+          id: top.id,
+          label: top.label,
+          environment: top.environment,
+          encryptedApiKey: top.encryptedApiKey,
+          encryptedSecretKey: top.encryptedSecretKey,
+          permissions: top.permissions,
+          isActive: top.isActive,
+        };
+      }
       return this.inMemoryCredentials.get(userId) || null;
     }
 
@@ -3409,18 +3444,24 @@ export class PostgresBinanceExecutionDbAdapter implements BinanceExecutionDbAdap
 
     try {
       const validUserId = await ensureUserEntity(pool, userId);
-      const res = await pool.query(
-        `SELECT id, encrypted_api_key, encrypted_secret_key, key_permissions, is_active
-         FROM binance_credentials
-         WHERE user_id = $1 AND is_active = true
-         ORDER BY created_at DESC
-         LIMIT 1`,
-        [validUserId]
-      );
+      const query = credentialId
+        ? `SELECT id, label, environment, encrypted_api_key, encrypted_secret_key, key_permissions, is_active
+           FROM binance_credentials
+           WHERE user_id = $1 AND id = $2 AND is_active = true
+           LIMIT 1`
+        : `SELECT id, label, environment, encrypted_api_key, encrypted_secret_key, key_permissions, is_active
+           FROM binance_credentials
+           WHERE user_id = $1 AND is_active = true
+           ORDER BY is_default DESC, created_at DESC
+           LIMIT 1`;
+      const params = credentialId ? [validUserId, credentialId] : [validUserId];
+      const res = await pool.query(query, params);
       if (res.rows.length > 0) {
         const row = res.rows[0];
         return {
           id: row.id,
+          label: row.label || 'Binance Primary',
+          environment: (row.environment === 'MAINNET' ? 'MAINNET' : 'TESTNET') as 'TESTNET' | 'MAINNET',
           encryptedApiKey: row.encrypted_api_key,
           encryptedSecretKey: row.encrypted_secret_key,
           permissions: row.key_permissions,
@@ -3432,6 +3473,244 @@ export class PostgresBinanceExecutionDbAdapter implements BinanceExecutionDbAdap
       console.error(`[PostgresBinanceExecutionDbAdapter] getBinanceCredentials failed for ${userId} (FAIL-CLOSED):`, err?.message || err);
       throw err;
     }
+  }
+
+  private static readonly MAX_ACTIVE_BINANCE_ACCOUNTS = 10;
+  private inMemoryBinanceVault: Array<
+    BinanceCredentialMeta & { encryptedApiKey: string; encryptedSecretKey: string }
+  > = [];
+
+  static resolveMasterKeyHex(customMasterKeyHex?: string): string {
+    const candidate = customMasterKeyHex || process.env.BINANCE_VAULT_MASTER_KEY || process.env.MASTER_VAULT_KEY;
+    if (candidate && /^[0-9a-fA-F]{64}$/.test(candidate.trim())) {
+      return candidate.trim().toLowerCase();
+    }
+    const seed =
+      candidate ||
+      process.env.CREDENTIAL_ENCRYPTION_KEY ||
+      process.env.SESSION_SECRET ||
+      process.env.JWT_SECRET ||
+      'poolnet-v25-binance-vault-master-key';
+    return crypto.createHash('sha256').update(seed, 'utf8').digest('hex');
+  }
+
+  async listBinanceCredentials(userId: string): Promise<BinanceCredentialMeta[]> {
+    if (this.isExplicitInMemory) {
+      const norm = userId.toLowerCase();
+      return this.inMemoryBinanceVault
+        .filter((c) => c.userId === norm && c.isActive)
+        .sort((a, b) => Number(b.isDefault) - Number(a.isDefault))
+        .map(({ encryptedApiKey: _a, encryptedSecretKey: _s, ...meta }) => meta);
+    }
+
+    const pool = this.getPool();
+    if (!pool) {
+      throw new Error('DATABASE_UNAVAILABLE: PostgreSQL pool is required for listing Binance credentials');
+    }
+
+    const validUserId = await ensureUserEntity(pool, userId);
+    const res = await pool.query(
+      `SELECT id, user_id, label, masked_api_key, environment, key_permissions, is_default, is_active, last_used_at, created_at
+       FROM binance_credentials
+       WHERE user_id = $1 AND is_active = true
+       ORDER BY is_default DESC, created_at DESC`,
+      [validUserId]
+    );
+    return res.rows.map((r: any) => ({
+      id: String(r.id),
+      userId: String(r.user_id),
+      label: String(r.label || 'Binance Primary'),
+      maskedApiKey: String(r.masked_api_key || '****'),
+      environment: (r.environment === 'MAINNET' ? 'MAINNET' : 'TESTNET') as 'TESTNET' | 'MAINNET',
+      permissions: (r.key_permissions || { read: true, trade: true, withdraw: false }) as BinanceKeyPermissions,
+      isDefault: Boolean(r.is_default),
+      isActive: Boolean(r.is_active),
+      lastUsedAt: r.last_used_at ? new Date(r.last_used_at).toISOString() : null,
+      createdAt: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString(),
+    }));
+  }
+
+  async addBinanceCredential(params: {
+    userId: string;
+    label: string;
+    rawApiKey: string;
+    rawSecretKey: string;
+    environment?: string;
+    permissions?: Partial<BinanceKeyPermissions>;
+    isDefault?: boolean;
+    customMasterKeyHex?: string;
+  }): Promise<BinanceCredentialMeta> {
+    const cleanLabel = (params.label || '').trim().slice(0, 64);
+    if (cleanLabel.length < 2) {
+      throw new Error('INVALID_ACCOUNT_LABEL: Account label must be at least 2 characters.');
+    }
+
+    const rawApiKey = (params.rawApiKey || '').trim();
+    const rawSecretKey = (params.rawSecretKey || '').trim();
+    // Reuse Non-Custodial Guardrail (AGENTS.md Rule 3) — rejects wallet private keys & BIP-39 mnemonics
+    assertNotPrivateKeyOrMnemonic(rawApiKey);
+    assertNotPrivateKeyOrMnemonic(rawSecretKey);
+
+    const permissions: BinanceKeyPermissions = {
+      read: params.permissions?.read !== false,
+      trade: params.permissions?.trade !== false,
+      withdraw: Boolean(params.permissions?.withdraw),
+    };
+    // Enforce anti-withdrawal guardrail
+    validateBinancePermissions(permissions);
+
+    const envUpper = (params.environment || 'TESTNET').trim().toUpperCase();
+    const environment: 'TESTNET' | 'MAINNET' = envUpper === 'MAINNET' ? 'MAINNET' : 'TESTNET';
+
+    const masterKeyHex = PostgresBinanceExecutionDbAdapter.resolveMasterKeyHex(params.customMasterKeyHex);
+    const encApi = JSON.stringify(BinanceCredentialVault.encrypt(rawApiKey, masterKeyHex));
+    const encSecret = JSON.stringify(BinanceCredentialVault.encrypt(rawSecretKey, masterKeyHex));
+    const maskedApiKey = maskApiKey(rawApiKey);
+
+    if (this.isExplicitInMemory) {
+      const norm = params.userId.toLowerCase();
+      const active = this.inMemoryBinanceVault.filter((c) => c.userId === norm && c.isActive);
+      if (active.length >= PostgresBinanceExecutionDbAdapter.MAX_ACTIVE_BINANCE_ACCOUNTS) {
+        throw new Error(
+          `MAX_KEYS_REACHED: Maximum ${PostgresBinanceExecutionDbAdapter.MAX_ACTIVE_BINANCE_ACCOUNTS} active Binance accounts allowed per user.`
+        );
+      }
+      const shouldBeDefault = Boolean(params.isDefault) || active.length === 0;
+      if (shouldBeDefault) {
+        for (const item of active) item.isDefault = false;
+      }
+      const record = {
+        id: crypto.randomUUID(),
+        userId: norm,
+        label: cleanLabel,
+        maskedApiKey,
+        environment,
+        permissions,
+        isDefault: shouldBeDefault,
+        isActive: true,
+        lastUsedAt: null,
+        createdAt: new Date().toISOString(),
+        encryptedApiKey: encApi,
+        encryptedSecretKey: encSecret,
+      };
+      this.inMemoryBinanceVault.push(record);
+      await this.createAuditLog(norm, 'BINANCE_CREDENTIAL_ADDED', record.id, `Added Binance ${environment} account "${cleanLabel}"`);
+      const { encryptedApiKey: _a, encryptedSecretKey: _s, ...meta } = record;
+      return meta;
+    }
+
+    const pool = this.getPool();
+    if (!pool) {
+      throw new Error('DATABASE_UNAVAILABLE: PostgreSQL pool is required for saving Binance credentials');
+    }
+
+    const validUserId = await ensureUserEntity(pool, params.userId);
+    const countRes = await pool.query(
+      `SELECT COUNT(*)::int AS cnt FROM binance_credentials WHERE user_id = $1 AND is_active = true`,
+      [validUserId]
+    );
+    const existingCount = Number(countRes.rows[0]?.cnt || 0);
+    if (existingCount >= PostgresBinanceExecutionDbAdapter.MAX_ACTIVE_BINANCE_ACCOUNTS) {
+      throw new Error(
+        `MAX_KEYS_REACHED: Maximum ${PostgresBinanceExecutionDbAdapter.MAX_ACTIVE_BINANCE_ACCOUNTS} active Binance accounts allowed per user.`
+      );
+    }
+
+    const shouldBeDefault = Boolean(params.isDefault) || existingCount === 0;
+    if (shouldBeDefault) {
+      await pool.query(`UPDATE binance_credentials SET is_default = false WHERE user_id = $1`, [validUserId]);
+    }
+
+    const id = crypto.randomUUID();
+    const res = await pool.query(
+      `INSERT INTO binance_credentials (
+         id, user_id, label, masked_api_key, environment,
+         encrypted_api_key, encrypted_secret_key, key_permissions,
+         is_default, is_active, created_at, updated_at
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, true, NOW(), NOW())
+       RETURNING id, user_id, label, masked_api_key, environment, key_permissions, is_default, is_active, last_used_at, created_at`,
+      [id, validUserId, cleanLabel, maskedApiKey, environment, encApi, encSecret, JSON.stringify(permissions), shouldBeDefault]
+    );
+    const r = res.rows[0];
+    await this.createAuditLog(validUserId, 'BINANCE_CREDENTIAL_ADDED', id, `Added Binance ${environment} account "${cleanLabel}" (${maskedApiKey})`);
+    return {
+      id: String(r.id),
+      userId: String(r.user_id),
+      label: String(r.label),
+      maskedApiKey: String(r.masked_api_key),
+      environment: (r.environment === 'MAINNET' ? 'MAINNET' : 'TESTNET') as 'TESTNET' | 'MAINNET',
+      permissions: r.key_permissions as BinanceKeyPermissions,
+      isDefault: Boolean(r.is_default),
+      isActive: Boolean(r.is_active),
+      lastUsedAt: r.last_used_at ? new Date(r.last_used_at).toISOString() : null,
+      createdAt: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString(),
+    };
+  }
+
+  async setDefaultBinanceCredential(userId: string, credentialId: string): Promise<boolean> {
+    if (this.isExplicitInMemory) {
+      const norm = userId.toLowerCase();
+      const target = this.inMemoryBinanceVault.find(
+        (c) => c.userId === norm && c.id === credentialId && c.isActive
+      );
+      if (!target) return false;
+      for (const c of this.inMemoryBinanceVault) {
+        if (c.userId === norm && c.isActive) c.isDefault = c.id === credentialId;
+      }
+      return true;
+    }
+
+    const pool = this.getPool();
+    if (!pool) {
+      throw new Error('DATABASE_UNAVAILABLE: PostgreSQL pool is required');
+    }
+    const validUserId = await ensureUserEntity(pool, userId);
+    const check = await pool.query(
+      `SELECT id FROM binance_credentials WHERE id = $1 AND user_id = $2 AND is_active = true`,
+      [credentialId, validUserId]
+    );
+    if (check.rows.length === 0) return false;
+    await pool.query(`UPDATE binance_credentials SET is_default = false, updated_at = NOW() WHERE user_id = $1`, [validUserId]);
+    await pool.query(
+      `UPDATE binance_credentials SET is_default = true, updated_at = NOW() WHERE id = $1 AND user_id = $2`,
+      [credentialId, validUserId]
+    );
+    return true;
+  }
+
+  async revokeBinanceCredential(userId: string, credentialId: string): Promise<boolean> {
+    if (this.isExplicitInMemory) {
+      const norm = userId.toLowerCase();
+      const target = this.inMemoryBinanceVault.find(
+        (c) => c.userId === norm && c.id === credentialId && c.isActive
+      );
+      if (!target) return false;
+      target.isActive = false;
+      target.isDefault = false;
+      await this.createAuditLog(norm, 'BINANCE_CREDENTIAL_REVOKED', credentialId, `Revoked Binance account "${target.label}"`);
+      return true;
+    }
+
+    const pool = this.getPool();
+    if (!pool) {
+      throw new Error('DATABASE_UNAVAILABLE: PostgreSQL pool is required');
+    }
+    const validUserId = await ensureUserEntity(pool, userId);
+    const res = await pool.query(
+      `UPDATE binance_credentials
+       SET is_active = false, is_default = false, updated_at = NOW()
+       WHERE id = $1 AND user_id = $2 AND is_active = true
+       RETURNING id, label`,
+      [credentialId, validUserId]
+    );
+    if (res.rows.length === 0) return false;
+    await this.createAuditLog(
+      validUserId,
+      'BINANCE_CREDENTIAL_REVOKED',
+      credentialId,
+      `Revoked Binance account "${res.rows[0].label || credentialId}"`
+    );
+    return true;
   }
 
   async recordOrderFill(fill: {
@@ -5747,6 +6026,7 @@ import {
   encryptSecret,
   decryptSecret,
   maskApiKey,
+  assertNotPrivateKeyOrMnemonic,
   validateChainScope,
   assertChainScopeMatches,
   type ProviderKeyChainScope,

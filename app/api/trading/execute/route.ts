@@ -170,11 +170,21 @@ export async function POST(req: NextRequest) {
           { status: 503 }
         );
       }
+      const requestedCredentialId =
+        typeof body?.credentialId === 'string' && body.credentialId.trim() && body.credentialId !== 'DEFAULT'
+          ? body.credentialId.trim()
+          : undefined;
       const execDb = new PostgresBinanceExecutionDbAdapter(pool);
-      const creds = await execDb.getBinanceCredentials(auth.user.userId);
+      const creds = await execDb.getBinanceCredentials(auth.user.userId, requestedCredentialId);
       if (!creds || creds.isActive === false) {
         return NextResponse.json(
-          { success: false, error: 'CEX_CREDENTIALS_MISSING: Active trade-only Binance API credentials are required', timestamp: new Date().toISOString() },
+          {
+            success: false,
+            error: requestedCredentialId
+              ? 'CEX_CREDENTIAL_NOT_FOUND: Selected Binance account is inactive or does not belong to your session'
+              : 'CEX_CREDENTIALS_MISSING: Active trade-only Binance API credentials are required',
+            timestamp: new Date().toISOString(),
+          },
           { status: 422 }
         );
       }
@@ -201,6 +211,9 @@ export async function POST(req: NextRequest) {
           tradeIntentId,
           executionMode,
           status: 'APPROVED',
+          credentialId: creds.id,
+          credentialLabel: creds.label || 'Binance Primary',
+          credentialEnvironment: creds.environment || 'TESTNET',
           decision,
         },
         timestamp: new Date().toISOString(),

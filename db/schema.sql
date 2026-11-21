@@ -265,13 +265,19 @@ CREATE TABLE bounty_claims (
 CREATE TABLE binance_credentials (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    label VARCHAR(64) NOT NULL DEFAULT 'Binance Primary',
+    masked_api_key VARCHAR(32) NOT NULL DEFAULT '****',
+    environment VARCHAR(16) NOT NULL DEFAULT 'TESTNET',
     encrypted_api_key TEXT NOT NULL,
     encrypted_secret_key TEXT NOT NULL,
     key_permissions JSONB NOT NULL DEFAULT '{"read": true, "trade": true, "withdraw": false}'::jsonb,
+    is_default BOOLEAN NOT NULL DEFAULT FALSE,
     is_active BOOLEAN DEFAULT TRUE,
+    last_used_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+CREATE INDEX IF NOT EXISTS idx_binance_creds_user_active ON binance_credentials (user_id, is_active);
 
 CREATE TYPE trade_stage AS ENUM ('PAPER', 'TESTNET', 'LIVE');
 CREATE TYPE order_side AS ENUM ('BUY', 'SELL');

@@ -678,6 +678,65 @@ export default function BillingPage() {
         </div>
       )}
 
+      {/* Connected Multi-Account Vaults & Non-Custodial Guardrail Overview */}
+      <div
+        className="bg-panel"
+        style={{
+          border: '1px solid var(--color-border)',
+          borderRadius: '10px',
+          padding: '20px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '14px',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+          <div>
+            <h3 style={{ fontSize: '15px', fontWeight: 800, color: 'var(--color-foreground)', margin: '0 0 4px 0' }}>
+              🔐 Connected Multi-Account API Vaults (BYOK &amp; Non-Custodial)
+            </h3>
+            <p className="text-muted" style={{ margin: 0, fontSize: '12px' }}>
+              Kelola banyak API Key terenkripsi AES-256-GCM per akun tanpa pernah menyimpan private key dompet Anda di server.
+            </p>
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
+          <div style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+            <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--color-foreground)', marginBottom: '4px' }}>
+              🚀 Bankr Launchpad Vault (CREATOR+)
+            </div>
+            <p className="text-muted" style={{ fontSize: '11px', margin: '0 0 10px 0', lineHeight: 1.45 }}>
+              Simpan hingga 10 API Key Bankr dengan isolasi multi-chain (Base, Robinhood, Arbitrum, Arc).
+            </p>
+            <a href="/launchpad" className="btn-secondary" style={{ fontSize: '11px', padding: '5px 10px', display: 'inline-block' }}>
+              Kelola di /launchpad →
+            </a>
+          </div>
+          <div style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+            <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--color-foreground)', marginBottom: '4px' }}>
+              ⚡ Binance CEX Multi-Account (TRADER / AGENT)
+            </div>
+            <p className="text-muted" style={{ fontSize: '11px', margin: '0 0 10px 0', lineHeight: 1.45 }}>
+              Simpan hingga 10 akun API Binance Testnet/Mainnet (wajib Read + Trade Only, No-Withdrawal Guard).
+            </p>
+            <a href="/trading" className="btn-secondary" style={{ fontSize: '11px', padding: '5px 10px', display: 'inline-block' }}>
+              Kelola di /trading →
+            </a>
+          </div>
+          <div style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+            <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--color-foreground)', marginBottom: '4px' }}>
+              🛡️ Non-Custodial Wallet Agent Guard
+            </div>
+            <p className="text-muted" style={{ fontSize: '11px', margin: '0 0 10px 0', lineHeight: 1.45 }}>
+              AI Desk hanya menghasilkan proposal terverifikasi Risk Gate; eksekusi DEX tetap 100% tanda tangan dompet Anda.
+            </p>
+            <a href="/ai-desk" className="btn-secondary" style={{ fontSize: '11px', padding: '5px 10px', display: 'inline-block' }}>
+              Buka AI Desk →
+            </a>
+          </div>
+        </div>
+      </div>
+
       {/* Admin Billing Rail Diagnostics Console (SYSTEM_ADMIN / SUPER_ADMIN / BILLING_ADMIN Exclusive) */}
       {(hasCapability('MANAGE_BILLING_PLANS') || userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN' || userRole === 'BILLING_ADMIN') && (
         <div className="bg-panel" style={{ border: '1px solid #FF9100', borderRadius: '8px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
