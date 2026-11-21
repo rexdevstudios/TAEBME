@@ -61,9 +61,9 @@ export function PageWorkflowBanner({
                 gap: '4px',
                 fontSize: '11px',
                 fontFamily: 'var(--font-mono)',
-                color: '#38BDF8',
-                backgroundColor: 'rgba(56, 189, 248, 0.08)',
-                border: '1px solid rgba(56, 189, 248, 0.2)',
+                color: 'var(--color-badge-info-text)',
+                backgroundColor: 'var(--color-badge-info-bg)',
+                border: '1px solid var(--color-badge-info-border)',
                 padding: '2px 8px',
                 borderRadius: '6px',
               }}
@@ -87,9 +87,9 @@ export function PageWorkflowBanner({
                 fontSize: '11px',
                 fontWeight: 700,
                 fontFamily: 'var(--font-mono)',
-                color: '#86EFAC',
-                backgroundColor: 'rgba(34, 197, 94, 0.1)',
-                border: '1px solid rgba(34, 197, 94, 0.3)',
+                color: 'var(--color-badge-success-text)',
+                backgroundColor: 'var(--color-badge-success-bg)',
+                border: '1px solid var(--color-badge-success-border)',
                 padding: '3px 9px',
                 borderRadius: '6px',
               }}
@@ -107,9 +107,9 @@ export function PageWorkflowBanner({
                 fontSize: '11px',
                 fontWeight: 700,
                 fontFamily: 'var(--font-mono)',
-                color: '#FDE047',
-                backgroundColor: 'rgba(245, 158, 11, 0.12)',
-                border: '1px solid rgba(245, 158, 11, 0.4)',
+                color: 'var(--color-badge-warning-text)',
+                backgroundColor: 'var(--color-badge-warning-bg)',
+                border: '1px solid var(--color-badge-warning-border)',
                 padding: '3px 9px',
                 borderRadius: '6px',
                 textDecoration: 'none',
@@ -132,8 +132,8 @@ export function PageWorkflowBanner({
                 alignItems: 'center',
                 gap: '6px',
                 padding: '4px 10px',
-                borderRadius: '6px',
-                backgroundColor: 'rgba(15, 23, 42, 0.7)',
+                borderRadius: '8px',
+                backgroundColor: 'var(--color-surface-subtle)',
                 border: '1px solid var(--color-border)',
                 fontSize: '11px',
               }}
@@ -141,7 +141,7 @@ export function PageWorkflowBanner({
               <span
                 style={{
                   fontWeight: 900,
-                  color: '#00E5FF',
+                  color: 'var(--color-badge-info-text)',
                   fontFamily: 'var(--font-mono)',
                 }}
               >

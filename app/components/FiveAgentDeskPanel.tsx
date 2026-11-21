@@ -186,7 +186,7 @@ export function FiveAgentDeskPanel({
                 setDexNetwork((found.chain || 'base').replace('-mainnet', '').replace('-sepolia', ''));
               }
             }}
-            style={{ minWidth: '185px', padding: '7px 10px', borderRadius: '6px', backgroundColor: '#0B1220', border: '1px solid var(--color-border)', color: 'var(--color-foreground)', fontSize: '12px', fontFamily: 'var(--font-mono)' }}
+            style={{ minWidth: '185px', padding: '7px 10px', borderRadius: '6px', backgroundColor: 'var(--color-surface-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-foreground)', fontSize: '12px', fontFamily: 'var(--font-mono)' }}
           >
             {launchpadTokens.length === 0 && <option value="">Belum ada token aktif</option>}
             {launchpadTokens.map((tk: any, idx: number) => (
@@ -200,7 +200,7 @@ export function FiveAgentDeskPanel({
             <select
               value={dexNetwork}
               onChange={(e) => setDexNetwork(e.target.value)}
-              style={{ padding: '7px 10px', borderRadius: '6px', backgroundColor: '#0B1220', border: '1px solid var(--color-border)', color: 'var(--color-foreground)', fontSize: '12px' }}
+              style={{ padding: '7px 10px', borderRadius: '6px', backgroundColor: 'var(--color-surface-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-foreground)', fontSize: '12px' }}
             >
               <option value="base">Base</option>
               <option value="arbitrum">Arbitrum</option>
@@ -213,7 +213,7 @@ export function FiveAgentDeskPanel({
               value={tokenAddress}
               onChange={(e) => setTokenAddress(e.target.value)}
               placeholder="Paste Contract Address (0x... / Solana Mint)"
-              style={{ minWidth: '220px', flex: '1 1 220px', padding: '7px 10px', borderRadius: '6px', backgroundColor: '#0B1220', border: '1px solid var(--color-border)', color: 'var(--color-foreground)', fontSize: '12px', fontFamily: 'var(--font-mono)' }}
+              style={{ minWidth: '220px', flex: '1 1 220px', padding: '7px 10px', borderRadius: '6px', backgroundColor: 'var(--color-surface-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-foreground)', fontSize: '12px', fontFamily: 'var(--font-mono)' }}
             />
           </>
         ) : (
@@ -222,14 +222,14 @@ export function FiveAgentDeskPanel({
             value={symbol}
             onChange={(e) => setSymbol(e.target.value.toUpperCase())}
             placeholder="Symbol (BTCUSDT)"
-            style={{ width: '120px', padding: '7px 10px', borderRadius: '6px', backgroundColor: '#0B1220', border: '1px solid var(--color-border)', color: 'var(--color-foreground)', fontSize: '12px', fontFamily: 'var(--font-mono)' }}
+            style={{ width: '120px', padding: '7px 10px', borderRadius: '6px', backgroundColor: 'var(--color-surface-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-foreground)', fontSize: '12px', fontFamily: 'var(--font-mono)' }}
           />
         )}
         <select
           value={strategyProfile}
           onChange={(e) => handleSelectStrategy(e.target.value as StrategyProfileId)}
           title={STRATEGY_PROFILES[strategyProfile]?.description}
-          style={{ padding: '7px 10px', borderRadius: '6px', backgroundColor: '#0B1220', border: '1px solid rgba(168, 85, 247, 0.45)', color: '#E9D5FF', fontSize: '12px', fontWeight: 700 }}
+          style={{ padding: '7px 10px', borderRadius: '6px', backgroundColor: 'var(--color-surface-elevated)', border: '1px solid rgba(168, 85, 247, 0.45)', color: '#E9D5FF', fontSize: '12px', fontWeight: 700 }}
         >
           {Object.values(STRATEGY_PROFILES).map((sp) => (
             <option key={sp.id} value={sp.id}>
@@ -240,7 +240,7 @@ export function FiveAgentDeskPanel({
         <select
           value={action}
           onChange={(e) => setAction(e.target.value as 'BUY' | 'SELL')}
-          style={{ padding: '7px 10px', borderRadius: '6px', backgroundColor: '#0B1220', border: '1px solid var(--color-border)', color: 'var(--color-foreground)', fontSize: '12px' }}
+          style={{ padding: '7px 10px', borderRadius: '6px', backgroundColor: 'var(--color-surface-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-foreground)', fontSize: '12px' }}
         >
           <option value="BUY">BUY</option>
           <option value="SELL">SELL</option>
@@ -250,7 +250,7 @@ export function FiveAgentDeskPanel({
           min={1}
           value={quantity}
           onChange={(e) => setQuantity(Number(e.target.value))}
-          style={{ width: '95px', padding: '7px 10px', borderRadius: '6px', backgroundColor: '#0B1220', border: '1px solid var(--color-border)', color: 'var(--color-foreground)', fontSize: '12px', fontFamily: 'var(--font-mono)' }}
+          style={{ width: '95px', padding: '7px 10px', borderRadius: '6px', backgroundColor: 'var(--color-surface-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-foreground)', fontSize: '12px', fontFamily: 'var(--font-mono)' }}
         />
         <input
           type="number"
@@ -260,12 +260,12 @@ export function FiveAgentDeskPanel({
           value={maxSlippagePct}
           onChange={(e) => setMaxSlippagePct(Number(e.target.value))}
           title="Max Slippage %"
-          style={{ width: '80px', padding: '7px 10px', borderRadius: '6px', backgroundColor: '#0B1220', border: '1px solid var(--color-border)', color: 'var(--color-foreground)', fontSize: '12px', fontFamily: 'var(--font-mono)' }}
+          style={{ width: '80px', padding: '7px 10px', borderRadius: '6px', backgroundColor: 'var(--color-surface-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-foreground)', fontSize: '12px', fontFamily: 'var(--font-mono)' }}
         />
         <select
           value={mode}
           onChange={(e) => setMode(e.target.value as 'PAPER' | 'LIVE_ADVISORY')}
-          style={{ padding: '7px 10px', borderRadius: '6px', backgroundColor: '#0B1220', border: '1px solid var(--color-border)', color: 'var(--color-foreground)', fontSize: '12px' }}
+          style={{ padding: '7px 10px', borderRadius: '6px', backgroundColor: 'var(--color-surface-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-foreground)', fontSize: '12px' }}
         >
           <option value="PAPER">PAPER (Auto-Fill Sim)</option>
           <option value="LIVE_ADVISORY">LIVE (Non-Custodial Handoff)</option>
@@ -298,7 +298,7 @@ export function FiveAgentDeskPanel({
               <div
                 key={a.agent}
                 style={{
-                  backgroundColor: '#0B1220',
+                  backgroundColor: 'var(--color-surface-elevated)',
                   border: `1px solid ${a.status === 'BLOCKED' ? '#EF4444' : 'var(--color-border)'}`,
                   borderLeft: `3px solid ${meta.color}`,
                   borderRadius: '6px',
@@ -323,7 +323,7 @@ export function FiveAgentDeskPanel({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <div
             style={{
-              backgroundColor: '#070B14',
+              backgroundColor: 'var(--color-surface-subtle)',
               border: '1px solid var(--color-border)',
               borderRadius: '6px',
               padding: '12px',

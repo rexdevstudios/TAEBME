@@ -567,7 +567,7 @@ export default function LaunchpadPage() {
                 </div>
               )}
               {selectedChain === 'arc' && (
-                <div style={{ backgroundColor: '#071A2E', border: '1px solid #00E5FF', padding: '8px 10px', borderRadius: '4px', fontSize: '11px', color: '#80D8FF' }}>
+                <div style={{ backgroundColor: 'var(--color-badge-info-bg)', border: '1px solid var(--color-badge-info-border)', padding: '8px 10px', borderRadius: '6px', fontSize: '11px', color: 'var(--color-badge-info-text)' }}>
                   ⚡ <strong>Arc Network:</strong> Siap untuk peluncuran simulasi maupun kontrak native Arc Network.
                 </div>
               )}
@@ -578,14 +578,14 @@ export default function LaunchpadPage() {
               type="button"
               onClick={() => setShowAdvancedOptions((v) => !v)}
               className="btn-secondary"
-              style={{ width: '100%', justifyContent: 'space-between', padding: '8px 12px', fontSize: '11px', color: '#94A3B8' }}
+              style={{ width: '100%', justifyContent: 'space-between', padding: '8px 12px', fontSize: '11px', color: 'var(--color-foreground)' }}
             >
               <span>⚙️ Pengaturan Lanjutan (Pairing: {poolPairing} · {isDegenMode ? 'Degen $2.5k' : 'Standard $69k'} · Vesting: {creatorVesting === 'NONE' ? '0%' : '15%'})</span>
               <span>{showAdvancedOptions ? '▲ Sembunyikan' : '▼ Ubah'}</span>
             </button>
 
             {showAdvancedOptions && (
-              <div className="flex-col gap-md" style={{ padding: '12px', borderRadius: '6px', border: '1px solid var(--color-border)', backgroundColor: 'rgba(15, 23, 42, 0.45)' }}>
+              <div className="flex-col gap-md" style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--color-border)', backgroundColor: 'var(--color-surface-subtle)' }}>
             {/* Pool Pairing & Launch Profile */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div className="flex-col gap-xs">
@@ -748,9 +748,9 @@ export default function LaunchpadPage() {
             style={{
               marginBottom: '16px',
               padding: '14px',
-              borderRadius: '8px',
-              border: '1px solid rgba(0, 229, 255, 0.28)',
-              background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(2, 6, 23, 0.95) 100%)',
+              borderRadius: '10px',
+              border: '1px solid var(--color-badge-info-border)',
+              backgroundColor: 'var(--color-surface-subtle)',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
@@ -759,20 +759,20 @@ export default function LaunchpadPage() {
             }}
           >
             <div>
-              <div style={{ fontSize: '10px', color: '#38BDF8', fontFamily: 'var(--font-mono)', fontWeight: 800, marginBottom: '4px' }}>
+              <div style={{ fontSize: '10px', color: 'var(--color-badge-info-text)', fontFamily: 'var(--font-mono)', fontWeight: 800, marginBottom: '4px' }}>
                 LIVE TOKEN CARD PREVIEW
               </div>
-              <div style={{ fontSize: '16px', fontWeight: 900, color: '#F8FAFC' }}>
+              <div style={{ fontSize: '16px', fontWeight: 900, color: 'var(--color-foreground)' }}>
                 {tokenName.trim() || 'Nama Token Anda'}{' '}
                 <span style={{ color: 'var(--color-accent)', fontFamily: 'var(--font-mono)' }}>
                   ${(tokenSymbol.trim() || 'TICKER').toUpperCase()}
                 </span>
               </div>
               <div className="text-muted" style={{ fontSize: '11px', marginTop: '2px' }}>
-                Chain: <strong style={{ color: '#E2E8F0' }}>{selectedChain.toUpperCase()}</strong> · Mode: <strong style={{ color: '#E2E8F0' }}>{mode.replace(/_/g, ' ')}</strong> · Tax: <strong style={{ color: '#22C55E' }}>0%</strong>
+                Chain: <strong style={{ color: 'var(--color-foreground)' }}>{selectedChain.toUpperCase()}</strong> · Mode: <strong style={{ color: 'var(--color-foreground)' }}>{mode.replace(/_/g, ' ')}</strong> · Tax: <strong style={{ color: 'var(--color-accent-emerald)' }}>0%</strong>
               </div>
             </div>
-            <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', padding: '4px 8px', borderRadius: '6px', backgroundColor: 'rgba(34, 197, 94, 0.12)', color: '#86EFAC', border: '1px solid rgba(34, 197, 94, 0.3)' }}>
+            <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', padding: '4px 8px', borderRadius: '6px', backgroundColor: 'var(--color-badge-success-bg)', color: 'var(--color-badge-success-text)', border: '1px solid var(--color-badge-success-border)' }}>
               {isDegenMode ? 'Degen $2.5k Cap' : 'Standard $69k Cap'}
             </span>
           </div>
@@ -845,13 +845,13 @@ export default function LaunchpadPage() {
                 <span className="text-muted">Arkham Risk Passport:</span>
                 <span style={{ color: 'var(--color-accent)', fontWeight: 900 }}>{draftResult.riskPassportScore} / 100 (LOW_RISK)</span>
               </div>
-              <div style={{ backgroundColor: '#041E15', border: '1px solid var(--color-accent)', color: 'var(--color-accent)', padding: '12px', borderRadius: '4px', textAlign: 'center', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '16px' }}>
+              <div style={{ backgroundColor: 'var(--color-badge-success-bg)', border: '1px solid var(--color-badge-success-border)', color: 'var(--color-badge-success-text)', padding: '12px', borderRadius: '8px', textAlign: 'center', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '16px' }}>
                 <CheckCircle2 size={16} /> Draft Ready for Onchain Graduation Test
               </div>
 
               {/* On-Chain Registration Action & Status */}
-              <div style={{ marginBottom: '16px', padding: '14px', borderRadius: '6px', border: '1px solid var(--color-border)', backgroundColor: '#0B1017' }}>
-                <div style={{ fontSize: '12px', fontWeight: 800, marginBottom: '8px', color: '#00E5FF', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{ marginBottom: '16px', padding: '14px', borderRadius: '8px', border: '1px solid var(--color-border)', backgroundColor: 'var(--color-surface-subtle)' }}>
+                <div style={{ fontSize: '12px', fontWeight: 800, marginBottom: '8px', color: 'var(--color-badge-info-text)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Zap size={14} /> Settlement Layer: {selectedChain === 'robinhood' ? 'Robinhood Chain L2' : 'Base Blockchain'}
                 </div>
                 {userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN' ? (
@@ -957,7 +957,7 @@ export default function LaunchpadPage() {
             <Rocket size={18} style={{ color: 'var(--color-accent)' }} /> Live Deployed Tokens & Bonding Curves
           </h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span className="badge" style={{ backgroundColor: '#041E15', color: 'var(--color-accent)', border: '1px solid var(--color-accent)', fontSize: '11px', fontWeight: 800 }}>
+            <span className="badge" style={{ backgroundColor: 'var(--color-badge-info-bg)', color: 'var(--color-badge-info-text)', border: '1px solid var(--color-badge-info-border)', fontSize: '11px', fontWeight: 800 }}>
               {activeTokens.length} LIVE TOKENS (MULTI-CHAIN)
             </span>
             <button
@@ -967,7 +967,7 @@ export default function LaunchpadPage() {
               style={{ padding: '6px 12px', fontSize: '11px' }}
               disabled={isLoadingTokens}
             >
-              {isLoadingTokens ? 'Refreshing...' : '🔄 Refresh SSOT'}
+              {isLoadingTokens ? 'Refreshing...' : '🔄 Refresh Daftar'}
             </button>
           </div>
         </div>
@@ -1009,9 +1009,10 @@ export default function LaunchpadPage() {
                   className="bg-panel"
                   style={{
                     padding: '16px',
-                    borderRadius: '8px',
+                    borderRadius: '12px',
                     border: '1px solid var(--color-border)',
-                    backgroundColor: '#070C12',
+                    backgroundColor: 'var(--color-surface-elevated)',
+                    boxShadow: 'var(--shadow-sm)',
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
@@ -1023,7 +1024,7 @@ export default function LaunchpadPage() {
                       >
                         <div style={{ fontWeight: 900, color: 'var(--color-foreground)', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                           {token.name}
-                          <span style={{ fontSize: '11px', color: '#38BDF8' }}>↗</span>
+                          <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>↗</span>
                         </div>
                         <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, color: 'var(--color-accent)', fontSize: '12px' }}>
                           ${token.ticker}
@@ -1033,12 +1034,12 @@ export default function LaunchpadPage() {
                     <span
                       style={{
                         padding: '2px 8px',
-                        borderRadius: '4px',
+                        borderRadius: '6px',
                         fontSize: '10px',
                         fontWeight: 800,
-                        backgroundColor: '#071A2E',
-                        color: '#00E5FF',
-                        border: '1px solid #00E5FF',
+                        backgroundColor: 'var(--color-badge-info-bg)',
+                        color: 'var(--color-badge-info-text)',
+                        border: '1px solid var(--color-badge-info-border)',
                       }}
                     >
                       {token.chain?.toUpperCase() || 'BASE'}
@@ -1056,9 +1057,9 @@ export default function LaunchpadPage() {
                         borderRadius: '4px',
                         fontSize: '10px',
                         fontWeight: 700,
-                        backgroundColor: 'rgba(245, 158, 11, 0.15)',
-                        color: '#F59E0B',
-                        border: '1px solid rgba(245, 158, 11, 0.3)',
+                        backgroundColor: 'var(--color-badge-warning-bg)',
+                        color: 'var(--color-badge-warning-text)',
+                        border: '1px solid var(--color-badge-warning-border)',
                         textDecoration: 'none',
                         display: 'inline-flex',
                         alignItems: 'center',
@@ -1072,17 +1073,18 @@ export default function LaunchpadPage() {
 
                   {/* SocialFi Programs Strip */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '10px', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '10px', color: '#64748B', fontFamily: 'monospace' }}>SocialFi:</span>
+                    <span style={{ fontSize: '10px', color: 'var(--color-muted)', fontFamily: 'monospace' }}>SocialFi:</span>
                     <a
                       href={`/kol?launchId=${token.launchId || ''}&tab=MARKET`}
                       style={{
                         fontSize: '9px',
-                        padding: '1px 5px',
+                        padding: '2px 6px',
                         borderRadius: '4px',
-                        backgroundColor: 'rgba(168, 85, 247, 0.12)',
-                        color: '#C084FC',
-                        border: '1px solid rgba(168, 85, 247, 0.3)',
+                        backgroundColor: 'var(--color-badge-purple-bg)',
+                        color: 'var(--color-badge-purple-text)',
+                        border: '1px solid var(--color-badge-purple-border)',
                         textDecoration: 'none',
+                        fontWeight: 600,
                       }}
                       title="Diamond Hands HODL Loyalty"
                     >
@@ -1092,12 +1094,13 @@ export default function LaunchpadPage() {
                       href={`/kol?launchId=${token.launchId || ''}&tab=MARKET`}
                       style={{
                         fontSize: '9px',
-                        padding: '1px 5px',
+                        padding: '2px 6px',
                         borderRadius: '4px',
-                        backgroundColor: 'rgba(16, 185, 129, 0.12)',
-                        color: '#6EE7B7',
-                        border: '1px solid rgba(16, 185, 129, 0.3)',
+                        backgroundColor: 'var(--color-badge-success-bg)',
+                        color: 'var(--color-badge-success-text)',
+                        border: '1px solid var(--color-badge-success-border)',
                         textDecoration: 'none',
+                        fontWeight: 600,
                       }}
                       title="Liquid Staking Vault"
                     >
@@ -1107,12 +1110,13 @@ export default function LaunchpadPage() {
                       href={`/kol?launchId=${token.launchId || ''}&tab=MARKET`}
                       style={{
                         fontSize: '9px',
-                        padding: '1px 5px',
+                        padding: '2px 6px',
                         borderRadius: '4px',
-                        backgroundColor: 'rgba(56, 189, 248, 0.12)',
-                        color: '#7DD3FC',
-                        border: '1px solid rgba(56, 189, 248, 0.3)',
+                        backgroundColor: 'var(--color-badge-info-bg)',
+                        color: 'var(--color-badge-info-text)',
+                        border: '1px solid var(--color-badge-info-border)',
                         textDecoration: 'none',
+                        fontWeight: 600,
                       }}
                       title="Viral Community & X Raid"
                     >
@@ -1126,7 +1130,7 @@ export default function LaunchpadPage() {
                       <span>Graduation Progress</span>
                       <span style={{ color: 'var(--color-foreground)', fontWeight: 700 }}>${raised.toLocaleString()} / ${target.toLocaleString()}</span>
                     </div>
-                    <div style={{ width: '100%', height: '6px', backgroundColor: '#1A2332', borderRadius: '3px', overflow: 'hidden' }}>
+                    <div style={{ width: '100%', height: '6px', backgroundColor: 'var(--color-surface-inset)', borderRadius: '3px', overflow: 'hidden' }}>
                       <div style={{ width: `${progressPct}%`, height: '100%', backgroundColor: 'var(--color-accent)' }} />
                     </div>
                   </div>
@@ -1135,7 +1139,7 @@ export default function LaunchpadPage() {
                     <a
                       href={portalUrl}
                       className="btn-secondary"
-                      style={{ flex: '1 1 21%', padding: '6px 2px', textAlign: 'center', fontSize: '11px', justifyContent: 'center', color: '#38BDF8', borderColor: 'rgba(56, 189, 248, 0.4)' }}
+                      style={{ flex: '1 1 21%', padding: '6px 2px', textAlign: 'center', fontSize: '11px', justifyContent: 'center', color: 'var(--color-badge-info-text)', borderColor: 'var(--color-badge-info-border)' }}
                       title="Buka Portal Detail Token"
                     >
                       Portal 🌐
@@ -1150,7 +1154,7 @@ export default function LaunchpadPage() {
                     <a
                       href={`/kol?launchId=${token.launchId || ''}&tab=MARKET`}
                       className="btn-secondary"
-                      style={{ flex: '1 1 21%', padding: '6px 2px', textAlign: 'center', fontSize: '11px', justifyContent: 'center', borderColor: 'rgba(168, 85, 247, 0.4)', color: '#C084FC' }}
+                      style={{ flex: '1 1 21%', padding: '6px 2px', textAlign: 'center', fontSize: '11px', justifyContent: 'center', borderColor: 'var(--color-badge-purple-border)', color: 'var(--color-badge-purple-text)' }}
                       title="Ikuti Bounties, Kampanye Share & Staking di KOL Hub"
                     >
                       SocialFi 🎯

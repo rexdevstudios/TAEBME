@@ -106,7 +106,7 @@ export default function HeaderNav() {
         <Link href="/" className="poolnet-brand" style={{ fontSize: '18px', fontWeight: 900, letterSpacing: '-0.5px' }}>
           POOLNET
         </Link>
-        <span className="badge" style={{ backgroundColor: '#1A1E2F', border: '1px solid #334155', color: '#94A3B8', fontSize: '11px', padding: '2px 6px' }}>
+        <span className="badge" style={{ backgroundColor: 'var(--color-badge-neutral-bg)', border: '1px solid var(--color-badge-neutral-border)', color: 'var(--color-badge-neutral-text)', fontSize: '11px', padding: '2px 7px' }}>
           v2.5
         </span>
         <div
@@ -114,19 +114,19 @@ export default function HeaderNav() {
             display: 'inline-flex',
             alignItems: 'center',
             gap: '6px',
-            padding: '3px 8px',
-            borderRadius: '10px',
+            padding: '3px 9px',
+            borderRadius: '9999px',
             backgroundColor: selectedChainHex === '0x14a34'
-              ? 'rgba(0, 229, 255, 0.08)'
+              ? 'var(--color-badge-info-bg)'
               : selectedChainHex === '0x2105'
-                ? 'rgba(34, 197, 94, 0.08)'
-                : 'rgba(245, 158, 11, 0.12)',
+                ? 'var(--color-badge-success-bg)'
+                : 'var(--color-badge-warning-bg)',
             border: `1px solid ${
               selectedChainHex === '0x14a34'
-                ? 'rgba(0, 229, 255, 0.25)'
+                ? 'var(--color-badge-info-border)'
                 : selectedChainHex === '0x2105'
-                  ? 'rgba(34, 197, 94, 0.25)'
-                  : 'rgba(245, 158, 11, 0.35)'
+                  ? 'var(--color-badge-success-border)'
+                  : 'var(--color-badge-warning-border)'
             }`,
           }}
           title={`Environment: ${networkLabel} · Active Wallet Chain: ${normChainHex || 'Not detected'}`}
@@ -139,10 +139,10 @@ export default function HeaderNav() {
               borderRadius: '50%',
               flexShrink: 0,
               backgroundColor: selectedChainHex === '0x14a34'
-                ? '#00E5FF'
+                ? 'var(--color-badge-info-text)'
                 : selectedChainHex === '0x2105'
-                  ? '#22C55E'
-                  : '#F59E0B',
+                  ? 'var(--color-badge-success-text)'
+                  : 'var(--color-badge-warning-text)',
             }}
           />
           <select
@@ -167,10 +167,10 @@ export default function HeaderNav() {
               border: 'none',
               outline: 'none',
               color: selectedChainHex === '0x14a34'
-                ? '#67E8F9'
+                ? 'var(--color-badge-info-text)'
                 : selectedChainHex === '0x2105'
-                  ? '#86EFAC'
-                  : '#FDE047',
+                  ? 'var(--color-badge-success-text)'
+                  : 'var(--color-badge-warning-text)',
               fontSize: '11px',
               fontWeight: 700,
               fontFamily: 'var(--font-mono)',
@@ -179,12 +179,12 @@ export default function HeaderNav() {
             }}
           >
             {normChainHex && !isKnownChain && (
-              <option value={normChainHex} style={{ backgroundColor: '#0B1220', color: '#FDE047' }}>
+              <option value={normChainHex} style={{ backgroundColor: 'var(--color-surface-elevated)', color: 'var(--color-badge-warning-text)' }}>
                 Other ({parseInt(normChainHex, 16) || normChainHex})
               </option>
             )}
             {CHAIN_OPTIONS.map((c) => (
-              <option key={c.hex} value={c.hex} style={{ backgroundColor: '#0B1220', color: '#E2E8F0' }}>
+              <option key={c.hex} value={c.hex} style={{ backgroundColor: 'var(--color-surface-elevated)', color: 'var(--color-foreground)' }}>
                 {c.label}
               </option>
             ))}
@@ -206,11 +206,10 @@ export default function HeaderNav() {
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '5px',
-                padding: '5px 9px',
-                borderRadius: '6px',
+                padding: '6px 11px',
+                borderRadius: '9999px',
                 fontSize: '12px',
                 whiteSpace: 'nowrap',
-                backgroundColor: active ? 'rgba(34, 197, 94, 0.1)' : 'transparent',
                 transition: 'all 150ms ease',
               }}
             >
@@ -263,9 +262,9 @@ export default function HeaderNav() {
               href="/billing"
               className="badge"
               style={{
-                border: '1px solid var(--color-border)',
-                backgroundColor: 'rgba(15, 23, 42, 0.6)',
-                color: '#94A3B8',
+                border: '1px solid var(--color-badge-neutral-border)',
+                backgroundColor: 'var(--color-badge-neutral-bg)',
+                color: 'var(--color-badge-neutral-text)',
                 fontSize: '11px',
                 textDecoration: 'none',
                 display: 'inline-flex',
@@ -274,7 +273,7 @@ export default function HeaderNav() {
               }}
               title={`Active Subscription Tier: ${planId || 'FREE'} · Available Credits: ${credits.toLocaleString()}`}
             >
-              <span style={{ color: '#FFC400', fontWeight: 900 }}>{planId || 'FREE'}</span>
+              <span style={{ color: 'var(--color-badge-warning-text)', fontWeight: 900 }}>{planId || 'FREE'}</span>
               <span>·</span>
               <span>{credits.toLocaleString()} cr</span>
             </Link>

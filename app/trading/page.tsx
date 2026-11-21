@@ -546,7 +546,7 @@ export default function TradingPage() {
               <span className="badge badge-trader">
                 ✓ Arkham {signal?.inputs.counterpartyRisk || 'CLEAR'}
               </span>
-              <span className="badge badge-trader" style={{ border: '1px solid #00E5FF', color: '#00E5FF', backgroundColor: '#071A2E' }}>
+              <span className="badge badge-trader" style={{ border: '1px solid var(--color-badge-info-border)', color: 'var(--color-badge-info-text)', backgroundColor: 'var(--color-badge-info-bg)' }}>
                 ✓ Sentiment {signal?.inputs.webSentiment || 'NEUTRAL'}
               </span>
             </div>
@@ -634,7 +634,7 @@ export default function TradingPage() {
             </div>
 
             {(linkedTokenAddress || linkedProposalId) && (
-              <div style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', padding: '8px', borderRadius: '6px', backgroundColor: 'rgba(0, 229, 255, 0.08)', border: '1px solid rgba(0, 229, 255, 0.25)', marginBottom: '10px', color: '#80D8FF' }}>
+              <div style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', padding: '8px', borderRadius: '6px', backgroundColor: 'var(--color-badge-info-bg)', border: '1px solid var(--color-badge-info-border)', marginBottom: '10px', color: 'var(--color-badge-info-text)' }}>
                 {linkedTokenAddress && (
                   <div>
                     Target Token: {linkedTokenAddress.slice(0, 10)}...{linkedTokenAddress.slice(-6)}

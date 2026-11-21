@@ -581,7 +581,7 @@ export default function OverviewPage() {
           <h2 style={{ fontSize: '18px', fontWeight: 900, margin: 0, color: '#FFD600' }}>
             Emergency Master Console
           </h2>
-          <span className="badge badge-admin" style={{ border: '1px solid #FF9100', color: '#FFD600', backgroundColor: '#261704' }}>
+          <span className="badge badge-admin" style={{ border: '1px solid var(--color-badge-warning-border)', color: 'var(--color-badge-warning-text)', backgroundColor: 'var(--color-badge-warning-bg)' }}>
             SUPERVISOR TIER
           </span>
         </div>
@@ -777,7 +777,7 @@ export default function OverviewPage() {
           <div className="text-muted" style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: '12px' }}>EXECUTION PLANE WORKERS</div>
           <div className="flex-row gap-sm" style={{ flexWrap: 'wrap' }}>
             {(overview?.executionPlaneWorkers || ['BinanceOrderWorker', 'LaunchpadIndexerWorker', 'DaytonaSandboxRunner', 'BinanceStreamListener']).map((worker) => (
-              <span key={worker} style={{ backgroundColor: '#131D2D', color: '#00E5FF', border: '1px solid #1B2B42', padding: '6px 12px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold' }}>
+              <span key={worker} style={{ backgroundColor: 'var(--color-badge-info-bg)', color: 'var(--color-badge-info-text)', border: '1px solid var(--color-badge-info-border)', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold' }}>
                 <Cpu size={12} className="inline mr-1" style={{display:'inline', marginRight:'4px', verticalAlign:'text-bottom'}}/> {worker}
               </span>
             ))}

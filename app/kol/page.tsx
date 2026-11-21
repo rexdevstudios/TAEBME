@@ -492,7 +492,7 @@ export default function KolHubPage() {
               <span className="badge" style={{ backgroundColor: 'rgba(34, 197, 94, 0.1)', color: '#86EFAC', border: '1px solid rgba(34, 197, 94, 0.25)', fontSize: '11px', padding: '2px 8px' }}>
                 SocialFi Bounty Portal
               </span>
-              <span className="badge" style={{ backgroundColor: '#1E293B', border: '1px solid #334155', color: '#94A3B8', fontSize: '11px', padding: '2px 8px' }}>
+              <span className="badge" style={{ backgroundColor: 'var(--color-badge-neutral-bg)', border: '1px solid var(--color-badge-neutral-border)', color: 'var(--color-badge-neutral-text)', fontSize: '11px', padding: '2px 8px' }}>
                 Arkham & Merkle Verified
               </span>
             </div>
@@ -755,7 +755,7 @@ export default function KolHubPage() {
                 }}
               >
                 <span>
-                  🎯 Memfilter kampanye untuk token ID: <code style={{ color: '#F8FAFC' }}>{activeLaunchFilter.slice(0, 8)}...</code>
+                  🎯 Memfilter kampanye untuk token ID: <code style={{ color: 'var(--color-foreground)' }}>{activeLaunchFilter.slice(0, 8)}...</code>
                 </span>
                 <button
                   type="button"
@@ -764,7 +764,7 @@ export default function KolHubPage() {
                     fetchCampaigns();
                   }}
                   className="btn-secondary"
-                  style={{ padding: '4px 10px', fontSize: '11px', color: '#F8FAFC' }}
+                  style={{ padding: '4px 10px', fontSize: '11px', color: 'var(--color-foreground)' }}
                 >
                   Tampilkan Semua Kampanye ✕
                 </button>

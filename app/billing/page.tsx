@@ -394,7 +394,7 @@ export default function BillingPage() {
               flex: '1 1 280px',
               padding: '7px 10px',
               borderRadius: '6px',
-              backgroundColor: '#0B1220',
+              backgroundColor: 'var(--color-surface-elevated)',
               border: '1px solid var(--color-border)',
               color: 'var(--color-foreground)',
               fontSize: '11px',
