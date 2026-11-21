@@ -218,6 +218,27 @@ async function runBlackboxSuite() {
   const unauthAuditRes = await fetch(`${BASE_URL}/api/admin/audit-logs`);
   assert(unauthAuditRes.status === 401, 'Unauthenticated GET /api/admin/audit-logs strictly rejected with HTTP 401');
 
+  // ==========================================================================
+  // TEST 10: GameFi Profile, Quest & Mint Voucher Auth Guards
+  // ==========================================================================
+  console.log('\n--- [TEST 10: GameFi Profile, Quest & Mint Voucher Auth Guards] ---');
+  const unauthGfProfile = await fetch(`${BASE_URL}/api/gamefi/profile`);
+  assert(unauthGfProfile.status === 401, 'Unauthenticated GET /api/gamefi/profile strictly rejected with HTTP 401');
+
+  const unauthGfQuest = await fetch(`${BASE_URL}/api/gamefi/quests/complete`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ questId: 'daily_checkin' }),
+  });
+  assert(unauthGfQuest.status === 401, 'Unauthenticated POST /api/gamefi/quests/complete strictly rejected with HTTP 401');
+
+  const unauthGfVoucher = await fetch(`${BASE_URL}/api/gamefi/nft/mint-voucher`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tier: 'BRONZE' }),
+  });
+  assert(unauthGfVoucher.status === 401, 'Unauthenticated POST /api/gamefi/nft/mint-voucher strictly rejected with HTTP 401');
+
   console.log('\n================================================================');
   console.log(`  🎉 BLACKBOX SUITE COMPLETED: ${passedTests} PASSED, ${failedTests} FAILED`);
   console.log('================================================================\n');

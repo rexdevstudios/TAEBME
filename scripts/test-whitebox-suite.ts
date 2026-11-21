@@ -20,6 +20,7 @@ import {
 } from '../packages/launchpad/bounty-escrow';
 import { DexPairFactoryService } from '../packages/launchpad/dex-pair-factory';
 import { TradingRiskGate } from '../packages/trading/risk-gate';
+import { computePassTier, getUtcDailyQuestKey } from '../packages/gamefi/gamefi-service';
 import {
   getDbPool,
   defaultDraftDbAdapter,
@@ -354,6 +355,19 @@ async function runWhiteboxSuite() {
     }
     assert(enumFailed, 'Schema enforcement prevents undefined entity states');
   }
+
+  // ==========================================================================
+  // SECTION 6: GameFi Tier Progression & Daily UTC Quest Key Invariants
+  // ==========================================================================
+  console.log('\n--- [SECTION 6: GameFi Tier Progression & UTC Idempotency Keys] ---');
+  assert(computePassTier(0) === 'BRONZE', 'GameFi 0 XP maps to BRONZE tier');
+  assert(computePassTier(250) === 'SILVER', 'GameFi 250 XP maps to SILVER tier');
+  assert(computePassTier(500) === 'GOLD', 'GameFi 500 XP maps to GOLD tier');
+  const dayA = getUtcDailyQuestKey(new Date('2026-11-21T01:00:00Z'));
+  const dayB = getUtcDailyQuestKey(new Date('2026-11-21T23:59:59Z'));
+  const dayC = getUtcDailyQuestKey(new Date('2026-11-22T00:00:01Z'));
+  assert(dayA === dayB, 'Same UTC date produces identical daily_checkin idempotency key');
+  assert(dayA !== dayC, 'Next UTC date rolls over to distinct daily_checkin idempotency key');
 
   console.log('\n================================================================');
   console.log(`  🎉 WHITEBOX SUITE COMPLETED: ${passedAssertions} PASSED, ${failedAssertions} FAILED`);

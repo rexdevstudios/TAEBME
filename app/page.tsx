@@ -19,12 +19,19 @@ interface OverviewData {
 }
 
 export default function OverviewPage() {
-  const { isConnected, userRole, planId, credits, walletAddress, connectMetaMask, isConnecting, chainId } = useAuth();
+  const { isConnected, userRole, planId, credits, walletAddress, connectMetaMask, isConnecting, refreshSession } = useAuth();
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [activeLaunches, setActiveLaunches] = useState<any[]>([]);
-  const [gameFiProfile, setGameFiProfile] = useState<{ xp: number; level: number; passTier: string; completedQuests: string[] } | null>(null);
+  const [gameFiProfile, setGameFiProfile] = useState<{
+    xp: number;
+    level: number;
+    passTier: string;
+    completedQuests: string[];
+    dailyCheckInAvailable?: boolean;
+  } | null>(null);
   const [questFeedback, setQuestFeedback] = useState<string | null>(null);
   const [questLoading, setQuestLoading] = useState<string | null>(null);
+  const [voucherLoading, setVoucherLoading] = useState<boolean>(false);
   const [connectError, setConnectError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -155,11 +162,41 @@ export default function OverviewPage() {
       if (json.profile) {
         setGameFiProfile(json.profile);
       }
-      setQuestFeedback(`✅ Quest "${questId}" selesai! +${json.completion?.xpGranted ?? 100} XP ditambahkan ke profil GameFi Anda.`);
+      const crBonus = Number(json.creditsGranted ?? 0);
+      if (crBonus > 0) {
+        refreshSession().catch(() => {});
+      }
+      setQuestFeedback(
+        `✅ Quest "${questId}" selesai! +${json.completion?.xpGranted ?? 100} XP${crBonus > 0 ? ` & +${crBonus} Credits` : ''} ditambahkan ke akun Anda.`
+      );
     } catch (err: any) {
       setQuestFeedback(`⚠️ Gagal memverifikasi quest: ${err?.message || 'Network error'}`);
     } finally {
       setQuestLoading(null);
+    }
+  };
+
+  const handleRequestPassVoucher = async () => {
+    const tier = gameFiProfile?.passTier || 'BRONZE';
+    setVoucherLoading(true);
+    setQuestFeedback(null);
+    try {
+      const res = await fetch('/api/gamefi/nft/mint-voucher', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tier }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        setQuestFeedback(`ℹ️ Mint Voucher (${tier}): ${json.error || 'Signer / koleksi NFT belum dikonfigurasi pada environment ini.'}`);
+        return;
+      }
+      setQuestFeedback(`✅ EIP-712 Mint Voucher (${tier}) diterbitkan! Contract: ${json.voucher?.contractAddress || 'Verified'} · Nonce: ${json.voucher?.nonce || '—'}`);
+    } catch (err: any) {
+      setQuestFeedback(`⚠️ Gagal meminta Mint Voucher: ${err?.message || 'Network error'}`);
+    } finally {
+      setVoucherLoading(false);
     }
   };
 
@@ -480,9 +517,9 @@ export default function OverviewPage() {
     return (
       <div className="flex-col gap-lg">
         {/* Top Welcome & Active Plan Banner */}
-        <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+        <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
           <div>
-            <h1 style={{ margin: '0 0 8px 0', fontSize: '24px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <h1 style={{ margin: '0 0 6px 0', fontSize: '22px', display: 'flex', alignItems: 'center', gap: '10px' }}>
               Welcome back, {walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : 'User'}
             </h1>
             <p className="text-muted" style={{ margin: 0, fontSize: '13px' }}>
@@ -491,23 +528,12 @@ export default function OverviewPage() {
               <strong style={{ color: 'var(--color-accent)' }}>{credits.toLocaleString()} Credits</strong>
             </p>
           </div>
-          <div className="flex-row gap-sm" style={{ flexWrap: 'wrap' }}>
-            <a href="/agent" className="btn-primary" style={{ textDecoration: 'none' }}>
-              <BrainCircuit size={16} /> 5-Agent Trading Desk
-            </a>
-            <a href="/trading" className="btn-secondary" style={{ textDecoration: 'none' }}>
-              <Network size={16} /> Trading Terminal
-            </a>
-            <a href="/launchpad" className="btn-secondary" style={{ textDecoration: 'none' }}>
-              <Rocket size={16} /> Token Launchpad
-            </a>
-            <a href="/billing" className="btn-secondary" style={{ textDecoration: 'none', borderColor: '#FFC400', color: '#FFC400' }}>
-              <Zap size={16} /> Billing &amp; Upgrade Tier
-            </a>
-          </div>
+          <a href="/trading" className="btn-primary" style={{ textDecoration: 'none', padding: '8px 14px', fontSize: '13px' }}>
+            <Network size={15} /> Open Trading Terminal →
+          </a>
         </div>
 
-        {/* 4 Quick-Launch Command Cards */}
+        {/* 4 Quick-Launch Command Cards (Single Non-Duplicated Navigation Hub) */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
           <a href="/agent" className="card" style={{ textDecoration: 'none', borderLeft: '3px solid #A855F7' }}>
             <div style={{ fontWeight: 900, color: '#C084FC', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
@@ -610,10 +636,10 @@ export default function OverviewPage() {
                 <Award size={17} /> GameFi Trader Pass &amp; On-Chain Quest Progression
               </h3>
               <p className="text-muted" style={{ margin: '2px 0 0 0', fontSize: '12px' }}>
-                Selesaikan quest ekosistem untuk meningkatkan XP dan membuka kualifikasi Trader Pass NFT (`BRONZE` → `SILVER 250 XP` → `GOLD 500 XP`).
+                Idempoten di PostgreSQL SSOT: selesaikan Daily Check-In &amp; Milestone Quests untuk memperoleh XP, Bonus Kredit, dan kualifikasi Trader Pass NFT (`BRONZE` → `SILVER 250 XP` → `GOLD 500 XP`).
               </p>
             </div>
-            <div style={{ display: 'flex', gap: '8px', fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
               <span style={{ padding: '4px 10px', borderRadius: '6px', backgroundColor: 'rgba(168, 85, 247, 0.15)', color: '#E9D5FF', border: '1px solid rgba(168, 85, 247, 0.35)', fontWeight: 800 }}>
                 XP: {gameFiProfile?.xp ?? 0}
               </span>
@@ -623,8 +649,36 @@ export default function OverviewPage() {
               <span style={{ padding: '4px 10px', borderRadius: '6px', backgroundColor: 'rgba(255, 196, 0, 0.15)', color: '#FDE047', border: '1px solid rgba(255, 196, 0, 0.35)', fontWeight: 800 }}>
                 PASS: {gameFiProfile?.passTier || 'BRONZE'}
               </span>
+              <button
+                type="button"
+                onClick={handleRequestPassVoucher}
+                disabled={voucherLoading}
+                className="btn-secondary"
+                style={{ padding: '4px 10px', fontSize: '11px', borderColor: '#C084FC', color: '#E9D5FF' }}
+              >
+                {voucherLoading ? 'Verifying...' : `Request ${gameFiProfile?.passTier || 'BRONZE'} NFT Voucher`}
+              </button>
             </div>
           </div>
+
+          {/* XP Progress Bar toward GOLD (500 XP) */}
+          {(() => {
+            const xpVal = gameFiProfile?.xp ?? 0;
+            const nextTarget = xpVal < 250 ? 250 : 500;
+            const nextLabel = xpVal < 250 ? 'SILVER (250 XP)' : xpVal < 500 ? 'GOLD (500 XP)' : 'MAX TIER (GOLD UNLOCKED)';
+            const pct = Math.min(100, Math.round((xpVal / nextTarget) * 100));
+            return (
+              <div style={{ marginBottom: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--color-muted)', marginBottom: '4px' }}>
+                  <span>Progress menuju {nextLabel}</span>
+                  <span>{xpVal} / {nextTarget} XP ({pct}%)</span>
+                </div>
+                <div style={{ width: '100%', height: '6px', borderRadius: '999px', backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                  <div style={{ width: `${pct}%`, height: '100%', background: 'linear-gradient(90deg, #A855F7 0%, #22C55E 100%)', transition: 'width 300ms ease' }} />
+                </div>
+              </div>
+            );
+          })()}
 
           {questFeedback && (
             <div style={{ marginBottom: '12px', padding: '8px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 700, backgroundColor: questFeedback.includes('✅') ? 'rgba(16, 185, 129, 0.12)' : 'rgba(245, 158, 11, 0.12)', color: questFeedback.includes('✅') ? '#6EE7B7' : '#FDE047', border: `1px solid ${questFeedback.includes('✅') ? 'rgba(16, 185, 129, 0.35)' : 'rgba(245, 158, 11, 0.35)'}` }}>
@@ -632,20 +686,27 @@ export default function OverviewPage() {
             </div>
           )}
 
-          <div className="grid-3" style={{ gap: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
             {[
-              { id: 'connect_siwe', title: '1. Non-Custodial SIWE Login', xp: '+100 XP', desc: 'Verifikasi sesi dompet EIP-4361 SIWE aktif.' },
-              { id: 'verify_sybil', title: '2. Anti-Sybil Social Passport', xp: '+250 XP', desc: 'Verifikasi profil KOL / World ID / Farcaster di KOL Hub.' },
-              { id: 'first_trade_or_launch', title: '3. First Trade Intent or Token Launch', xp: '+500 XP', desc: 'Buat 1 trade intent di Terminal/5-Agent Desk atau launch token.' },
+              { id: 'daily_checkin', badge: 'DAILY UTC', title: 'Daily Check-In', xp: '+25 XP · +5 cr', desc: 'Klaim bonus harian 1× per hari (reset otomatis 00:00 UTC).' },
+              { id: 'connect_siwe', badge: 'ONE-TIME', title: '1. Non-Custodial SIWE Login', xp: '+100 XP · +10 cr', desc: 'Verifikasi sesi dompet EIP-4361 SIWE aktif.' },
+              { id: 'verify_sybil', badge: 'ONE-TIME', title: '2. Anti-Sybil Social Passport', xp: '+250 XP · +25 cr', desc: 'Verifikasi profil KOL / World ID / Farcaster di KOL Hub.' },
+              { id: 'first_trade_or_launch', badge: 'ONE-TIME', title: '3. First Trade or Token Launch', xp: '+500 XP · +50 cr', desc: 'Buat 1 trade intent di Terminal/5-Agent Desk atau launch token.' },
             ].map((q) => {
-              const isDone = gameFiProfile?.completedQuests?.includes(q.id);
+              const isDone =
+                q.id === 'daily_checkin'
+                  ? gameFiProfile?.dailyCheckInAvailable === false
+                  : Boolean(gameFiProfile?.completedQuests?.includes(q.id));
               return (
-                <div key={q.id} className="bg-panel" style={{ border: '1px solid var(--color-border)', borderRadius: '6px', padding: '12px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '10px' }}>
+                <div key={q.id} className="bg-panel" style={{ border: `1px solid ${isDone ? 'rgba(34, 197, 94, 0.3)' : 'var(--color-border)'}`, borderRadius: '6px', padding: '12px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '10px' }}>
                   <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
                       <span style={{ fontWeight: 800, fontSize: '12px', color: 'var(--color-foreground)' }}>{q.title}</span>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 900, color: 'var(--color-accent)' }}>{q.xp}</span>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', backgroundColor: q.badge === 'DAILY UTC' ? 'rgba(56, 189, 248, 0.15)' : 'rgba(168, 85, 247, 0.15)', color: q.badge === 'DAILY UTC' ? '#7DD3FC' : '#E9D5FF' }}>
+                        {q.badge}
+                      </span>
                     </div>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 900, color: 'var(--color-accent)', marginBottom: '4px' }}>{q.xp}</div>
                     <div className="text-muted" style={{ fontSize: '11px' }}>{q.desc}</div>
                   </div>
                   <button
@@ -653,9 +714,9 @@ export default function OverviewPage() {
                     disabled={isDone || questLoading !== null}
                     onClick={() => handleCompleteQuest(q.id)}
                     className={isDone ? 'btn-secondary' : 'btn-primary'}
-                    style={{ width: '100%', justifyContent: 'center', padding: '7px 10px', fontSize: '11px' }}
+                    style={{ width: '100%', justifyContent: 'center', padding: '7px 10px', fontSize: '11px', opacity: isDone ? 0.75 : 1 }}
                   >
-                    {isDone ? '✓ Completed' : questLoading === q.id ? 'Verifying...' : `Claim ${q.xp}`}
+                    {isDone ? (q.id === 'daily_checkin' ? '✓ Claimed Today (UTC)' : '✓ Completed') : questLoading === q.id ? 'Verifying...' : `Claim ${q.xp}`}
                   </button>
                 </div>
               );

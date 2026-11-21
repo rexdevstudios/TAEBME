@@ -3839,23 +3839,65 @@ export class PostgresGameFiDbAdapter {
     return false;
   }
 
-  async getUserGameFiProfile(userId: string): Promise<UserGameFiProfile> {
+  private async resolveGameFiUserUuid(pool: Pool, userId: string, walletAddress?: string): Promise<string | null> {
+    if (isUuid(userId)) return userId;
+    const lookupKey = walletAddress || userId;
+    if (!lookupKey) return null;
+    try {
+      return await ensureUserEntity(pool, lookupKey);
+    } catch {
+      return null;
+    }
+  }
+
+  async getCompletedQuestIds(userId: string, walletAddress?: string): Promise<string[]> {
     const pool = this.getPool();
-    if (pool && isUuid(userId)) {
+    if (pool) {
       try {
-        const res = await pool.query(
-          `SELECT user_id as "userId", xp, level, quests_completed as "questsCompleted", updated_at as "updatedAt"
-           FROM user_gamefi_profiles WHERE user_id = $1 LIMIT 1`,
-          [userId]
-        );
-        if (res.rows.length > 0) {
-          const r = res.rows[0];
+        const resolvedUuid = await this.resolveGameFiUserUuid(pool, userId, walletAddress);
+        if (resolvedUuid) {
+          const res = await pool.query(
+            `SELECT quest_id FROM quest_completions WHERE user_id = $1 AND status = 'COMPLETED'`,
+            [resolvedUuid]
+          );
+          return res.rows.map((r: any) => String(r.quest_id));
+        }
+      } catch (err: any) {
+        if (process.env.NODE_ENV === 'production') throw err;
+      }
+    }
+    return inMemoryQuestCompletions
+      .filter((c) => c.userId === userId && c.status === 'COMPLETED')
+      .map((c) => c.questId);
+  }
+
+  async getUserGameFiProfile(userId: string, walletAddress?: string): Promise<UserGameFiProfile> {
+    const pool = this.getPool();
+    if (pool) {
+      try {
+        const resolvedUuid = await this.resolveGameFiUserUuid(pool, userId, walletAddress);
+        if (resolvedUuid) {
+          const res = await pool.query(
+            `SELECT user_id as "userId", xp, level, quests_completed as "questsCompleted", updated_at as "updatedAt"
+             FROM user_gamefi_profiles WHERE user_id = $1 LIMIT 1`,
+            [resolvedUuid]
+          );
+          if (res.rows.length > 0) {
+            const r = res.rows[0];
+            return {
+              userId: r.userId,
+              xp: Number(r.xp),
+              level: Number(r.level),
+              questsCompleted: Number(r.questsCompleted),
+              updatedAt: r.updatedAt,
+            };
+          }
           return {
-            userId: r.userId,
-            xp: Number(r.xp),
-            level: Number(r.level),
-            questsCompleted: Number(r.questsCompleted),
-            updatedAt: r.updatedAt,
+            userId: resolvedUuid,
+            xp: 0,
+            level: 1,
+            questsCompleted: 0,
+            updatedAt: new Date(),
           };
         }
       } catch (err: any) {
@@ -3877,13 +3919,15 @@ export class PostgresGameFiDbAdapter {
 
   async recordQuestCompletion(params: {
     userId: string;
+    walletAddress?: string;
     questId: string;
     xpGranted: number;
   }): Promise<{ profile: UserGameFiProfile; completion: QuestCompletion }> {
-    const { userId, questId, xpGranted } = params;
+    const { userId, walletAddress, questId, xpGranted } = params;
     const pool = this.getPool();
+    const resolvedUuid = pool ? await this.resolveGameFiUserUuid(pool, userId, walletAddress) : null;
 
-    if (pool && isUuid(userId)) {
+    if (pool && resolvedUuid) {
       const client = await pool.connect();
       try {
         await client.query('BEGIN');
@@ -3895,7 +3939,7 @@ export class PostgresGameFiDbAdapter {
            VALUES ($1, $2, $3, 'COMPLETED', $4, NOW())
            ON CONFLICT (user_id, quest_id) DO NOTHING
            RETURNING id, completed_at`,
-          [completionUuid, userId, questId, xpGranted]
+          [completionUuid, resolvedUuid, questId, xpGranted]
         );
 
         if (insertRes.rows.length === 0) {
@@ -3915,7 +3959,7 @@ export class PostgresGameFiDbAdapter {
              quests_completed = user_gamefi_profiles.quests_completed + 1,
              updated_at = NOW()
            RETURNING user_id as "userId", xp, level, quests_completed as "questsCompleted", updated_at as "updatedAt"`,
-          [userId, xpGranted]
+          [resolvedUuid, xpGranted]
         );
 
         await client.query('COMMIT');
@@ -3931,7 +3975,7 @@ export class PostgresGameFiDbAdapter {
 
         const completion: QuestCompletion = {
           id: completionUuid,
-          userId,
+          userId: resolvedUuid,
           questId,
           status: 'COMPLETED',
           xpGranted,

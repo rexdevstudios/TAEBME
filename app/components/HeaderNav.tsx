@@ -59,9 +59,9 @@ export default function HeaderNav() {
     { href: '/', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/launchpad', label: 'Launchpad', icon: Rocket },
     { href: '/kol', label: 'KOL Hub', icon: Award },
-    { href: '/trading', label: 'Trading Terminal', icon: Network },
-    { href: '/agent', label: 'AI Proposals', icon: BrainCircuit },
-    { href: '/billing', label: 'Billing & Tiers', icon: CreditCard },
+    { href: '/trading', label: 'Trading', icon: Network },
+    { href: '/agent', label: 'AI Desk', icon: BrainCircuit },
+    { href: '/billing', label: 'Billing', icon: CreditCard },
   ];
 
   const isActive = (href: string) => {
@@ -173,7 +173,7 @@ export default function HeaderNav() {
       </div>
 
       {/* Dynamic Navigation Links */}
-      <nav className="nav-links">
+      <nav className="nav-links" style={{ gap: '4px' }}>
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.href);
@@ -185,14 +185,16 @@ export default function HeaderNav() {
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '6px',
-                padding: '6px 12px',
+                gap: '5px',
+                padding: '5px 9px',
                 borderRadius: '6px',
+                fontSize: '12px',
+                whiteSpace: 'nowrap',
                 backgroundColor: active ? 'rgba(34, 197, 94, 0.1)' : 'transparent',
                 transition: 'all 150ms ease',
               }}
             >
-              <Icon size={15} style={{ verticalAlign: 'middle' }} />
+              <Icon size={14} style={{ verticalAlign: 'middle', flexShrink: 0 }} />
               <span>{item.label}</span>
             </Link>
           );
@@ -244,17 +246,18 @@ export default function HeaderNav() {
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '6px',
-                padding: '6px 12px',
+                gap: '5px',
+                padding: '5px 9px',
                 borderRadius: '6px',
                 border: '1px solid var(--color-border)',
                 backgroundColor: 'var(--color-primary)',
-                fontSize: '13px',
+                fontSize: '12px',
                 fontWeight: 600,
+                whiteSpace: 'nowrap',
                 color: 'var(--color-foreground)',
               }}
             >
-              <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#22C55E' }} />
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#22C55E', flexShrink: 0 }} />
               {truncatedAddress}
             </div>
 
