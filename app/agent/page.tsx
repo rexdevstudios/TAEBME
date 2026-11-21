@@ -7,6 +7,7 @@ import { FiveAgentDeskPanel } from '../components/FiveAgentDeskPanel';
 import { PageWorkflowBanner } from '../components/PageWorkflowBanner';
 import { UserRiskPolicyPanel } from '../components/UserRiskPolicyPanel';
 import { CustomAgentBuilderPanel } from '../components/CustomAgentBuilderPanel';
+import { ByokLlmVaultPanel } from '../components/ByokLlmVaultPanel';
 import type { CustomAgentProfile } from '@packages/agent/skill-registry';
 
 export default function AgentPage() {
@@ -16,6 +17,7 @@ export default function AgentPage() {
   const [action, setAction] = useState<'BUY' | 'SELL'>('BUY');
   const [qty, setQty] = useState(100);
   const [selectedCustomAgent, setSelectedCustomAgent] = useState<CustomAgentProfile | null>(null);
+  const [selectedLlmProvider, setSelectedLlmProvider] = useState<'PLATFORM' | 'GEMINI' | 'OPENAI'>('PLATFORM');
   const [proposal, setProposal] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -181,6 +183,13 @@ export default function AgentPage() {
         }}
       />
 
+      {/* BYOK LLM Provider Vault (GEMINI / OPENAI — Reuses user_provider_api_keys) */}
+      <ByokLlmVaultPanel
+        isConnected={isConnected}
+        selectedLlmProvider={selectedLlmProvider}
+        onSelectLlmProvider={setSelectedLlmProvider}
+      />
+
       {/* Non-Custodial Personal Risk Guard (Reused from /trading, Clamped to Billing Tier) */}
       <UserRiskPolicyPanel isConnected={isConnected} />
 
@@ -192,6 +201,7 @@ export default function AgentPage() {
         defaultQty={qty}
         selectedAgentId={selectedCustomAgent?.id || null}
         selectedAgentName={selectedCustomAgent?.name || null}
+        selectedLlmProvider={selectedLlmProvider}
       />
 
       <div className="grid-2">

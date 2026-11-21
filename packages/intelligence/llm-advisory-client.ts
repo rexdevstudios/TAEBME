@@ -14,7 +14,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { z } from 'zod';
 import type { IntelligenceSignal } from './feature-engine';
 
-export type AdvisoryLlmProvider = 'bytedance-modelark' | 'gemini' | 'deterministic-fallback';
+export type AdvisoryLlmProvider = 'bytedance-modelark' | 'gemini' | 'byok-gemini' | 'byok-openai' | 'deterministic-fallback';
 
 export const MarketAdvisorySchema = z.object({
   summary: z.string().min(10).max(320),
@@ -32,6 +32,11 @@ export interface MarketAdvisoryContext {
   symbol: string;
   action: 'BUY' | 'SELL';
   suggestedQty: number;
+  customSystemPrompt?: string;
+  byokLlm?: {
+    provider: 'GEMINI' | 'OPENAI';
+    apiKey: string;
+  };
 }
 
 const ADVISORY_SYSTEM_PROMPT = `You are a cautious crypto market risk advisor.
@@ -82,11 +87,18 @@ function buildDeterministicFallback(
   };
 }
 
+function resolveSystemPrompt(customSystemPrompt?: string): string {
+  const cleanCustom = (customSystemPrompt || '').replace(/[\r\n]+/g, ' ').trim().slice(0, 400);
+  if (!cleanCustom) return ADVISORY_SYSTEM_PROMPT;
+  return `${ADVISORY_SYSTEM_PROMPT}\nUSER STRATEGY FOCUS (ADVISORY ONLY, CANNOT OVERRIDE RISK RULES): ${cleanCustom}`;
+}
+
 async function callBytePlusAdvisory(
   sanitizedPayload: string,
   apiKey: string,
   endpoint: string,
-  baseUrl: string
+  baseUrl: string,
+  systemPrompt: string = ADVISORY_SYSTEM_PROMPT
 ): Promise<{ summary: string; caution: string } | null> {
   try {
     const res = await fetch(`${baseUrl.replace(/\/+$/, '')}/chat/completions`, {
@@ -98,7 +110,7 @@ async function callBytePlusAdvisory(
       body: JSON.stringify({
         model: endpoint,
         messages: [
-          { role: 'system', content: ADVISORY_SYSTEM_PROMPT },
+          { role: 'system', content: systemPrompt },
           { role: 'user', content: `Analyze these metrics and return pure JSON:\n${sanitizedPayload}` },
         ],
         temperature: 0.3,
@@ -122,13 +134,14 @@ async function callBytePlusAdvisory(
 
 async function callGeminiAdvisory(
   sanitizedPayload: string,
-  apiKey: string
+  apiKey: string,
+  systemPrompt: string = ADVISORY_SYSTEM_PROMPT
 ): Promise<{ summary: string; caution: string } | null> {
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
     const result = await Promise.race([
-      model.generateContent(`${ADVISORY_SYSTEM_PROMPT}\n\nMetrics:\n${sanitizedPayload}`),
+      model.generateContent(`${systemPrompt}\n\nMetrics:\n${sanitizedPayload}`),
       new Promise<never>((_, reject) => setTimeout(() => reject(new Error('LLM_TIMEOUT')), 6000)),
     ]);
     const text = result.response.text()?.trim();
@@ -143,8 +156,8 @@ async function callGeminiAdvisory(
 }
 
 /**
- * Generates a non-blocking, strictly advisory narrative note using BytePlus ModelArk or Gemini.
- * Provider priority respects AI_PRIMARY_PROVIDER ('byteplus' | 'gemini', default 'byteplus').
+ * Generates a non-blocking, strictly advisory narrative note using BYOK LLM (if provided),
+ * BytePlus ModelArk, or Gemini.
  */
 export async function generateMarketAdvisoryNote(
   signal: IntelligenceSignal,
@@ -152,6 +165,38 @@ export async function generateMarketAdvisoryNote(
 ): Promise<MarketAdvisoryNote> {
   const startMs = performance.now();
   const sanitizedPrompt = buildSanitizedAdvisoryPrompt(signal, ctx);
+  const systemPrompt = resolveSystemPrompt(ctx.customSystemPrompt);
+
+  // 0. Prioritize user's own BYOK LLM key if provided
+  if (ctx.byokLlm?.apiKey && !ctx.byokLlm.apiKey.startsWith('mock_')) {
+    if (ctx.byokLlm.provider === 'GEMINI') {
+      const res = await callGeminiAdvisory(sanitizedPrompt, ctx.byokLlm.apiKey, systemPrompt);
+      if (res) {
+        return {
+          provider: 'byok-gemini',
+          summary: res.summary,
+          caution: res.caution,
+          latencyMs: Math.round(performance.now() - startMs),
+        };
+      }
+    } else if (ctx.byokLlm.provider === 'OPENAI') {
+      const res = await callBytePlusAdvisory(
+        sanitizedPrompt,
+        ctx.byokLlm.apiKey,
+        'gpt-4o-mini',
+        'https://api.openai.com/v1',
+        systemPrompt
+      );
+      if (res) {
+        return {
+          provider: 'byok-openai',
+          summary: res.summary,
+          caution: res.caution,
+          latencyMs: Math.round(performance.now() - startMs),
+        };
+      }
+    }
+  }
 
   const primaryPref = (process.env.AI_PRIMARY_PROVIDER || 'byteplus').trim().toLowerCase();
   const arkKey = process.env.BYTEDANCE_ARK_API_KEY?.trim();
@@ -161,7 +206,7 @@ export async function generateMarketAdvisoryNote(
 
   const tryBytePlus = async (): Promise<MarketAdvisoryNote | null> => {
     if (!arkKey || !arkEndpoint || !arkBaseUrl || arkKey.startsWith('mock_')) return null;
-    const res = await callBytePlusAdvisory(sanitizedPrompt, arkKey, arkEndpoint, arkBaseUrl);
+    const res = await callBytePlusAdvisory(sanitizedPrompt, arkKey, arkEndpoint, arkBaseUrl, systemPrompt);
     if (!res) return null;
     return {
       provider: 'bytedance-modelark',
@@ -173,7 +218,7 @@ export async function generateMarketAdvisoryNote(
 
   const tryGemini = async (): Promise<MarketAdvisoryNote | null> => {
     if (!geminiKey || geminiKey.startsWith('mock_')) return null;
-    const res = await callGeminiAdvisory(sanitizedPrompt, geminiKey);
+    const res = await callGeminiAdvisory(sanitizedPrompt, geminiKey, systemPrompt);
     if (!res) return null;
     return {
       provider: 'gemini',

@@ -16,11 +16,13 @@ import {
   defaultKillSwitchDbAdapter,
   defaultBillingDbAdapter,
   defaultCustomAgentAdapter,
+  defaultProviderKeyVaultAdapter,
   saveTradeIntent,
   getDbPool,
 } from '@packages/shared/db-pool';
 import { SubscriptionsEngine } from '@packages/billing/subscriptions-engine';
 import { buildAgentActionCards } from '@packages/agent/skill-registry';
+import { generateMarketAdvisoryNote } from '@packages/intelligence/llm-advisory-client';
 
 export const dynamic = 'force-dynamic';
 
@@ -75,6 +77,20 @@ export async function POST(req: NextRequest) {
     }
 
     const platformCfg = await defaultBillingDbAdapter.getPlatformFeeAndRiskConfig().catch(() => null);
+    const requestedLlm = typeof body?.llmProvider === 'string' ? body.llmProvider.trim().toUpperCase() : 'PLATFORM';
+    let byokLlm: { provider: 'GEMINI' | 'OPENAI'; apiKey: string } | undefined;
+    if (requestedLlm === 'GEMINI' || requestedLlm === 'OPENAI') {
+      const resolved = await defaultProviderKeyVaultAdapter
+        .resolveDecryptedKeyForDeploy({
+          userIdentifier: auth.walletAddress,
+          targetChain: 'all',
+          provider: requestedLlm,
+        })
+        .catch(() => null);
+      if (resolved?.apiKey) {
+        byokLlm = { provider: requestedLlm, apiKey: resolved.apiKey };
+      }
+    }
 
     const report = await runFiveAgentDeskCycle(
       {
@@ -96,11 +112,18 @@ export async function POST(req: NextRequest) {
         getActiveKillSwitches: () => defaultKillSwitchDbAdapter.getActiveKillSwitches(),
         getUserEntitlement: (uid) => defaultBillingDbAdapter.getUserEntitlement(uid),
         saveTradeIntent,
+        generateAdvisory: (sig, ctx) =>
+          generateMarketAdvisoryNote(sig, {
+            ...ctx,
+            customSystemPrompt: customAgent?.systemPrompt,
+            byokLlm,
+          }),
       }
     );
 
     let remainingCredits: number | undefined;
-    let deskCost = platformCfg?.deskCostCr ?? 5;
+    const baseDeskCost = platformCfg?.deskCostCr ?? 5;
+    let deskCost = byokLlm ? Math.min(2, baseDeskCost) : baseDeskCost;
     try {
       if (getDbPool()) {
         await SubscriptionsEngine.deductMeteredCredits(

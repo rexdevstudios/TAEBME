@@ -13,9 +13,12 @@ import { requireCapability } from '@packages/auth/session';
 import { rateLimiter } from '@packages/auth/rate-limiter';
 import { defaultBillingDbAdapter, defaultProviderKeyVaultAdapter } from '@packages/shared/db-pool';
 import {
+  SubscriptionsEngine,
   annotateKeysWithQuotaStatus,
   computeEffectiveVaultCapacity,
 } from '@packages/billing/subscriptions-engine';
+
+const ALLOWED_VAULT_PROVIDERS = new Set(['BANKR', 'GEMINI', 'OPENAI']);
 
 export const dynamic = 'force-dynamic';
 
@@ -39,13 +42,21 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const provider = (searchParams.get('provider') || 'BANKR').toUpperCase();
+    if (!ALLOWED_VAULT_PROVIDERS.has(provider)) {
+      return NextResponse.json(
+        { success: false, error: `INVALID_PROVIDER: Allowed providers are BANKR, GEMINI, OPENAI`, timestamp: new Date().toISOString() },
+        { status: 400 }
+      );
+    }
     const [rawKeys, planId, addonSlots] = await Promise.all([
       defaultProviderKeyVaultAdapter.listKeys(auth.walletAddress, provider),
       defaultBillingDbAdapter.getUserPlan(auth.walletAddress).catch(() => 'FREE' as const),
       defaultBillingDbAdapter.getUserAddonSlots(auth.walletAddress).catch(() => ({ bankrExtraSlots: 0, binanceExtraSlots: 0 })),
     ]);
     const effCap = computeEffectiveVaultCapacity(planId, addonSlots);
-    const keys = annotateKeysWithQuotaStatus(rawKeys, { maxActive: effCap.maxBankrKeys });
+    const baseCap = SubscriptionsEngine.getPlanCapacities(planId);
+    const effectiveMaxKeys = provider === 'BANKR' ? effCap.maxBankrKeys : baseCap.maxLlmKeys;
+    const keys = annotateKeysWithQuotaStatus(rawKeys, { maxActive: effectiveMaxKeys });
 
     return NextResponse.json(
       {
@@ -53,10 +64,13 @@ export async function GET(req: NextRequest) {
         data: {
           provider,
           planId: effCap.planId,
-          maxKeys: effCap.maxBankrKeys,
-          addonSlots: effCap.bankrExtraSlots,
+          maxKeys: effectiveMaxKeys,
+          addonSlots: provider === 'BANKR' ? effCap.bankrExtraSlots : 0,
           keys,
-          platformFallbackAvailable: Boolean(process.env.BANKR_API_KEY && !process.env.BANKR_API_KEY.startsWith('mock_')),
+          platformFallbackAvailable:
+            provider === 'BANKR'
+              ? Boolean(process.env.BANKR_API_KEY && !process.env.BANKR_API_KEY.startsWith('mock_'))
+              : Boolean(process.env.GEMINI_API_KEY || process.env.BYTEDANCE_ARK_API_KEY),
         },
         timestamp: new Date().toISOString(),
       },
@@ -97,6 +111,12 @@ export async function POST(req: NextRequest) {
     const label = typeof body?.label === 'string' ? body.label.trim() : '';
     const apiKey = typeof body?.apiKey === 'string' ? body.apiKey.trim() : '';
     const provider = typeof body?.provider === 'string' ? body.provider.trim().toUpperCase() : 'BANKR';
+    if (!ALLOWED_VAULT_PROVIDERS.has(provider)) {
+      return NextResponse.json(
+        { success: false, error: `INVALID_PROVIDER: Allowed providers are BANKR, GEMINI, OPENAI`, timestamp: new Date().toISOString() },
+        { status: 400 }
+      );
+    }
     const chainScope = typeof body?.chainScope === 'string' ? body.chainScope.trim().toLowerCase() : 'all';
     const isDefault = Boolean(body?.isDefault);
 
@@ -105,6 +125,8 @@ export async function POST(req: NextRequest) {
       defaultBillingDbAdapter.getUserAddonSlots(auth.walletAddress).catch(() => ({ bankrExtraSlots: 0, binanceExtraSlots: 0 })),
     ]);
     const effCap = computeEffectiveVaultCapacity(planId, addonSlots);
+    const baseCap = SubscriptionsEngine.getPlanCapacities(planId);
+    const effectiveMaxKeys = provider === 'BANKR' ? effCap.maxBankrKeys : baseCap.maxLlmKeys;
 
     const created = await defaultProviderKeyVaultAdapter.addKey({
       userIdentifier: auth.walletAddress,
@@ -113,7 +135,7 @@ export async function POST(req: NextRequest) {
       rawApiKey: apiKey,
       chainScope,
       isDefault,
-      maxAllowed: effCap.maxBankrKeys,
+      maxAllowed: effectiveMaxKeys,
     });
 
     return NextResponse.json(
