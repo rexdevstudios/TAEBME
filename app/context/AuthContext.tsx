@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { ensureBaseNetwork } from '@packages/launchpad/web3-provider';
+import { ensureBaseNetwork, resolveBrowserEthereumProvider } from '@packages/launchpad/web3-provider';
 
 export type UserRole =
   | 'GUEST'
@@ -35,14 +35,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
  * (prioritizes MetaMask from window.ethereum.providers, falls back to window.ethereum).
  */
 function resolveInjectedEthereumProvider(): any | null {
-  if (typeof window === 'undefined') return null;
-  const eth = (window as any).ethereum;
-  if (!eth) return null;
-  if (Array.isArray(eth.providers) && eth.providers.length > 0) {
-    const mm = eth.providers.find((p: any) => p?.isMetaMask && !p?.isBraveWallet);
-    return mm || eth.providers[0];
-  }
-  return eth;
+  return resolveBrowserEthereumProvider();
 }
 
 function isMobileBrowser(): boolean {
@@ -135,9 +128,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [refreshSession]);
 
   const switchNetwork = useCallback(
-    async (targetHexChainId: string): Promise<{ success: boolean; chainId?: number; error?: string }> => {
+    async (targetHexChainId: string): Promise<{ success: boolean; chainId?: number; hexChainId?: string; error?: string }> => {
       const res = await ensureBaseNetwork(targetHexChainId);
-      if (res.success) {
+      if (res.success && res.hexChainId) {
+        setChainId(res.hexChainId.toLowerCase());
+      } else if (res.success) {
         setChainId(targetHexChainId.toLowerCase());
       }
       return res;

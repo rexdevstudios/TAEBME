@@ -120,13 +120,31 @@ export function getContractConfiguration(overrideAddress?: string | null): Contr
 }
 
 /**
- * Returns an ethers BrowserProvider instance connected to window.ethereum.
+ * Resolves the best available EIP-1193 provider in multi-wallet browsers
+ * (prioritizes MetaMask when window.ethereum.providers has multiple extensions like TokenPocket + MetaMask).
+ */
+export function resolveBrowserEthereumProvider(): any | null {
+  if (typeof window === 'undefined') return null;
+  const eth = (window as any).ethereum;
+  if (!eth) return null;
+  if (Array.isArray(eth.providers) && eth.providers.length > 0) {
+    const mm = eth.providers.find((p: any) => p?.isMetaMask && !p?.isBraveWallet && !p?.isTokenPocket);
+    if (mm) return mm;
+    const anyMm = eth.providers.find((p: any) => p?.isMetaMask);
+    return anyMm || eth.providers[0];
+  }
+  return eth;
+}
+
+/**
+ * Returns an ethers BrowserProvider instance connected to the resolved EIP-1193 provider.
  */
 export function getBrowserProvider(): ethers.BrowserProvider {
-  if (typeof window === 'undefined' || !(window as any).ethereum) {
+  const ethereum = resolveBrowserEthereumProvider();
+  if (!ethereum) {
     throw new Error('WALLET_NOT_DETECTED: Ekstensi MetaMask atau dompet Web3 EIP-1193 tidak ditemukan.');
   }
-  return new ethers.BrowserProvider((window as any).ethereum);
+  return new ethers.BrowserProvider(ethereum);
 }
 
 /**
@@ -146,27 +164,53 @@ export async function getCurrentChainId(): Promise<number> {
   return Number(network.chainId);
 }
 
+function isUnrecognizedChainError(err: any): boolean {
+  const codes = [err?.code, err?.data?.originalError?.code, err?.error?.code];
+  if (codes.some((c) => c === 4902 || String(c) === '4902')) return true;
+  const msg = [err?.message, err?.data?.originalError?.message, err?.error?.message]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+  return msg.includes('unrecognized chain') || msg.includes('try adding the chain') || msg.includes('wallet_addethereumchain');
+}
+
 /**
- * Validates and enforces that user is connected to the environment-expected Base network.
- * Prompts user to switch network via wallet_switchEthereumChain if necessary.
+ * Validates and enforces that the browser wallet is connected to the target EVM network.
+ * Sends EIP-3326 wallet_switchEthereumChain directly to MetaMask/EIP-1193 provider,
+ * falling back to EIP-3085 wallet_addEthereumChain on error 4902, then verifies eth_chainId.
  */
 export async function ensureBaseNetwork(
   targetHexChainId?: string
-): Promise<{ success: boolean; chainId?: number; error?: string }> {
-  if (typeof window === 'undefined' || !(window as any).ethereum) {
-    return { success: false, error: 'Dompet Web3 tidak terdeteksi.' };
+): Promise<{ success: boolean; chainId?: number; hexChainId?: string; error?: string }> {
+  const ethereum = resolveBrowserEthereumProvider();
+  if (!ethereum) {
+    return { success: false, error: 'Dompet Web3 (MetaMask) tidak terdeteksi di browser ini.' };
   }
 
-  const envConfig = getEnvironmentConfig();
-  const hexChain = targetHexChainId || envConfig.chainHex;
+  // Resolve default target chain safely in browser runtime without requiring server-only process.env.APP_ENV
+  let fallbackHex = '0x2105';
+  let isTestnetHost = false;
+  if (typeof window !== 'undefined' && window.location?.hostname === 'testnet.pndigi.site') {
+    fallbackHex = '0x14a34';
+    isTestnetHost = true;
+  } else {
+    try {
+      const envConfig = getEnvironmentConfig();
+      fallbackHex = envConfig.chainHex;
+      isTestnetHost = envConfig.env === 'testnet';
+    } catch {
+      fallbackHex = '0x2105';
+    }
+  }
 
-  const ethereum = (window as any).ethereum;
+  const hexChain = (targetHexChainId || fallbackHex).toLowerCase();
+
   const targetConfig =
     Object.values(SUPPORTED_BASE_CHAINS).find(
-      (c) => c.hexChainId.toLowerCase() === hexChain.toLowerCase()
-    ) || (envConfig.env === 'testnet' ? SUPPORTED_BASE_CHAINS.BASE_SEPOLIA : SUPPORTED_BASE_CHAINS.BASE_MAINNET);
+      (c) => c.hexChainId.toLowerCase() === hexChain
+    ) || (isTestnetHost ? SUPPORTED_BASE_CHAINS.BASE_SEPOLIA : SUPPORTED_BASE_CHAINS.BASE_MAINNET);
 
-  // Validate chain consistency with active environment
+  // Validate chain consistency with known network registry
   try {
     validateChainAndContractConsistency(targetConfig.chainId);
   } catch (err: any) {
@@ -175,20 +219,19 @@ export async function ensureBaseNetwork(
 
   try {
     const currentChainHex: string = await ethereum.request({ method: 'eth_chainId' });
-    if (currentChainHex && currentChainHex.toLowerCase() === hexChain.toLowerCase()) {
-      return { success: true, chainId: targetConfig.chainId };
+    if (currentChainHex && currentChainHex.toLowerCase() === targetConfig.hexChainId.toLowerCase()) {
+      return { success: true, chainId: targetConfig.chainId, hexChainId: currentChainHex.toLowerCase() };
     }
 
-    // Attempt to switch network
+    // Attempt direct EIP-3326 switch in MetaMask
     try {
       await ethereum.request({
         method: 'wallet_switchEthereumChain',
-        params: [{ chainId: hexChain }],
+        params: [{ chainId: targetConfig.hexChainId }],
       });
-      return { success: true, chainId: targetConfig.chainId };
     } catch (switchErr: any) {
-      // Error code 4902: Unrecognized chain, needs to be added
-      if (switchErr?.code === 4902) {
+      // Error code 4902 (direct or nested): Unrecognized chain, add via EIP-3085
+      if (isUnrecognizedChainError(switchErr)) {
         await ethereum.request({
           method: 'wallet_addEthereumChain',
           params: [
@@ -201,20 +244,38 @@ export async function ensureBaseNetwork(
             },
           ],
         });
-        return { success: true, chainId: targetConfig.chainId };
-      }
-
-      // User rejected switch
-      if (switchErr?.code === 4001) {
+      } else if (switchErr?.code === 4001) {
         return {
           success: false,
           error: 'USER_REJECTED: Pengguna menolak perpindahan jaringan ke ' + targetConfig.name,
         };
+      } else if (switchErr?.code === -32002) {
+        return {
+          success: false,
+          error: 'Permintaan pindah jaringan sudah terbuka di MetaMask. Klik ikon ekstensi MetaMask (🦊) di toolbar browser.',
+        };
+      } else {
+        throw switchErr;
       }
-
-      throw switchErr;
     }
+
+    // Verify actual active chainId reported by MetaMask post-switch
+    const verifiedHex: string = await ethereum
+      .request({ method: 'eth_chainId' })
+      .catch(() => targetConfig.hexChainId);
+    const normVerified = (verifiedHex || targetConfig.hexChainId).toLowerCase();
+    return {
+      success: true,
+      chainId: parseInt(normVerified, 16) || targetConfig.chainId,
+      hexChainId: normVerified,
+    };
   } catch (err: any) {
+    if (err?.code === 4001) {
+      return {
+        success: false,
+        error: 'USER_REJECTED: Pengguna menolak penambahan/perpindahan jaringan ke ' + targetConfig.name,
+      };
+    }
     return { success: false, error: err?.message || 'Gagal mengubah jaringan dompet.' };
   }
 }

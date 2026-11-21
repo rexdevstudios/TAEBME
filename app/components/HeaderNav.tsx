@@ -35,21 +35,20 @@ export default function HeaderNav() {
   const [isSwitchingChain, setIsSwitchingChain] = React.useState(false);
 
   const CHAIN_OPTIONS = [
-    { hex: '0x2105', label: 'Base Mainnet (8453)' },
-    { hex: '0x14a34', label: 'Base Sepolia (84532)' },
-    { hex: '0x1237', label: 'Robinhood L2 (4663)' },
-    { hex: '0xa4b1', label: 'Arbitrum One (42161)' },
-    { hex: '0x13b2', label: 'Arc Network (5042)' },
+    { hex: '0x2105', label: 'Base Mainnet' },
+    { hex: '0x14a34', label: 'Base Sepolia' },
+    { hex: '0x1237', label: 'Robinhood L2' },
+    { hex: '0xa4b1', label: 'Arbitrum One' },
+    { hex: '0x13b2', label: 'Arc Network' },
   ];
 
   const normChainHex = (chainId || '').toLowerCase();
+  const isKnownChain = CHAIN_OPTIONS.some((c) => c.hex === normChainHex);
   const defaultHexForHost =
     typeof window !== 'undefined' && window.location.hostname === 'testnet.pndigi.site'
       ? '0x14a34'
       : '0x2105';
-  const selectedChainHex = CHAIN_OPTIONS.some((c) => c.hex === normChainHex)
-    ? normChainHex
-    : defaultHexForHost;
+  const selectedChainHex = normChainHex ? normChainHex : defaultHexForHost;
 
   const truncatedAddress = walletAddress
     ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
@@ -95,75 +94,81 @@ export default function HeaderNav() {
             alignItems: 'center',
             gap: '6px',
             padding: '3px 8px',
-            borderRadius: '12px',
-            backgroundColor: networkLabel === 'Base Sepolia'
+            borderRadius: '10px',
+            backgroundColor: selectedChainHex === '0x14a34'
               ? 'rgba(0, 229, 255, 0.08)'
-              : networkLabel === 'Base Mainnet'
+              : selectedChainHex === '0x2105'
                 ? 'rgba(34, 197, 94, 0.08)'
-                : 'rgba(148, 163, 184, 0.08)',
+                : 'rgba(245, 158, 11, 0.12)',
             border: `1px solid ${
-              networkLabel === 'Base Sepolia'
-                ? 'rgba(0, 229, 255, 0.2)'
-                : networkLabel === 'Base Mainnet'
-                  ? 'rgba(34, 197, 94, 0.2)'
-                  : 'rgba(148, 163, 184, 0.2)'
+              selectedChainHex === '0x14a34'
+                ? 'rgba(0, 229, 255, 0.25)'
+                : selectedChainHex === '0x2105'
+                  ? 'rgba(34, 197, 94, 0.25)'
+                  : 'rgba(245, 158, 11, 0.35)'
             }`,
-            fontSize: '11px',
-            color: networkLabel === 'Base Sepolia'
-              ? '#67E8F9'
-              : networkLabel === 'Base Mainnet'
-                ? '#86EFAC'
-                : '#94A3B8',
-            fontWeight: 600,
           }}
-          title="Deployment environment label (informational only — not a wallet chain check)"
+          title={`Environment: ${networkLabel} · Active Wallet Chain: ${normChainHex || 'Not detected'}`}
           aria-label={`Deployment environment: ${networkLabel}`}
         >
-          <span style={{
-            width: '6px', height: '6px', borderRadius: '50%',
-            backgroundColor: networkLabel === 'Base Sepolia'
-              ? '#00E5FF'
-              : networkLabel === 'Base Mainnet'
-                ? '#22C55E'
-                : '#94A3B8',
-          }} />
-          {networkLabel}
-        </div>
-        <select
-          aria-label="Universal Network Switcher"
-          title="Switch active Web3 / MetaMask blockchain network"
-          value={selectedChainHex}
-          disabled={isSwitchingChain}
-          onChange={async (e) => {
-            const targetHex = e.target.value;
-            setIsSwitchingChain(true);
-            try {
-              const res = await switchNetwork(targetHex);
-              if (!res.success && res.error) {
-                alert(`Network Switch: ${res.error}`);
+          <span
+            style={{
+              width: '6px',
+              height: '6px',
+              borderRadius: '50%',
+              flexShrink: 0,
+              backgroundColor: selectedChainHex === '0x14a34'
+                ? '#00E5FF'
+                : selectedChainHex === '0x2105'
+                  ? '#22C55E'
+                  : '#F59E0B',
+            }}
+          />
+          <select
+            aria-label="Universal Network Switcher"
+            value={selectedChainHex}
+            disabled={isSwitchingChain}
+            onChange={async (e) => {
+              const targetHex = e.target.value;
+              if (!targetHex || targetHex === normChainHex) return;
+              setIsSwitchingChain(true);
+              try {
+                const res = await switchNetwork(targetHex);
+                if (!res.success && res.error) {
+                  alert(`MetaMask Network Switch: ${res.error}`);
+                }
+              } finally {
+                setIsSwitchingChain(false);
               }
-            } finally {
-              setIsSwitchingChain(false);
-            }
-          }}
-          style={{
-            backgroundColor: '#0B1220',
-            border: '1px solid var(--color-border)',
-            color: '#38BDF8',
-            borderRadius: '8px',
-            padding: '4px 8px',
-            fontSize: '11px',
-            fontWeight: 700,
-            fontFamily: 'var(--font-mono)',
-            cursor: 'pointer',
-          }}
-        >
-          {CHAIN_OPTIONS.map((c) => (
-            <option key={c.hex} value={c.hex}>
-              ⚡ {c.label}
-            </option>
-          ))}
-        </select>
+            }}
+            style={{
+              backgroundColor: 'transparent',
+              border: 'none',
+              outline: 'none',
+              color: selectedChainHex === '0x14a34'
+                ? '#67E8F9'
+                : selectedChainHex === '0x2105'
+                  ? '#86EFAC'
+                  : '#FDE047',
+              fontSize: '11px',
+              fontWeight: 700,
+              fontFamily: 'var(--font-mono)',
+              cursor: 'pointer',
+              paddingRight: '4px',
+            }}
+          >
+            {normChainHex && !isKnownChain && (
+              <option value={normChainHex} style={{ backgroundColor: '#0B1220', color: '#FDE047' }}>
+                Other ({parseInt(normChainHex, 16) || normChainHex})
+              </option>
+            )}
+            {CHAIN_OPTIONS.map((c) => (
+              <option key={c.hex} value={c.hex} style={{ backgroundColor: '#0B1220', color: '#E2E8F0' }}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Dynamic Navigation Links */}
