@@ -2729,161 +2729,7 @@ export function resetDbStateForTesting(): void {
   });
 }
 
-export class PostgresKillSwitchDbAdapter implements KillSwitchDbAdapter {
-  private inMemorySwitches: Map<string, KillSwitchRecord> = new Map();
-
-  seedKillSwitch(ks: {
-    id: string;
-    scope: 'GLOBAL' | 'USER' | 'TOKEN';
-    targetId?: string;
-    isActive: boolean;
-    reason: string;
-    triggeredBy?: string;
-    triggeredAt?: Date | string;
-  }): void {
-    this.inMemorySwitches.set(ks.id, {
-      id: ks.id,
-      scope: ks.scope,
-      targetId: ks.targetId,
-      isActive: ks.isActive,
-      reason: ks.reason,
-      activatedBy: ks.triggeredBy || 'admin',
-      activatedAt: ks.triggeredAt instanceof Date ? ks.triggeredAt.toISOString() : (ks.triggeredAt || new Date().toISOString()),
-    });
-  }
-
-  clearKillSwitches(): void {
-    this.inMemorySwitches.clear();
-  }
-
-  async activateKillSwitch(ks: Omit<KillSwitchRecord, 'id' | 'activatedAt'>): Promise<string> {
-    const id = crypto.randomUUID();
-    const activatedAt = new Date().toISOString();
-    const pool = getDbPool();
-
-    if (pool) {
-      try {
-        const validUserId = await ensureUserEntity(pool, ks.activatedBy);
-        const targetUuid = isUuid(ks.targetId) ? ks.targetId : null;
-
-        // Deactivate any existing active switches for same scope/target first
-        await pool.query(
-          `UPDATE kill_switches SET is_active = FALSE, deactivated_at = NOW()
-           WHERE scope = $1 AND (target_id = $2 OR ($2 IS NULL AND target_id IS NULL)) AND is_active = TRUE`,
-          [ks.scope, targetUuid]
-        );
-
-        const res = await pool.query(
-          `INSERT INTO kill_switches (id, scope, target_id, is_active, reason, activated_by, activated_at)
-           VALUES ($1, $2, $3, TRUE, $4, $5, $6) RETURNING id`,
-          [id, ks.scope, targetUuid, ks.reason, validUserId, activatedAt]
-        );
-        return res.rows[0]?.id || id;
-      } catch (err: any) {
-        console.error('[PostgresKillSwitchDbAdapter] activateKillSwitch error:', err?.message || err);
-        throw new Error(`DB_KILL_SWITCH_ACTIVATE_FAILED: ${err?.message}`);
-      }
-    }
-
-    // In-memory fallback for local dev/test
-    const record: KillSwitchRecord = { id, activatedAt, ...ks };
-    this.inMemorySwitches.set(id, record);
-    return id;
-  }
-
-  async deactivateKillSwitch(idOrScope: string, deactivatedBy: string): Promise<void> {
-    const pool = getDbPool();
-    if (pool) {
-      try {
-        const validUserId = await ensureUserEntity(pool, deactivatedBy);
-        if (isUuid(idOrScope)) {
-          await pool.query(
-            `UPDATE kill_switches SET is_active = FALSE, deactivated_by = $1, deactivated_at = NOW() WHERE id = $2`,
-            [validUserId, idOrScope]
-          );
-        } else {
-          await pool.query(
-            `UPDATE kill_switches SET is_active = FALSE, deactivated_by = $1, deactivated_at = NOW() WHERE scope = $2 AND is_active = TRUE`,
-            [validUserId, idOrScope.toUpperCase()]
-          );
-        }
-        return;
-      } catch (err: any) {
-        console.error('[PostgresKillSwitchDbAdapter] deactivateKillSwitch error:', err?.message || err);
-        throw new Error(`DB_KILL_SWITCH_DEACTIVATE_FAILED: ${err?.message}`);
-      }
-    }
-
-    for (const record of this.inMemorySwitches.values()) {
-      if (record.id === idOrScope || record.scope === idOrScope.toUpperCase()) {
-        record.isActive = false;
-        record.deactivatedBy = deactivatedBy;
-        record.deactivatedAt = new Date().toISOString();
-      }
-    }
-  }
-
-  async getActiveKillSwitches(): Promise<KillSwitchRecord[]> {
-    const memSwitches = Array.from(this.inMemorySwitches.values()).filter((ks) => ks.isActive);
-    const pool = getDbPool();
-    if (pool) {
-      try {
-        const res = await pool.query(
-          `SELECT id, scope, target_id as "targetId", is_active as "isActive", reason,
-                  activated_by as "activatedBy", deactivated_by as "deactivatedBy",
-                  activated_at as "activatedAt", deactivated_at as "deactivatedAt"
-           FROM kill_switches WHERE is_active = TRUE`
-        );
-        const dbSwitches = res.rows.map((r) => ({
-          id: r.id,
-          scope: r.scope,
-          targetId: r.targetId || undefined,
-          isActive: r.isActive,
-          reason: r.reason,
-          activatedBy: r.activatedBy,
-          deactivatedBy: r.deactivatedBy || undefined,
-          activatedAt: r.activatedAt?.toISOString ? r.activatedAt.toISOString() : String(r.activatedAt),
-          deactivatedAt: r.deactivatedAt?.toISOString ? r.deactivatedAt.toISOString() : r.deactivatedAt,
-        }));
-        const combined = new Map<string, KillSwitchRecord>();
-        for (const s of dbSwitches) combined.set(s.id, s);
-        for (const s of memSwitches) combined.set(s.id, s);
-        return Array.from(combined.values());
-      } catch (err: any) {
-        console.error('[PostgresKillSwitchDbAdapter] getActiveKillSwitches error (FAIL-CLOSED):', err?.message || err);
-        throw new Error(`DATABASE_UNAVAILABLE: Failed to query active kill switches: ${err?.message || err}`);
-      }
-    }
-
-    return memSwitches;
-  }
-
-  async createAuditLog(actorId: string, action: string, entityId?: string, reason?: string): Promise<void> {
-    const pool = getDbPool();
-    if (pool) {
-      try {
-        const validUserId = await ensureUserEntity(pool, actorId);
-        let validEntityId: string | null = null;
-        if (entityId && isUuid(entityId)) {
-          const entityCheck = await pool.query('SELECT id FROM entities WHERE id = $1', [entityId]);
-          if (entityCheck.rows.length > 0) {
-            validEntityId = entityId;
-          }
-        }
-
-        await pool.query(
-          `INSERT INTO audit_logs (id, actor_id, action, entity_id, reason, created_at)
-           VALUES (gen_random_uuid(), $1, $2, $3, $4, NOW())`,
-          [validUserId, action, validEntityId, reason || '']
-        );
-      } catch (err: any) {
-        console.warn('[PostgresKillSwitchDbAdapter] createAuditLog warning:', err?.message || err);
-      }
-    }
-  }
-}
-
-export const defaultKillSwitchDbAdapter = new PostgresKillSwitchDbAdapter();
+// POSTGRES KILL SWITCH ADAPTER -> Extracted to packages/db/kill-switch-repo.ts (Phase AE1)
 
 export type SnapshotTransitionAction = 'INSERT' | 'APPLY_UPDATE' | 'NO_OP_IDENTICAL' | 'IGNORED_STALE';
 
@@ -4030,175 +3876,7 @@ export const defaultBinanceExecutionDbAdapter = new PostgresBinanceExecutionDbAd
 // POSTGRES GAMEFI & NFT DATABASE ADAPTER -> Extracted to packages/db/gamefi-repo.ts (Phase AD2)
 // ============================================================================
 
-export class PostgresProposalDbAdapter implements ProposalDbAdapter {
-  private inMemoryProposals: Map<string, AgentProposalRecord> = new Map();
-  private inMemoryAuditLogs: Array<{ actorId: string; action: string; entityId?: string; reason?: string; createdAt: string }> = [];
-
-  async createProposal(proposal: Omit<AgentProposalRecord, 'id'>): Promise<string> {
-    const id = crypto.randomUUID();
-    const record: AgentProposalRecord = {
-      ...proposal,
-      id,
-    };
-    this.inMemoryProposals.set(id, record);
-
-    const pool = getDbPool();
-    if (!pool && process.env.NODE_ENV === 'production') {
-      throw new Error('DATABASE_UNAVAILABLE: Neon connection pool is not available in production.');
-    }
-
-    if (pool) {
-      try {
-        const validUserId = await ensureUserEntity(pool, proposal.userId);
-        let validAgentId: string = proposal.agentId;
-        if (!isUuid(validAgentId)) {
-          const agentRes = await pool.query('SELECT id FROM agent_profiles LIMIT 1');
-          if (agentRes.rows.length > 0) {
-            validAgentId = agentRes.rows[0].id;
-          } else {
-            const newAgentId = crypto.randomUUID();
-            await pool.query("INSERT INTO entities (id, type) VALUES ($1, 'AGENT')", [newAgentId]);
-            await pool.query(
-              "INSERT INTO agent_profiles (id, owner_id, name, strategy_description, system_prompt, risk_tolerance_level) VALUES ($1, $2, 'Default Agent', 'Momentum trading strategy', 'Analyze market signals and propose trades', 'MODERATE')",
-              [newAgentId, validUserId]
-            );
-            validAgentId = newAgentId;
-          }
-        }
-
-        await pool.query(
-          `INSERT INTO agent_proposals (
-            id, agent_id, user_id, target_symbol, action, suggested_qty, suggested_price,
-            rationale, confidence_score, status, expires_at, created_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
-          [
-            id,
-            validAgentId,
-            validUserId,
-            proposal.targetSymbol,
-            proposal.action,
-            proposal.suggestedQty,
-            proposal.suggestedPrice || null,
-            proposal.rationale,
-            proposal.confidenceScore,
-            proposal.status || 'PENDING_APPROVAL',
-            proposal.expiresAt,
-            proposal.createdAt || new Date().toISOString(),
-          ]
-        );
-      } catch (err: any) {
-        console.warn('[PostgresProposalDbAdapter] createProposal DB write warning:', err?.message || err);
-        if (process.env.NODE_ENV === 'production') {
-          throw new Error(`DATABASE_ERROR: Failed to persist agent proposal to PostgreSQL SSOT: ${err?.message || err}`);
-        }
-      }
-    }
-
-    return id;
-  }
-
-  async getProposalById(id: string): Promise<AgentProposalRecord | null> {
-    const pool = getDbPool();
-    if (pool) {
-      try {
-        const res = await pool.query('SELECT * FROM agent_proposals WHERE id = $1', [id]);
-        if (res.rows.length > 0) {
-          const r = res.rows[0];
-          return {
-            id: r.id,
-            agentId: r.agent_id,
-            userId: r.user_id,
-            targetSymbol: r.target_symbol,
-            action: r.action,
-            suggestedQty: Number(r.suggested_qty),
-            suggestedPrice: r.suggested_price ? Number(r.suggested_price) : undefined,
-            rationale: r.rationale,
-            confidenceScore: Number(r.confidence_score),
-            status: r.status,
-            expiresAt: r.expires_at?.toISOString ? r.expires_at.toISOString() : String(r.expires_at),
-            createdAt: r.created_at?.toISOString ? r.created_at.toISOString() : String(r.created_at),
-          };
-        }
-      } catch (err: any) {
-        console.warn('[PostgresProposalDbAdapter] getProposalById warning:', err?.message || err);
-        if (process.env.NODE_ENV === 'production') {
-          throw new Error(`DATABASE_ERROR: Failed to query agent proposal from PostgreSQL SSOT: ${err?.message || err}`);
-        }
-      }
-    }
-
-    return this.inMemoryProposals.get(id) || null;
-  }
-
-  async updateProposalStatus(id: string, status: 'APPROVED' | 'REJECTED' | 'EXPIRED'): Promise<void> {
-    const mem = this.inMemoryProposals.get(id);
-    if (mem) {
-      mem.status = status;
-    }
-
-    const pool = getDbPool();
-    if (!pool && process.env.NODE_ENV === 'production') {
-      throw new Error('DATABASE_UNAVAILABLE: Neon connection pool is not available in production.');
-    }
-
-    if (pool) {
-      try {
-        await pool.query('UPDATE agent_proposals SET status = $1 WHERE id = $2', [status, id]);
-      } catch (err: any) {
-        console.warn('[PostgresProposalDbAdapter] updateProposalStatus warning:', err?.message || err);
-        if (process.env.NODE_ENV === 'production') {
-          throw new Error(`DATABASE_ERROR: Failed to update agent proposal status in PostgreSQL SSOT: ${err?.message || err}`);
-        }
-      }
-    }
-  }
-
-  async createAuditLog(actorId: string, action: string, entityId?: string, reason?: string): Promise<void> {
-    this.inMemoryAuditLogs.push({
-      actorId,
-      action,
-      entityId,
-      reason,
-      createdAt: new Date().toISOString(),
-    });
-
-    const pool = getDbPool();
-    if (pool) {
-      try {
-        const validUserId = await ensureUserEntity(pool, actorId);
-        let validEntityId: string | null = null;
-        if (entityId && isUuid(entityId)) {
-          const entityCheck = await pool.query('SELECT id FROM entities WHERE id = $1', [entityId]);
-          if (entityCheck.rows.length > 0) {
-            validEntityId = entityId;
-          }
-        }
-
-        await pool.query(
-          `INSERT INTO audit_logs (id, actor_id, action, entity_id, reason, created_at)
-           VALUES (gen_random_uuid(), $1, $2, $3, $4, NOW())`,
-          [validUserId, action, validEntityId, reason || '']
-        );
-      } catch (err: any) {
-        console.warn('[PostgresProposalDbAdapter] createAuditLog warning:', err?.message || err);
-        if (process.env.NODE_ENV === 'production') {
-          throw new Error(`DATABASE_ERROR: Failed to write audit log to PostgreSQL SSOT: ${err?.message || err}`);
-        }
-      }
-    }
-  }
-
-  getAuditLogs() {
-    return [...this.inMemoryAuditLogs];
-  }
-
-  clearInMemoryState() {
-    this.inMemoryProposals.clear();
-    this.inMemoryAuditLogs = [];
-  }
-}
-
-export const defaultProposalDbAdapter = new PostgresProposalDbAdapter();
+// POSTGRES PROPOSAL ADAPTER -> Extracted to packages/db/proposal-repo.ts (Phase AE1)
 
 // ----------------------------------------------------------------------------
 // POSTGRES BILLING DB ADAPTER
@@ -5856,6 +5534,14 @@ import {
   PostgresGameFiDbAdapter,
   registerGameFiRepoDeps,
 } from '../db/gamefi-repo';
+import {
+  PostgresKillSwitchDbAdapter,
+  registerKillSwitchRepoDeps,
+} from '../db/kill-switch-repo';
+import {
+  PostgresProposalDbAdapter,
+  registerProposalRepoDeps,
+} from '../db/proposal-repo';
 
 registerProviderVaultRepoDeps({
   getDbPool,
@@ -5876,13 +5562,29 @@ registerGameFiRepoDeps({
   isUuid,
 });
 
+registerKillSwitchRepoDeps({
+  getDbPool,
+  ensureUserEntity,
+  isUuid,
+});
+
+registerProposalRepoDeps({
+  getDbPool,
+  ensureUserEntity,
+  isUuid,
+});
+
 export {
   PostgresProviderKeyVaultAdapter,
   PostgresCustomAgentAdapter,
   PostgresGameFiDbAdapter,
+  PostgresKillSwitchDbAdapter,
+  PostgresProposalDbAdapter,
   type UserProviderKeyMeta,
 };
 
 export const defaultProviderKeyVaultAdapter = new PostgresProviderKeyVaultAdapter();
 export const defaultCustomAgentAdapter = new PostgresCustomAgentAdapter();
 export const defaultGameFiDbAdapter = new PostgresGameFiDbAdapter();
+export const defaultKillSwitchDbAdapter = new PostgresKillSwitchDbAdapter();
+export const defaultProposalDbAdapter = new PostgresProposalDbAdapter();

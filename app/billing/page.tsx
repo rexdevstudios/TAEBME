@@ -7,6 +7,7 @@ import { ethers } from 'ethers';
 import { ensureBaseNetwork, getBrowserSigner, normalizeWeb3Error, resolveBrowserEthereumProvider } from '@packages/launchpad/web3-provider';
 import { PageWorkflowBanner } from '../components/PageWorkflowBanner';
 import { BillingAddonStorePanel } from '../components/BillingAddonStorePanel';
+import { ProviderRegistryStatusPanel } from '../components/ProviderRegistryStatusPanel';
 import { UserWebhookVaultPanel } from '../components/UserWebhookVaultPanel';
 import { UserSecurityActivityPanel } from '../components/UserSecurityActivityPanel';
 
@@ -784,6 +785,9 @@ export default function BillingPage() {
           </div>
         </div>
       </div>
+
+      {/* Live Modular Provider & AI Engine Registry (GET /api/providers/registry) */}
+      <ProviderRegistryStatusPanel />
 
       {/* Outbound Alert Webhooks (SSRF-Safe HTTPS · Discord / Custom Endpoint + Test Ping) */}
       <UserWebhookVaultPanel isConnected={isConnected} />
