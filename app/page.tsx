@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from './context/AuthContext';
 import { Activity, ShieldAlert, Zap, Rocket, Award, Server, Cpu, Lock, Network, Wallet, BrainCircuit } from 'lucide-react';
 import { executeKillSwitchToggle } from './lib/kill-switch-admin-client';
+import { LandingHeroMotion } from './components/LandingHeroMotion';
 
 interface OverviewData {
   status: string;
@@ -204,245 +205,21 @@ export default function OverviewPage() {
   // GUEST VIEW (Landing Page)
   // -------------------------
   if (!isConnected || userRole === 'GUEST') {
+    const handleGuestConnect = async () => {
+      setConnectError(null);
+      const res = await connectMetaMask();
+      if (!res.success && res.error) setConnectError(res.error);
+    };
+
     return (
       <div className="flex-col" style={{ gap: 0 }}>
 
-        {/* ── HERO SECTION ── */}
-        <section
-          style={{
-            position: 'relative',
-            paddingTop: 'var(--space-3xl)',
-            paddingBottom: 'var(--space-3xl)',
-            textAlign: 'center',
-            overflow: 'hidden',
-          }}
-        >
-          {/* Ambient background glow orbs */}
-          <div style={{
-            position: 'absolute', top: '-20%', left: '50%', transform: 'translateX(-50%)',
-            width: '600px', height: '400px',
-            background: 'radial-gradient(ellipse, rgba(0,229,255,0.08) 0%, transparent 70%)',
-            pointerEvents: 'none', zIndex: 0,
-          }} />
-          <div style={{
-            position: 'absolute', top: '30%', left: '15%',
-            width: '300px', height: '300px',
-            background: 'radial-gradient(ellipse, rgba(34,197,94,0.06) 0%, transparent 70%)',
-            pointerEvents: 'none', zIndex: 0,
-          }} />
-
-          <div style={{ position: 'relative', zIndex: 1, maxWidth: '820px', margin: '0 auto' }}>
-
-            {/* Main headline */}
-            <h1 style={{
-              fontSize: 'clamp(36px, 6vw, 64px)',
-              fontWeight: 900,
-              lineHeight: 1.05,
-              margin: '0 0 var(--space-lg) 0',
-              letterSpacing: '-1.5px',
-            }}>
-              <span className="hero-headline">The Autonomous Social Liquidity</span>
-              <br />
-              <span style={{
-                background: 'linear-gradient(135deg, #00E5FF 0%, #22C55E 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
-              }}>
-                &amp; Bonding Curve Engine on Base
-              </span>
-            </h1>
-
-            {/* Sub-headline */}
-            <p className="text-muted" style={{
-              fontSize: '18px',
-              lineHeight: 1.7,
-              maxWidth: '600px',
-              margin: '0 auto var(--space-xl) auto',
-            }}>
-              Launch tokens with automated liquidity graduation, syndicate with verified KOLs,
-              and trade with zero rugpull risk — powered by deterministic bonding curves.
-            </p>
-
-            {/* CTA Buttons */}
-            <div className="flex-row" style={{ justifyContent: 'center', gap: 'var(--space-md)', flexWrap: 'wrap' }}>
-              <a href="/launchpad" className="btn-cta" style={{ textDecoration: 'none' }}>
-                <Rocket size={18} /> Launch Token
-              </a>
-              <a href="/kol" className="btn-glass" style={{ textDecoration: 'none' }}>
-                <Network size={18} /> Explore Deal Rooms
-              </a>
-              <button
-                onClick={async () => {
-                  setConnectError(null);
-                  const res = await connectMetaMask();
-                  if (!res.success && res.error) setConnectError(res.error);
-                }}
-                disabled={isConnecting}
-                className="btn-secondary"
-                style={{ fontSize: '15px', padding: '14px 24px' }}
-              >
-                <Wallet size={18} />
-                {isConnecting ? 'Signing SIWE...' : 'Connect Wallet (SIWE)'}
-              </button>
-            </div>
-
-            {connectError && (
-              <p className="text-destructive" style={{ marginTop: 'var(--space-md)', fontWeight: 600 }}>
-                {connectError}
-              </p>
-            )}
-
-            {/* Secondary auth entry — email / alternative login */}
-            <p className="text-muted" style={{ marginTop: 'var(--space-lg)', fontSize: '13px' }}>
-              Prefer email or alternative login?{' '}
-              <a
-                href="/auth/login"
-                style={{
-                  color: '#94A3B8',
-                  textDecoration: 'underline',
-                  textUnderlineOffset: '3px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                }}
-              >
-                <Lock size={12} /> Login Portal
-              </a>
-            </p>
-          </div>
-        </section>
-
-        {/* ── PROTOCOL GUARANTEE STRIP ── */}
-        <section style={{ padding: 'var(--space-2xl) 0' }}>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: 'var(--space-md)',
-          }}>
-            {[
-              { icon: <Zap size={28} style={{ color: '#00E5FF' }} />, stat: '0%', label: 'Initial Liquidity Required' },
-              { icon: <Activity size={28} style={{ color: '#22C55E' }} />, stat: 'Auto', label: 'Aerodrome Graduation' },
-              { icon: <ShieldAlert size={28} style={{ color: '#D500F9' }} />, stat: 'ZK', label: 'Anti-Sybil KOL Proof' },
-              { icon: <Lock size={28} style={{ color: '#FFD600' }} />, stat: '100%', label: 'Non-Custodial' },
-            ].map((item, i) => (
-              <div key={i} className="stat-card" style={{ textAlign: 'center' }}>
-                <div style={{ marginBottom: '12px', display: 'flex', justifyContent: 'center' }}>{item.icon}</div>
-                <div style={{ fontSize: '28px', fontWeight: 900, lineHeight: 1, marginBottom: '6px', color: 'var(--color-foreground)' }}>
-                  {item.stat}
-                </div>
-                <div className="text-muted" style={{ fontSize: '13px', lineHeight: 1.4 }}>{item.label}</div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* ── BENTO FEATURE GRID ── */}
-        <section style={{ padding: 'var(--space-2xl) 0' }}>
-          <div style={{ textAlign: 'center', marginBottom: 'var(--space-xl)' }}>
-            <h2 style={{ fontSize: '32px', fontWeight: 800, margin: '0 0 12px 0', letterSpacing: '-0.5px' }}>
-              Everything you need to launch &amp; trade
-            </h2>
-            <p className="text-muted" style={{ fontSize: '16px', margin: 0 }}>
-              Built on Base. Powered by automated bonding curves.
-            </p>
-          </div>
-
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-            gap: 'var(--space-lg)',
-          }}>
-            {/* Card A – Bonding Curve Launchpad */}
-            <div className="bento-card">
-              <div style={{ marginBottom: '16px' }}>
-                <Rocket size={32} style={{ color: '#00E5FF' }} className="glow-accent" />
-              </div>
-              <h3 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 10px 0', color: 'var(--color-foreground)' }}>
-                Bonding Curve Launchpad
-              </h3>
-              <p className="text-muted" style={{ fontSize: '14px', lineHeight: 1.6, margin: '0 0 16px 0' }}>
-                Fair-launch tokens on a deterministic P₀=0 bonding curve. Auto-graduates to Aerodrome at 24 ETH target with zero rugpull risk.
-              </p>
-              <div style={{
-                background: 'linear-gradient(90deg, rgba(0,229,255,0.06) 0%, rgba(34,197,94,0.06) 100%)',
-                border: '1px solid rgba(0,229,255,0.12)',
-                borderRadius: '8px',
-                padding: '12px 16px',
-                fontSize: '12px',
-                color: '#67E8F9',
-                fontFamily: 'monospace',
-              }}>
-                G = 24 ETH · Fee = 1% · S_grad = 668M tokens
-              </div>
-            </div>
-
-            {/* Card B – Angel Deal Room */}
-            <div className="bento-card">
-              <div style={{ marginBottom: '16px' }}>
-                <Award size={32} style={{ color: '#22C55E' }} />
-              </div>
-              <h3 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 10px 0', color: 'var(--color-foreground)' }}>
-                Angel Deal Room
-              </h3>
-              <p className="text-muted" style={{ fontSize: '14px', lineHeight: 1.6, margin: '0 0 16px 0' }}>
-                Syndicate with verified KOLs — Twitter, Farcaster &amp; Lens verified — for bounty-powered viral launch campaigns.
-              </p>
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                {['Twitter/X ✓', 'Farcaster ✓', 'Lens ✓', 'World ID ✓'].map(p => (
-                  <span key={p} style={{
-                    padding: '3px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600,
-                    background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)', color: '#86EFAC',
-                  }}>{p}</span>
-                ))}
-              </div>
-            </div>
-
-            {/* Card C – Risk Gate */}
-            <div className="bento-card">
-              <div style={{ marginBottom: '16px' }}>
-                <ShieldAlert size={32} style={{ color: '#D500F9' }} />
-              </div>
-              <h3 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 10px 0', color: 'var(--color-foreground)' }}>
-                Deterministic Risk Gate
-              </h3>
-              <p className="text-muted" style={{ fontSize: '14px', lineHeight: 1.6, margin: '0 0 16px 0' }}>
-                Every trade passes through a fail-closed TradingRiskGate. Slippage caps, MEV frontrun detection, and real-time kill switch.
-              </p>
-              <div style={{
-                background: 'rgba(213, 0, 249, 0.06)',
-                border: '1px solid rgba(213, 0, 249, 0.15)',
-                borderRadius: '8px',
-                padding: '10px 14px',
-                fontSize: '12px',
-                color: '#E879F9',
-              }}>
-                ● Slippage Cap: 3%  ● Max Order: $10,000
-              </div>
-            </div>
-
-            {/* Card D – Cross-Chain */}
-            <div className="bento-card">
-              <div style={{ marginBottom: '16px' }}>
-                <BrainCircuit size={32} style={{ color: '#FFD600' }} />
-              </div>
-              <h3 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 10px 0', color: 'var(--color-foreground)' }}>
-                Cross-Chain Liquidity
-              </h3>
-              <p className="text-muted" style={{ fontSize: '14px', lineHeight: 1.6, margin: '0 0 16px 0' }}>
-                Deploy across Base, Solana, Clanker, and Robinhood Chain. AI-advisory agents suggest optimal chain routing.
-              </p>
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                {['Base ✓', 'Solana ✓', 'Clanker ✓', 'RH Chain ✓'].map(c => (
-                  <span key={c} style={{
-                    padding: '3px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600,
-                    background: 'rgba(255,214,0,0.08)', border: '1px solid rgba(255,214,0,0.2)', color: '#FDE047',
-                  }}>{c}</span>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
+        {/* ── GSAP INTERACTIVE HERO, LIVE MARQUEE, STATS & SPOTLIGHT BENTO ── */}
+        <LandingHeroMotion
+          isConnecting={isConnecting}
+          connectError={connectError}
+          onConnectMetaMask={handleGuestConnect}
+        />
 
         {/* ── 3-STEP ONBOARDING WALKTHROUGH ── */}
         <section style={{
@@ -494,7 +271,7 @@ export default function OverviewPage() {
               style={{ fontSize: '16px', padding: '16px 40px' }}
             >
               <Wallet size={20} />
-              {isConnecting ? 'Signing SIWE...' : 'Get Started — Connect Wallet'}
+              {isConnecting ? 'Menghubungkan...' : 'Get Started — Connect Wallet'}
             </button>
             {connectError && (
               <p className="text-destructive" style={{ marginTop: 'var(--space-md)', fontWeight: 600 }}>

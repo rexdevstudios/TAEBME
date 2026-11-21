@@ -15,6 +15,8 @@ import {
   BrainCircuit,
   Award,
   CreditCard,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { getNetworkLabel } from '../lib/classifyHostname';
 
@@ -34,6 +36,24 @@ export default function HeaderNav() {
   } = useAuth();
 
   const [isSwitchingChain, setIsSwitchingChain] = React.useState(false);
+  const [theme, setTheme] = React.useState<'dark' | 'light'>('dark');
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const saved = window.localStorage.getItem('poolnet_theme');
+    const initial: 'dark' | 'light' = saved === 'light' ? 'light' : 'dark';
+    setTheme(initial);
+    document.documentElement.setAttribute('data-theme', initial);
+  }, []);
+
+  const toggleTheme = () => {
+    const next: 'dark' | 'light' = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('poolnet_theme', next);
+      document.documentElement.setAttribute('data-theme', next);
+    }
+  };
 
   const CHAIN_OPTIONS = [
     { hex: '0x2105', label: 'Base Mainnet' },
@@ -203,6 +223,23 @@ export default function HeaderNav() {
 
       {/* Account & Session Controls */}
       <div className="flex-row items-center gap-sm">
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className="btn-secondary"
+          style={{
+            padding: '6px 8px',
+            borderRadius: '9999px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}
+          title={theme === 'dark' ? 'Ganti ke Tema Terang (Light Mode)' : 'Ganti ke Tema Gelap (Dark Mode)'}
+          aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+        >
+          {theme === 'dark' ? <Sun size={14} color="#FDE047" /> : <Moon size={14} color="#1A73E8" />}
+        </button>
         {isConnected ? (
           <>
             {userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN' || userRole === 'LAUNCH_ADMIN' || userRole === 'RISK_ADMIN' || userRole === 'BILLING_ADMIN' ? (

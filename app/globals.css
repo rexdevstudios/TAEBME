@@ -32,6 +32,121 @@
   --shadow-neon: 0 4px 18px rgba(138, 180, 248, 0.22);
 }
 
+/* Gemini Web Light Mode Theme */
+[data-theme="light"] {
+  --color-primary: #F0F4F9;
+  --color-on-primary: #1F1F1F;
+  --color-secondary: #E3EAF4;
+  --color-accent: #1A73E8;
+  --color-accent-emerald: #059669;
+  --color-background: #FFFFFF;
+  --color-foreground: #1F1F1F;
+  --color-muted: #5F6368;
+  --color-muted-bg: #E8EEF5;
+  --color-border: rgba(31, 31, 31, 0.12);
+  --color-destructive: #D93025;
+  --color-ring: #1A73E8;
+  --shadow-sm: 0 1px 3px rgba(60, 64, 67, 0.12);
+  --shadow-md: 0 4px 16px rgba(60, 64, 67, 0.14);
+  --shadow-lg: 0 10px 28px rgba(60, 64, 67, 0.16);
+  --shadow-neon: 0 4px 14px rgba(26, 115, 232, 0.25);
+}
+
+[data-theme="light"] .header-nav {
+  background-color: rgba(255, 255, 255, 0.9);
+  border-bottom: 1px solid rgba(31, 31, 31, 0.1);
+}
+[data-theme="light"] .card:hover {
+  background-color: #E8EEF6;
+  border-color: rgba(26, 115, 232, 0.35);
+}
+[data-theme="light"] .input {
+  background-color: #FFFFFF;
+  color: #1F1F1F;
+}
+[data-theme="light"] .nav-link:hover {
+  background-color: rgba(26, 115, 232, 0.08);
+  color: #1F1F1F;
+}
+[data-theme="light"] .nav-link-active {
+  background-color: rgba(26, 115, 232, 0.14);
+  color: #1A73E8;
+}
+[data-theme="light"] .glass-panel,
+[data-theme="light"] .bento-card,
+[data-theme="light"] .stat-card {
+  background: #F0F4F9;
+  border-color: rgba(31, 31, 31, 0.1);
+}
+[data-theme="light"] .hero-headline {
+  background: linear-gradient(135deg, #1F1F1F 0%, #444746 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+[data-theme="light"] .text-muted {
+  color: #5F6368;
+}
+
+/* Marquee Ticker Animation (Auto-Pauses on Hover/Focus & Reduced Motion) */
+@keyframes poolnet-marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.poolnet-marquee-track {
+  display: flex;
+  width: max-content;
+  animation: poolnet-marquee 28s linear infinite;
+}
+.poolnet-marquee-wrapper:hover .poolnet-marquee-track,
+.poolnet-marquee-wrapper:focus-within .poolnet-marquee-track {
+  animation-play-state: paused;
+}
+
+/* Interactive Spotlight Card */
+.spotlight-card {
+  position: relative;
+  overflow: hidden;
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1), border-color 220ms ease, box-shadow 220ms ease;
+}
+.spotlight-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    420px circle at var(--spot-x, 50%) var(--spot-y, 50%),
+    rgba(138, 180, 248, 0.14),
+    transparent 60%
+  );
+  opacity: 0;
+  transition: opacity 250ms ease;
+  pointer-events: none;
+  z-index: 0;
+}
+.spotlight-card:hover::before {
+  opacity: 1;
+}
+.spotlight-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(138, 180, 248, 0.35);
+}
+[data-theme="light"] .spotlight-card::before {
+  background: radial-gradient(
+    420px circle at var(--spot-x, 50%) var(--spot-y, 50%),
+    rgba(26, 115, 232, 0.12),
+    transparent 60%
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .poolnet-marquee-track {
+    animation: none;
+  }
+  .spotlight-card:hover {
+    transform: none;
+  }
+}
+
 * {
   box-sizing: border-box;
 }
