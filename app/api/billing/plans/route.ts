@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ApiResponse } from '@packages/shared/contracts/api-contracts';
 import { requireCapability } from '@packages/auth/session';
 import { defaultBillingDbAdapter } from '@packages/shared/db-pool';
-import type { PlanId } from '@packages/billing/subscriptions-engine';
+import { SubscriptionsEngine, type PlanId } from '@packages/billing/subscriptions-engine';
 
 const CANONICAL_PLANS = [
   {
@@ -113,6 +113,7 @@ export async function GET() {
 
     return {
       ...plan,
+      capacities: SubscriptionsEngine.getPlanCapacities(pid),
       originalPriceUsd,
       originalPriceEth,
       discountPct,

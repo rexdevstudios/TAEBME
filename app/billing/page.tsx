@@ -33,6 +33,15 @@ interface Plan {
   hasAgentAccess?: boolean;
   hasPriorityScrape?: boolean;
   features?: string[];
+  capacities?: {
+    planId: string;
+    monthlyCredits: number;
+    maxBankrKeys: number;
+    maxBinanceAccounts: number;
+    allowMainnetBinance: boolean;
+    maxOrderValueUsd: number;
+    maxDailyLossUsd: number;
+  };
 }
 
 export default function BillingPage() {
@@ -500,6 +509,28 @@ export default function BillingPage() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontFamily: 'var(--font-mono)' }}>
                     <CheckCircle2 size={14} style={{ color: 'var(--color-accent)' }} /> {plan.monthlyCredits.toLocaleString()} Monthly Credits
                   </div>
+                  {plan.capacities && (
+                    <div
+                      style={{
+                        marginTop: '4px',
+                        padding: '8px 10px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--color-border)',
+                        background: 'rgba(15, 23, 42, 0.04)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '4px',
+                        fontSize: '11px',
+                        fontFamily: 'var(--font-mono)',
+                      }}
+                    >
+                      <div>🚀 Bankr BYOK Vault: <strong>{plan.capacities.maxBankrKeys}</strong> key(s)</div>
+                      <div>
+                        ⚡ Binance CEX Vault: <strong>{plan.capacities.maxBinanceAccounts}</strong> akun ({plan.capacities.allowMainnetBinance ? 'Testnet + Mainnet' : 'Testnet Only'})
+                      </div>
+                      <div>🛡️ Max Order Cap: <strong>${plan.capacities.maxOrderValueUsd.toLocaleString()}</strong></div>
+                    </div>
+                  )}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <CheckCircle2 size={14} style={{ color: hasCreator ? 'var(--color-accent)' : 'var(--color-muted)', opacity: hasCreator ? 1 : 0.3 }} />
                     <span style={{ color: hasCreator ? 'var(--color-foreground)' : 'var(--color-muted)' }}>Launchpad Creator &amp; AI Studio</span>

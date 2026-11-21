@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { KeyRound, ShieldCheck, Plus, Trash2, CheckCircle2, Lock, AlertTriangle } from 'lucide-react';
+import { KeyRound, ShieldCheck, Plus, Trash2, CheckCircle2, Lock, AlertTriangle, Activity } from 'lucide-react';
 
 export interface BinanceAccountMetaItem {
   id: string;
@@ -30,6 +30,11 @@ export function BinanceKeyVaultPanel({
   onSelectCredentialId,
 }: BinanceKeyVaultPanelProps) {
   const [accounts, setAccounts] = useState<BinanceAccountMetaItem[]>([]);
+  const [maxAccounts, setMaxAccounts] = useState<number>(10);
+  const [planId, setPlanId] = useState<string>('FREE');
+  const [allowMainnet, setAllowMainnet] = useState<boolean>(false);
+  const [pingingId, setPingingId] = useState<string | null>(null);
+  const [pingStatusMap, setPingStatusMap] = useState<Record<string, { ok: boolean; text: string }>>({});
   const [loading, setLoading] = useState<boolean>(false);
   const [showAddForm, setShowAddForm] = useState<boolean>(false);
   const [label, setLabel] = useState<string>('');
@@ -49,6 +54,9 @@ export function BinanceKeyVaultPanel({
       if (json?.success && Array.isArray(json.data?.accounts)) {
         const list: BinanceAccountMetaItem[] = json.data.accounts;
         setAccounts(list);
+        if (typeof json.data.maxAccounts === 'number') setMaxAccounts(json.data.maxAccounts);
+        if (typeof json.data.planId === 'string') setPlanId(json.data.planId);
+        if (typeof json.data.allowMainnet === 'boolean') setAllowMainnet(json.data.allowMainnet);
         const def = list.find((a) => a.isDefault) || list[0];
         if (def && (!selectedCredentialId || selectedCredentialId === 'DEFAULT')) {
           onSelectCredentialId(def.id);
@@ -127,6 +135,53 @@ export function BinanceKeyVaultPanel({
     }
   };
 
+  const handleTestPing = async (credentialId: string) => {
+    setPingingId(credentialId);
+    setFeedback(null);
+    try {
+      const res = await fetch('/api/user/binance-credentials/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credentialId }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json?.success) {
+        setPingStatusMap((prev) => ({
+          ...prev,
+          [credentialId]: { ok: false, text: json?.error || `HTTP ${res.status}` },
+        }));
+      } else {
+        const d = json.data;
+        if (!d.connected) {
+          setPingStatusMap((prev) => ({
+            ...prev,
+            [credentialId]: { ok: false, text: d.error || 'Koneksi gagal' },
+          }));
+        } else if (d.canWithdraw) {
+          setPingStatusMap((prev) => ({
+            ...prev,
+            [credentialId]: { ok: false, text: `⚠️ WITHDRAWAL AKTIF! Nonaktifkan di Binance (${d.latencyMs}ms)` },
+          }));
+        } else {
+          setPingStatusMap((prev) => ({
+            ...prev,
+            [credentialId]: {
+              ok: true,
+              text: `✅ Verified · Trade ${d.canTrade ? 'ON' : 'OFF'} · Withdraw OFF (${d.latencyMs}ms)`,
+            },
+          }));
+        }
+      }
+    } catch (err: any) {
+      setPingStatusMap((prev) => ({
+        ...prev,
+        [credentialId]: { ok: false, text: err?.message || 'Ping error' },
+      }));
+    } finally {
+      setPingingId(null);
+    }
+  };
+
   const handleRevoke = async (credentialId: string) => {
     setFeedback(null);
     try {
@@ -162,8 +217,13 @@ export function BinanceKeyVaultPanel({
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <KeyRound size={14} style={{ color: '#F59E0B' }} />
           <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--color-foreground)' }}>
-            Binance Multi-Account Vault ({accounts.length}/10)
+            Binance Multi-Account Vault ({accounts.length}/{maxAccounts} · {planId})
           </span>
+          {accounts.length >= maxAccounts && (
+            <a href="/billing" style={{ fontSize: '10px', fontWeight: 800, color: '#38BDF8', textDecoration: 'underline' }}>
+              Upgrade →
+            </a>
+          )}
         </div>
         {isConnected && (
           <button
@@ -264,8 +324,29 @@ export function BinanceKeyVaultPanel({
                       <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--color-muted)' }}>
                         {acc.maskedApiKey}
                       </span>
+                      {pingStatusMap[acc.id] && (
+                        <span
+                          style={{
+                            fontSize: '10px',
+                            fontWeight: 700,
+                            color: pingStatusMap[acc.id].ok ? '#10B981' : '#F59E0B',
+                          }}
+                        >
+                          {pingStatusMap[acc.id].text}
+                        </span>
+                      )}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                      <button
+                        type="button"
+                        onClick={() => handleTestPing(acc.id)}
+                        disabled={pingingId === acc.id}
+                        className="btn-secondary"
+                        style={{ padding: '3px 6px', fontSize: '10px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                        title="Test koneksi & cek izin withdraw secara live"
+                      >
+                        <Activity size={10} /> {pingingId === acc.id ? 'Ping...' : 'Test'}
+                      </button>
                       {!acc.isDefault ? (
                         <button
                           type="button"
@@ -325,7 +406,9 @@ export function BinanceKeyVaultPanel({
                   style={{ padding: '6px 8px', fontSize: '11px', fontWeight: 700 }}
                 >
                   <option value="TESTNET">TESTNET</option>
-                  <option value="MAINNET">MAINNET</option>
+                  <option value="MAINNET" disabled={!allowMainnet}>
+                    {allowMainnet ? 'MAINNET' : 'MAINNET (TRADER+)'}
+                  </option>
                 </select>
               </div>
               <input

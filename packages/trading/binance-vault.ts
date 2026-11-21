@@ -93,3 +93,89 @@ export class BinanceCredentialVault {
     validateBinancePermissions(perms);
   }
 }
+
+export interface BinanceLivePingResult {
+  connected: boolean;
+  environment: 'TESTNET' | 'MAINNET';
+  canTrade: boolean;
+  canWithdraw: boolean;
+  accountType?: string;
+  latencyMs: number;
+  securityWarning?: 'WITHDRAWAL_ENABLED_ON_EXCHANGE';
+  error?: string;
+}
+
+/**
+ * Stateless Read-Only Live Ping & Permission Verifier (GET /api/v3/account).
+ * Safely checks whether the stored Binance API key is active, canTrade=true, and canWithdraw=false.
+ */
+export async function verifyBinanceCredentialLive(params: {
+  apiKey: string;
+  secretKey: string;
+  environment: 'TESTNET' | 'MAINNET';
+  fetchImpl?: typeof fetch;
+}): Promise<BinanceLivePingResult> {
+  const start = Date.now();
+  const baseUrl =
+    params.environment === 'MAINNET' ? 'https://api.binance.com' : 'https://testnet.binance.vision';
+  const timestamp = Date.now();
+  const queryString = `timestamp=${timestamp}&recvWindow=5000`;
+  const signature = crypto
+    .createHmac('sha256', params.secretKey)
+    .update(queryString)
+    .digest('hex');
+
+  const url = `${baseUrl}/api/v3/account?${queryString}&signature=${signature}`;
+  const doFetch = params.fetchImpl || fetch;
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 6000);
+    let res: Response;
+    try {
+      res = await doFetch(url, {
+        method: 'GET',
+        headers: { 'X-MBX-APIKEY': params.apiKey },
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+
+    const latencyMs = Math.max(1, Date.now() - start);
+    const data: any = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      return {
+        connected: false,
+        environment: params.environment,
+        canTrade: false,
+        canWithdraw: false,
+        latencyMs,
+        error: data?.msg ? `Binance (${data.code || res.status}): ${data.msg}` : `HTTP_${res.status}`,
+      };
+    }
+
+    const canTrade = Boolean(data?.canTrade);
+    const canWithdraw = Boolean(data?.canWithdraw);
+
+    return {
+      connected: true,
+      environment: params.environment,
+      canTrade,
+      canWithdraw,
+      accountType: typeof data?.accountType === 'string' ? data.accountType : 'SPOT',
+      latencyMs,
+      ...(canWithdraw ? { securityWarning: 'WITHDRAWAL_ENABLED_ON_EXCHANGE' as const } : {}),
+    };
+  } catch (err: any) {
+    return {
+      connected: false,
+      environment: params.environment,
+      canTrade: false,
+      canWithdraw: false,
+      latencyMs: Math.max(1, Date.now() - start),
+      error: err?.name === 'AbortError' ? 'BINANCE_PING_TIMEOUT' : err?.message || 'BINANCE_PING_FAILED',
+    };
+  }
+}

@@ -3538,12 +3538,21 @@ export class PostgresBinanceExecutionDbAdapter implements BinanceExecutionDbAdap
     environment?: string;
     permissions?: Partial<BinanceKeyPermissions>;
     isDefault?: boolean;
+    maxAllowed?: number;
     customMasterKeyHex?: string;
   }): Promise<BinanceCredentialMeta> {
     const cleanLabel = (params.label || '').trim().slice(0, 64);
     if (cleanLabel.length < 2) {
       throw new Error('INVALID_ACCOUNT_LABEL: Account label must be at least 2 characters.');
     }
+
+    const effectiveMax = Math.max(
+      1,
+      Math.min(
+        PostgresBinanceExecutionDbAdapter.MAX_ACTIVE_BINANCE_ACCOUNTS,
+        Number(params.maxAllowed ?? PostgresBinanceExecutionDbAdapter.MAX_ACTIVE_BINANCE_ACCOUNTS)
+      )
+    );
 
     const rawApiKey = (params.rawApiKey || '').trim();
     const rawSecretKey = (params.rawSecretKey || '').trim();
@@ -3570,9 +3579,9 @@ export class PostgresBinanceExecutionDbAdapter implements BinanceExecutionDbAdap
     if (this.isExplicitInMemory) {
       const norm = params.userId.toLowerCase();
       const active = this.inMemoryBinanceVault.filter((c) => c.userId === norm && c.isActive);
-      if (active.length >= PostgresBinanceExecutionDbAdapter.MAX_ACTIVE_BINANCE_ACCOUNTS) {
+      if (active.length >= effectiveMax) {
         throw new Error(
-          `MAX_KEYS_REACHED: Maximum ${PostgresBinanceExecutionDbAdapter.MAX_ACTIVE_BINANCE_ACCOUNTS} active Binance accounts allowed per user.`
+          `MAX_KEYS_REACHED: Maximum ${effectiveMax} active Binance accounts allowed for your plan.`
         );
       }
       const shouldBeDefault = Boolean(params.isDefault) || active.length === 0;
@@ -3610,9 +3619,9 @@ export class PostgresBinanceExecutionDbAdapter implements BinanceExecutionDbAdap
       [validUserId]
     );
     const existingCount = Number(countRes.rows[0]?.cnt || 0);
-    if (existingCount >= PostgresBinanceExecutionDbAdapter.MAX_ACTIVE_BINANCE_ACCOUNTS) {
+    if (existingCount >= effectiveMax) {
       throw new Error(
-        `MAX_KEYS_REACHED: Maximum ${PostgresBinanceExecutionDbAdapter.MAX_ACTIVE_BINANCE_ACCOUNTS} active Binance accounts allowed per user.`
+        `MAX_KEYS_REACHED: Maximum ${effectiveMax} active Binance accounts allowed for your plan.`
       );
     }
 
@@ -6100,12 +6109,20 @@ export class PostgresProviderKeyVaultAdapter {
     rawApiKey: string;
     chainScope?: string;
     isDefault?: boolean;
+    maxAllowed?: number;
   }): Promise<UserProviderKeyMeta> {
     const cleanProvider = (params.provider || 'BANKR').trim().toUpperCase();
     const cleanLabel = (params.label || 'Bankr Key').trim().slice(0, 64);
     if (cleanLabel.length < 2) {
       throw new Error('INVALID_KEY_LABEL: Key label must be at least 2 characters.');
     }
+    const effectiveMax = Math.max(
+      1,
+      Math.min(
+        PostgresProviderKeyVaultAdapter.MAX_ACTIVE_KEYS_PER_USER,
+        Number(params.maxAllowed ?? PostgresProviderKeyVaultAdapter.MAX_ACTIVE_KEYS_PER_USER)
+      )
+    );
     const chainScope = validateChainScope(params.chainScope);
     const enc = encryptSecret(params.rawApiKey);
     const masked = maskApiKey(params.rawApiKey);
@@ -6119,9 +6136,9 @@ export class PostgresProviderKeyVaultAdapter {
           [userId, cleanProvider]
         );
         const existingCount = Number(countRes.rows[0]?.cnt || 0);
-        if (existingCount >= PostgresProviderKeyVaultAdapter.MAX_ACTIVE_KEYS_PER_USER) {
+        if (existingCount >= effectiveMax) {
           throw new Error(
-            `MAX_KEYS_REACHED: Maximum ${PostgresProviderKeyVaultAdapter.MAX_ACTIVE_KEYS_PER_USER} active API keys allowed per account.`
+            `MAX_KEYS_REACHED: Maximum ${effectiveMax} active API keys allowed for your plan.`
           );
         }
 
@@ -6179,9 +6196,9 @@ export class PostgresProviderKeyVaultAdapter {
     const userActive = inMemoryProviderKeys.filter(
       (k) => k.userId === normUser && k.provider === cleanProvider && k.isActive
     );
-    if (userActive.length >= PostgresProviderKeyVaultAdapter.MAX_ACTIVE_KEYS_PER_USER) {
+    if (userActive.length >= effectiveMax) {
       throw new Error(
-        `MAX_KEYS_REACHED: Maximum ${PostgresProviderKeyVaultAdapter.MAX_ACTIVE_KEYS_PER_USER} active API keys allowed per account.`
+        `MAX_KEYS_REACHED: Maximum ${effectiveMax} active API keys allowed for your plan.`
       );
     }
     const shouldBeDefault = Boolean(params.isDefault) || userActive.length === 0;

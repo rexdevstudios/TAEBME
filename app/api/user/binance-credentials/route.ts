@@ -12,7 +12,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireCapability } from '@packages/auth/session';
 import { rateLimiter } from '@packages/auth/rate-limiter';
-import { getDbPool, PostgresBinanceExecutionDbAdapter } from '@packages/shared/db-pool';
+import { defaultBillingDbAdapter, getDbPool, PostgresBinanceExecutionDbAdapter } from '@packages/shared/db-pool';
+import { SubscriptionsEngine } from '@packages/billing/subscriptions-engine';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,13 +44,20 @@ export async function GET(req: NextRequest) {
     }
 
     const adapter = getAdapterOrFail();
-    const accounts = await adapter.listBinanceCredentials(auth.walletAddress);
+    const [accounts, planId] = await Promise.all([
+      adapter.listBinanceCredentials(auth.walletAddress),
+      defaultBillingDbAdapter.getUserPlan(auth.walletAddress).catch(() => 'FREE' as const),
+    ]);
+    const capacities = SubscriptionsEngine.getPlanCapacities(planId);
 
     return NextResponse.json(
       {
         success: true,
         data: {
           provider: 'BINANCE',
+          planId: capacities.planId,
+          maxAccounts: capacities.maxBinanceAccounts,
+          allowMainnet: capacities.allowMainnetBinance,
           accounts,
         },
         timestamp: new Date().toISOString(),
@@ -101,6 +109,20 @@ export async function POST(req: NextRequest) {
       withdraw: Boolean(body?.permissions?.withdraw),
     };
 
+    const planId = await defaultBillingDbAdapter.getUserPlan(auth.walletAddress).catch(() => 'FREE' as const);
+    const capacities = SubscriptionsEngine.getPlanCapacities(planId);
+
+    if (environment === 'MAINNET' && !capacities.allowMainnetBinance) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `PLAN_MAINNET_REQUIRED: Paket ${capacities.planId} hanya mendukung Binance TESTNET. Upgrade ke TRADER atau AGENT di /billing untuk akun MAINNET.`,
+          timestamp: new Date().toISOString(),
+        },
+        { status: 403 }
+      );
+    }
+
     const adapter = getAdapterOrFail();
     const created = await adapter.addBinanceCredential({
       userId: auth.walletAddress,
@@ -110,6 +132,7 @@ export async function POST(req: NextRequest) {
       environment,
       permissions,
       isDefault,
+      maxAllowed: capacities.maxBinanceAccounts,
     });
 
     return NextResponse.json(

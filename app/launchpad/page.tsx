@@ -50,6 +50,8 @@ export default function LaunchpadPage() {
   const [isAngelModalOpen, setIsAngelModalOpen] = useState(false);
   const [tokenName, setTokenName] = useState('');
   const [tokenSymbol, setTokenSymbol] = useState('');
+  const [tokenDescription, setTokenDescription] = useState('');
+  const [tokenImageUrl, setTokenImageUrl] = useState('');
   const [mode, setMode] = useState<LaunchModeType>('BONDING_CURVE');
   const [creatorWallet, setCreatorWallet] = useState(walletAddress || '');
   const [whitelistWallets, setWhitelistWallets] = useState('');
@@ -228,6 +230,8 @@ export default function LaunchpadPage() {
           degenMode: isDegenMode,
           simulateOnly,
           providerKeyId: selectedBankrKeyId,
+          ...(tokenDescription.trim() ? { description: tokenDescription.trim() } : {}),
+          ...(tokenImageUrl.trim() ? { imageUrl: tokenImageUrl.trim() } : {}),
         }),
       });
       const json = await res.json();
@@ -455,6 +459,12 @@ export default function LaunchpadPage() {
           setTokenName(name);
           setTokenSymbol(ticker);
         }}
+        onApplyAssets={({ name, ticker, description, imageUrl }) => {
+          if (name) setTokenName(name);
+          if (ticker) setTokenSymbol(ticker);
+          if (description) setTokenDescription(description);
+          if (imageUrl) setTokenImageUrl(imageUrl);
+        }}
       />
 
       <div className="grid-2">
@@ -463,6 +473,32 @@ export default function LaunchpadPage() {
           <h2 style={{ color: 'var(--color-foreground)', marginTop: 0, fontSize: '16px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
             <FileText size={18} /> Launch Token Draft Wizard
           </h2>
+          {(tokenImageUrl || tokenDescription) && (
+            <div
+              style={{
+                marginBottom: '12px',
+                padding: '8px 10px',
+                borderRadius: '8px',
+                border: '1px solid rgba(16, 185, 129, 0.35)',
+                background: 'rgba(16, 185, 129, 0.08)',
+                fontSize: '11px',
+                color: 'var(--color-foreground)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '3px',
+              }}
+            >
+              <strong style={{ color: '#10B981' }}>✅ Aset Creator Studio Terhubung ke Wizard</strong>
+              {tokenImageUrl && (
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--color-muted)', wordBreak: 'break-all' }}>
+                  IPFS Image: {tokenImageUrl}
+                </span>
+              )}
+              {tokenDescription && (
+                <span style={{ fontSize: '11px', color: 'var(--color-muted)' }}>{tokenDescription}</span>
+              )}
+            </div>
+          )}
           <form onSubmit={handleCreateDraft} className="flex-col gap-md">
             <div className="flex-col gap-xs">
               <label style={{ color: 'var(--color-muted)', fontSize: '12px', fontWeight: 700 }}>Token Name</label>

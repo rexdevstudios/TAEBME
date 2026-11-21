@@ -9,6 +9,7 @@ interface CreatorStudioPanelProps {
   tokenSymbol: string;
   selectedChain: string;
   onApplyIdentity: (name: string, ticker: string) => void;
+  onApplyAssets?: (assets: { name?: string; ticker?: string; description?: string; imageUrl?: string }) => void;
 }
 
 export function CreatorStudioPanel({
@@ -16,6 +17,7 @@ export function CreatorStudioPanel({
   tokenSymbol,
   selectedChain,
   onApplyIdentity,
+  onApplyAssets,
 }: CreatorStudioPanelProps) {
   const { refreshSession } = useAuth();
   const [trendPrompt, setTrendPrompt] = useState('');
@@ -50,6 +52,11 @@ export function CreatorStudioPanel({
       }
       setGeneratedIdentity(json.data.identity);
       onApplyIdentity(json.data.identity.name, json.data.identity.ticker);
+      onApplyAssets?.({
+        name: json.data.identity.name,
+        ticker: json.data.identity.ticker,
+        description: json.data.identity.description,
+      });
       refreshSession().catch(() => {});
       setStatusMsg(
         `✅ Identitas $${json.data.identity.ticker} ("${json.data.identity.name}") siap (${json.data.provider}) dan otomatis terisi ke form draft.`
@@ -86,7 +93,16 @@ export function CreatorStudioPanel({
         return;
       }
       setLogoDataUri(json.data.imageDataUri);
-      setIpfsMetadataUrl(json.data.ipfsMetadataUrl || null);
+      const resolvedIpfsUrl = json.data.ipfsImageUrl || json.data.ipfsMetadataUrl || null;
+      setIpfsMetadataUrl(resolvedIpfsUrl);
+      if (resolvedIpfsUrl) {
+        onApplyAssets?.({
+          name: generatedIdentity?.name,
+          ticker: generatedIdentity?.ticker,
+          description: generatedIdentity?.description,
+          imageUrl: resolvedIpfsUrl,
+        });
+      }
       refreshSession().catch(() => {});
       setStatusMsg(
         json.data.uploadedToIpfs
@@ -231,6 +247,24 @@ export function CreatorStudioPanel({
               alt="Generated Token Logo"
               style={{ width: '56px', height: '56px', borderRadius: '8px', border: '1px solid var(--color-border)' }}
             />
+          )}
+          {(ipfsMetadataUrl || generatedIdentity) && onApplyAssets && (
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => {
+                onApplyAssets({
+                  name: generatedIdentity?.name || tokenName,
+                  ticker: generatedIdentity?.ticker || tokenSymbol,
+                  description: generatedIdentity?.description,
+                  imageUrl: ipfsMetadataUrl || undefined,
+                });
+                setStatusMsg('✅ Aset & CID IPFS berhasil diterapkan ke Launch Token Draft Wizard.');
+              }}
+              style={{ fontSize: '11px', padding: '6px 10px' }}
+            >
+              Terapkan ke Launch Wizard (1-Klik) →
+            </button>
           )}
           {ipfsMetadataUrl && (
             <a href={ipfsMetadataUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: '11px', color: '#38BDF8', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>

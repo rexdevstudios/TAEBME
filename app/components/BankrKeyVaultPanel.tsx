@@ -31,6 +31,8 @@ export function BankrKeyVaultPanel({
   activePlanLabel = 'FREE',
 }: BankrKeyVaultPanelProps) {
   const [keys, setKeys] = useState<ProviderKeyItem[]>([]);
+  const [maxKeys, setMaxKeys] = useState<number>(10);
+  const [vaultPlanId, setVaultPlanId] = useState<string>(activePlanLabel || 'FREE');
   const [platformFallbackAvailable, setPlatformFallbackAvailable] = useState<boolean>(true);
   const [loading, setLoading] = useState<boolean>(false);
   const [showAddForm, setShowAddForm] = useState<boolean>(false);
@@ -49,6 +51,8 @@ export function BankrKeyVaultPanel({
       if (json?.success && Array.isArray(json.data?.keys)) {
         const list: ProviderKeyItem[] = json.data.keys;
         setKeys(list);
+        if (typeof json.data.maxKeys === 'number') setMaxKeys(json.data.maxKeys);
+        if (typeof json.data.planId === 'string') setVaultPlanId(json.data.planId);
         setPlatformFallbackAvailable(Boolean(json.data.platformFallbackAvailable));
         const def = list.find((k) => k.isDefault);
         if (def && (!selectedKeyId || selectedKeyId === 'AUTO')) {
@@ -154,8 +158,13 @@ export function BankrKeyVaultPanel({
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
           <KeyRound size={14} style={{ color: 'var(--color-accent)' }} />
           <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--color-foreground)' }}>
-            Multi-Key Bankr BYOK Vault
+            Multi-Key Bankr BYOK Vault ({keys.length}/{maxKeys} · {vaultPlanId})
           </span>
+          {keys.length >= maxKeys && (
+            <a href="/billing" style={{ fontSize: '10px', fontWeight: 800, color: '#38BDF8', textDecoration: 'underline' }}>
+              Upgrade Kuota →
+            </a>
+          )}
           <span
             className="badge"
             style={{

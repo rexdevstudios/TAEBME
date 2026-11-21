@@ -10,6 +10,16 @@ export interface PlanEntitlements {
   aiProposals: boolean;
 }
 
+export interface PlanCapacities {
+  planId: PlanId;
+  monthlyCredits: number;
+  maxBankrKeys: number;
+  maxBinanceAccounts: number;
+  allowMainnetBinance: boolean;
+  maxOrderValueUsd: number;
+  maxDailyLossUsd: number;
+}
+
 export interface BillingDbAdapter {
   getUserPlan(userId: string): Promise<PlanId>;
   getUserCreditBalance(userId: string): Promise<number>;
@@ -32,6 +42,53 @@ export class SubscriptionsEngine {
     TRADER: 5000,
     AGENT: 15000,
   };
+
+  private static readonly PLAN_CAPACITIES: Record<PlanId, PlanCapacities> = {
+    FREE: {
+      planId: 'FREE',
+      monthlyCredits: 100,
+      maxBankrKeys: 1,
+      maxBinanceAccounts: 1,
+      allowMainnetBinance: false,
+      maxOrderValueUsd: 250,
+      maxDailyLossUsd: 50,
+    },
+    CREATOR: {
+      planId: 'CREATOR',
+      monthlyCredits: 2000,
+      maxBankrKeys: 5,
+      maxBinanceAccounts: 2,
+      allowMainnetBinance: false,
+      maxOrderValueUsd: 1000,
+      maxDailyLossUsd: 200,
+    },
+    TRADER: {
+      planId: 'TRADER',
+      monthlyCredits: 5000,
+      maxBankrKeys: 3,
+      maxBinanceAccounts: 5,
+      allowMainnetBinance: true,
+      maxOrderValueUsd: 10000,
+      maxDailyLossUsd: 1000,
+    },
+    AGENT: {
+      planId: 'AGENT',
+      monthlyCredits: 15000,
+      maxBankrKeys: 10,
+      maxBinanceAccounts: 10,
+      allowMainnetBinance: true,
+      maxOrderValueUsd: 25000,
+      maxDailyLossUsd: 2500,
+    },
+  };
+
+  /**
+   * SSOT Kapasitas Bisnis per Tier Billing (Vault Keys, Binance Accounts, Mainnet Access, Risk Caps)
+   */
+  static getPlanCapacities(planId?: string | null): PlanCapacities {
+    const norm = String(planId || 'FREE').trim().toUpperCase() as PlanId;
+    return this.PLAN_CAPACITIES[norm] || this.PLAN_CAPACITIES.FREE;
+  }
 
   /**
    * Pengecekan Entitlement Fitur berdasarkan Plan Aktif User

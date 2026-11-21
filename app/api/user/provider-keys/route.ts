@@ -11,7 +11,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireCapability } from '@packages/auth/session';
 import { rateLimiter } from '@packages/auth/rate-limiter';
-import { defaultProviderKeyVaultAdapter } from '@packages/shared/db-pool';
+import { defaultBillingDbAdapter, defaultProviderKeyVaultAdapter } from '@packages/shared/db-pool';
+import { SubscriptionsEngine } from '@packages/billing/subscriptions-engine';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,13 +36,19 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const provider = (searchParams.get('provider') || 'BANKR').toUpperCase();
-    const keys = await defaultProviderKeyVaultAdapter.listKeys(auth.walletAddress, provider);
+    const [keys, planId] = await Promise.all([
+      defaultProviderKeyVaultAdapter.listKeys(auth.walletAddress, provider),
+      defaultBillingDbAdapter.getUserPlan(auth.walletAddress).catch(() => 'FREE' as const),
+    ]);
+    const capacities = SubscriptionsEngine.getPlanCapacities(planId);
 
     return NextResponse.json(
       {
         success: true,
         data: {
           provider,
+          planId: capacities.planId,
+          maxKeys: capacities.maxBankrKeys,
           keys,
           platformFallbackAvailable: Boolean(process.env.BANKR_API_KEY && !process.env.BANKR_API_KEY.startsWith('mock_')),
         },
@@ -87,6 +94,9 @@ export async function POST(req: NextRequest) {
     const chainScope = typeof body?.chainScope === 'string' ? body.chainScope.trim().toLowerCase() : 'all';
     const isDefault = Boolean(body?.isDefault);
 
+    const planId = await defaultBillingDbAdapter.getUserPlan(auth.walletAddress).catch(() => 'FREE' as const);
+    const capacities = SubscriptionsEngine.getPlanCapacities(planId);
+
     const created = await defaultProviderKeyVaultAdapter.addKey({
       userIdentifier: auth.walletAddress,
       provider,
@@ -94,6 +104,7 @@ export async function POST(req: NextRequest) {
       rawApiKey: apiKey,
       chainScope,
       isDefault,
+      maxAllowed: capacities.maxBankrKeys,
     });
 
     return NextResponse.json(
