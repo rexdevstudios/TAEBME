@@ -704,7 +704,7 @@ export async function ensureNetworkInPool(pool: Pool, chainInput: string): Promi
 // IN-MEMORY FALLBACK STORES (DEV / TEST / SIMULATION)
 // ----------------------------------------------------------------------------
 const inMemoryDrafts: any[] = [];
-const inMemoryKolProfiles: Map<string, KolProfile> = new Map();
+// inMemoryKolProfiles imported from ../db/kol-repo (shared with PostgresBountyDbAdapter)
 const inMemoryClaims: Map<string, BountyClaim> = new Map();
 const inMemorySettledTxHashes: Map<string, string> = new Map();
 const inMemoryInFlightSettlements: Set<string> = new Set();
@@ -1277,167 +1277,7 @@ export class PostgresDraftDbAdapter implements LaunchDraftDbAdapter {
   }
 }
 
-// ----------------------------------------------------------------------------
-// SEC-02: Typed error for twitter_handle uniqueness constraint (PG 23505).
-// Route handlers must catch this specifically to return HTTP 409 HANDLE_CONFLICT
-// without leaking raw database error messages or constraint names.
-// ----------------------------------------------------------------------------
-export class HandleConflictError extends Error {
-  readonly code = 'HANDLE_CONFLICT';
-  constructor(message: string) {
-    super(message);
-    this.name = 'HandleConflictError';
-  }
-}
-
-// ----------------------------------------------------------------------------
-// POSTGRES KOL DB ADAPTER
-// ----------------------------------------------------------------------------
-export class PostgresKolDbAdapter implements KolDbAdapter {
-  async upsertKolProfile(p: Partial<KolProfile> & { userId: string }): Promise<KolProfile> {
-    const pool = getDbPool();
-    const existing = inMemoryKolProfiles.get(p.userId) || {
-      id: `kol-${Date.now()}`,
-      userId: p.userId,
-      twitterHandle: p.twitterHandle,
-      followersCount: p.followersCount || 0,
-      trustScore: p.trustScore || 50,
-      completedBounties: 0,
-      totalEarnedUsd: 0,
-      isVerified: p.isVerified || false,
-    };
-
-    const updated: KolProfile = {
-      ...existing,
-      ...p,
-      id: existing.id,
-      userId: p.userId,
-      followersCount: p.followersCount ?? existing.followersCount,
-      trustScore: p.trustScore ?? existing.trustScore,
-      isVerified: p.isVerified ?? existing.isVerified,
-    };
-
-    if (pool) {
-      try {
-        const userId = await ensureUserEntity(pool, p.userId);
-        const res = await pool.query(
-          `INSERT INTO kol_profiles (
-            user_id, twitter_handle, followers_count, trust_score, is_verified, updated_at
-          ) VALUES ($1, $2, $3, $4, $5, NOW())
-          ON CONFLICT (user_id) DO UPDATE SET
-            twitter_handle = COALESCE(EXCLUDED.twitter_handle, kol_profiles.twitter_handle),
-            followers_count = COALESCE(EXCLUDED.followers_count, kol_profiles.followers_count),
-            trust_score = COALESCE(EXCLUDED.trust_score, kol_profiles.trust_score),
-            is_verified = COALESCE(EXCLUDED.is_verified, kol_profiles.is_verified),
-            updated_at = NOW()
-          RETURNING id, user_id, twitter_handle, followers_count, trust_score, is_verified, completed_bounties, total_earned_usd`,
-          [
-            userId,
-            // SEC-03: Normalize to lowercase at DB write boundary (defense-in-depth;
-            // application layer in kol-service.ts also lowercases before calling here).
-            updated.twitterHandle ? updated.twitterHandle.toLowerCase() : null,
-            updated.followersCount,
-            updated.trustScore,
-            updated.isVerified,
-          ]
-        );
-
-        if (res.rows.length > 0) {
-          const row = res.rows[0];
-          const dbProfile: KolProfile = {
-            id: row.id,
-            userId: row.user_id,
-            twitterHandle: row.twitter_handle,
-            followersCount: row.followers_count,
-            trustScore: row.trust_score,
-            completedBounties: row.completed_bounties || 0,
-            totalEarnedUsd: Number(row.total_earned_usd || 0),
-            isVerified: row.is_verified,
-          };
-          inMemoryKolProfiles.set(p.userId, dbProfile);
-          return dbProfile;
-        }
-      } catch (err: any) {
-        // SEC-02: Distinguish twitter_handle uniqueness violation (PG error 23505)
-        // from other DB errors so the route handler can return HTTP 409 cleanly.
-        if (err?.code === '23505' && err?.constraint?.includes('twitter_handle')) {
-          throw new HandleConflictError(
-            `Twitter handle '${p.twitterHandle}' is already registered to another account.`
-          );
-        }
-        if (process.env.NODE_ENV === 'production') throw err;
-        console.warn('[PostgresKolDbAdapter] DB upsert failed, fallback to memory:', err.message);
-      }
-    }
-
-    inMemoryKolProfiles.set(p.userId, updated);
-    return updated;
-  }
-
-  async getKolProfile(userIdOrAddress: string): Promise<KolProfile | null> {
-    const pool = getDbPool();
-    if (pool) {
-      try {
-        const cleanAddress = userIdOrAddress.startsWith('usr-')
-          ? userIdOrAddress.slice(4).toLowerCase()
-          : userIdOrAddress.toLowerCase();
-
-        const res = await pool.query(
-          `SELECT kp.* FROM kol_profiles kp
-           LEFT JOIN wallets w ON w.user_id = kp.user_id
-           WHERE kp.user_id::text = $1 
-              OR LOWER(kp.twitter_handle) = LOWER($1)
-              OR LOWER(w.address) = LOWER($2)
-           LIMIT 1`,
-          [userIdOrAddress, cleanAddress]
-        );
-
-        if (res.rows.length > 0) {
-          const row = res.rows[0];
-          return {
-            id: row.id,
-            userId: row.user_id,
-            twitterHandle: row.twitter_handle,
-            followersCount: row.followers_count,
-            trustScore: row.trust_score,
-            completedBounties: row.completed_bounties || 0,
-            totalEarnedUsd: Number(row.total_earned_usd || 0),
-            isVerified: row.is_verified,
-          };
-        }
-      } catch (err: any) {
-        if (process.env.NODE_ENV === 'production') throw err;
-      }
-    }
-    return inMemoryKolProfiles.get(userIdOrAddress) || null;
-  }
-
-  async createAuditLog(actorId: string, action: string, entityId?: string, reason?: string): Promise<void> {
-    const pool = getDbPool();
-    if (pool) {
-      try {
-        let validActorId = actorId;
-        if (!isUuid(validActorId)) {
-          validActorId = await ensureUserEntity(pool, actorId);
-        }
-        let validEntityId: string | null = null;
-        if (entityId && isUuid(entityId)) {
-          const entityCheck = await pool.query('SELECT id FROM entities WHERE id = $1', [entityId]);
-          if (entityCheck.rows.length > 0) {
-            validEntityId = entityId;
-          }
-        }
-        await pool.query(
-          `INSERT INTO audit_logs (actor_id, action, entity_id, reason, created_at)
-           VALUES ($1, $2, $3, $4, NOW())`,
-          [validActorId, action, validEntityId, reason || null]
-        );
-      } catch {
-        // Non-blocking
-      }
-    }
-  }
-}
+// POSTGRES KOL DB ADAPTER & HandleConflictError -> Extracted to packages/db/kol-repo.ts (Phase AF1)
 
 // ----------------------------------------------------------------------------
 // POSTGRES BOUNTY DB ADAPTER
@@ -2203,7 +2043,6 @@ export class PostgresBountyDbAdapter implements BountyDbAdapter {
 
 // Single instances for API routes
 export const defaultDraftDbAdapter = new PostgresDraftDbAdapter();
-export const defaultKolDbAdapter = new PostgresKolDbAdapter();
 export const defaultBountyDbAdapter = new PostgresBountyDbAdapter();
 
 /**
@@ -4643,158 +4482,7 @@ export class PostgresBillingDbAdapter implements BillingDbAdapter {
 
 export const defaultBillingDbAdapter = new PostgresBillingDbAdapter();
 
-// ----------------------------------------------------------------------------
-// POSTGRES DUAL-CONTROL DB ADAPTER
-// ----------------------------------------------------------------------------
-export class PostgresDualControlDbAdapter implements DualControlDbAdapter {
-  private inMemoryRequests: Map<string, DualControlRequestRecord> = new Map();
-  private inMemoryAuditLogs: any[] = [];
-
-  seedRequest(req: DualControlRequestRecord): void {
-    this.inMemoryRequests.set(req.id, { ...req });
-  }
-
-  clearRequests(): void {
-    this.inMemoryRequests.clear();
-    this.inMemoryAuditLogs = [];
-  }
-
-  getAuditLogs(): any[] {
-    return [...this.inMemoryAuditLogs];
-  }
-
-  async createRequest(req: Omit<DualControlRequestRecord, 'id'>): Promise<string> {
-    const id = crypto.randomUUID();
-    const record: DualControlRequestRecord = { id, ...req };
-    const pool = getDbPool();
-    if (pool) {
-      try {
-        const validRequesterId = await ensureUserEntity(pool, req.requestedBy);
-        await pool.query(
-          `INSERT INTO dual_control_requests (
-            id, action_type, requested_by, payload, status, expires_at, created_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
-          [
-            id,
-            req.actionType,
-            validRequesterId,
-            JSON.stringify(req.payload),
-            req.status,
-            req.expiresAt,
-          ]
-        );
-        this.inMemoryRequests.set(id, record);
-        return id;
-      } catch (err: any) {
-        throw new Error(`DB_DUAL_CONTROL_CREATE_FAILED: ${err?.message}`);
-      }
-    }
-    this.inMemoryRequests.set(id, record);
-    return id;
-  }
-
-  async getRequestById(id: string): Promise<DualControlRequestRecord | null> {
-    if (this.inMemoryRequests.has(id)) {
-      return this.inMemoryRequests.get(id) || null;
-    }
-    const pool = getDbPool();
-    if (pool) {
-      try {
-        const res = await pool.query(
-          `SELECT id, action_type AS "actionType", requested_by AS "requestedBy",
-                  approved_by AS "approvedBy", payload, status,
-                  expires_at AS "expiresAt", created_at AS "createdAt"
-           FROM dual_control_requests
-           WHERE id = $1 LIMIT 1`,
-          [id]
-        );
-        if (res.rows.length > 0) {
-          const row = res.rows[0];
-          return {
-            id: row.id,
-            actionType: row.actionType,
-            requestedBy: row.requestedBy,
-            approvedBy: row.approvedBy,
-            payload: typeof row.payload === 'string' ? JSON.parse(row.payload) : row.payload,
-            reason: row.payload?.reason || 'Dual-control request',
-            status: row.status,
-            expiresAt: new Date(row.expiresAt).toISOString(),
-            createdAt: new Date(row.createdAt).toISOString(),
-          };
-        }
-        return this.inMemoryRequests.get(id) || null;
-      } catch (err: any) {
-        throw new Error(`DB_DUAL_CONTROL_GET_FAILED: ${err?.message}`);
-      }
-    }
-    return this.inMemoryRequests.get(id) || null;
-  }
-
-  async updateRequestStatus(id: string, status: string, approvedBy?: string, expectedStatus?: string): Promise<boolean> {
-    const memReq = this.inMemoryRequests.get(id);
-    const pool = getDbPool();
-    if (pool) {
-      try {
-        const validApproverId = approvedBy ? await ensureUserEntity(pool, approvedBy) : null;
-        const res = await pool.query(
-          `UPDATE dual_control_requests
-           SET status = $1, approved_by = COALESCE($2, approved_by)
-           WHERE id = $3 AND ($4::varchar IS NULL OR status = $4)`,
-          [status, validApproverId, id, expectedStatus || null]
-        );
-        if (expectedStatus && res.rowCount === 0 && !memReq) {
-          return false;
-        }
-      } catch (err: any) {
-        if (!memReq) {
-          throw new Error(`DB_DUAL_CONTROL_UPDATE_FAILED: ${err?.message}`);
-        }
-      }
-    }
-    if (memReq) {
-      if (expectedStatus && memReq.status !== expectedStatus) {
-        return false;
-      }
-      memReq.status = status as any;
-      if (approvedBy) memReq.approvedBy = approvedBy;
-    }
-    return true;
-  }
-
-  async createAuditLog(entry: {
-    actorId: string;
-    action: string;
-    entityId?: string;
-    payloadBefore?: unknown;
-    payloadAfter?: unknown;
-    reason?: string;
-  }): Promise<void> {
-    this.inMemoryAuditLogs.push({ ...entry, timestamp: new Date().toISOString() });
-    const pool = getDbPool();
-    if (pool) {
-      try {
-        const validActorId = await ensureUserEntity(pool, entry.actorId);
-        await pool.query(
-          `INSERT INTO audit_logs (
-            actor_id, action, entity_id, payload_before, payload_after, reason, created_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
-          [
-            validActorId,
-            entry.action,
-            entry.entityId && isUuid(entry.entityId) ? entry.entityId : null,
-            JSON.stringify(entry.payloadBefore || {}),
-            JSON.stringify(entry.payloadAfter || {}),
-            entry.reason || null,
-          ]
-        );
-      } catch {
-        // Non-blocking fallback
-      }
-    }
-  }
-}
-
-export const defaultDualControlDbAdapter = new PostgresDualControlDbAdapter();
+// POSTGRES DUAL-CONTROL DB ADAPTER -> Extracted to packages/db/dual-control-repo.ts (Phase AF1)
 
 
 // ============================================================================
@@ -5542,6 +5230,16 @@ import {
   PostgresProposalDbAdapter,
   registerProposalRepoDeps,
 } from '../db/proposal-repo';
+import {
+  HandleConflictError,
+  PostgresKolDbAdapter,
+  inMemoryKolProfiles,
+  registerKolRepoDeps,
+} from '../db/kol-repo';
+import {
+  PostgresDualControlDbAdapter,
+  registerDualControlRepoDeps,
+} from '../db/dual-control-repo';
 
 registerProviderVaultRepoDeps({
   getDbPool,
@@ -5574,12 +5272,27 @@ registerProposalRepoDeps({
   isUuid,
 });
 
+registerKolRepoDeps({
+  getDbPool,
+  ensureUserEntity,
+  isUuid,
+});
+
+registerDualControlRepoDeps({
+  getDbPool,
+  ensureUserEntity,
+  isUuid,
+});
+
 export {
+  HandleConflictError,
   PostgresProviderKeyVaultAdapter,
   PostgresCustomAgentAdapter,
   PostgresGameFiDbAdapter,
   PostgresKillSwitchDbAdapter,
   PostgresProposalDbAdapter,
+  PostgresKolDbAdapter,
+  PostgresDualControlDbAdapter,
   type UserProviderKeyMeta,
 };
 
@@ -5588,3 +5301,5 @@ export const defaultCustomAgentAdapter = new PostgresCustomAgentAdapter();
 export const defaultGameFiDbAdapter = new PostgresGameFiDbAdapter();
 export const defaultKillSwitchDbAdapter = new PostgresKillSwitchDbAdapter();
 export const defaultProposalDbAdapter = new PostgresProposalDbAdapter();
+export const defaultKolDbAdapter = new PostgresKolDbAdapter();
+export const defaultDualControlDbAdapter = new PostgresDualControlDbAdapter();
