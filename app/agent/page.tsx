@@ -126,21 +126,21 @@ export default function AgentPage() {
       {/* Top Banner */}
       <div className="bg-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderRadius: '8px' }}>
         <div>
-          <h1 style={{ fontSize: '20px', fontWeight: 900, margin: '0 0 4px 0', color: '#D500F9', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Bot size={20} /> AI Agent Intelligence & Proposal Sandbox
+          <h1 style={{ fontSize: '20px', fontWeight: 800, margin: '0 0 4px 0', color: 'var(--color-foreground)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Bot size={20} color="#8AB4F8" /> Asisten AI &amp; Strategi Trading
           </h1>
-          <p className="text-muted" style={{ margin: 0, fontSize: '12px' }}>
-            Proposal-only AI strategy engine with multi-factor fusion (Arkham, Firecrawl, Binance OHLCV, DefiLlama Macro TVL).
+          <p className="text-muted" style={{ margin: 0, fontSize: '13px' }}>
+            Analisis peluang beli/jual berbasis data pasar live, likuiditas DEX, dan sentimen — seluruh eksekusi tetap memerlukan persetujuan Anda.
           </p>
         </div>
         <div className="flex-row gap-sm items-center">
           {(userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN') && (
             <span className="badge badge-admin">
-              👑 FEATURE WEIGHT ADMIN ACTIVE
+              👑 Admin Aktif
             </span>
           )}
-          <span className="badge" style={{ backgroundColor: '#1C0D2E', color: '#D500F9', border: '1px solid #3B1566' }}>
-            PROPOSAL-ONLY GUARANTEED
+          <span className="badge" style={{ backgroundColor: 'rgba(138, 180, 248, 0.12)', color: '#8AB4F8', border: '1px solid rgba(138, 180, 248, 0.3)' }}>
+            Mode Rekomendasi (Aman)
           </span>
         </div>
       </div>
@@ -331,11 +331,11 @@ export default function AgentPage() {
         <div className="bg-panel" style={{ border: '1px solid #FF9100', borderRadius: '8px', padding: '24px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '16px' }}>
             <div>
-              <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#FFD600', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Settings2 size={18} /> System Admin: Multi-Factor Intelligence Engine Weights (SSOT)
+              <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#FFD600', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Settings2 size={18} /> Pengaturan Bobot Analisis AI (Admin)
               </h3>
-              <p className="text-muted" style={{ margin: '4px 0 0 0', fontSize: '11px' }}>
-                Atur bobot skoring AI untuk FeatureEngine. Sistem otomatis menormalisasi total bobot ke 100% saat disimpan ke PostgreSQL.
+              <p className="text-muted" style={{ margin: '4px 0 0 0', fontSize: '12px' }}>
+                Atur persentase pengaruh tiap sumber data pada skor rekomendasi AI. Total bobot otomatis dinormalisasi ke 100% saat disimpan.
               </p>
             </div>
             <div className="flex-row gap-sm items-center">
@@ -358,7 +358,7 @@ export default function AgentPage() {
                 className="btn-primary"
                 style={{ padding: '6px 12px', fontSize: '11px' }}
               >
-                {weightsSaving ? 'Saving...' : 'Simpan Bobot ke SSOT'}
+                {weightsSaving ? 'Menyimpan...' : 'Simpan Pengaturan'}
               </button>
             </div>
           </div>

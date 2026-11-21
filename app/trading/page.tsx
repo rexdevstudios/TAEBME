@@ -73,69 +73,153 @@ interface TradingAnalysis {
   tradingPaused: boolean;
 }
 
-// Data-Dense High-Contrast SVG Candlestick & Volume Chart
+// Interactive Gemini-Styled Candlestick & Volume Chart with Hover Crosshair, OHLCV Tooltip & Price Scale
 function CandlestickChart({ candles }: { candles: Candle[] }) {
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+
   if (!candles || candles.length === 0) {
-    return <div className="text-muted" style={{ padding: '3rem', textAlign: 'center', fontSize: '12px' }}>Loading chart data...</div>;
+    return <div className="text-muted" style={{ padding: '3rem', textAlign: 'center', fontSize: '13px' }}>Memuat data grafik pasar...</div>;
   }
 
-  const width = 600;
-  const height = 240;
-  const padding = 16;
+  const width = 640;
+  const height = 268;
+  const padLeft = 12;
+  const padRight = 64;
+  const padTop = 16;
+  const padBottom = 46;
+  const plotW = width - padLeft - padRight;
+  const plotH = height - padTop - padBottom;
 
   const minPrice = Math.min(...candles.map((c) => c.low));
   const maxPrice = Math.max(...candles.map((c) => c.high));
   const priceRange = maxPrice - minPrice || 1;
   const maxVol = Math.max(...candles.map((c) => c.volume)) || 1;
-  const candleWidth = (width - padding * 2) / candles.length;
+  const candleWidth = plotW / candles.length;
+
+  const formatPx = (p: number) => (p >= 100 ? p.toFixed(2) : p >= 1 ? p.toFixed(4) : p.toFixed(6));
+  const toY = (p: number) => padTop + (1 - (p - minPrice) / priceRange) * plotH;
+
+  const activeIdx = hoverIdx !== null && candles[hoverIdx] ? hoverIdx : candles.length - 1;
+  const activeCandle = candles[activeIdx];
+  const isBullActive = activeCandle.close >= activeCandle.open;
+  const changePct = activeCandle.open > 0 ? ((activeCandle.close - activeCandle.open) / activeCandle.open) * 100 : 0;
+
+  const lastCandle = candles[candles.length - 1];
+  const lastY = toY(lastCandle.close);
+  const priceLevels = [maxPrice, minPrice + priceRange * 0.66, minPrice + priceRange * 0.33, minPrice];
 
   return (
-    <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} style={{ overflow: 'visible' }}>
-      {/* Price Grid Lines */}
-      <line x1={padding} y1={padding} x2={width - padding} y2={padding} stroke="var(--color-border)" strokeDasharray="2 2" />
-      <line x1={padding} y1={height / 2} x2={width - padding} y2={height / 2} stroke="var(--color-border)" strokeDasharray="2 2" />
-      <line x1={padding} y1={height - padding - 40} x2={width - padding} y2={height - padding - 40} stroke="var(--color-border)" strokeDasharray="2 2" />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      {/* Floating OHLCV Telemetry Bar */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '10px',
+          fontSize: '11px',
+          fontFamily: 'var(--font-mono)',
+          color: 'var(--color-muted)',
+          padding: '4px 6px',
+        }}
+      >
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          <span>O: <strong style={{ color: '#E3E3E3' }}>{formatPx(activeCandle.open)}</strong></span>
+          <span>H: <strong style={{ color: '#34D399' }}>{formatPx(activeCandle.high)}</strong></span>
+          <span>L: <strong style={{ color: '#F28B82' }}>{formatPx(activeCandle.low)}</strong></span>
+          <span>C: <strong style={{ color: isBullActive ? '#34D399' : '#F28B82' }}>{formatPx(activeCandle.close)}</strong></span>
+          <span>Vol: <strong style={{ color: '#8AB4F8' }}>{Math.round(activeCandle.volume).toLocaleString()}</strong></span>
+        </div>
+        <span style={{ color: isBullActive ? '#34D399' : '#F28B82', fontWeight: 700 }}>
+          {changePct >= 0 ? `+${changePct.toFixed(2)}%` : `${changePct.toFixed(2)}%`} · {new Date(activeCandle.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        </span>
+      </div>
 
-      {/* Candles */}
-      {candles.map((c, i) => {
-        const isBull = c.close >= c.open;
-        const color = isBull ? '#10B981' : '#EF4444';
-        const x = padding + i * candleWidth + candleWidth / 2;
-        const chartHeight = height - padding * 2 - 40;
+      <svg
+        width="100%"
+        height={height}
+        viewBox={`0 0 ${width} ${height}`}
+        style={{ overflow: 'visible', cursor: 'crosshair' }}
+        onMouseLeave={() => setHoverIdx(null)}
+      >
+        {/* Horizontal Price Grid Lines & Right Y-Axis Price Labels */}
+        {priceLevels.map((lvl, idx) => {
+          const y = toY(lvl);
+          return (
+            <g key={idx}>
+              <line x1={padLeft} y1={y} x2={width - padRight} y2={y} stroke="rgba(255,255,255,0.07)" strokeDasharray="3 3" />
+              <text x={width - padRight + 6} y={y + 3} fill="#9AA0A6" fontSize="9.5" fontFamily="monospace">
+                {formatPx(lvl)}
+              </text>
+            </g>
+          );
+        })}
 
-        const yHigh = padding + (1 - (c.high - minPrice) / priceRange) * chartHeight;
-        const yLow = padding + (1 - (c.low - minPrice) / priceRange) * chartHeight;
-        const yOpen = padding + (1 - (c.open - minPrice) / priceRange) * chartHeight;
-        const yClose = padding + (1 - (c.close - minPrice) / priceRange) * chartHeight;
+        {/* Live Last-Price Dashed Line & Pill */}
+        <line x1={padLeft} y1={lastY} x2={width - padRight} y2={lastY} stroke="#8AB4F8" strokeWidth="1" strokeDasharray="4 4" opacity="0.7" />
+        <rect x={width - padRight + 2} y={lastY - 8} width={60} height={16} rx="4" fill="#4285F4" />
+        <text x={width - padRight + 6} y={lastY + 3} fill="#FFFFFF" fontSize="9" fontWeight="700" fontFamily="monospace">
+          {formatPx(lastCandle.close)}
+        </text>
 
-        const candleTop = Math.min(yOpen, yClose);
-        const candleBodyHeight = Math.max(2, Math.abs(yClose - yOpen));
-        const volHeight = (c.volume / maxVol) * 35;
-        const yVol = height - padding - volHeight;
+        {/* Candles + Interactive Hover Hitboxes */}
+        {candles.map((c, i) => {
+          const isBull = c.close >= c.open;
+          const color = isBull ? '#34D399' : '#F28B82';
+          const x = padLeft + i * candleWidth + candleWidth / 2;
 
-        return (
-          <g key={i}>
-            <line x1={x} y1={yHigh} x2={x} y2={yLow} stroke={color} strokeWidth="1.2" />
-            <rect
-              x={x - candleWidth * 0.35}
-              y={candleTop}
-              width={candleWidth * 0.7}
-              height={candleBodyHeight}
-              fill={color}
-              rx="1"
-            />
-            <rect
-              x={x - candleWidth * 0.35}
-              y={yVol}
-              width={candleWidth * 0.7}
-              height={volHeight}
-              fill={color}
-              opacity="0.25"
-            />
-          </g>
-        );
-      })}
-    </svg>
+          const yHigh = toY(c.high);
+          const yLow = toY(c.low);
+          const yOpen = toY(c.open);
+          const yClose = toY(c.close);
+
+          const candleTop = Math.min(yOpen, yClose);
+          const candleBodyHeight = Math.max(2, Math.abs(yClose - yOpen));
+          const volHeight = (c.volume / maxVol) * 32;
+          const yVol = height - 8 - volHeight;
+          const isHovered = hoverIdx === i;
+
+          return (
+            <g key={i} onMouseEnter={() => setHoverIdx(i)}>
+              {isHovered && (
+                <>
+                  <line x1={x} y1={padTop} x2={x} y2={height - 8} stroke="rgba(138, 180, 248, 0.45)" strokeWidth="1" strokeDasharray="3 3" />
+                  <line x1={padLeft} y1={yClose} x2={width - padRight} y2={yClose} stroke="rgba(138, 180, 248, 0.35)" strokeWidth="1" strokeDasharray="3 3" />
+                </>
+              )}
+              <line x1={x} y1={yHigh} x2={x} y2={yLow} stroke={color} strokeWidth={isHovered ? '1.8' : '1.2'} />
+              <rect
+                x={x - candleWidth * 0.34}
+                y={candleTop}
+                width={Math.max(2, candleWidth * 0.68)}
+                height={candleBodyHeight}
+                fill={color}
+                rx="1.5"
+                opacity={isHovered ? 1 : 0.9}
+              />
+              <rect
+                x={x - candleWidth * 0.34}
+                y={yVol}
+                width={Math.max(2, candleWidth * 0.68)}
+                height={volHeight}
+                fill={color}
+                opacity={isHovered ? 0.5 : 0.22}
+                rx="1"
+              />
+              {/* Invisible full-height hitbox for smooth hover */}
+              <rect
+                x={padLeft + i * candleWidth}
+                y={padTop}
+                width={candleWidth}
+                height={height - padTop}
+                fill="transparent"
+              />
+            </g>
+          );
+        })}
+      </svg>
+    </div>
   );
 }
 

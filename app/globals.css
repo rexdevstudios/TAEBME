@@ -1,18 +1,19 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
-  /* Cyberpunk Terminal Design System Colors */
-  --color-primary: #0F172A;
-  --color-on-primary: #FFFFFF;
-  --color-secondary: #1E293B;
-  --color-accent: #22C55E; /* Neon Green */
-  --color-background: #020617; /* Very Dark Blue/Black */
-  --color-foreground: #F8FAFC;
-  --color-muted: #94A3B8; /* High-contrast readable muted text */
-  --color-muted-bg: #1A1E2F; /* Muted container background */
-  --color-border: #334155;
-  --color-destructive: #EF4444;
-  --color-ring: #0F172A;
+  /* Gemini Web Dark Mode Design System Colors */
+  --color-primary: #1E1F20;
+  --color-on-primary: #E3E3E3;
+  --color-secondary: #282A2C;
+  --color-accent: #8AB4F8; /* Gemini Soft Blue */
+  --color-accent-emerald: #34D399;
+  --color-background: #131314; /* Gemini Dark Canvas */
+  --color-foreground: #E3E3E3;
+  --color-muted: #9AA0A6; /* Soft high-contrast muted text */
+  --color-muted-bg: #282A2C;
+  --color-border: rgba(255, 255, 255, 0.09);
+  --color-destructive: #F28B82;
+  --color-ring: #8AB4F8;
 
   /* Spacing Variables */
   --space-xs: 4px;
@@ -23,12 +24,12 @@
   --space-2xl: 48px;
   --space-3xl: 64px;
 
-  /* Shadows */
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
-  --shadow-md: 0 4px 6px rgba(0,0,0,0.3);
-  --shadow-lg: 0 10px 15px rgba(0,0,0,0.5);
-  --shadow-xl: 0 20px 25px rgba(0,0,0,0.7);
-  --shadow-neon: 0 0 10px rgba(34, 197, 94, 0.4);
+  /* Soft Material-You Elevations */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 10px 28px rgba(0, 0, 0, 0.45);
+  --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.55);
+  --shadow-neon: 0 4px 18px rgba(138, 180, 248, 0.22);
 }
 
 * {
@@ -37,11 +38,12 @@
 
 body {
   margin: 0;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
   background-color: var(--color-background);
   color: var(--color-foreground);
   min-height: 100vh;
-  line-height: 1.5;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
 }
 
@@ -65,6 +67,7 @@ a {
 .bg-panel {
   background-color: var(--color-primary);
   border: 1px solid var(--color-border);
+  border-radius: 16px;
 }
 
 .flex-row {
@@ -89,21 +92,22 @@ a {
 .card {
   background-color: var(--color-primary);
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: 18px;
   padding: var(--space-lg);
   box-shadow: var(--shadow-sm);
-  transition: all 200ms ease;
+  transition: background-color 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
 }
 .card:hover {
-  border-color: #475569;
+  border-color: rgba(138, 180, 248, 0.25);
+  background-color: #222325;
   box-shadow: var(--shadow-md);
 }
 
 .btn-primary {
-  background: var(--color-accent);
-  color: #000000;
+  background: linear-gradient(135deg, #4285F4 0%, #7B8FF7 55%, #9B72CB 100%);
+  color: #FFFFFF;
   padding: 10px 20px;
-  border-radius: 6px;
+  border-radius: 9999px;
   font-weight: 600;
   border: none;
   transition: all 200ms ease;
@@ -114,23 +118,23 @@ a {
   box-shadow: var(--shadow-neon);
 }
 .btn-primary:hover {
-  background: #16A34A;
+  filter: brightness(1.08);
   transform: translateY(-1px);
 }
 .btn-primary:disabled {
-  background: var(--color-border);
-  color: #94A3B8;
+  background: var(--color-secondary);
+  color: var(--color-muted);
   cursor: not-allowed;
   box-shadow: none;
   transform: none;
 }
 
 .btn-secondary {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.03);
   color: var(--color-foreground);
   border: 1px solid var(--color-border);
-  padding: 10px 20px;
-  border-radius: 6px;
+  padding: 10px 18px;
+  border-radius: 9999px;
   font-weight: 500;
   transition: all 200ms ease;
   cursor: pointer;
@@ -139,16 +143,16 @@ a {
   gap: 8px;
 }
 .btn-secondary:hover {
-  border-color: var(--color-foreground);
+  border-color: rgba(138, 180, 248, 0.4);
   background: var(--color-secondary);
 }
 
 .btn-destructive {
-  background: transparent;
+  background: rgba(242, 139, 130, 0.08);
   color: var(--color-destructive);
-  border: 1px solid var(--color-destructive);
-  padding: 10px 20px;
-  border-radius: 6px;
+  border: 1px solid rgba(242, 139, 130, 0.35);
+  padding: 10px 18px;
+  border-radius: 9999px;
   font-weight: 600;
   transition: all 200ms ease;
   cursor: pointer;
@@ -157,35 +161,34 @@ a {
   gap: 8px;
 }
 .btn-destructive:hover {
-  background: var(--color-destructive);
+  background: #EF4444;
   color: #fff;
 }
 
 .input {
   padding: 12px 16px;
-  background-color: var(--color-background);
+  background-color: #131314;
   color: var(--color-foreground);
   border: 1px solid var(--color-border);
-  border-radius: 6px;
-  font-size: 16px;
-  transition: border-color 200ms ease;
+  border-radius: 12px;
+  font-size: 14px;
+  transition: border-color 200ms ease, box-shadow 200ms ease;
   width: 100%;
 }
 .input:focus {
   border-color: var(--color-accent);
   outline: none;
-  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2);
+  box-shadow: 0 0 0 2px rgba(138, 180, 248, 0.2);
 }
 
 .badge {
   display: inline-flex;
   align-items: center;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 .badge-admin {
   background-color: rgba(239, 68, 68, 0.1);
@@ -208,9 +211,9 @@ a {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 32px;
-  background-color: rgba(15, 23, 42, 0.8);
-  backdrop-filter: blur(8px);
+  padding: 12px 24px;
+  background-color: rgba(19, 19, 20, 0.88);
+  backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--color-border);
   position: sticky;
   top: 0;
@@ -222,16 +225,19 @@ a {
   gap: 24px;
 }
 .nav-link {
-  color: #94A3B8;
+  color: var(--color-muted);
   font-weight: 500;
   font-size: 14px;
-  transition: color 200ms ease;
+  border-radius: 9999px;
+  transition: color 200ms ease, background-color 200ms ease;
 }
 .nav-link:hover {
   color: var(--color-foreground);
+  background-color: rgba(255, 255, 255, 0.05);
 }
 .nav-link-active {
-  color: var(--color-accent);
+  color: #FFFFFF;
+  background-color: rgba(138, 180, 248, 0.14);
 }
 
 /* Grid Layouts */
@@ -251,35 +257,33 @@ a {
 .terminal-text {
   font-family: 'Courier New', Courier, monospace;
   color: var(--color-accent);
-  text-shadow: 0 0 5px rgba(34,197,94,0.3);
 }
 
-/* PoolNet Brand Text */
+/* PoolNet Brand Text (Gemini Gradient) */
 .poolnet-brand {
-  font-family: 'Inter', system-ui, sans-serif;
-  font-weight: 900;
-  letter-spacing: -0.5px;
-  background: linear-gradient(135deg, #00E5FF 0%, #22C55E 100%);
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+  background: linear-gradient(135deg, #4285F4 0%, #9B72CB 55%, #D96570 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
   text-shadow: none;
-  filter: drop-shadow(0 0 8px rgba(0, 229, 255, 0.35));
 }
 
 /* Web3 Modern Utility Classes */
 
-/* Frosted glass panel - for hero sections and feature cards */
+/* Frosted glass panel - Gemini soft surface */
 .glass-panel {
-  backdrop-filter: blur(12px) saturate(120%);
-  background: rgba(15, 23, 42, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
+  backdrop-filter: blur(14px) saturate(115%);
+  background: rgba(30, 31, 32, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 20px;
 }
 
-/* Ambient neon accent glow - Base Blue + Cyan drop-shadow */
+/* Soft Gemini glow */
 .glow-accent {
-  filter: drop-shadow(0 0 12px rgba(0, 229, 255, 0.45)) drop-shadow(0 0 24px rgba(34, 197, 94, 0.2));
+  filter: drop-shadow(0 0 12px rgba(138, 180, 248, 0.35));
 }
 
 /* Live on-chain status pulse badge */

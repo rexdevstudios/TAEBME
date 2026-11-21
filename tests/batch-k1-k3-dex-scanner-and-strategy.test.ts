@@ -84,6 +84,12 @@ describe('Phase K1–K3 — Modular DEX Market Scanner & Strategy Profiles', () 
         saveTradeIntent: async () => 'intent-k1-001',
         fetchMacroSignal: async () => null,
         fetchDexSnapshot: async () => sampleHealthySnapshot,
+        generateAdvisory: async () => ({
+          provider: 'DETERMINISTIC_FALLBACK',
+          summary: 'Mock advisory for K1.3 deterministic test',
+          caution: 'Advisory only',
+          generatedAt: new Date().toISOString(),
+        }),
       }
     );
 

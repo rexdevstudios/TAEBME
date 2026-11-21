@@ -338,44 +338,44 @@ export default function BillingPage() {
   return (
     <div className="flex-col gap-lg">
       {/* Top Banner */}
-      <div className="bg-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', padding: '16px', borderRadius: '8px' }}>
+      <div className="bg-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', padding: '18px 20px', borderRadius: '16px' }}>
         <div>
-          <h1 style={{ fontSize: '20px', fontWeight: 900, margin: '0 0 4px 0', color: '#FFC400', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <CreditCard size={20} /> Subscription Tiers, Credit Ledger &amp; Business Fees
+          <h1 style={{ fontSize: '20px', fontWeight: 800, margin: '0 0 4px 0', color: 'var(--color-foreground)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <CreditCard size={20} color="#8AB4F8" /> Paket Layanan &amp; Kredit
           </h1>
-          <p className="text-muted" style={{ margin: 0, fontSize: '12px' }}>
-            PostgreSQL SSOT double-entry credit ledger (`plans`, `subscriptions`, `ledger_entries`) &amp; non-custodial on-chain settlement verifier.
+          <p className="text-muted" style={{ margin: 0, fontSize: '13px' }}>
+            Pilih paket sesuai kebutuhan Anda, kelola saldo kredit bulanan, dan pantau seluruh riwayat penggunaan akun.
           </p>
         </div>
         <div className="flex-row gap-sm items-center">
           {isConnected && (
             <>
-              <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', fontFamily: 'var(--font-mono)' }}>
-                <span className="text-muted">Tier: </span>
-                <span style={{ color: '#FFC400', fontWeight: 900 }}>{activePlanId}</span>
+              <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '6px 12px', borderRadius: '999px', fontSize: '12px' }}>
+                <span className="text-muted">Paket: </span>
+                <span style={{ color: '#FFC400', fontWeight: 800 }}>{activePlanId}</span>
               </div>
-              <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', fontFamily: 'var(--font-mono)' }}>
-                <span className="text-muted">Balance: </span>
-                <span style={{ color: 'var(--color-accent)', fontWeight: 900 }}>{credits.toLocaleString()} Credits</span>
+              <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '6px 12px', borderRadius: '999px', fontSize: '12px' }}>
+                <span className="text-muted">Saldo: </span>
+                <span style={{ color: '#8AB4F8', fontWeight: 800 }}>{credits.toLocaleString()} Kredit</span>
               </div>
             </>
           )}
-          <span className="badge badge-trader" style={{ border: '1px solid #00E676', color: '#00E676', backgroundColor: '#041E15' }}>
-            {loading ? 'LOADING...' : 'SSOT PLANS ACTIVE'}
+          <span className="badge badge-trader" style={{ border: '1px solid rgba(52, 211, 153, 0.35)', color: '#6EE7B7', backgroundColor: 'rgba(52, 211, 153, 0.1)' }}>
+            {loading ? 'Memuat...' : 'Paket Aktif'}
           </span>
         </div>
       </div>
 
       {/* Workflow & Plan Entitlement Guide */}
       <PageWorkflowBanner
-        title="Alur Paket, Pembayaran & Ledger Kredit"
+        title="Cara Berlangganan & Menggunakan Kredit"
         isUnlocked={true}
-        creditSummary={`Burn Saat Ini: Studio ${studioCostCr} cr · Desk ${deskCostCr} cr · Launch ${launchCostCr} cr`}
+        creditSummary={`Tarif Fitur: Studio ${studioCostCr} cr · AI Desk ${deskCostCr} cr · Launch ${launchCostCr} cr`}
         steps={[
           { step: '1', label: 'Pilih Paket (FREE / CREATOR / TRADER / AGENT)' },
-          { step: '2', label: 'Bayar 1-Click ETH via MetaMask / Promo Diskon' },
-          { step: '3', label: 'Role & Kredit Otomatis Aktif di SSOT' },
-          { step: '4', label: 'Pantau Mutasi di Ledger Statement' },
+          { step: '2', label: 'Bayar 1-Klik ETH via MetaMask / Promo' },
+          { step: '3', label: 'Paket & Kredit Langsung Aktif' },
+          { step: '4', label: 'Pantau Riwayat di Mutasi Kredit' },
         ]}
       />
 
@@ -607,11 +607,11 @@ export default function BillingPage() {
         <div className="bg-panel" style={{ border: '1px solid var(--color-border)', borderRadius: '8px', padding: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
             <div>
-              <h3 style={{ fontSize: '15px', fontWeight: 900, color: 'var(--color-foreground)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <History size={16} color="var(--color-accent)" /> Double-Entry Credit Ledger Statement (`ledger_entries`)
+              <h3 style={{ fontSize: '15px', fontWeight: 800, color: 'var(--color-foreground)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <History size={16} color="var(--color-accent)" /> Riwayat Mutasi Kredit
               </h3>
-              <p className="text-muted" style={{ margin: '2px 0 0 0', fontSize: '11px' }}>
-                Riwayat penambahan kredit tier (`+SUBSCRIPTION_GRANT`) dan pemotongan otomatis fitur (`-1 AI_ASSET_STUDIO`, `-5 FIVE_AGENT_DESK_RUN`, `-50 TOKEN_LAUNCH_PUBLISH`).
+              <p className="text-muted" style={{ margin: '2px 0 0 0', fontSize: '12px' }}>
+                Catatan lengkap penambahan kredit paket, bonus quest, dan pemakaian fitur AI / peluncuran token.
               </p>
             </div>
             <button
@@ -682,11 +682,11 @@ export default function BillingPage() {
       {(hasCapability('MANAGE_BILLING_PLANS') || userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN' || userRole === 'BILLING_ADMIN') && (
         <div className="bg-panel" style={{ border: '1px solid #FF9100', borderRadius: '8px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div>
-            <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#FFD600', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <ShieldAlert size={18} /> Admin Tier Discount &amp; Promo Campaign Manager (SSOT `plans`)
+            <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#FFD600', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <ShieldAlert size={18} /> Pengaturan Diskon &amp; Promo Paket (Admin)
             </h3>
             <p className="text-muted" style={{ margin: 0, fontSize: '12px' }}>
-              Atur persentase diskon (`0% - 100%`) dan label promo pada paket layanan (`CREATOR`, `TRADER`, `AGENT`). Perubahan langsung tersimpan di PostgreSQL (`plans.features`) dan otomatis memotong harga USD &amp; ETH di seluruh halaman.
+              Atur persentase diskon (0% – 100%) dan label promo pada paket layanan. Perubahan langsung memotong harga USD &amp; ETH di seluruh halaman.
             </p>
           </div>
 

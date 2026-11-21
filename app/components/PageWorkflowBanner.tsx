@@ -75,8 +75,8 @@ export function PageWorkflowBanner({
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           {!isConnected ? (
-            <span style={{ fontSize: '11px', color: 'var(--color-muted)', fontFamily: 'var(--font-mono)' }}>
-              Mode Pengunjung (Connect MetaMask SIWE untuk akses penuh)
+            <span style={{ fontSize: '11px', color: 'var(--color-muted)' }}>
+              Mode Pengunjung (Hubungkan Dompet MetaMask untuk akses penuh)
             </span>
           ) : isUnlocked ? (
             <span

@@ -523,9 +523,9 @@ export default function OverviewPage() {
               Welcome back, {walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : 'User'}
             </h1>
             <p className="text-muted" style={{ margin: 0, fontSize: '13px' }}>
-              Authenticated as <strong className="text-accent">{userRole}</strong> via EIP-4361 SIWE · Active Tier:{' '}
-              <strong style={{ color: '#FFC400' }}>{activeTier}</strong> · Balance:{' '}
-              <strong style={{ color: 'var(--color-accent)' }}>{credits.toLocaleString()} Credits</strong>
+              Terhubung sebagai <strong className="text-accent">{userRole}</strong> · Paket Aktif:{' '}
+              <strong style={{ color: '#FFC400' }}>{activeTier}</strong> · Saldo:{' '}
+              <strong style={{ color: 'var(--color-accent)' }}>{credits.toLocaleString()} Kredit</strong>
             </p>
           </div>
           <a href="/trading" className="btn-primary" style={{ textDecoration: 'none', padding: '8px 14px', fontSize: '13px' }}>
@@ -576,10 +576,10 @@ export default function OverviewPage() {
               <ShieldAlert size={18} className="text-accent" /> Security &amp; Risk Guardrails
             </h3>
             <ul style={{ paddingLeft: '18px', color: 'var(--color-foreground)', margin: 0, fontSize: '13px' }} className="flex-col gap-sm">
-              <li>Session: <span className="text-accent">Active (HttpOnly SIWE)</span></li>
-              <li>Wallet: <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--color-accent)' }}>{walletAddress ? `${walletAddress.slice(0, 8)}...${walletAddress.slice(-4)}` : '—'}</span></li>
-              <li>Max Order Size: <span>$10,000 <span style={{ color: '#94A3B8', fontSize: '11px' }}>(Risk Gate)</span></span></li>
-              <li>Max Slippage Cap: <span>3.0% <span style={{ color: '#94A3B8', fontSize: '11px' }}>(Immutable)</span></span></li>
+              <li>Sesi Dompet: <span className="text-accent">Aktif &amp; Aman</span></li>
+              <li>Dompet: <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--color-accent)' }}>{walletAddress ? `${walletAddress.slice(0, 8)}...${walletAddress.slice(-4)}` : '—'}</span></li>
+              <li>Batas Order Maks: <span>$10,000 <span style={{ color: '#94A3B8', fontSize: '11px' }}>(Risk Guard)</span></span></li>
+              <li>Batas Slippage Maks: <span>3.0% <span style={{ color: '#94A3B8', fontSize: '11px' }}>(Otomatis)</span></span></li>
             </ul>
           </div>
 
@@ -604,7 +604,7 @@ export default function OverviewPage() {
             {activeLaunches.length > 0 ? (
               <div className="flex-col gap-xs" style={{ fontSize: '12px' }}>
                 <div style={{ color: 'var(--color-foreground)', fontWeight: 700 }}>
-                  {activeLaunches.length} Active Token Launch(es) in SSOT:
+                  {activeLaunches.length} Token Aktif:
                 </div>
                 {activeLaunches.slice(0, 3).map((t: any, idx: number) => (
                   <div key={t.launchId || idx} style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', color: '#CBD5E1' }}>
@@ -636,7 +636,7 @@ export default function OverviewPage() {
                 <Award size={17} /> GameFi Trader Pass &amp; On-Chain Quest Progression
               </h3>
               <p className="text-muted" style={{ margin: '2px 0 0 0', fontSize: '12px' }}>
-                Idempoten di PostgreSQL SSOT: selesaikan Daily Check-In &amp; Milestone Quests untuk memperoleh XP, Bonus Kredit, dan kualifikasi Trader Pass NFT (`BRONZE` → `SILVER 250 XP` → `GOLD 500 XP`).
+                Selesaikan Daily Check-In &amp; misi akun untuk memperoleh XP, Bonus Kredit, dan membuka Trader Pass NFT (BRONZE → SILVER 250 XP → GOLD 500 XP).
               </p>
             </div>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
@@ -886,8 +886,8 @@ export default function OverviewPage() {
         {/* Governance Audit Log Viewer (SSOT `audit_logs`) */}
         <div className="bg-panel" style={{ padding: '16px', borderRadius: '6px', marginBottom: '16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
-            <div style={{ color: '#00E5FF', fontSize: '12px', fontWeight: 800 }}>
-              📜 Governance Audit Trail (`audit_logs` — PostgreSQL SSOT)
+            <div style={{ color: '#8AB4F8', fontSize: '12px', fontWeight: 800 }}>
+              📜 Riwayat Aktivitas Admin
             </div>
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
               {(['ALL', 'BILLING', 'KILL_SWITCH', 'LAUNCH', 'SNAPSHOT'] as const).map((f) => (
