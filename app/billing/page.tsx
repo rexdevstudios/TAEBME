@@ -743,7 +743,7 @@ export default function BillingPage() {
               🚀 Bankr Launchpad Vault (CREATOR+)
             </div>
             <p className="text-muted" style={{ fontSize: '11px', margin: '0 0 10px 0', lineHeight: 1.45 }}>
-              Simpan hingga 10 API Key Bankr dengan isolasi multi-chain (Base, Robinhood, Arbitrum, Arc).
+              Simpan hingga 15 (CREATOR) / 25 (AGENT) API Key Bankr (+ Permanent Add-On Slots) dengan isolasi multi-chain (Base, Robinhood, Arbitrum, Arc).
             </p>
             <a href="/launchpad" className="btn-secondary" style={{ fontSize: '11px', padding: '5px 10px', display: 'inline-block' }}>
               Kelola di /launchpad →
@@ -754,10 +754,21 @@ export default function BillingPage() {
               ⚡ Binance CEX Multi-Account (TRADER / AGENT)
             </div>
             <p className="text-muted" style={{ fontSize: '11px', margin: '0 0 10px 0', lineHeight: 1.45 }}>
-              Simpan hingga 10 akun API Binance Testnet/Mainnet (wajib Read + Trade Only, No-Withdrawal Guard).
+              Simpan hingga 5 (TRADER) / 15 (AGENT) akun API Binance Testnet/Mainnet (+ Add-On Slots) dengan No-Withdrawal Guard &amp; Live Ping.
             </p>
             <a href="/trading" className="btn-secondary" style={{ fontSize: '11px', padding: '5px 10px', display: 'inline-block' }}>
               Kelola di /trading →
+            </a>
+          </div>
+          <div style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+            <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--color-foreground)', marginBottom: '4px' }}>
+              🧠 BYOK LLM Vault (TRADER / AGENT)
+            </div>
+            <p className="text-muted" style={{ fontSize: '11px', margin: '0 0 10px 0', lineHeight: 1.45 }}>
+              Simpan hingga 3 (TRADER) / 5 (AGENT) key Google Gemini, OpenAI GPT-4o, &amp; Anthropic Claude (Sonnet/Haiku/Opus) — hemat 60% credits (2 Cr/run).
+            </p>
+            <a href="/agent" className="btn-secondary" style={{ fontSize: '11px', padding: '5px 10px', display: 'inline-block' }}>
+              Kelola di /agent →
             </a>
           </div>
           <div style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--color-border)' }}>

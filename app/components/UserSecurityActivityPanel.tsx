@@ -70,7 +70,7 @@ export function UserSecurityActivityPanel({ isConnected }: UserSecurityActivityP
 
       {rows.length === 0 ? (
         <div className="text-muted" style={{ fontSize: '12px' }}>
-          Belum ada catatan aktivitas keamanan (tambah API Key, verifikasi Binance, pembelian Add-On, atau update Risk Policy akan muncul otomatis di sini).
+          Belum ada catatan aktivitas keamanan (tambah API Key, verifikasi Binance / BYOK LLM / Webhook, pembelian Add-On, atau update Risk Policy akan muncul otomatis di sini).
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
