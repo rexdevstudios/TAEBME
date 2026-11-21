@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { Bot, ShieldAlert, Settings2, FileCode2, Target, BrainCircuit, Activity, BarChart3, Wallet } from 'lucide-react';
 import { FiveAgentDeskPanel } from '../components/FiveAgentDeskPanel';
 import { PageWorkflowBanner } from '../components/PageWorkflowBanner';
+import { UserRiskPolicyPanel } from '../components/UserRiskPolicyPanel';
 
 export default function AgentPage() {
   const { isConnected, userRole, hasCapability, entitlements, connectMetaMask, isConnecting, refreshSession } = useAuth();
@@ -166,6 +167,9 @@ export default function AgentPage() {
           { step: '4', label: 'Persetujuan Manual di /trading' },
         ]}
       />
+
+      {/* Non-Custodial Personal Risk Guard (Reused from /trading, Clamped to Billing Tier) */}
+      <UserRiskPolicyPanel isConnected={isConnected} />
 
       {/* 5-Agent Autonomous Trading Desk (100% Vercel-Native) */}
       <FiveAgentDeskPanel

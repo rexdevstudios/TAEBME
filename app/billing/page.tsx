@@ -766,7 +766,7 @@ export default function BillingPage() {
             <p className="text-muted" style={{ fontSize: '11px', margin: '0 0 10px 0', lineHeight: 1.45 }}>
               AI Desk hanya menghasilkan proposal terverifikasi Risk Gate; eksekusi DEX tetap 100% tanda tangan dompet Anda.
             </p>
-            <a href="/ai-desk" className="btn-secondary" style={{ fontSize: '11px', padding: '5px 10px', display: 'inline-block' }}>
+            <a href="/agent" className="btn-secondary" style={{ fontSize: '11px', padding: '5px 10px', display: 'inline-block' }}>
               Buka AI Desk →
             </a>
           </div>

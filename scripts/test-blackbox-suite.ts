@@ -272,6 +272,25 @@ async function runBlackboxSuite() {
   const unauthActivity = await fetch(`${BASE_URL}/api/user/activity`);
   assert(unauthActivity.status === 401, 'Unauthenticated GET /api/user/activity strictly rejected with HTTP 401');
 
+  // -------------------------------------------------------------------------
+  // TEST 12: Canonical Frontend Route Integrity & Live Billing Capacity Contract
+  // -------------------------------------------------------------------------
+  console.log('\n--- [TEST 12: Canonical Frontend Routes & Live Billing Capacities] ---');
+  const canonicalPages = ['/', '/launchpad', '/trading', '/agent', '/kol', '/billing'];
+  for (const pagePath of canonicalPages) {
+    const pageRes = await fetch(`${BASE_URL}${pagePath}`);
+    assert(pageRes.status === 200, `Canonical page GET ${pagePath} returns HTTP 200 (Got ${pageRes.status})`);
+  }
+
+  const livePlansRes = await fetch(`${BASE_URL}/api/billing/plans`);
+  const livePlansJson: any = await livePlansRes.json();
+  const livePlans = Array.isArray(livePlansJson?.data) ? livePlansJson.data : [];
+  const creatorPlan = livePlans.find((p: any) => p.id === 'CREATOR');
+  const agentPlan = livePlans.find((p: any) => p.id === 'AGENT');
+  assert(creatorPlan?.capacities?.maxBankrKeys === 15, `Live CREATOR plan exposes maxBankrKeys === 15 (Got ${creatorPlan?.capacities?.maxBankrKeys})`);
+  assert(agentPlan?.capacities?.maxBankrKeys === 25, `Live AGENT plan exposes maxBankrKeys === 25 (Got ${agentPlan?.capacities?.maxBankrKeys})`);
+  assert(agentPlan?.capacities?.maxBinanceAccounts === 15, `Live AGENT plan exposes maxBinanceAccounts === 15 (Got ${agentPlan?.capacities?.maxBinanceAccounts})`);
+
   console.log('\n================================================================');
   console.log(`  🎉 BLACKBOX SUITE COMPLETED: ${passedTests} PASSED, ${failedTests} FAILED`);
   console.log('================================================================\n');
