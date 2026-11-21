@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { CreditCard, CheckCircle2, ShieldAlert, Zap, TrendingUp, Wallet, Banknote, Scale, History, RefreshCw } from 'lucide-react';
 import { ethers } from 'ethers';
-import { ensureBaseNetwork, getBrowserSigner, normalizeWeb3Error } from '@packages/launchpad/web3-provider';
+import { ensureBaseNetwork, getBrowserSigner, normalizeWeb3Error, resolveBrowserEthereumProvider } from '@packages/launchpad/web3-provider';
 import { PageWorkflowBanner } from '../components/PageWorkflowBanner';
 
 interface LedgerEntry {
@@ -62,6 +62,7 @@ export default function BillingPage() {
   const [maxSlippagePct, setMaxSlippagePct] = useState<number>(3.0);
   const [treasuryWallet, setTreasuryWallet] = useState<string>('0x0c9f4a82b5ae258e8e65ca40ac4f1abc455c34b6');
   const [launchpadContractAddress, setLaunchpadContractAddress] = useState<string>('');
+  const [isVerifyingBytecode, setIsVerifyingBytecode] = useState<boolean>(false);
   const [configSaving, setConfigSaving] = useState<boolean>(false);
   const [configFeedback, setConfigFeedback] = useState<string | null>(null);
 
@@ -153,6 +154,41 @@ export default function BillingPage() {
       setDiscountFeedback(`⚠️ Gagal menyimpan diskon: ${err?.message || 'Network error'}`);
     } finally {
       setDiscountSaving(false);
+    }
+  };
+
+  const handleVerifyContractBytecode = async () => {
+    const addr = launchpadContractAddress.trim();
+    if (!addr || !ethers.isAddress(addr)) {
+      setConfigFeedback('⚠️ Masukkan alamat EVM 0x... yang valid terlebih dahulu sebelum verifikasi bytecode.');
+      return;
+    }
+    const ethereum = resolveBrowserEthereumProvider();
+    if (!ethereum) {
+      setConfigFeedback('⚠️ MetaMask tidak terdeteksi untuk mengecek bytecode on-chain (eth_getCode).');
+      return;
+    }
+    setIsVerifyingBytecode(true);
+    setConfigFeedback(null);
+    try {
+      const [code, activeChainHex] = await Promise.all([
+        ethereum.request({ method: 'eth_getCode', params: [ethers.getAddress(addr), 'latest'] }),
+        ethereum.request({ method: 'eth_chainId' }).catch(() => 'unknown'),
+      ]);
+      if (typeof code === 'string' && code.length > 2 && code !== '0x0') {
+        const byteLen = Math.floor((code.length - 2) / 2);
+        setConfigFeedback(
+          `✅ Kontrak terverifikasi on-chain pada chain ${activeChainHex} (${byteLen.toLocaleString()} bytes bytecode). Siap disimpan ke SSOT.`
+        );
+      } else {
+        setConfigFeedback(
+          `⚠️ Tidak ditemukan bytecode kontrak (eth_getCode = 0x) untuk ${addr} pada chain ${activeChainHex}. Pastikan alamat adalah Smart Contract (bukan dompet EOA) dan jaringan MetaMask sesuai.`
+        );
+      }
+    } catch (err: any) {
+      setConfigFeedback(`⚠️ Gagal memeriksa bytecode on-chain: ${normalizeWeb3Error(err)}`);
+    } finally {
+      setIsVerifyingBytecode(false);
     }
   };
 
@@ -845,14 +881,26 @@ export default function BillingPage() {
               </div>
               <div className="flex-col gap-xs" style={{ flex: '1 1 260px' }}>
                 <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-muted)' }}>BondingCurveLaunchpad.sol Factory Contract Address (Optional Override)</label>
-                <input
-                  type="text"
-                  placeholder="0x... (Deployed BondingCurveLaunchpad.sol)"
-                  value={launchpadContractAddress}
-                  onChange={(e) => setLaunchpadContractAddress(e.target.value)}
-                  className="input"
-                  style={{ padding: '7px 10px', fontSize: '12px', fontFamily: 'var(--font-mono)' }}
-                />
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <input
+                    type="text"
+                    placeholder="0x... (Deployed BondingCurveLaunchpad.sol)"
+                    value={launchpadContractAddress}
+                    onChange={(e) => setLaunchpadContractAddress(e.target.value)}
+                    className="input"
+                    style={{ flex: 1, padding: '7px 10px', fontSize: '12px', fontFamily: 'var(--font-mono)' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleVerifyContractBytecode}
+                    disabled={isVerifyingBytecode || !launchpadContractAddress.trim()}
+                    className="btn-secondary"
+                    style={{ padding: '7px 10px', fontSize: '11px', whiteSpace: 'nowrap' }}
+                    title="Cek eth_getCode on-chain via MetaMask untuk memastikan alamat ini adalah Smart Contract"
+                  >
+                    {isVerifyingBytecode ? 'Checking...' : 'Verify Bytecode'}
+                  </button>
+                </div>
               </div>
               <button
                 type="button"

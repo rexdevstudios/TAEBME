@@ -69,6 +69,20 @@ export interface IntelligenceSignal {
 // Feature Engine
 // ---------------------------------------------------------------------------
 
+export interface FeatureWeights {
+  arkham: number;
+  firecrawl: number;
+  ohlcv: number;
+  defillama: number;
+}
+
+const DEFAULT_WEIGHTS: FeatureWeights = {
+  arkham: 0.35,
+  firecrawl: 0.25,
+  ohlcv: 0.25,
+  defillama: 0.15,
+};
+
 export class FeatureEngine {
   /**
    * Kompute IntelligenceSignal dari semua sumber data yang tersedia.
@@ -82,7 +96,13 @@ export class FeatureEngine {
     counterpartyProfile?: ArkhamCounterpartyProfile | null,
     firecrawlSignal?: FirecrawlSignal | null,
     macroSignal?: DefiLlamaMacroSignal | null,
+    weights?: Partial<FeatureWeights> | null,
   ): IntelligenceSignal {
+    const arkhamMult = weights && typeof weights.arkham === 'number' ? Math.max(0, weights.arkham) / DEFAULT_WEIGHTS.arkham : 1;
+    const ohlcvMult = weights && typeof weights.ohlcv === 'number' ? Math.max(0, weights.ohlcv) / DEFAULT_WEIGHTS.ohlcv : 1;
+    const firecrawlMult = weights && typeof weights.firecrawl === 'number' ? Math.max(0, weights.firecrawl) / DEFAULT_WEIGHTS.firecrawl : 1;
+    const defillamaMult = weights && typeof weights.defillama === 'number' ? Math.max(0, weights.defillama) / DEFAULT_WEIGHTS.defillama : 1;
+
     const riskFlags: string[] = [];
     const rationaleParts: string[] = [];
     let confidenceScore = 0.5; // neutral baseline
@@ -96,18 +116,18 @@ export class FeatureEngine {
       if (counterpartyProfile.isCounterpartyBlocked) {
         counterpartyRisk = 'BLOCKED';
         riskFlags.push('COUNTERPARTY_BLOCKED');
-        confidenceScore -= 0.4;
+        confidenceScore -= 0.4 * arkhamMult;
         rationaleParts.push(
           `Counterparty flagged BLOCKED by Arkham (${counterpartyProfile.arkhamEntityType}, score: ${counterpartyProfile.riskPassportScore}/100)`
         );
       } else if (counterpartyProfile.riskPassportScore < 50) {
         counterpartyRisk = 'CAUTION';
         riskFlags.push('LOW_ARKHAM_SCORE');
-        confidenceScore -= 0.1;
+        confidenceScore -= 0.1 * arkhamMult;
         rationaleParts.push(`Counterparty Arkham score is low (${counterpartyProfile.riskPassportScore}/100 — caution)`);
       } else {
         counterpartyRisk = 'CLEAR';
-        confidenceScore += 0.05;
+        confidenceScore += 0.05 * arkhamMult;
         rationaleParts.push(`Counterparty cleared by Arkham (${counterpartyProfile.arkhamEntityType}, score: ${counterpartyProfile.riskPassportScore}/100)`);
       }
     } else {
@@ -127,15 +147,15 @@ export class FeatureEngine {
       if (volatilityPct > 5) {
         marketVolatility = 'HIGH';
         riskFlags.push('HIGH_VOLATILITY');
-        confidenceScore -= 0.15;
+        confidenceScore -= 0.15 * ohlcvMult;
         rationaleParts.push(`Market volatility HIGH (${volatilityPct}% avg range/close)`);
       } else if (volatilityPct > 2) {
         marketVolatility = 'MEDIUM';
-        confidenceScore -= 0.05;
+        confidenceScore -= 0.05 * ohlcvMult;
         rationaleParts.push(`Market volatility MEDIUM (${volatilityPct}%)`);
       } else {
         marketVolatility = 'LOW';
-        confidenceScore += 0.05;
+        confidenceScore += 0.05 * ohlcvMult;
         rationaleParts.push(`Market volatility LOW (${volatilityPct}%) — favorable`);
       }
     } else {
@@ -144,14 +164,14 @@ export class FeatureEngine {
 
     if (isVolumeSpike) {
       riskFlags.push('VOLUME_SPIKE');
-      confidenceScore -= 0.1;
+      confidenceScore -= 0.1 * ohlcvMult;
       rationaleParts.push('Unusual volume spike detected (>2× average) — elevated risk');
     }
 
     if (orderbookSnapshot) {
       if (orderbookSnapshot.spreadPct > 1.0) {
         riskFlags.push('WIDE_SPREAD');
-        confidenceScore -= 0.05;
+        confidenceScore -= 0.05 * ohlcvMult;
         rationaleParts.push(`Spread wide (${orderbookSnapshot.spreadPct.toFixed(2)}%) — potential low liquidity`);
       } else {
         rationaleParts.push(`Spread normal (${orderbookSnapshot.spreadPct.toFixed(2)}%)`);
@@ -168,7 +188,7 @@ export class FeatureEngine {
       if (typeof meta.sentimentScore === 'number') {
         if (meta.sentimentScore >= 0.65) {
           webSentiment = 'POSITIVE';
-          confidenceScore += 0.05;
+          confidenceScore += 0.05 * firecrawlMult;
           rationaleParts.push(`Web sentiment POSITIVE (score: ${meta.sentimentScore.toFixed(2)})`);
         } else if (meta.sentimentScore >= 0.4) {
           webSentiment = 'NEUTRAL';
@@ -176,7 +196,7 @@ export class FeatureEngine {
         } else {
           webSentiment = 'NEGATIVE';
           riskFlags.push('NEGATIVE_WEB_SENTIMENT');
-          confidenceScore -= 0.05;
+          confidenceScore -= 0.05 * firecrawlMult;
           rationaleParts.push(`Web sentiment NEGATIVE (score: ${meta.sentimentScore.toFixed(2)})`);
         }
       } else if (firecrawlSignal.markdownLength > 200) {
@@ -198,10 +218,10 @@ export class FeatureEngine {
     if (macroSignal && macroSignal.macroSentiment !== 'UNAVAILABLE') {
       macroSentiment = macroSignal.macroSentiment;
       if (macroSignal.macroSentiment === 'BULLISH') {
-        confidenceScore += 0.05;
+        confidenceScore += 0.05 * defillamaMult;
         rationaleParts.push(`Macro DeFi TVL sentiment BULLISH (Total TVL: $${(macroSignal.totalDefiTvlUsd / 1e9).toFixed(1)}B)`);
       } else if (macroSignal.macroSentiment === 'BEARISH') {
-        confidenceScore -= 0.05;
+        confidenceScore -= 0.05 * defillamaMult;
         riskFlags.push('BEARISH_MACRO_TVL');
         rationaleParts.push(`Macro DeFi TVL sentiment BEARISH (Total TVL: $${(macroSignal.totalDefiTvlUsd / 1e9).toFixed(1)}B)`);
       } else {

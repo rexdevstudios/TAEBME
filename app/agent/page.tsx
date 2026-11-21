@@ -1,13 +1,13 @@
 ﻿'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Bot, ShieldAlert, Settings2, FileCode2, Target, BrainCircuit, Activity, BarChart3, Wallet } from 'lucide-react';
 import { FiveAgentDeskPanel } from '../components/FiveAgentDeskPanel';
 import { PageWorkflowBanner } from '../components/PageWorkflowBanner';
 
 export default function AgentPage() {
-  const { isConnected, userRole, entitlements, connectMetaMask, isConnecting, refreshSession } = useAuth();
+  const { isConnected, userRole, hasCapability, entitlements, connectMetaMask, isConnecting, refreshSession } = useAuth();
   const [connectError, setConnectError] = useState<string | null>(null);
   const [symbol, setSymbol] = useState('BTCUSDT');
   const [action, setAction] = useState<'BUY' | 'SELL'>('BUY');
@@ -16,11 +16,76 @@ export default function AgentPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Admin weights
+  // Admin weights (hydrated from & persisted to PostgreSQL SSOT via /api/billing/plans)
   const [arkhamWeight, setArkhamWeight] = useState(0.35);
   const [firecrawlWeight, setFirecrawlWeight] = useState(0.25);
   const [ohlcvWeight, setOhlcvWeight] = useState(0.25);
   const [defillamaWeight, setDefillamaWeight] = useState(0.15);
+  const [weightsSaving, setWeightsSaving] = useState(false);
+  const [weightsFeedback, setWeightsFeedback] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('/api/billing/plans')
+      .then((r) => r.json())
+      .then((json) => {
+        const w = json?.platformConfig?.aiFeatureWeights;
+        if (w && typeof w === 'object') {
+          if (typeof w.arkham === 'number') setArkhamWeight(w.arkham);
+          if (typeof w.firecrawl === 'number') setFirecrawlWeight(w.firecrawl);
+          if (typeof w.ohlcv === 'number') setOhlcvWeight(w.ohlcv);
+          if (typeof w.defillama === 'number') setDefillamaWeight(w.defillama);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleSaveWeights = async () => {
+    setWeightsSaving(true);
+    setWeightsFeedback(null);
+    try {
+      const res = await fetch('/api/billing/plans', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update-platform-config',
+          aiFeatureWeights: {
+            arkham: arkhamWeight,
+            firecrawl: firecrawlWeight,
+            ohlcv: ohlcvWeight,
+            defillama: defillamaWeight,
+          },
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        setWeightsFeedback(`⚠️ Gagal menyimpan bobot (${res.status}): ${json.error || 'Forbidden / Error'}`);
+        return;
+      }
+      const saved = json.data?.aiFeatureWeights;
+      if (saved) {
+        setArkhamWeight(saved.arkham);
+        setFirecrawlWeight(saved.firecrawl);
+        setOhlcvWeight(saved.ohlcv);
+        setDefillamaWeight(saved.defillama);
+      }
+      setWeightsFeedback(
+        `✅ Bobot AI tersimpan & dinormalisasi ke PostgreSQL SSOT (Arkham ${Math.round((saved?.arkham ?? arkhamWeight) * 100)}% · Firecrawl ${Math.round((saved?.firecrawl ?? firecrawlWeight) * 100)}% · OHLCV ${Math.round((saved?.ohlcv ?? ohlcvWeight) * 100)}% · DefiLlama ${Math.round((saved?.defillama ?? defillamaWeight) * 100)}%).`
+      );
+    } catch (err: any) {
+      setWeightsFeedback(`⚠️ Gagal menyimpan bobot: ${err?.message || 'Network error'}`);
+    } finally {
+      setWeightsSaving(false);
+    }
+  };
+
+  const handleResetWeights = () => {
+    setArkhamWeight(0.35);
+    setFirecrawlWeight(0.25);
+    setOhlcvWeight(0.25);
+    setDefillamaWeight(0.15);
+    setWeightsFeedback('ℹ️ Bobot dikembalikan ke default (35% / 25% / 25% / 15%). Klik "Simpan Bobot ke SSOT" untuk menerapkan.');
+  };
 
   const handleGenerateProposal = async () => {
     if (!isConnected) {
@@ -261,34 +326,105 @@ export default function AgentPage() {
         </div>
       </div>
 
-      {/* Admin Feature Weight Inspector (Exclusive to SYSTEM_ADMIN) */}
-      {(userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN') && (
+      {/* Admin Feature Weight Configurator (Exclusive to SUPER_ADMIN / SYSTEM_ADMIN / MANAGE_BILLING_PLANS) */}
+      {(hasCapability('MANAGE_BILLING_PLANS') || userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN') && (
         <div className="bg-panel" style={{ border: '1px solid #FF9100', borderRadius: '8px', padding: '24px' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#FFD600', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Settings2 size={18} /> System Admin: Multi-Factor Intelligence Engine Weights
-          </h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '16px' }}>
+            <div>
+              <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#FFD600', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Settings2 size={18} /> System Admin: Multi-Factor Intelligence Engine Weights (SSOT)
+              </h3>
+              <p className="text-muted" style={{ margin: '4px 0 0 0', fontSize: '11px' }}>
+                Atur bobot skoring AI untuk FeatureEngine. Sistem otomatis menormalisasi total bobot ke 100% saat disimpan ke PostgreSQL.
+              </p>
+            </div>
+            <div className="flex-row gap-sm items-center">
+              <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: '#38BDF8', fontWeight: 800 }}>
+                Total Input: {Math.round((arkhamWeight + firecrawlWeight + ohlcvWeight + defillamaWeight) * 100)}%
+              </span>
+              <button
+                type="button"
+                onClick={handleResetWeights}
+                disabled={weightsSaving}
+                className="btn-secondary"
+                style={{ padding: '6px 10px', fontSize: '11px' }}
+              >
+                Reset Default
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveWeights}
+                disabled={weightsSaving}
+                className="btn-primary"
+                style={{ padding: '6px 12px', fontSize: '11px' }}
+              >
+                {weightsSaving ? 'Saving...' : 'Simpan Bobot ke SSOT'}
+              </button>
+            </div>
+          </div>
           <div className="grid-4">
             <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '16px', borderRadius: '6px' }}>
               <div style={{ color: '#00E5FF', fontWeight: 800, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}><ShieldAlert size={14} /> Arkham Intelligence</div>
-              <div style={{ fontSize: '18px', fontWeight: 900, color: 'var(--color-foreground)', margin: '8px 0', fontFamily: 'var(--font-mono)' }}>{(arkhamWeight * 100).toFixed(0)}%</div>
-              <div className="text-muted" style={{ fontSize: '11px' }}>Counterparty & Sanctions Risk</div>
+              <div style={{ fontSize: '18px', fontWeight: 900, color: 'var(--color-foreground)', margin: '8px 0', fontFamily: 'var(--font-mono)' }}>{Math.round(arkhamWeight * 100)}%</div>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={Math.round(arkhamWeight * 100)}
+                onChange={(e) => setArkhamWeight(Number(e.target.value) / 100)}
+                aria-label="Arkham Intelligence Weight"
+                style={{ width: '100%', marginBottom: '6px' }}
+              />
+              <div className="text-muted" style={{ fontSize: '11px' }}>Counterparty &amp; Sanctions Risk</div>
             </div>
             <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '16px', borderRadius: '6px' }}>
               <div style={{ color: '#D500F9', fontWeight: 800, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}><Activity size={14} /> Firecrawl Sentiment</div>
-              <div style={{ fontSize: '18px', fontWeight: 900, color: 'var(--color-foreground)', margin: '8px 0', fontFamily: 'var(--font-mono)' }}>{(firecrawlWeight * 100).toFixed(0)}%</div>
-              <div className="text-muted" style={{ fontSize: '11px' }}>Web News & Social Buzz</div>
+              <div style={{ fontSize: '18px', fontWeight: 900, color: 'var(--color-foreground)', margin: '8px 0', fontFamily: 'var(--font-mono)' }}>{Math.round(firecrawlWeight * 100)}%</div>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={Math.round(firecrawlWeight * 100)}
+                onChange={(e) => setFirecrawlWeight(Number(e.target.value) / 100)}
+                aria-label="Firecrawl Sentiment Weight"
+                style={{ width: '100%', marginBottom: '6px' }}
+              />
+              <div className="text-muted" style={{ fontSize: '11px' }}>Web News &amp; Social Buzz</div>
             </div>
             <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '16px', borderRadius: '6px' }}>
-              <div style={{ color: 'var(--color-accent)', fontWeight: 800, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}><BarChart3 size={14} /> Binance OHLCV & RSI</div>
-              <div style={{ fontSize: '18px', fontWeight: 900, color: 'var(--color-foreground)', margin: '8px 0', fontFamily: 'var(--font-mono)' }}>{(ohlcvWeight * 100).toFixed(0)}%</div>
+              <div style={{ color: 'var(--color-accent)', fontWeight: 800, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}><BarChart3 size={14} /> Binance OHLCV &amp; RSI</div>
+              <div style={{ fontSize: '18px', fontWeight: 900, color: 'var(--color-foreground)', margin: '8px 0', fontFamily: 'var(--font-mono)' }}>{Math.round(ohlcvWeight * 100)}%</div>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={Math.round(ohlcvWeight * 100)}
+                onChange={(e) => setOhlcvWeight(Number(e.target.value) / 100)}
+                aria-label="Binance OHLCV Weight"
+                style={{ width: '100%', marginBottom: '6px' }}
+              />
               <div className="text-muted" style={{ fontSize: '11px' }}>Technical Momentum Indicators</div>
             </div>
             <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '16px', borderRadius: '6px' }}>
               <div style={{ color: '#FFC400', fontWeight: 800, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}><Activity size={14} /> DefiLlama Macro TVL</div>
-              <div style={{ fontSize: '18px', fontWeight: 900, color: 'var(--color-foreground)', margin: '8px 0', fontFamily: 'var(--font-mono)' }}>{(defillamaWeight * 100).toFixed(0)}%</div>
+              <div style={{ fontSize: '18px', fontWeight: 900, color: 'var(--color-foreground)', margin: '8px 0', fontFamily: 'var(--font-mono)' }}>{Math.round(defillamaWeight * 100)}%</div>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={Math.round(defillamaWeight * 100)}
+                onChange={(e) => setDefillamaWeight(Number(e.target.value) / 100)}
+                aria-label="DefiLlama Macro TVL Weight"
+                style={{ width: '100%', marginBottom: '6px' }}
+              />
               <div className="text-muted" style={{ fontSize: '11px' }}>Chain Liquidity Inflow</div>
             </div>
           </div>
+          {weightsFeedback && (
+            <div style={{ marginTop: '12px', padding: '10px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 700, backgroundColor: weightsFeedback.includes('✅') ? 'rgba(16, 185, 129, 0.14)' : 'rgba(245, 158, 11, 0.14)', color: weightsFeedback.includes('✅') ? '#6EE7B7' : '#FDE047', border: `1px solid ${weightsFeedback.includes('✅') ? 'rgba(16, 185, 129, 0.35)' : 'rgba(245, 158, 11, 0.35)'}` }}>
+              {weightsFeedback}
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -4294,6 +4294,36 @@ export interface SubscriptionRecord {
   credits: number;
 }
 
+export interface AiFeatureWeights {
+  arkham: number;
+  firecrawl: number;
+  ohlcv: number;
+  defillama: number;
+}
+
+export const DEFAULT_AI_FEATURE_WEIGHTS: AiFeatureWeights = {
+  arkham: 0.35,
+  firecrawl: 0.25,
+  ohlcv: 0.25,
+  defillama: 0.15,
+};
+
+function normalizeAiFeatureWeights(raw?: Partial<AiFeatureWeights> | null): AiFeatureWeights {
+  if (!raw || typeof raw !== 'object') return { ...DEFAULT_AI_FEATURE_WEIGHTS };
+  const a = Number.isFinite(Number(raw.arkham)) ? Math.max(0, Number(raw.arkham)) : DEFAULT_AI_FEATURE_WEIGHTS.arkham;
+  const f = Number.isFinite(Number(raw.firecrawl)) ? Math.max(0, Number(raw.firecrawl)) : DEFAULT_AI_FEATURE_WEIGHTS.firecrawl;
+  const o = Number.isFinite(Number(raw.ohlcv)) ? Math.max(0, Number(raw.ohlcv)) : DEFAULT_AI_FEATURE_WEIGHTS.ohlcv;
+  const d = Number.isFinite(Number(raw.defillama)) ? Math.max(0, Number(raw.defillama)) : DEFAULT_AI_FEATURE_WEIGHTS.defillama;
+  const sum = a + f + o + d;
+  if (sum <= 0) return { ...DEFAULT_AI_FEATURE_WEIGHTS };
+  return {
+    arkham: Math.round((a / sum) * 10000) / 10000,
+    firecrawl: Math.round((f / sum) * 10000) / 10000,
+    ohlcv: Math.round((o / sum) * 10000) / 10000,
+    defillama: Math.round((d / sum) * 10000) / 10000,
+  };
+}
+
 export interface PlatformFeeAndRiskConfig {
   studioCostCr: number;
   deskCostCr: number;
@@ -4303,6 +4333,7 @@ export interface PlatformFeeAndRiskConfig {
   maxSlippagePct: number;
   treasuryWallet: string;
   launchpadContractAddress?: string;
+  aiFeatureWeights?: AiFeatureWeights;
   updatedBy?: string;
   updatedAt?: string;
 }
@@ -4321,6 +4352,7 @@ export class PostgresBillingDbAdapter implements BillingDbAdapter {
     maxDailyLossUsd: 1000,
     maxSlippagePct: 3.0,
     treasuryWallet: '0x0c9f4a82b5ae258e8e65ca40ac4f1abc455c34b6',
+    aiFeatureWeights: { ...DEFAULT_AI_FEATURE_WEIGHTS },
   };
 
   seedSubscription(userId: string, sub: {
@@ -4351,11 +4383,15 @@ export class PostgresBillingDbAdapter implements BillingDbAdapter {
       maxDailyLossUsd: 1000,
       maxSlippagePct: 3.0,
       treasuryWallet: '0x0c9f4a82b5ae258e8e65ca40ac4f1abc455c34b6',
+      aiFeatureWeights: { ...DEFAULT_AI_FEATURE_WEIGHTS },
     };
   }
 
   async getPlatformFeeAndRiskConfig(): Promise<PlatformFeeAndRiskConfig> {
-    const base: PlatformFeeAndRiskConfig = { ...this.inMemoryFeeAndRiskConfig };
+    const base: PlatformFeeAndRiskConfig = {
+      ...this.inMemoryFeeAndRiskConfig,
+      aiFeatureWeights: normalizeAiFeatureWeights(this.inMemoryFeeAndRiskConfig.aiFeatureWeights),
+    };
     const pool = getDbPool();
     if (pool) {
       try {
@@ -4375,6 +4411,9 @@ export class PostgresBillingDbAdapter implements BillingDbAdapter {
             }
             if (typeof cfg.launchpadContractAddress === 'string' && /^0x[a-fA-F0-9]{40}$/.test(cfg.launchpadContractAddress)) {
               base.launchpadContractAddress = cfg.launchpadContractAddress;
+            }
+            if (cfg.aiFeatureWeights && typeof cfg.aiFeatureWeights === 'object') {
+              base.aiFeatureWeights = normalizeAiFeatureWeights(cfg.aiFeatureWeights);
             }
             if (typeof cfg.updatedBy === 'string') base.updatedBy = cfg.updatedBy;
             if (typeof cfg.updatedAt === 'string') base.updatedAt = cfg.updatedAt;
@@ -4408,6 +4447,9 @@ export class PostgresBillingDbAdapter implements BillingDbAdapter {
           : params.launchpadContractAddress === ''
           ? undefined
           : current.launchpadContractAddress,
+      aiFeatureWeights: params.aiFeatureWeights
+        ? normalizeAiFeatureWeights(params.aiFeatureWeights)
+        : normalizeAiFeatureWeights(current.aiFeatureWeights),
       updatedBy: params.actorId,
       updatedAt: new Date().toISOString(),
     };

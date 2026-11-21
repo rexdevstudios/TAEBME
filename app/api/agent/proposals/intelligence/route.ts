@@ -21,12 +21,24 @@ export async function POST(req: NextRequest) {
     const userId = auth.user.userId;
     const agentId = body.agentId && typeof body.agentId === 'string' ? body.agentId : 'agent-alpha';
 
-    // 2. Fetch DefiLlama macro signal in parallel (non-blocking enrichment)
-    const macroResult = await Promise.allSettled([fetchDefiLlamaMacroSignal()]);
-    const macroSignal = macroResult[0].status === 'fulfilled' ? macroResult[0].value : null;
+    // 2. Fetch DefiLlama macro signal & SSOT platform config in parallel (non-blocking enrichment)
+    const [macroResult, platformCfgResult] = await Promise.allSettled([
+      fetchDefiLlamaMacroSignal(),
+      defaultBillingDbAdapter.getPlatformFeeAndRiskConfig(),
+    ]);
+    const macroSignal = macroResult.status === 'fulfilled' ? macroResult.value : null;
+    const platformCfg = platformCfgResult.status === 'fulfilled' ? platformCfgResult.value : null;
+    const proposalCostCr = platformCfg?.studioCostCr ?? 1;
 
-    // 3. Compute Intelligence Signal (with macro enrichment)
-    const signal = FeatureEngine.computeSignal(symbol, intelligenceCache, null, null, macroSignal);
+    // 3. Compute Intelligence Signal (with macro enrichment & SSOT feature weights)
+    const signal = FeatureEngine.computeSignal(
+      symbol,
+      intelligenceCache,
+      null,
+      null,
+      macroSignal,
+      platformCfg?.aiFeatureWeights
+    );
 
     // 4. Generate proposal with PostgreSQL SSOT persistence
     const proposal = await AgentProposalEngine.generateProposalWithIntelligence(
@@ -50,10 +62,10 @@ export async function POST(req: NextRequest) {
 
     let remainingCredits: number | undefined;
     try {
-      if (getDbPool() && auth.walletAddress) {
+      if (getDbPool() && auth.walletAddress && proposalCostCr > 0) {
         await SubscriptionsEngine.deductMeteredCredits(
           auth.walletAddress,
-          1,
+          proposalCostCr,
           'AI_PROPOSAL_SIGNAL',
           proposal.id || `prop-${Date.now()}`,
           defaultBillingDbAdapter
@@ -64,7 +76,7 @@ export async function POST(req: NextRequest) {
       // Non-blocking fallback
     }
 
-    const enrichedProposal = { ...proposal, llmAdvisory, creditsBurned: 1, remainingCredits };
+    const enrichedProposal = { ...proposal, llmAdvisory, creditsBurned: proposalCostCr, remainingCredits };
 
     const response: ApiResponse<typeof enrichedProposal> = {
       success: true,

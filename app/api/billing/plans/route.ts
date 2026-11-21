@@ -164,6 +164,8 @@ export async function POST(req: NextRequest) {
         treasuryWallet: typeof body.treasuryWallet === 'string' ? body.treasuryWallet.trim() : undefined,
         launchpadContractAddress:
           typeof body.launchpadContractAddress === 'string' ? body.launchpadContractAddress.trim() : undefined,
+        aiFeatureWeights:
+          body.aiFeatureWeights && typeof body.aiFeatureWeights === 'object' ? body.aiFeatureWeights : undefined,
         actorId: auth.walletAddress || auth.user.userId,
       });
 
