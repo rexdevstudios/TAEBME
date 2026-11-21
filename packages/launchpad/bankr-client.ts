@@ -8,6 +8,8 @@
  * Safety invariant: NEVER blindly retries on timeout to prevent duplicate on-chain deployments.
  */
 
+import { validateMultiChainFeeRecipient } from '../shared/credential-vault';
+
 export const BANKR_DEPLOY_URL = 'https://api.bankr.bot/token-launches/deploy';
 
 export type BankrSupportedChain = 'base' | 'robinhood' | 'arbitrum' | 'arc';
@@ -26,6 +28,7 @@ export interface BankrDeployRequest {
   };
   degenMode?: boolean;
   simulateOnly?: boolean;
+  apiKeyOverride?: string;
 }
 
 export interface BankrDeployResponse {
@@ -36,19 +39,25 @@ export interface BankrDeployResponse {
   chain: BankrSupportedChain;
   httpStatus?: number;
   message: string;
+  keySource?: 'BYOK_VAULT' | 'PLATFORM_ENV';
 }
 
 export async function deployTokenViaBankrApi(
   payload: BankrDeployRequest
 ): Promise<BankrDeployResponse> {
-  const apiKey = process.env.BANKR_API_KEY?.trim();
+  const overrideKey = payload.apiKeyOverride?.trim();
+  const apiKey = overrideKey || process.env.BANKR_API_KEY?.trim();
+  const keySource: 'BYOK_VAULT' | 'PLATFORM_ENV' = overrideKey ? 'BYOK_VAULT' : 'PLATFORM_ENV';
   const chain: BankrSupportedChain = payload.chain || 'base';
+
+  validateMultiChainFeeRecipient(chain, payload.feeRecipient);
 
   if (!apiKey || apiKey.startsWith('mock_')) {
     return {
       status: 'failed',
       chain,
-      message: 'BANKR_API_KEY is not configured in Vercel environment variables.',
+      keySource,
+      message: 'BANKR_API_KEY belum tersedia. Tambahkan Bankr API Key Anda di Multi-Key BYOK Vault atau set di environment.',
     };
   }
 

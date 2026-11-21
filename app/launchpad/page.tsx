@@ -9,6 +9,7 @@ import { AdminMerkleSnapshotPanel } from '../components/AdminMerkleSnapshotPanel
 import { CreatorStudioPanel } from '../components/CreatorStudioPanel';
 import { PageWorkflowBanner } from '../components/PageWorkflowBanner';
 import { TokenAvatar } from '../components/TokenAvatar';
+import { BankrKeyVaultPanel } from '../components/BankrKeyVaultPanel';
 import { ethers } from 'ethers';
 import {
   getContractConfiguration,
@@ -29,9 +30,23 @@ import {
 export type LaunchModeType = 'BONDING_CURVE' | 'FAIR_LAUNCH' | 'WHITELIST_PRIVATE' | 'FIXED_PRICE' | 'COMMUNITY_PRELAUNCH';
 
 export default function LaunchpadPage() {
-  const { isConnected, userRole, entitlements, walletAddress, connectMetaMask, isConnecting, refreshSession, switchNetwork } = useAuth();
+  const { isConnected, userRole, entitlements, walletAddress, connectMetaMask, isConnecting, refreshSession, switchNetwork, hasCapability, planId, credits } = useAuth();
   const [connectError, setConnectError] = useState<string | null>(null);
+  const [selectedBankrKeyId, setSelectedBankrKeyId] = useState<string>('PLATFORM_DEFAULT');
   const [ssotFactoryAddress, setSsotFactoryAddress] = useState<string>('');
+  const [billingConfig, setBillingConfig] = useState<{
+    treasuryFeePct: number;
+    creatorFeePct: number;
+    launchCostCr: number;
+    studioCostCr: number;
+  }>({
+    treasuryFeePct: 0.5,
+    creatorFeePct: 0.5,
+    launchCostCr: 50,
+    studioCostCr: 1,
+  });
+  const [feeRecipientType, setFeeRecipientType] = useState<'wallet' | 'x' | 'farcaster' | 'ens'>('wallet');
+  const [feeRecipientHandle, setFeeRecipientHandle] = useState<string>('');
   const [isAngelModalOpen, setIsAngelModalOpen] = useState(false);
   const [tokenName, setTokenName] = useState('');
   const [tokenSymbol, setTokenSymbol] = useState('');
@@ -97,12 +112,21 @@ export default function LaunchpadPage() {
     fetch('/api/billing/plans')
       .then((r) => r.json())
       .then((json) => {
-        const addr = json?.platformConfig?.launchpadContractAddress;
+        const cfg = json?.platformConfig;
+        const addr = cfg?.launchpadContractAddress;
         if (typeof addr === 'string' && addr.trim()) {
           setSsotFactoryAddress(addr.trim());
           if (typeof window !== 'undefined') {
             (window as any).__RTRADER_LAUNCHPAD_CONTRACT__ = addr.trim();
           }
+        }
+        if (cfg) {
+          setBillingConfig({
+            treasuryFeePct: Number(cfg.treasuryFeePct ?? 0.5),
+            creatorFeePct: Number(cfg.creatorFeePct ?? 0.5),
+            launchCostCr: Number(cfg.launchCostCr ?? 50),
+            studioCostCr: Number(cfg.studioCostCr ?? 1),
+          });
         }
       })
       .catch(() => {});
@@ -180,16 +204,30 @@ export default function LaunchpadPage() {
     setIsBankrDeploying(true);
     setOnChainFeedback(null);
     try {
+      const recipientAddr = (walletAddress || creatorWallet || '').trim();
+      const customHandle = feeRecipientHandle.trim();
+      const resolvedFeeRecipient =
+        feeRecipientType === 'wallet'
+          ? recipientAddr
+            ? { type: 'wallet' as const, value: recipientAddr }
+            : undefined
+          : customHandle
+          ? { type: feeRecipientType, value: customHandle }
+          : recipientAddr
+          ? { type: 'wallet' as const, value: recipientAddr }
+          : undefined;
       const res = await fetch('/api/launchpad/bankr-deploy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          draftId: draftResult.id || draftResult.draftId,
           tokenName: draftResult.name || tokenName,
           tokenSymbol: draftResult.ticker || draftResult.symbol || tokenSymbol,
           chain: selectedChain,
-          feeRecipient: walletAddress || creatorWallet || undefined,
+          feeRecipient: resolvedFeeRecipient,
           degenMode: isDegenMode,
           simulateOnly,
+          providerKeyId: selectedBankrKeyId,
         }),
       });
       const json = await res.json();
@@ -203,8 +241,9 @@ export default function LaunchpadPage() {
       if (d.txHash) setPublishedTxHash(d.txHash);
       refreshSession().catch(() => {});
       fetchActiveTokens();
+      const keyBadge = d.keySource === 'BYOK_VAULT' ? ` [BYOK: ${d.usedKeyLabel || d.usedKeyMasked}]` : ' [Platform Key]';
       setOnChainFeedback(
-        `✅ Bankr ${d.status?.toUpperCase() || 'DEPLOYED'}: $${d.tokenSymbol || tokenSymbol} on ${selectedChain.toUpperCase()} (${d.tokenAddress || 'Simulated CA'}) · -${d.creditsBurned ?? 50} Credits`
+        `✅ Bankr ${d.status?.toUpperCase() || 'DEPLOYED'}${keyBadge}: $${d.tokenSymbol || tokenSymbol} on ${selectedChain.toUpperCase()} (${d.tokenAddress || 'Simulated CA'}) · -${d.creditsBurned ?? 50} Credits`
       );
     } catch (err: any) {
       setOnChainFeedback(`❌ Bankr Deploy Error: ${err?.message || 'Network error'}`);
@@ -612,7 +651,9 @@ export default function LaunchpadPage() {
               className="btn-secondary"
               style={{ width: '100%', justifyContent: 'space-between', padding: '8px 12px', fontSize: '11px', color: 'var(--color-foreground)' }}
             >
-              <span>⚙️ Pengaturan Lanjutan (Pairing: {poolPairing} · {isDegenMode ? 'Degen $2.5k' : 'Standard $69k'} · Vesting: {creatorVesting === 'NONE' ? '0%' : '15%'})</span>
+              <span>
+                ⚙️ Pengaturan Lanjutan (Pairing: {poolPairing} · {isDegenMode ? 'Degen $2.5k' : 'Standard $69k'} · Royalty: {billingConfig.creatorFeePct}% · Deploy: -{billingConfig.launchCostCr} cr)
+              </span>
               <span>{showAdvancedOptions ? '▲ Sembunyikan' : '▼ Ubah'}</span>
             </button>
 
@@ -689,7 +730,7 @@ export default function LaunchpadPage() {
                 <label style={{ color: 'var(--color-muted)', fontSize: '12px', fontWeight: 700 }}>
                   Creator Vesting (Local Launchpad Contract)
                 </label>
-                <span style={{ fontSize: '10px', color: '#FFAB00', fontWeight: 700 }}>
+                <span style={{ fontSize: '10px', color: 'var(--color-badge-warning-text)', fontWeight: 700 }}>
                   ℹ️ Smart contract lokal
                 </span>
               </div>
@@ -715,6 +756,102 @@ export default function LaunchpadPage() {
                 * Vesting kustom berlaku untuk deploy via Smart Contract Launchpad.
               </span>
             </div>
+
+            {/* Bankr-Compatible Creator Royalty / Fee Recipient Routing */}
+            <div className="flex-col gap-xs">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '4px' }}>
+                <label style={{ color: 'var(--color-muted)', fontSize: '12px', fontWeight: 700 }}>
+                  Tujuan Royalti Creator (Bankr Fee Recipient Format)
+                </label>
+                <span style={{ fontSize: '10px', color: 'var(--color-badge-info-text)', fontWeight: 700 }}>
+                  Royalti Creator: {billingConfig.creatorFeePct.toFixed(2)}% / Swap
+                </span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+                {[
+                  { id: 'wallet' as const, label: 'Wallet (0x)' },
+                  { id: 'x' as const, label: 'X / Twitter' },
+                  { id: 'farcaster' as const, label: 'Farcaster' },
+                  { id: 'ens' as const, label: 'ENS (.eth)' },
+                ].map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setFeeRecipientType(opt.id)}
+                    className={feeRecipientType === opt.id ? 'btn-primary' : 'btn-secondary'}
+                    style={{ padding: '6px 4px', justifyContent: 'center', fontSize: '10px' }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              {feeRecipientType !== 'wallet' ? (
+                <input
+                  type="text"
+                  value={feeRecipientHandle}
+                  onChange={(e) => setFeeRecipientHandle(e.target.value)}
+                  placeholder={
+                    feeRecipientType === 'x'
+                      ? 'Handle X penerima royalti (mis. @creator_handle)'
+                      : feeRecipientType === 'farcaster'
+                      ? 'Handle Farcaster penerima royalti (mis. @creator.eth)'
+                      : 'Nama domain ENS penerima royalti (mis. creator.eth)'
+                  }
+                  className="input"
+                  style={{ padding: '8px 10px', fontSize: '11px', fontFamily: 'var(--font-mono)' }}
+                />
+              ) : (
+                <span style={{ fontSize: '10px', color: 'var(--color-muted)' }}>
+                  * Menggunakan alamat Creator Wallet Address di bawah sebagai penerima royalti on-chain.
+                </span>
+              )}
+            </div>
+
+            {/* Live Billing & Credit Sync Summary Card (Synced with /billing) */}
+            <div
+              style={{
+                padding: '10px 12px',
+                borderRadius: '8px',
+                backgroundColor: 'var(--color-surface-elevated)',
+                border: '1px solid var(--color-border)',
+                fontSize: '11px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '6px',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                <span style={{ fontWeight: 800, color: 'var(--color-foreground)' }}>
+                  ⚡ Sinkronisasi Paket &amp; Biaya Peluncuran (/billing)
+                </span>
+                <a
+                  href="/billing"
+                  style={{ color: 'var(--color-accent)', fontWeight: 700, textDecoration: 'underline', fontSize: '11px' }}
+                >
+                  Kelola Paket &amp; Kredit →
+                </a>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))', gap: '8px' }}>
+                <div style={{ padding: '6px 8px', borderRadius: '6px', backgroundColor: 'var(--color-surface-subtle)', border: '1px solid var(--color-border)' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--color-muted)' }}>Paket &amp; Saldo Aktif</div>
+                  <div style={{ fontWeight: 800, color: 'var(--color-foreground)', fontFamily: 'var(--font-mono)' }}>
+                    {planId || 'FREE'} · {(credits ?? 0).toLocaleString()} cr
+                  </div>
+                </div>
+                <div style={{ padding: '6px 8px', borderRadius: '6px', backgroundColor: 'var(--color-surface-subtle)', border: '1px solid var(--color-border)' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--color-muted)' }}>Biaya Deploy / Studio</div>
+                  <div style={{ fontWeight: 800, color: 'var(--color-badge-info-text)', fontFamily: 'var(--font-mono)' }}>
+                    {billingConfig.launchCostCr} cr Launch · {billingConfig.studioCostCr} cr AI
+                  </div>
+                </div>
+                <div style={{ padding: '6px 8px', borderRadius: '6px', backgroundColor: 'var(--color-surface-subtle)', border: '1px solid var(--color-border)' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--color-muted)' }}>Bagi Hasil Trading Fee</div>
+                  <div style={{ fontWeight: 800, color: 'var(--color-badge-success-text)', fontFamily: 'var(--font-mono)' }}>
+                    {billingConfig.creatorFeePct.toFixed(2)}% Creator / {billingConfig.treasuryFeePct.toFixed(2)}% Treasury
+                  </div>
+                </div>
+              </div>
+            </div>
               </div>
             )}
 
@@ -728,6 +865,16 @@ export default function LaunchpadPage() {
                 style={{ padding: '12px', fontFamily: 'var(--font-mono)' }}
               />
             </div>
+
+            {/* Multi-Key Bankr BYOK Vault (Encrypted AES-256-GCM · Multi-Chain Safe) */}
+            <BankrKeyVaultPanel
+              isConnected={isConnected}
+              selectedChain={selectedChain}
+              selectedKeyId={selectedBankrKeyId}
+              onSelectKeyId={setSelectedBankrKeyId}
+              canPublishLaunch={Boolean(hasCapability?.('PUBLISH_LAUNCH') || entitlements?.createLaunch)}
+              activePlanLabel={planId || 'FREE'}
+            />
 
             {!isConnected ? (
               <div className="flex-col gap-xs" style={{ marginTop: '8px' }}>
@@ -925,21 +1072,19 @@ export default function LaunchpadPage() {
                     className="btn-secondary"
                     onClick={() => handleBankrDeploy(true)}
                     disabled={isBankrDeploying || isRegisteringOnChain}
-                    style={{ flex: 1, padding: '8px 10px', fontSize: '11px', justifyContent: 'center', borderColor: '#38BDF8', color: '#38BDF8' }}
+                    style={{ flex: 1, padding: '8px 10px', fontSize: '11px', justifyContent: 'center', borderColor: 'var(--color-badge-info-border)', color: 'var(--color-badge-info-text)' }}
                   >
-                    {isBankrDeploying ? '⏳ Running Bankr...' : '🧪 Simulate Bankr Launch (-50 cr)'}
+                    {isBankrDeploying ? '⏳ Running Bankr...' : `🧪 Simulate Bankr Launch (-${billingConfig.launchCostCr} cr)`}
                   </button>
-                  {selectedChain === 'base' && (
-                    <button
-                      type="button"
-                      className="btn-primary"
-                      onClick={() => handleBankrDeploy(false)}
-                      disabled={isBankrDeploying || isRegisteringOnChain}
-                      style={{ flex: 1, padding: '8px 10px', fontSize: '11px', justifyContent: 'center' }}
-                    >
-                      {isBankrDeploying ? '⏳ Deploying...' : '⚡ Bankr Gas-Sponsored Deploy (-50 cr)'}
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={() => handleBankrDeploy(false)}
+                    disabled={isBankrDeploying || isRegisteringOnChain}
+                    style={{ flex: 1, padding: '8px 10px', fontSize: '11px', justifyContent: 'center' }}
+                  >
+                    {isBankrDeploying ? '⏳ Deploying...' : `⚡ Bankr Deploy ${selectedChain.toUpperCase()} (-${billingConfig.launchCostCr} cr)`}
+                  </button>
                 </div>
 
                 {onChainFeedback && (

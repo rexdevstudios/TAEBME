@@ -239,6 +239,16 @@ async function runBlackboxSuite() {
   });
   assert(unauthGfVoucher.status === 401, 'Unauthenticated POST /api/gamefi/nft/mint-voucher strictly rejected with HTTP 401');
 
+  const unauthByokGet = await fetch(`${BASE_URL}/api/user/provider-keys?provider=BANKR`);
+  assert(unauthByokGet.status === 401, 'Unauthenticated GET /api/user/provider-keys strictly rejected with HTTP 401');
+
+  const unauthByokPost = await fetch(`${BASE_URL}/api/user/provider-keys`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ label: 'Test', apiKey: 'bk_test_1234567890' }),
+  });
+  assert(unauthByokPost.status === 401, 'Unauthenticated POST /api/user/provider-keys strictly rejected with HTTP 401');
+
   console.log('\n================================================================');
   console.log(`  🎉 BLACKBOX SUITE COMPLETED: ${passedTests} PASSED, ${failedTests} FAILED`);
   console.log('================================================================\n');

@@ -589,7 +589,7 @@ export default async function TokenPortalPage({ params }: PageProps) {
         isGraduated={isGraduated}
       />
 
-      {/* 4-Pillar Economic Flywheel & Security Grid */}
+      {/* 4-Pillar Factual Protocol & Multi-Chain Security Grid */}
       <div
         style={{
           display: 'grid',
@@ -599,18 +599,20 @@ export default async function TokenPortalPage({ params }: PageProps) {
       >
         <div className="stat-card" style={{ padding: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-            <div style={{ padding: '8px', borderRadius: '8px', backgroundColor: 'rgba(239, 68, 68, 0.12)' }}>
-              <Flame size={20} color="#EF4444" />
+            <div style={{ padding: '8px', borderRadius: '8px', backgroundColor: 'var(--color-badge-warning-bg)' }}>
+              <Flame size={20} style={{ color: 'var(--color-badge-warning-text)' }} />
             </div>
             <div>
               <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: 'var(--color-foreground)' }}>
-                Deflationary Burn
+                Audited Bonding Curve &amp; LP Lock
               </h3>
-              <span className="text-muted" style={{ fontSize: '11px' }}>Perpetual Buyback &amp; Burn</span>
+              <span className="text-muted" style={{ fontSize: '11px' }}>
+                Target Graduasi: ${graduationThreshold.toLocaleString()}
+              </span>
             </div>
           </div>
           <p className="text-muted" style={{ fontSize: '12px', margin: 0, lineHeight: '1.5' }}>
-            Portion of AMM swap fees are automatically routed into the burn contract, reducing circulating supply with every trade.
+            Harga token bergerak secara deterministik mengikuti kurva bonding dan otomatis mengunci likuiditas DEX saat target graduasi tercapai.
           </p>
         </div>
 
@@ -621,13 +623,15 @@ export default async function TokenPortalPage({ params }: PageProps) {
             </div>
             <div>
               <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: 'var(--color-foreground)' }}>
-                0% Friction Tax
+                0% Token Transfer Tax
               </h3>
-              <span className="text-muted" style={{ fontSize: '11px' }}>Clean ERC20 / SPL Standard</span>
+              <span className="text-muted" style={{ fontSize: '11px' }}>
+                {isSol ? 'Clean SPL Token Standard' : 'Clean ERC-20 Standard'}
+              </span>
             </div>
           </div>
           <p className="text-muted" style={{ fontSize: '12px', margin: 0, lineHeight: '1.5' }}>
-            Zero transaction taxes on buys or sells. Unrestricted trading compatible with all DEX aggregators, snipers, and MEV relays.
+            Kontrak token bebas dari potongan transfer tersembunyi (0% buy/sell token tax). Biaya 1% hanya berlaku pada level protokol kurva bonding.
           </p>
         </div>
 
@@ -638,13 +642,23 @@ export default async function TokenPortalPage({ params }: PageProps) {
             </div>
             <div>
               <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: 'var(--color-foreground)' }}>
-                Doppler Settler AMM
+                {isSol
+                  ? 'Pump.fun & Raydium Router'
+                  : norm.chain === 'robinhood'
+                  ? 'Robinhood L2 & Doppler AMM'
+                  : norm.chain === 'arbitrum'
+                  ? 'Arbitrum L2 & Uniswap V3'
+                  : norm.chain === 'arc'
+                  ? 'Arc Network Native AMM'
+                  : 'Base L2 & Aerodrome / Doppler'}
               </h3>
-              <span className="text-muted" style={{ fontSize: '11px' }}>Decentralized Liquidity</span>
+              <span className="text-muted" style={{ fontSize: '11px' }}>
+                Jaringan: {norm.chain.toUpperCase()} · Mode: {launchMode.replace(/_/g, ' ')}
+              </span>
             </div>
           </div>
           <p className="text-muted" style={{ fontSize: '12px', margin: 0, lineHeight: '1.5' }}>
-            On-chain liquidity pools automatically lock and burn upon bonding curve graduation, ensuring permanent trading depth.
+            Routing likuiditas disesuaikan secara spesifik dengan jaringan {norm.chain.toUpperCase()} dengan proteksi slippage &amp; isolasi RPC multi-chain.
           </p>
         </div>
 
@@ -655,13 +669,13 @@ export default async function TokenPortalPage({ params }: PageProps) {
             </div>
             <div>
               <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: 'var(--color-foreground)' }}>
-                Non-Custodial Architecture
+                Non-Custodial Multi-Chain
               </h3>
-              <span className="text-muted" style={{ fontSize: '11px' }}>Verified On-Chain Settlement</span>
+              <span className="text-muted" style={{ fontSize: '11px' }}>Zero Private Key Custody · EIP-155 Safe</span>
             </div>
           </div>
           <p className="text-muted" style={{ fontSize: '12px', margin: 0, lineHeight: '1.5' }}>
-            No private keys or custody stored on the platform. All actions settled directly via smart contract logic.
+            Tidak ada private key atau seed phrase yang disimpan di server. Seluruh transaksi dieksekusi langsung melalui dompet Anda atau BYOK Vault terenkripsi.
           </p>
         </div>
       </div>

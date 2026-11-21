@@ -11,7 +11,13 @@ import { requireCapability } from '@packages/auth/session';
 import { rateLimiter } from '@packages/auth/rate-limiter';
 import { deployTokenViaBankrApi, type BankrSupportedChain } from '@packages/launchpad/bankr-client';
 import { SubscriptionsEngine } from '@packages/billing/subscriptions-engine';
-import { defaultBillingDbAdapter, getDbPool } from '@packages/shared/db-pool';
+import {
+  defaultBillingDbAdapter,
+  defaultDraftDbAdapter,
+  defaultProviderKeyVaultAdapter,
+  getDbPool,
+} from '@packages/shared/db-pool';
+import { validateMultiChainFeeRecipient } from '@packages/shared/credential-vault';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,6 +50,11 @@ export async function POST(req: NextRequest) {
     const tokenName = typeof body?.tokenName === 'string' ? body.tokenName.trim() : '';
     const tokenSymbol = typeof body?.tokenSymbol === 'string' ? body.tokenSymbol.trim() : '';
     const chain = (typeof body?.chain === 'string' ? body.chain.trim().toLowerCase() : 'base') as BankrSupportedChain;
+    const providerKeyId =
+      typeof body?.providerKeyId === 'string' && body.providerKeyId.trim() !== 'PLATFORM_DEFAULT'
+        ? body.providerKeyId.trim()
+        : undefined;
+    const draftId = typeof body?.draftId === 'string' ? body.draftId.trim() : undefined;
 
     if (tokenName.length < 2 || tokenSymbol.length < 2) {
       return NextResponse.json(
@@ -58,6 +69,47 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // 1. Validate Multi-Chain Fee Recipient compatibility before touching external API
+    try {
+      validateMultiChainFeeRecipient(chain, body?.feeRecipient);
+    } catch (feeErr: unknown) {
+      return NextResponse.json(
+        { success: false, error: feeErr instanceof Error ? feeErr.message : 'INVALID_FEE_RECIPIENT', timestamp: new Date().toISOString() },
+        { status: 400 }
+      );
+    }
+
+    // 2. Resolve BYOK API Key from encrypted vault (enforces ownership + chain_scope)
+    let resolvedByok: { apiKey: string; keyId: string; label: string; maskedKey: string } | null = null;
+    try {
+      if (providerKeyId) {
+        resolvedByok = await defaultProviderKeyVaultAdapter.resolveDecryptedKeyForDeploy({
+          userIdentifier: auth.walletAddress,
+          targetChain: chain,
+          keyId: providerKeyId,
+          provider: 'BANKR',
+        });
+      } else if (body?.providerKeyId !== 'PLATFORM_DEFAULT') {
+        // Optional auto-resolve default BYOK key if scope matches targetChain
+        try {
+          resolvedByok = await defaultProviderKeyVaultAdapter.resolveDecryptedKeyForDeploy({
+            userIdentifier: auth.walletAddress,
+            targetChain: chain,
+            provider: 'BANKR',
+          });
+        } catch {
+          resolvedByok = null;
+        }
+      }
+    } catch (vaultErr: unknown) {
+      const vMsg = vaultErr instanceof Error ? vaultErr.message : 'BYOK_KEY_ERROR';
+      const status = vMsg.startsWith('CHAIN_SCOPE_MISMATCH') ? 400 : 403;
+      return NextResponse.json(
+        { success: false, error: vMsg, timestamp: new Date().toISOString() },
+        { status }
+      );
+    }
+
     const result = await deployTokenViaBankrApi({
       tokenName,
       tokenSymbol,
@@ -69,6 +121,7 @@ export async function POST(req: NextRequest) {
       feeRecipient: body?.feeRecipient,
       degenMode: body?.degenMode !== false,
       simulateOnly: Boolean(body?.simulateOnly),
+      apiKeyOverride: resolvedByok?.apiKey,
     });
 
     const httpStatus =
@@ -80,12 +133,32 @@ export async function POST(req: NextRequest) {
 
     const isSuccess = result.status === 'deployed' || result.status === 'simulated';
     let remainingCredits: number | undefined;
+    let persistedLaunchId: string | undefined;
+    const platformCfg = await defaultBillingDbAdapter.getPlatformFeeAndRiskConfig().catch(() => null);
+    const launchCostCr = Math.max(0, Number(platformCfg?.launchCostCr ?? 50));
+
     if (isSuccess) {
+      // Auto-sync live Bankr deployed token to PostgreSQL SSOT `token_launches`
+      if (result.status === 'deployed' && result.tokenAddress && draftId) {
+        try {
+          const pub = await defaultDraftDbAdapter.publishLaunchDraft({
+            draftId,
+            contractAddress: result.tokenAddress,
+            chain: `${chain}-mainnet`,
+            txHash: result.txHash,
+            graduationThreshold: body?.degenMode !== false ? 2500 : 69000,
+          });
+          persistedLaunchId = pub.launchId;
+        } catch {
+          // Non-blocking persistence fallback
+        }
+      }
+
       try {
-        if (getDbPool() && auth?.walletAddress) {
+        if (getDbPool() && auth?.walletAddress && launchCostCr > 0) {
           await SubscriptionsEngine.deductMeteredCredits(
             auth.walletAddress,
-            50,
+            launchCostCr,
             'TOKEN_LAUNCH_BANKR',
             result.txHash || result.tokenAddress || `bankr-${tokenSymbol}-${Date.now()}`,
             defaultBillingDbAdapter
@@ -102,7 +175,11 @@ export async function POST(req: NextRequest) {
         success: isSuccess,
         data: {
           ...result,
-          creditsBurned: isSuccess ? 50 : 0,
+          keySource: resolvedByok ? 'BYOK_VAULT' : 'PLATFORM_ENV',
+          usedKeyLabel: resolvedByok?.label,
+          usedKeyMasked: resolvedByok?.maskedKey,
+          launchId: persistedLaunchId,
+          creditsBurned: isSuccess ? launchCostCr : 0,
           remainingCredits,
         },
         error: result.status === 'failed' || result.status === 'unknown' ? result.message : undefined,
