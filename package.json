@@ -33,6 +33,7 @@
     "verify:sim": "bun run scripts/test-simulation-suite.ts",
     "verify:blackbox": "bun run scripts/test-blackbox-suite.ts",
     "verify:blackbox:dual": "bun run scripts/test-blackbox-dual.ts",
+    "verify:siwe:testnet": "bun run scripts/test-siwe-e2e-smoke.ts",
     "verify:all": "npx tsc -p tsconfig.vercel.json --noEmit && bun run verify:unit && bun run verify:whitebox && bun run verify:sim",
     "typecheck": "tsc --noEmit",
     "db:seed": "npx tsx scripts/seed-db.ts",
