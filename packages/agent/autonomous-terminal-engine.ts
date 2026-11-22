@@ -48,7 +48,109 @@ export interface TerminalTradeCard {
   status: string;
   agent: SubAgentId;
   rail: ExecutionRailId;
+  href?: string;
   createdAt?: string;
+}
+
+export type TradingExecutionModeParam = 'PAPER' | 'DEX_NON_CUSTODIAL' | 'CEX_SINGLE_SHOT';
+
+export interface ParsedTradingHandoffParams {
+  symbol: string | null;
+  side: 'BUY' | 'SELL' | null;
+  qty: number | null;
+  mode: TradingExecutionModeParam | null;
+  tokenAddress: string | null;
+  chainId: number | null;
+  rail: ExecutionRailId | null;
+  agent: SubAgentId | null;
+  proposalId: string | null;
+}
+
+const SUPPORTED_HANDOFF_CHAIN_IDS = new Set<number>([1, 10, 56, 137, 8453, 42161]);
+const SUPPORTED_SUB_AGENTS = new Set<SubAgentId>(['SCOUT', 'SNIPER', 'CURVE', 'GRADUATE']);
+const SUPPORTED_EXECUTION_RAILS = new Set<ExecutionRailId>([
+  'INTERNAL_LAUNCHPAD',
+  'EXTERNAL_DEX_0X',
+  'EXTERNAL_CEX_AUTO',
+]);
+
+export function buildTerminalTradeHandoffUrl(params: {
+  symbol: string;
+  side: 'BUY' | 'SELL';
+  qty: number;
+  mode: TradingExecutionModeParam;
+  rail: ExecutionRailId;
+  agent: SubAgentId;
+  tokenAddress?: string | null;
+  chainId?: number | null;
+}): string {
+  const qs = new URLSearchParams();
+  qs.set('symbol', String(params.symbol || 'BTCUSDT').trim());
+  qs.set('side', params.side === 'SELL' ? 'SELL' : 'BUY');
+  const safeQty = Number.isFinite(params.qty) && params.qty > 0 ? params.qty : 0.02;
+  qs.set('qty', String(safeQty));
+  qs.set('mode', params.mode);
+  qs.set('rail', params.rail);
+  qs.set('agent', params.agent);
+  if (params.chainId && SUPPORTED_HANDOFF_CHAIN_IDS.has(Number(params.chainId))) {
+    qs.set('chainId', String(Number(params.chainId)));
+  } else if (params.mode === 'DEX_NON_CUSTODIAL') {
+    qs.set('chainId', '8453');
+  }
+  if (params.tokenAddress && /^0x[a-fA-F0-9]{40}$/.test(params.tokenAddress.trim())) {
+    qs.set('token', params.tokenAddress.trim());
+  }
+  return `/trading?${qs.toString()}`;
+}
+
+export function parseTradingHandoffSearchParams(
+  search: string | URLSearchParams
+): ParsedTradingHandoffParams {
+  const params = typeof search === 'string' ? new URLSearchParams(search) : search;
+  const rawSymbol = params.get('symbol')?.trim() || null;
+  const rawSide = params.get('side')?.trim().toUpperCase() || null;
+  const side: 'BUY' | 'SELL' | null = rawSide === 'BUY' || rawSide === 'SELL' ? rawSide : null;
+
+  const rawQty = params.get('qty');
+  const parsedQty = rawQty !== null && rawQty.trim() !== '' ? Number(rawQty) : NaN;
+  const qty = Number.isFinite(parsedQty) && parsedQty > 0 ? parsedQty : null;
+
+  const rawMode = params.get('mode')?.trim().toUpperCase() || null;
+  const mode: TradingExecutionModeParam | null =
+    rawMode === 'PAPER' || rawMode === 'DEX_NON_CUSTODIAL' || rawMode === 'CEX_SINGLE_SHOT'
+      ? rawMode
+      : null;
+
+  const rawToken = params.get('token')?.trim() || null;
+  const tokenAddress = rawToken && /^0x[a-fA-F0-9]{40}$/.test(rawToken) ? rawToken : null;
+
+  const rawChain = params.get('chainId');
+  const parsedChain = rawChain !== null && rawChain.trim() !== '' ? Number(rawChain) : NaN;
+  const chainId =
+    Number.isInteger(parsedChain) && SUPPORTED_HANDOFF_CHAIN_IDS.has(parsedChain)
+      ? parsedChain
+      : null;
+
+  const rawRail = params.get('rail')?.trim().toUpperCase() as ExecutionRailId | undefined;
+  const rail: ExecutionRailId | null =
+    rawRail && SUPPORTED_EXECUTION_RAILS.has(rawRail) ? rawRail : null;
+
+  const rawAgent = params.get('agent')?.trim().toUpperCase() as SubAgentId | undefined;
+  const agent: SubAgentId | null = rawAgent && SUPPORTED_SUB_AGENTS.has(rawAgent) ? rawAgent : null;
+
+  const proposalId = params.get('proposalId')?.trim() || null;
+
+  return {
+    symbol: rawSymbol,
+    side,
+    qty,
+    mode,
+    tokenAddress,
+    chainId,
+    rail,
+    agent,
+    proposalId,
+  };
 }
 
 export interface TerminalAgentFeedItem {
@@ -168,15 +270,32 @@ export function buildAutonomousTerminalSnapshot(params: {
   const recentTradeCards: TerminalTradeCard[] = intents.slice(0, 9).map((intent) => {
     const { agent, rail } = classifyIntentAgent(intent);
     counts[agent] += 1;
+    const normalizedSide: 'BUY' | 'SELL' = intent.side === 'SELL' ? 'SELL' : 'BUY';
+    const normalizedQty = Number(intent.quantity || 0) > 0 ? Number(intent.quantity) : 0.02;
+    const cardMode: TradingExecutionModeParam =
+      rail === 'INTERNAL_LAUNCHPAD' || rail === 'EXTERNAL_DEX_0X'
+        ? 'DEX_NON_CUSTODIAL'
+        : intent.stage === 'LIVE' || intent.stage === 'TESTNET'
+        ? 'CEX_SINGLE_SHOT'
+        : 'PAPER';
     return {
       id: intent.id,
       symbol: intent.symbol,
-      side: intent.side === 'SELL' ? 'SELL' : 'BUY',
+      side: normalizedSide,
       stage: intent.stage,
       quantity: Number(intent.quantity || 0),
       status: intent.status,
       agent,
       rail,
+      href: buildTerminalTradeHandoffUrl({
+        symbol: intent.symbol,
+        side: normalizedSide,
+        qty: normalizedQty,
+        mode: cardMode,
+        rail,
+        agent,
+        chainId: cardMode === 'DEX_NON_CUSTODIAL' ? 8453 : null,
+      }),
       createdAt: intent.createdAt,
     };
   });
@@ -186,7 +305,6 @@ export function buildAutonomousTerminalSnapshot(params: {
   // 1. Curve & Graduate signals from live platform launches (INTERNAL_LAUNCHPAD)
   for (const launch of launches.slice(0, 3)) {
     const ticker = String(launch.ticker || launch.symbol || 'TOKEN').replace(/^\$/, '').toUpperCase();
-    const addrParam = launch.contractAddress ? `&token=${encodeURIComponent(launch.contractAddress)}` : '';
     const isNearGrad = Boolean(launch.isGraduated) || Number(launch.bondingProgressPct ?? 0) >= 75;
     const agent: SubAgentId = isNearGrad ? 'GRADUATE' : 'CURVE';
     counts[agent] += 1;
@@ -199,7 +317,16 @@ export function buildAutonomousTerminalSnapshot(params: {
       headline: isNearGrad
         ? `$${ticker} approaching DEX graduation → MEV-protected entry ready`
         : `$${ticker} active on Bonding Curve → momentum monitoring`,
-      href: `/trading?symbol=${encodeURIComponent(`${ticker}/WETH`)}&side=BUY&qty=0.05&mode=DEX_NON_CUSTODIAL${addrParam}`,
+      href: buildTerminalTradeHandoffUrl({
+        symbol: `${ticker}/WETH`,
+        side: 'BUY',
+        qty: 0.05,
+        mode: 'DEX_NON_CUSTODIAL',
+        rail: 'INTERNAL_LAUNCHPAD',
+        agent,
+        tokenAddress: launch.contractAddress || null,
+        chainId: 8453,
+      }),
       symbol: `${ticker}/WETH`,
       side: 'BUY',
     });
@@ -221,7 +348,6 @@ export function buildAutonomousTerminalSnapshot(params: {
 
   for (const hint of hints.slice(0, 2)) {
     counts.SCOUT += 1;
-    const addrParam = hint.tokenAddress ? `&token=${encodeURIComponent(hint.tokenAddress)}` : '';
     liveFeed.push({
       id: `scout-${hint.symbol}`,
       agent: 'SCOUT',
@@ -229,7 +355,16 @@ export function buildAutonomousTerminalSnapshot(params: {
       rail: 'EXTERNAL_DEX_0X',
       railLabel: RAIL_LABELS.EXTERNAL_DEX_0X,
       headline: hint.note,
-      href: `/trading?symbol=${encodeURIComponent(hint.symbol)}&side=BUY&qty=0.02&mode=DEX_NON_CUSTODIAL${addrParam}`,
+      href: buildTerminalTradeHandoffUrl({
+        symbol: hint.symbol,
+        side: 'BUY',
+        qty: 0.02,
+        mode: 'DEX_NON_CUSTODIAL',
+        rail: 'EXTERNAL_DEX_0X',
+        agent: 'SCOUT',
+        tokenAddress: hint.tokenAddress || null,
+        chainId: 8453,
+      }),
       symbol: hint.symbol,
       side: 'BUY',
     });
@@ -246,7 +381,14 @@ export function buildAutonomousTerminalSnapshot(params: {
     headline: params.hasActiveCexKey
       ? 'BTCUSDT breakout watch → Auto-Router armed (Binance / Bybit V5)'
       : 'BTCUSDT breakout watch → Paper Sim / connect CEX vault to arm',
-    href: `/trading?symbol=BTCUSDT&side=BUY&qty=0.02&mode=${params.hasActiveCexKey ? 'CEX_SINGLE_SHOT' : 'PAPER'}`,
+    href: buildTerminalTradeHandoffUrl({
+      symbol: 'BTCUSDT',
+      side: 'BUY',
+      qty: 0.02,
+      mode: params.hasActiveCexKey ? 'CEX_SINGLE_SHOT' : 'PAPER',
+      rail: 'EXTERNAL_CEX_AUTO',
+      agent: 'SNIPER',
+    }),
     symbol: 'BTCUSDT',
     side: 'BUY',
   });

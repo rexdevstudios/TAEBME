@@ -32,7 +32,12 @@ import { resolveCexExecutionVenue } from '../packages/trading/venue-router';
 import { buildDexPartnerFeePayload, formatBrokerOrderId } from '../packages/trading/fee-monetization';
 import { buildZeroXQuoteUrl, ZEROX_NATIVE_ETH } from '../packages/trading/zerox-swap-client';
 import { EVM_DEX_CHAINS, getEvmExplorerTxUrl } from '../packages/launchpad/web3-provider';
-import { buildAutonomousTerminalSnapshot, formatScoutCacheAgeLabel } from '../packages/agent/autonomous-terminal-engine';
+import {
+  buildAutonomousTerminalSnapshot,
+  buildTerminalTradeHandoffUrl,
+  formatScoutCacheAgeLabel,
+  parseTradingHandoffSearchParams,
+} from '../packages/agent/autonomous-terminal-engine';
 import { validateChainScope } from '../packages/shared/credential-vault';
 import { ProviderRegistry } from '../packages/providers/registry';
 import { defaultBinanceExecutionDbAdapter, listUserRecentTradeIntents } from '../packages/shared/db-pool';
@@ -456,6 +461,30 @@ async function runSimulationSuite() {
       dcRecent.length === 1 &&
       dcRecent[0].reason === 'SOP-07 simulation test',
     'SOP-07 Dual-Control propose -> 2nd-admin approve -> atomic consume lifecycle succeeds'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 17: Interactive 1-Click Agent-to-Trading Handoff & Parser (Phase AX)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 17: 1-Click Agent-to-Trading Handoff & Multi-Chain Parser] ---');
+  const handoffUrl = buildTerminalTradeHandoffUrl({
+    symbol: 'ARB',
+    side: 'BUY',
+    qty: 0.04,
+    mode: 'DEX_NON_CUSTODIAL',
+    rail: 'EXTERNAL_DEX_0X',
+    agent: 'SCOUT',
+    tokenAddress: '0x912CE59144191C1204E64559FE8253a0e49E6548',
+    chainId: 42161,
+  });
+  const parsedHandoff = parseTradingHandoffSearchParams(handoffUrl.replace('/trading?', ''));
+  assert(
+    parsedHandoff.chainId === 42161 &&
+      parsedHandoff.rail === 'EXTERNAL_DEX_0X' &&
+      parsedHandoff.agent === 'SCOUT' &&
+      parsedHandoff.mode === 'DEX_NON_CUSTODIAL' &&
+      parsedHandoff.tokenAddress === '0x912CE59144191C1204E64559FE8253a0e49E6548',
+    '1-Click Agent-to-Trading handoff URL round-trips Arbitrum 42161 DEX parameters cleanly'
   );
 
   console.log('\n================================================================');

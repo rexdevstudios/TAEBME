@@ -16,6 +16,11 @@ import {
   getEvmExplorerTxUrl,
   normalizeWeb3Error,
 } from '@packages/launchpad/web3-provider';
+import {
+  parseTradingHandoffSearchParams,
+  type ExecutionRailId,
+  type SubAgentId,
+} from '@packages/agent/autonomous-terminal-engine';
 
 interface Candle {
   timestamp: number;
@@ -264,6 +269,11 @@ export default function TradingPage() {
   const [orderSlippagePct, setOrderSlippagePct] = useState<number>(1.5);
   const [linkedTokenAddress, setLinkedTokenAddress] = useState<string | null>(null);
   const [linkedProposalId, setLinkedProposalId] = useState<string | null>(null);
+  const [linkedAgentHandoff, setLinkedAgentHandoff] = useState<{
+    agent: SubAgentId | null;
+    rail: ExecutionRailId | null;
+    chainId: number | null;
+  } | null>(null);
   const [mevQuote, setMevQuote] = useState<{ isSafe: boolean; minAmountOut?: string; maxSlippageBps?: number } | null>(null);
   const [dexSwapPayload, setDexSwapPayload] = useState<{
     available: boolean;
@@ -279,24 +289,24 @@ export default function TradingPage() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const params = new URLSearchParams(window.location.search);
-    const tokenParam = params.get('token');
-    const symbolParam = params.get('symbol');
-    const sideParam = params.get('side');
-    const qtyParam = params.get('qty');
-    const modeParam = params.get('mode');
-    const proposalParam = params.get('proposalId');
+    const parsed = parseTradingHandoffSearchParams(window.location.search);
 
-    if (symbolParam) setSymbol(symbolParam);
-    if (sideParam === 'BUY' || sideParam === 'SELL') setOrderSide(sideParam);
-    if (qtyParam && Number(qtyParam) > 0) setOrderQty(Number(qtyParam));
-    if (modeParam === 'CEX_SINGLE_SHOT' || modeParam === 'DEX_NON_CUSTODIAL' || modeParam === 'PAPER') {
-      setExecutionMode(modeParam);
+    if (parsed.symbol) setSymbol(parsed.symbol);
+    if (parsed.side) setOrderSide(parsed.side);
+    if (parsed.qty) setOrderQty(parsed.qty);
+    if (parsed.mode) setExecutionMode(parsed.mode);
+    if (parsed.chainId) setDexChainId(parsed.chainId);
+    if (parsed.proposalId) setLinkedProposalId(parsed.proposalId);
+    if (parsed.agent || parsed.rail || parsed.chainId) {
+      setLinkedAgentHandoff({
+        agent: parsed.agent,
+        rail: parsed.rail,
+        chainId: parsed.chainId,
+      });
     }
-    if (proposalParam) setLinkedProposalId(proposalParam);
-    if (tokenParam && /^0x[a-fA-F0-9]{40}$/.test(tokenParam)) {
-      setLinkedTokenAddress(tokenParam);
-      fetch(`/api/trading/mev-quote?tokenAddress=${encodeURIComponent(tokenParam)}`)
+    if (parsed.tokenAddress) {
+      setLinkedTokenAddress(parsed.tokenAddress);
+      fetch(`/api/trading/mev-quote?tokenAddress=${encodeURIComponent(parsed.tokenAddress)}`)
         .then((r) => r.json())
         .then((json) => {
           if (json.success && json.data) {
@@ -744,8 +754,29 @@ export default function TradingPage() {
               )}
             </div>
 
-            {(linkedTokenAddress || linkedProposalId) && (
-              <div style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', padding: '8px', borderRadius: '6px', backgroundColor: 'var(--color-badge-info-bg)', border: '1px solid var(--color-badge-info-border)', marginBottom: '10px', color: 'var(--color-badge-info-text)' }}>
+            {(linkedTokenAddress || linkedProposalId || linkedAgentHandoff) && (
+              <div style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', padding: '8px', borderRadius: '6px', backgroundColor: 'var(--color-badge-info-bg)', border: '1px solid var(--color-badge-info-border)', marginBottom: '10px', color: 'var(--color-badge-info-text)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                {linkedAgentHandoff && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                    <span>
+                      🤖 Agent Handoff: <strong>{linkedAgentHandoff.agent || 'AUTO'}</strong>
+                      {linkedAgentHandoff.rail ? ` · ${linkedAgentHandoff.rail}` : ''}
+                      {linkedAgentHandoff.chainId ? ` · Chain ${linkedAgentHandoff.chainId}` : ''}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLinkedAgentHandoff(null);
+                        setLinkedTokenAddress(null);
+                        setLinkedProposalId(null);
+                      }}
+                      className="btn-secondary"
+                      style={{ padding: '1px 6px', fontSize: '10px' }}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                )}
                 {linkedTokenAddress && (
                   <div>
                     Target Token: {linkedTokenAddress.slice(0, 10)}...{linkedTokenAddress.slice(-6)}
@@ -773,7 +804,7 @@ export default function TradingPage() {
             <UserRiskPolicyPanel isConnected={isConnected} />
 
             {executionMode === 'DEX_NON_CUSTODIAL' && (
-              <div style={{ marginTop: '8px', marginBottom: '8px' }}>
+              <div style={{ marginTop: '8px', marginBottom: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <select
                   aria-label="DEX EVM Network"
                   value={dexChainId}
@@ -787,6 +818,15 @@ export default function TradingPage() {
                     </option>
                   ))}
                 </select>
+                <input
+                  type="text"
+                  aria-label="DEX Target Token Contract Address"
+                  value={linkedTokenAddress || ''}
+                  onChange={(e) => setLinkedTokenAddress(e.target.value.trim() || null)}
+                  placeholder="Target Token Contract 0x... (default Base WETH/USDC)"
+                  className="input"
+                  style={{ width: '100%', padding: '6px 8px', fontSize: '11px', fontFamily: 'var(--font-mono)' }}
+                />
               </div>
             )}
 

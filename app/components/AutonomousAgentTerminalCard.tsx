@@ -235,6 +235,17 @@ export function AutonomousAgentTerminalCard({ isConnected }: AutonomousAgentTerm
                         <span style={{ color: isApproved ? '#34D399' : '#F28B82', fontWeight: 800 }}>{card.status}</span>
                         <span className="text-muted">×{card.quantity}</span>
                       </div>
+                      {card.href && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px', paddingTop: '4px', borderTop: '1px solid rgba(148, 163, 184, 0.12)', fontSize: '9px' }}>
+                          <span className="text-muted">{card.agent}</span>
+                          <a
+                            href={card.href}
+                            style={{ color: '#38BDF8', fontWeight: 800, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '2px' }}
+                          >
+                            Re-Trade <ArrowUpRight size={10} />
+                          </a>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
