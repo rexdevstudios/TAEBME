@@ -16,8 +16,9 @@ import { defaultBillingDbAdapter, defaultProviderKeyVaultAdapter } from '@packag
 import { SubscriptionsEngine } from '@packages/billing/subscriptions-engine';
 import { verifyByokLlmKeyLive, type ByokLlmProvider } from '@packages/intelligence/llm-advisory-client';
 import { dispatchOutboundAlert } from '@packages/notifications/webhook-dispatcher';
+import { parseBybitKeyPair, verifyBybitCredentialLive } from '@packages/trading/bybit-vault';
 
-const VERIFIABLE_PROVIDERS = new Set(['GEMINI', 'OPENAI', 'ANTHROPIC', 'WEBHOOK']);
+const VERIFIABLE_PROVIDERS = new Set(['BYBIT', 'GEMINI', 'OPENAI', 'ANTHROPIC', 'WEBHOOK']);
 const LLM_PROVIDERS = new Set<ByokLlmProvider>(['GEMINI', 'OPENAI', 'ANTHROPIC']);
 
 export const dynamic = 'force-dynamic';
@@ -97,6 +98,41 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { success: false, error: 'BYOK_KEY_NOT_FOUND_OR_FORBIDDEN: Key not found in your vault', timestamp: new Date().toISOString() },
         { status: 404 }
+      );
+    }
+
+    if (provider === 'BYBIT') {
+      const { apiKey, secretKey } = parseBybitKeyPair(resolved.apiKey);
+      const env: 'TESTNET' | 'MAINNET' =
+        String(resolved.chainScope || '').toLowerCase() === 'mainnet' ? 'MAINNET' : 'TESTNET';
+      const bybitPing = await verifyBybitCredentialLive({
+        apiKey,
+        secretKey,
+        environment: env,
+      });
+      await defaultBillingDbAdapter
+        .createAuditLog(
+          auth.walletAddress,
+          'PROVIDER_KEY_VERIFIED',
+          resolved.keyId,
+          bybitPing.connected
+            ? `BYBIT "${resolved.label}" (${env}) ping OK (canTrade=${bybitPing.canTrade}, canWithdraw=${bybitPing.canWithdraw}, ${bybitPing.latencyMs}ms)`
+            : `BYBIT "${resolved.label}" (${env}) ping FAILED (${bybitPing.error || 'unknown'}, ${bybitPing.latencyMs}ms)`
+        )
+        .catch(() => {});
+
+      return NextResponse.json(
+        {
+          success: true,
+          data: {
+            keyId: resolved.keyId,
+            label: resolved.label,
+            provider: 'BYBIT',
+            ...bybitPing,
+          },
+          timestamp: new Date().toISOString(),
+        },
+        { status: 200 }
       );
     }
 

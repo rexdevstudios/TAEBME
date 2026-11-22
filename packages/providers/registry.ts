@@ -52,10 +52,10 @@ const REGISTRY_ITEMS: ProviderDescriptor[] = [
     id: 'BYBIT',
     name: 'Bybit Unified Spot/Perp',
     category: 'CEX',
-    status: 'ADAPTER_READY',
+    status: 'LIVE',
     vaultKeyProvider: 'BYBIT',
     supportedChainsOrMarkets: ['SPOT_TESTNET', 'SPOT_MAINNET'],
-    nonCustodialGuard: 'AES-256-GCM + No-Withdrawal Guard',
+    nonCustodialGuard: 'AES-256-GCM + No-Withdrawal Guard + V5 Live Ping Verifier',
     supportsByok: true,
   },
   {

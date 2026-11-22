@@ -18,16 +18,18 @@ import {
   computeEffectiveVaultCapacity,
 } from '@packages/billing/subscriptions-engine';
 import { assertSafeWebhookUrl } from '@packages/notifications/webhook-dispatcher';
+import { parseBybitKeyPair } from '@packages/trading/bybit-vault';
 
-const ALLOWED_VAULT_PROVIDERS = new Set(['BANKR', 'GEMINI', 'OPENAI', 'ANTHROPIC', 'WEBHOOK']);
+const ALLOWED_VAULT_PROVIDERS = new Set(['BANKR', 'BYBIT', 'GEMINI', 'OPENAI', 'ANTHROPIC', 'WEBHOOK']);
 const LLM_VAULT_PROVIDERS = new Set(['GEMINI', 'OPENAI', 'ANTHROPIC']);
 
 function resolveEffectiveMaxKeys(
   provider: string,
-  effCap: { maxBankrKeys: number },
+  effCap: { maxBankrKeys: number; maxBinanceAccounts: number },
   baseCap: { maxLlmKeys: number }
 ): number {
   if (provider === 'BANKR') return effCap.maxBankrKeys;
+  if (provider === 'BYBIT') return effCap.maxBinanceAccounts;
   if (LLM_VAULT_PROVIDERS.has(provider)) return baseCap.maxLlmKeys;
   // WEBHOOK quota is decoupled from BYOK LLM so FREE/CREATOR users keep webhook alert access
   return 2;
@@ -133,6 +135,9 @@ export async function POST(req: NextRequest) {
     if (provider === 'WEBHOOK') {
       assertSafeWebhookUrl(apiKey);
     }
+    if (provider === 'BYBIT') {
+      parseBybitKeyPair(apiKey);
+    }
     const chainScope = typeof body?.chainScope === 'string' ? body.chainScope.trim().toLowerCase() : 'all';
     const isDefault = Boolean(body?.isDefault);
 
@@ -143,6 +148,18 @@ export async function POST(req: NextRequest) {
     const effCap = computeEffectiveVaultCapacity(planId, addonSlots);
     const baseCap = SubscriptionsEngine.getPlanCapacities(planId);
     const effectiveMaxKeys = resolveEffectiveMaxKeys(provider, effCap, baseCap);
+
+    if (provider === 'BYBIT' && chainScope === 'mainnet' && !baseCap.allowMainnetBinance) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'PLAN_MAINNET_REQUIRED: Bybit Mainnet CEX credentials require Pro Terminal Trader (TRADER) or AI Autonomous Desk (AGENT) plan.',
+          timestamp: new Date().toISOString(),
+        },
+        { status: 403 }
+      );
+    }
 
     if (LLM_VAULT_PROVIDERS.has(provider) && effectiveMaxKeys <= 0) {
       return NextResponse.json(
