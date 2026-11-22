@@ -19,6 +19,7 @@ import {
   PostgresBinanceExecutionDbAdapter,
 } from '@packages/shared/db-pool';
 import { buildAutonomousTerminalSnapshot } from '@packages/agent/autonomous-terminal-engine';
+import { upstashRedis } from '@packages/shared/redis-client';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,13 +44,26 @@ export async function GET(req: NextRequest) {
     const pool = getDbPool();
     const binanceDb = pool ? new PostgresBinanceExecutionDbAdapter(pool) : null;
 
-    const [planId, intents, activeLaunches, bybitKeys, binanceAccounts] = await Promise.all([
+    const [planId, intents, activeLaunches, bybitKeys, binanceAccounts, cachedScoutRaw] = await Promise.all([
       defaultBillingDbAdapter.getUserPlan(auth.walletAddress).catch(() => 'FREE' as const),
       listUserRecentTradeIntents(auth.user.userId, 20).catch(() => []),
       defaultDraftDbAdapter.getActiveTokenLaunches().catch(() => []),
       defaultProviderKeyVaultAdapter.listKeys(auth.walletAddress, 'BYBIT').catch(() => []),
       binanceDb ? binanceDb.listBinanceCredentials(auth.walletAddress).catch(() => []) : Promise.resolve([]),
+      upstashRedis.isConfigured() ? upstashRedis.get<string>('agent:scout:dataset').catch(() => null) : Promise.resolve(null),
     ]);
+
+    let firecrawlHints: Array<{ symbol: string; note: string; tokenAddress?: string }> | undefined;
+    if (cachedScoutRaw) {
+      try {
+        const parsed = typeof cachedScoutRaw === 'string' ? JSON.parse(cachedScoutRaw) : cachedScoutRaw;
+        if (Array.isArray(parsed?.hints) && parsed.hints.length > 0) {
+          firecrawlHints = parsed.hints;
+        }
+      } catch {
+        // Ignore malformed cache
+      }
+    }
 
     const hasZeroXApiKey = Boolean(
       process.env.ZEROX_API_KEY && !process.env.ZEROX_API_KEY.startsWith('mock_')
@@ -65,6 +79,7 @@ export async function GET(req: NextRequest) {
       hasActiveCexKey: binanceAccounts.length > 0 || bybitKeys.length > 0,
       hasZeroXApiKey,
       hasFirecrawlApiKey,
+      firecrawlHints,
     });
 
     return NextResponse.json(

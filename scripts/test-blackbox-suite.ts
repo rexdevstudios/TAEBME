@@ -291,6 +291,13 @@ async function runBlackboxSuite() {
   const unauthAgentTerm = await fetch(`${BASE_URL}/api/agent/terminal-telemetry`);
   assert(unauthAgentTerm.status === 401, 'Unauthenticated GET /api/agent/terminal-telemetry strictly rejected with HTTP 401');
 
+  const unauthSessionAllow = await fetch(`${BASE_URL}/api/agent/session-allowance`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dailySpendCapUsd: 100 }),
+  });
+  assert(unauthSessionAllow.status === 401, 'Unauthenticated POST /api/agent/session-allowance strictly rejected with HTTP 401');
+
   // -------------------------------------------------------------------------
   // TEST 12: Canonical Frontend Route Integrity & Live Billing Capacity Contract
   // -------------------------------------------------------------------------

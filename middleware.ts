@@ -38,6 +38,7 @@ const PUBLIC_API_PATHS = new Set([
   '/api/cron/reorg-sweep', // Vercel Cron reorg sweeper handles CRON_SECRET internally
   '/api/cron/reconcile-orders', // Vercel Cron order reconciler handles CRON_SECRET internally
   '/api/cron/market-sync', // Vercel Cron market sync handles CRON_SECRET internally
+  '/api/cron/agent-scout-sync', // Vercel Cron Scout dataset sync handles CRON_SECRET internally
   '/api/telegram/webhook', // Telegram webhook handles X-Telegram-Bot-Api-Secret-Token internally
   '/api/launchpad/webhook', // Webhook receiver handles signature/secret internally
 ]);

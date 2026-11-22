@@ -370,6 +370,26 @@ async function runSimulationSuite() {
     '0x v2 auto-ETH fee URL and Dual-Rail 4-Sub-Agent terminal snapshot build cleanly'
   );
 
+  // -------------------------------------------------------------------------
+  // SCENARIO 13: ERC-7715 Session Allowance Spec Clamping for 0x Base (Phase AS)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 13: ERC-7715 Session Allowance Spec Clamping] ---');
+  const clampedAllowance = validateSessionAllowanceSpec(
+    {
+      delegateAddress: '0x4444444444444444444444444444444444444444',
+      chainId: 8453,
+      dailySpendCapUsd: 2000,
+      expiresAtIso: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      allowedContracts: ['0x0000000000001fF3684f28c67538d4D072C22734'],
+      allowedActions: ['SWAP_DEX'],
+    },
+    'FREE'
+  );
+  assert(
+    clampedAllowance.effectiveDailySpendCapUsd === 250 && clampedAllowance.standard === 'ERC-4337/ERC-7715',
+    'ERC-7715 Session Allowance clamps Base 0x daily cap to FREE tier ($250)'
+  );
+
   console.log('\n================================================================');
   console.log(`  🎉 SIMULATION SUITE COMPLETED: ${passed} PASSED, ${failed} FAILED`);
   console.log('================================================================\n');

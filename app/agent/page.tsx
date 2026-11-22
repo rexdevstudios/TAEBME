@@ -9,6 +9,7 @@ import { UserRiskPolicyPanel } from '../components/UserRiskPolicyPanel';
 import { CustomAgentBuilderPanel } from '../components/CustomAgentBuilderPanel';
 import { ByokLlmVaultPanel, type SelectedLlmProvider } from '../components/ByokLlmVaultPanel';
 import { AutonomousAgentTerminalCard } from '../components/AutonomousAgentTerminalCard';
+import { SessionAllowancePanel } from '../components/SessionAllowancePanel';
 import type { CustomAgentProfile } from '@packages/agent/skill-registry';
 
 export default function AgentPage() {
@@ -163,6 +164,9 @@ export default function AgentPage() {
 
       {/* Dual-Rail Autonomous 4-Sub-Agent Terminal (Scout / Sniper / Curve / Graduate) */}
       <AutonomousAgentTerminalCard isConnected={isConnected} />
+
+      {/* Non-Custodial ERC-7715 Session Allowance Spec Builder */}
+      <SessionAllowancePanel isConnected={isConnected} />
 
       {/* Workflow & Plan Entitlement Guide */}
       <PageWorkflowBanner
