@@ -10,6 +10,7 @@
 
 import crypto from 'crypto';
 import type { CexExecutionAdapterContract } from '../providers/registry';
+import { resolveBybitBrokerReferer } from './fee-monetization';
 
 export interface BybitLivePingResult {
   connected: boolean;
@@ -113,6 +114,7 @@ export async function submitBybitSpotOrder(params: {
   qty: number;
   price?: number;
   orderLinkId: string;
+  brokerReferer?: string;
   fetchImpl?: typeof fetch;
 }): Promise<BybitSpotOrderResult> {
   const start = Date.now();
@@ -147,6 +149,7 @@ export async function submitBybitSpotOrder(params: {
 
   const url = `${baseUrl}/v5/order/create`;
   const doFetch = params.fetchImpl || fetch;
+  const referer = resolveBybitBrokerReferer(params.brokerReferer);
 
   try {
     const controller = new AbortController();
@@ -161,6 +164,7 @@ export async function submitBybitSpotOrder(params: {
           'X-BAPI-TIMESTAMP': timestamp,
           'X-BAPI-RECV-WINDOW': recvWindow,
           'X-BAPI-SIGN': signature,
+          ...(referer ? { 'X-BAPI-REFERER': referer } : {}),
         },
         body: rawBody,
         signal: controller.signal,

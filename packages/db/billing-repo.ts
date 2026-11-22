@@ -77,6 +77,7 @@ export interface PlatformFeeAndRiskConfig {
   maxOrderValueUsd: number;
   maxDailyLossUsd: number;
   maxSlippagePct: number;
+  dexSwapFeeBps?: number;
   treasuryWallet: string;
   launchpadContractAddress?: string;
   aiFeatureWeights?: AiFeatureWeights;
@@ -98,6 +99,7 @@ export class PostgresBillingDbAdapter implements BillingDbAdapter {
     maxOrderValueUsd: 10000,
     maxDailyLossUsd: 1000,
     maxSlippagePct: 3.0,
+    dexSwapFeeBps: 25,
     treasuryWallet: '0x0c9f4a82b5ae258e8e65ca40ac4f1abc455c34b6',
     aiFeatureWeights: { ...DEFAULT_AI_FEATURE_WEIGHTS },
   };
@@ -169,6 +171,7 @@ export class PostgresBillingDbAdapter implements BillingDbAdapter {
             if (Number.isFinite(Number(cfg.maxOrderValueUsd))) base.maxOrderValueUsd = Math.max(100, Math.round(Number(cfg.maxOrderValueUsd)));
             if (Number.isFinite(Number(cfg.maxDailyLossUsd))) base.maxDailyLossUsd = Math.max(50, Math.round(Number(cfg.maxDailyLossUsd)));
             if (Number.isFinite(Number(cfg.maxSlippagePct))) base.maxSlippagePct = Math.max(0.1, Math.min(10, Number(cfg.maxSlippagePct)));
+            if (Number.isFinite(Number(cfg.dexSwapFeeBps))) base.dexSwapFeeBps = Math.max(0, Math.min(100, Math.round(Number(cfg.dexSwapFeeBps))));
             if (typeof cfg.treasuryWallet === 'string' && /^0x[a-fA-F0-9]{40}$/.test(cfg.treasuryWallet)) {
               base.treasuryWallet = cfg.treasuryWallet;
             }
@@ -200,6 +203,10 @@ export class PostgresBillingDbAdapter implements BillingDbAdapter {
       maxOrderValueUsd: params.maxOrderValueUsd !== undefined ? Math.max(100, Math.round(Number(params.maxOrderValueUsd))) : current.maxOrderValueUsd,
       maxDailyLossUsd: params.maxDailyLossUsd !== undefined ? Math.max(50, Math.round(Number(params.maxDailyLossUsd))) : current.maxDailyLossUsd,
       maxSlippagePct: params.maxSlippagePct !== undefined ? Math.max(0.1, Math.min(10, Number(params.maxSlippagePct))) : current.maxSlippagePct,
+      dexSwapFeeBps:
+        params.dexSwapFeeBps !== undefined
+          ? Math.max(0, Math.min(100, Math.round(Number(params.dexSwapFeeBps))))
+          : (current.dexSwapFeeBps ?? 25),
       treasuryWallet:
         typeof params.treasuryWallet === 'string' && /^0x[a-fA-F0-9]{40}$/.test(params.treasuryWallet)
           ? params.treasuryWallet

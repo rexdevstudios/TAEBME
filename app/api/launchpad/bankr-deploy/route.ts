@@ -23,6 +23,7 @@ import {
 } from '@packages/shared/db-pool';
 import { validateMultiChainFeeRecipient } from '@packages/shared/credential-vault';
 import { notifyUserWebhookBestEffort } from '@packages/notifications/webhook-dispatcher';
+import { resolveBankrEffectiveFeeRecipient } from '@packages/trading/fee-monetization';
 
 export const dynamic = 'force-dynamic';
 
@@ -134,6 +135,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const platformCfg = await defaultBillingDbAdapter.getPlatformFeeAndRiskConfig().catch(() => null);
+    const effectiveFeeRecipient = resolveBankrEffectiveFeeRecipient({
+      requestedFeeRecipient: body?.feeRecipient,
+      usingPlatformDefaultKey: !resolvedByok,
+      treasuryWallet: platformCfg?.treasuryWallet,
+    });
+
     const result = await deployTokenViaBankrApi({
       tokenName,
       tokenSymbol,
@@ -142,7 +150,7 @@ export async function POST(req: NextRequest) {
       websiteUrl: typeof body?.websiteUrl === 'string' ? body.websiteUrl : undefined,
       tweetUrl: typeof body?.tweetUrl === 'string' ? body.tweetUrl : undefined,
       chain,
-      feeRecipient: body?.feeRecipient,
+      feeRecipient: effectiveFeeRecipient as any,
       degenMode: body?.degenMode !== false,
       simulateOnly: Boolean(body?.simulateOnly),
       apiKeyOverride: resolvedByok?.apiKey,
@@ -158,7 +166,6 @@ export async function POST(req: NextRequest) {
     const isSuccess = result.status === 'deployed' || result.status === 'simulated';
     let remainingCredits: number | undefined;
     let persistedLaunchId: string | undefined;
-    const platformCfg = await defaultBillingDbAdapter.getPlatformFeeAndRiskConfig().catch(() => null);
     const launchCostCr = Math.max(0, Number(platformCfg?.launchCostCr ?? 50));
 
     if (isSuccess) {

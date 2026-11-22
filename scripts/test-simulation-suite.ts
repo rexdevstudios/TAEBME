@@ -29,6 +29,7 @@ import { TradingRiskGate, compute24hRiskExposure } from '../packages/trading/ris
 import { notifyUserWebhookBestEffort } from '../packages/notifications/webhook-dispatcher';
 import { signBybitV5Post, submitBybitSpotOrder } from '../packages/trading/bybit-vault';
 import { resolveCexExecutionVenue } from '../packages/trading/venue-router';
+import { buildDexPartnerFeePayload, formatBrokerOrderId } from '../packages/trading/fee-monetization';
 import { validateChainScope } from '../packages/shared/credential-vault';
 import { ProviderRegistry } from '../packages/providers/registry';
 import { defaultBinanceExecutionDbAdapter, listUserRecentTradeIntents } from '../packages/shared/db-pool';
@@ -322,6 +323,17 @@ async function runSimulationSuite() {
   assert(
     simHist.length === 1 && simHist[0]?.symbol === 'BTCUSDT',
     'User-scoped trade intent history returns only authenticated user records'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 11: Transaction Fee Monetization & Env-Driven Broker Tagging (Phase AQ)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 11: Transaction Fee Monetization & Broker Tagging] ---');
+  const dexFee = buildDexPartnerFeePayload({ dexSwapFeeBps: 25, chainId: 8453 });
+  const brokerOrdId = formatBrokerOrderId('sim-order-001', 'x-RTRADER');
+  assert(
+    dexFee.feeBps === 25 && dexFee.zeroXSwapParams.swapFeeBps === '25' && brokerOrdId.startsWith('x-RTRADER-'),
+    'DEX partner fee (25 bps) and CEX broker order tagging format deterministically'
   );
 
   console.log('\n================================================================');

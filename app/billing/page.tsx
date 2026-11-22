@@ -98,6 +98,7 @@ export default function BillingPage() {
   const [maxOrderValueUsd, setMaxOrderValueUsd] = useState<number>(10000);
   const [maxDailyLossUsd, setMaxDailyLossUsd] = useState<number>(1000);
   const [maxSlippagePct, setMaxSlippagePct] = useState<number>(3.0);
+  const [dexSwapFeeBps, setDexSwapFeeBps] = useState<number>(25);
   const [treasuryWallet, setTreasuryWallet] = useState<string>('0x0c9f4a82b5ae258e8e65ca40ac4f1abc455c34b6');
   const [launchpadContractAddress, setLaunchpadContractAddress] = useState<string>('');
   const [isVerifyingBytecode, setIsVerifyingBytecode] = useState<boolean>(false);
@@ -119,6 +120,7 @@ export default function BillingPage() {
         if (typeof cfg.maxOrderValueUsd === 'number') setMaxOrderValueUsd(cfg.maxOrderValueUsd);
         if (typeof cfg.maxDailyLossUsd === 'number') setMaxDailyLossUsd(cfg.maxDailyLossUsd);
         if (typeof cfg.maxSlippagePct === 'number') setMaxSlippagePct(cfg.maxSlippagePct);
+        if (typeof cfg.dexSwapFeeBps === 'number') setDexSwapFeeBps(cfg.dexSwapFeeBps);
         if (typeof cfg.treasuryWallet === 'string' && cfg.treasuryWallet) setTreasuryWallet(cfg.treasuryWallet);
         if (typeof cfg.launchpadContractAddress === 'string') setLaunchpadContractAddress(cfg.launchpadContractAddress);
       }
@@ -266,6 +268,7 @@ export default function BillingPage() {
           maxOrderValueUsd,
           maxDailyLossUsd,
           maxSlippagePct,
+          dexSwapFeeBps,
           treasuryWallet,
           launchpadContractAddress: launchpadContractAddress.trim(),
         }),
@@ -1082,6 +1085,19 @@ export default function BillingPage() {
                   max={10}
                   value={maxSlippagePct}
                   onChange={(e) => setMaxSlippagePct(Math.max(0.1, Math.min(10, Number(e.target.value) || 3.0)))}
+                  className="input"
+                  style={{ padding: '7px 10px', fontSize: '12px', fontFamily: 'var(--font-mono)' }}
+                />
+              </div>
+              <div className="flex-col gap-xs">
+                <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-muted)' }}>DEX Swap Fee (bps · 25=0.25%)</label>
+                <input
+                  type="number"
+                  step={1}
+                  min={0}
+                  max={100}
+                  value={dexSwapFeeBps}
+                  onChange={(e) => setDexSwapFeeBps(Math.max(0, Math.min(100, Math.round(Number(e.target.value) || 0))))}
                   className="input"
                   style={{ padding: '7px 10px', fontSize: '12px', fontFamily: 'var(--font-mono)' }}
                 />

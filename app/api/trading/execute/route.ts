@@ -35,6 +35,7 @@ import {
   verifyBybitCredentialLive,
 } from '@packages/trading/bybit-vault';
 import { resolveCexExecutionVenue } from '@packages/trading/venue-router';
+import { buildDexPartnerFeePayload } from '@packages/trading/fee-monetization';
 
 export const dynamic = 'force-dynamic';
 
@@ -239,6 +240,12 @@ export async function POST(req: NextRequest) {
         },
       });
 
+      const partnerFee = buildDexPartnerFeePayload({
+        dexSwapFeeBps: dynamicRiskCfg?.dexSwapFeeBps,
+        treasuryWallet: dynamicRiskCfg?.treasuryWallet,
+        chainId,
+      });
+
       return NextResponse.json({
         success: true,
         data: {
@@ -250,6 +257,7 @@ export async function POST(req: NextRequest) {
             liquidityWei: quote.liquidityWei.toString(),
             isSafe: verification.isSafe,
           },
+          partnerFee,
           decision,
         },
         timestamp: new Date().toISOString(),

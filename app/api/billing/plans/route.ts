@@ -96,6 +96,7 @@ export async function GET() {
       maxOrderValueUsd: 10000,
       maxDailyLossUsd: 1000,
       maxSlippagePct: 3.0,
+      dexSwapFeeBps: 25,
       treasuryWallet: '0x0c9f4a82b5ae258e8e65ca40ac4f1abc455c34b6',
     })),
   ]);
@@ -164,6 +165,7 @@ export async function POST(req: NextRequest) {
         maxOrderValueUsd: body.maxOrderValueUsd !== undefined ? Number(body.maxOrderValueUsd) : undefined,
         maxDailyLossUsd: body.maxDailyLossUsd !== undefined ? Number(body.maxDailyLossUsd) : undefined,
         maxSlippagePct: body.maxSlippagePct !== undefined ? Number(body.maxSlippagePct) : undefined,
+        dexSwapFeeBps: body.dexSwapFeeBps !== undefined ? Number(body.dexSwapFeeBps) : undefined,
         treasuryWallet: typeof body.treasuryWallet === 'string' ? body.treasuryWallet.trim() : undefined,
         launchpadContractAddress:
           typeof body.launchpadContractAddress === 'string' ? body.launchpadContractAddress.trim() : undefined,
