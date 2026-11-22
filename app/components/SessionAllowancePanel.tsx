@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { ShieldCheck, KeyRound, ChevronDown, ChevronUp } from 'lucide-react';
+import { EVM_DEX_CHAINS } from '@packages/launchpad/web3-provider';
 
 interface SessionAllowancePanelProps {
   isConnected: boolean;
@@ -9,6 +10,7 @@ interface SessionAllowancePanelProps {
 
 export function SessionAllowancePanel({ isConnected }: SessionAllowancePanelProps) {
   const [expanded, setExpanded] = useState(false);
+  const [selectedChainId, setSelectedChainId] = useState<number>(8453);
   const [delegateAddress, setDelegateAddress] = useState('');
   const [dailyCapUsd, setDailyCapUsd] = useState(250);
   const [expiryDays, setExpiryDays] = useState(7);
@@ -43,7 +45,7 @@ export function SessionAllowancePanel({ isConnected }: SessionAllowancePanelProp
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...(delegateAddress.trim() ? { delegateAddress: delegateAddress.trim() } : {}),
-          chainId: 8453,
+          chainId: selectedChainId,
           dailySpendCapUsd: dailyCapUsd,
           expiresAtIso,
           allowedContracts: ['0x0000000000001fF3684f28c67538d4D072C22734'],
@@ -119,7 +121,25 @@ export function SessionAllowancePanel({ isConnected }: SessionAllowancePanelProp
 
       {expanded && (
         <form onSubmit={handleValidateAllowance} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '8px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '8px' }}>
+            <div className="flex-col gap-xs">
+              <label style={{ fontSize: '10px', fontWeight: 700, color: 'var(--color-muted)' }}>
+                Jaringan EVM (6 Chain)
+              </label>
+              <select
+                aria-label="Session Allowance EVM Chain"
+                value={selectedChainId}
+                onChange={(e) => setSelectedChainId(Number(e.target.value) || 8453)}
+                className="input"
+                style={{ padding: '6px 8px', fontSize: '11px', fontWeight: 700 }}
+              >
+                {Object.values(EVM_DEX_CHAINS).map((c) => (
+                  <option key={c.chainId} value={c.chainId}>
+                    {c.name} ({c.chainId})
+                  </option>
+                ))}
+              </select>
+            </div>
             <div className="flex-col gap-xs">
               <label style={{ fontSize: '10px', fontWeight: 700, color: 'var(--color-muted)' }}>
                 Public Delegate Address (Opsional — Default Wallet Anda)

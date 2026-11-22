@@ -31,6 +31,7 @@ import { signBybitV5Post, submitBybitSpotOrder } from '../packages/trading/bybit
 import { resolveCexExecutionVenue } from '../packages/trading/venue-router';
 import { buildDexPartnerFeePayload, formatBrokerOrderId } from '../packages/trading/fee-monetization';
 import { buildZeroXQuoteUrl, ZEROX_NATIVE_ETH } from '../packages/trading/zerox-swap-client';
+import { EVM_DEX_CHAINS, getEvmExplorerTxUrl } from '../packages/launchpad/web3-provider';
 import { buildAutonomousTerminalSnapshot } from '../packages/agent/autonomous-terminal-engine';
 import { validateChainScope } from '../packages/shared/credential-vault';
 import { ProviderRegistry } from '../packages/providers/registry';
@@ -388,6 +389,17 @@ async function runSimulationSuite() {
   assert(
     clampedAllowance.effectiveDailySpendCapUsd === 250 && clampedAllowance.standard === 'ERC-4337/ERC-7715',
     'ERC-7715 Session Allowance clamps Base 0x daily cap to FREE tier ($250)'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 14: Full 6-Chain EVM DEX Registry & Explorer Parity (Phase AT)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 14: 6-Chain EVM DEX Registry & Explorer Parity] ---');
+  assert(
+    Object.keys(EVM_DEX_CHAINS).length === 6 &&
+      getEvmExplorerTxUrl(42161, '0x123').startsWith('https://arbiscan.io/tx/') &&
+      getEvmExplorerTxUrl(56, '0x123').startsWith('https://bscscan.com/tx/'),
+    'All 6 EVM DEX chains (Base, Arbitrum, Ethereum, Optimism, Polygon, BSC) map cleanly to explorers'
   );
 
   console.log('\n================================================================');

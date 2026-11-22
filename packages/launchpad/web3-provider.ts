@@ -281,6 +281,105 @@ export async function ensureBaseNetwork(
 }
 
 /**
+ * Authoritative 6-Chain EVM DEX Registry (100% parity with 0x Swap API v2 `ZEROX_SUPPORTED_CHAIN_IDS`).
+ */
+export const EVM_DEX_CHAINS: Record<number, ChainConfig> = {
+  8453: SUPPORTED_BASE_CHAINS.BASE_MAINNET,
+  42161: SUPPORTED_BASE_CHAINS.ARBITRUM_MAINNET,
+  1: {
+    chainId: 1,
+    hexChainId: '0x1',
+    name: 'Ethereum Mainnet',
+    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+    rpcUrl: 'https://eth.llamarpc.com',
+    explorerUrl: 'https://etherscan.io',
+  },
+  10: {
+    chainId: 10,
+    hexChainId: '0xa',
+    name: 'Optimism Mainnet',
+    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+    rpcUrl: 'https://mainnet.optimism.io',
+    explorerUrl: 'https://optimistic.etherscan.io',
+  },
+  137: {
+    chainId: 137,
+    hexChainId: '0x89',
+    name: 'Polygon PoS',
+    nativeCurrency: { name: 'POL', symbol: 'POL', decimals: 18 },
+    rpcUrl: 'https://polygon-rpc.com',
+    explorerUrl: 'https://polygonscan.com',
+  },
+  56: {
+    chainId: 56,
+    hexChainId: '0x38',
+    name: 'BNB Smart Chain',
+    nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 },
+    rpcUrl: 'https://bsc-dataseed.binance.org',
+    explorerUrl: 'https://bscscan.com',
+  },
+};
+
+export function getEvmExplorerTxUrl(chainId: number, txHash: string): string {
+  const cfg = EVM_DEX_CHAINS[chainId] || SUPPORTED_BASE_CHAINS.BASE_MAINNET;
+  return `${cfg.explorerUrl.replace(/\/+$/, '')}/tx/${txHash}`;
+}
+
+/**
+ * Multi-Chain MetaMask Network Switcher for any supported 0x EVM DEX chain (Phase AT).
+ * Leaves `ensureBaseNetwork()` untouched for Billing & Launchpad contracts.
+ */
+export async function ensureEvmNetwork(
+  targetChainId: number
+): Promise<{ success: boolean; chainId?: number; hexChainId?: string; error?: string }> {
+  const ethereum = resolveBrowserEthereumProvider();
+  if (!ethereum) {
+    return { success: false, error: 'Dompet Web3 (MetaMask) tidak terdeteksi di browser ini.' };
+  }
+  const targetConfig = EVM_DEX_CHAINS[targetChainId];
+  if (!targetConfig) {
+    return { success: false, error: `UNSUPPORTED_EVM_CHAIN: Chain ID ${targetChainId} belum didukung.` };
+  }
+
+  try {
+    const currentChainHex: string = await ethereum.request({ method: 'eth_chainId' });
+    if (currentChainHex && currentChainHex.toLowerCase() === targetConfig.hexChainId.toLowerCase()) {
+      return { success: true, chainId: targetConfig.chainId, hexChainId: currentChainHex.toLowerCase() };
+    }
+
+    try {
+      await ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: targetConfig.hexChainId }],
+      });
+    } catch (switchErr: any) {
+      if (isUnrecognizedChainError(switchErr)) {
+        await ethereum.request({
+          method: 'wallet_addEthereumChain',
+          params: [
+            {
+              chainId: targetConfig.hexChainId,
+              chainName: targetConfig.name,
+              nativeCurrency: targetConfig.nativeCurrency,
+              rpcUrls: [targetConfig.rpcUrl],
+              blockExplorerUrls: [targetConfig.explorerUrl],
+            },
+          ],
+        });
+      } else if (switchErr?.code === 4001) {
+        return { success: false, error: `USER_REJECTED: Pengguna menolak pindah ke ${targetConfig.name}.` };
+      } else {
+        throw switchErr;
+      }
+    }
+
+    return { success: true, chainId: targetConfig.chainId, hexChainId: targetConfig.hexChainId };
+  } catch (err: any) {
+    return { success: false, error: err?.message || `Gagal berpindah ke ${targetConfig.name}.` };
+  }
+}
+
+/**
  * Instantiates the BondingCurveLaunchpad contract with a verified deployment address.
  * Throws an explicit error if the contract is not verified or blocked.
  */

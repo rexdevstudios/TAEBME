@@ -9,7 +9,13 @@ import { BinanceKeyVaultPanel } from '../components/BinanceKeyVaultPanel';
 import { BybitKeyVaultPanel } from '../components/BybitKeyVaultPanel';
 import { UserRiskPolicyPanel } from '../components/UserRiskPolicyPanel';
 import { RecentTradeHistoryPanel } from '../components/RecentTradeHistoryPanel';
-import { ensureBaseNetwork, getBrowserSigner, normalizeWeb3Error } from '@packages/launchpad/web3-provider';
+import {
+  EVM_DEX_CHAINS,
+  ensureEvmNetwork,
+  getBrowserSigner,
+  getEvmExplorerTxUrl,
+  normalizeWeb3Error,
+} from '@packages/launchpad/web3-provider';
 
 interface Candle {
   timestamp: number;
@@ -246,6 +252,7 @@ export default function TradingPage() {
 
   // Controlled order parameters & deep-link context (Launchpad ?token= & Agent ?proposalId=)
   const [executionMode, setExecutionMode] = useState<'PAPER' | 'DEX_NON_CUSTODIAL' | 'CEX_SINGLE_SHOT'>('PAPER');
+  const [dexChainId, setDexChainId] = useState<number>(8453);
   const [cexVenue, setCexVenue] = useState<'BINANCE' | 'BYBIT'>('BINANCE');
   const [venueManuallyChosen, setVenueManuallyChosen] = useState<boolean>(false);
   const [cexActiveCounts, setCexActiveCounts] = useState<{ binance: number; bybit: number } | null>(null);
@@ -381,7 +388,7 @@ export default function TradingPage() {
           quantity: orderQty > 0 ? orderQty : 0.1,
           maxSlippagePct: orderSlippagePct > 0 ? orderSlippagePct : 1.5,
           tokenAddress: linkedTokenAddress || '0x4200000000000000000000000000000000000006',
-          chainId: parsedChainId,
+          chainId: executionMode === 'DEX_NON_CUSTODIAL' ? dexChainId : parsedChainId,
           ...(executionMode === 'CEX_SINGLE_SHOT'
             ? {
                 venue: cexVenue,
@@ -441,9 +448,10 @@ export default function TradingPage() {
     if (!dexSwapPayload?.available || !dexSwapPayload.transaction) return;
     setDexSigning(true);
     try {
-      const netCheck = await ensureBaseNetwork();
+      const targetChain = dexSwapPayload.chainId || dexChainId;
+      const netCheck = await ensureEvmNetwork(targetChain);
       if (!netCheck.success) {
-        setActionFeedback(`⚠️ ${netCheck.error || 'Harap beralih ke jaringan Base di MetaMask.'}`);
+        setActionFeedback(`⚠️ ${netCheck.error || 'Harap beralih ke jaringan EVM yang dipilih di MetaMask.'}`);
         return;
       }
       const signer = await getBrowserSigner();
@@ -453,9 +461,10 @@ export default function TradingPage() {
         value: BigInt(dexSwapPayload.transaction.value || '0'),
       });
       setDexTxHash(tx.hash);
-      setActionFeedback(`📡 Transaksi 0x Swap v2 terkirim (${tx.hash.slice(0, 12)}...). Menunggu konfirmasi Base...`);
+      const chainLabel = EVM_DEX_CHAINS[targetChain]?.name || `Chain ${targetChain}`;
+      setActionFeedback(`📡 Transaksi 0x Swap v2 terkirim di ${chainLabel} (${tx.hash.slice(0, 12)}...). Menunggu konfirmasi...`);
       await tx.wait(1);
-      setActionFeedback(`✅ 0x Swap v2 terkonfirmasi on-chain! Tx: ${tx.hash}`);
+      setActionFeedback(`✅ 0x Swap v2 terkonfirmasi on-chain di ${chainLabel}! Tx: ${tx.hash}`);
     } catch (err: any) {
       setActionFeedback(`⚠️ MetaMask Swap dibatalkan / gagal: ${normalizeWeb3Error(err)}`);
     } finally {
@@ -763,6 +772,24 @@ export default function TradingPage() {
 
             <UserRiskPolicyPanel isConnected={isConnected} />
 
+            {executionMode === 'DEX_NON_CUSTODIAL' && (
+              <div style={{ marginTop: '8px', marginBottom: '8px' }}>
+                <select
+                  aria-label="DEX EVM Network"
+                  value={dexChainId}
+                  onChange={(e) => setDexChainId(Number(e.target.value) || 8453)}
+                  className="input"
+                  style={{ width: '100%', padding: '6px 8px', fontSize: '11px', fontWeight: 700 }}
+                >
+                  {Object.values(EVM_DEX_CHAINS).map((c) => (
+                    <option key={c.chainId} value={c.chainId}>
+                      DEX Network: {c.name} (Chain {c.chainId})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             {executionMode === 'CEX_SINGLE_SHOT' && (
               <>
                 <div style={{ display: 'flex', gap: '6px', marginTop: '8px', marginBottom: '4px' }}>
@@ -871,12 +898,12 @@ export default function TradingPage() {
                 {dexTxHash && (
                   <div style={{ marginTop: '6px' }}>
                     <a
-                      href={`https://basescan.org/tx/${dexTxHash}`}
+                      href={getEvmExplorerTxUrl(dexSwapPayload?.chainId || dexChainId, dexTxHash)}
                       target="_blank"
                       rel="noreferrer"
                       style={{ color: '#38BDF8', fontSize: '11px', textDecoration: 'underline' }}
                     >
-                      Lihat di BaseScan →
+                      Lihat di Block Explorer →
                     </a>
                   </div>
                 )}
