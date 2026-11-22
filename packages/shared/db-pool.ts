@@ -834,6 +834,59 @@ export async function getTradeIntentByIdempotencyKey(idempotencyKey: string): Pr
   return null;
 }
 
+/**
+ * Lists recent trade intents strictly scoped to a single authenticated user (Phase AP).
+ * - Clamps `limit` to `1..50` (default `10`).
+ * - Falls back cleanly to in-memory seeded intents in offline/test environments.
+ */
+export async function listUserRecentTradeIntents(
+  userIdentifier: string,
+  limit: number = 10
+): Promise<TradeIntentRecord[]> {
+  const safeLimit = Math.max(1, Math.min(50, Math.floor(Number(limit) || 10)));
+  const pool = getDbPool();
+  if (pool) {
+    try {
+      const validUserId = await ensureUserEntity(pool, userIdentifier);
+      const res = await pool.query(
+        `SELECT id, user_id AS "userId", stage, symbol, side, type,
+                quantity::float AS quantity, price::float AS price,
+                idempotency_key AS "idempotencyKey", status,
+                risk_decision_id AS "riskDecisionId", created_at AS "createdAt"
+         FROM trade_intents
+         WHERE user_id = $1
+         ORDER BY created_at DESC
+         LIMIT $2`,
+        [validUserId, safeLimit]
+      );
+      return res.rows.map((r: any) => ({
+        id: String(r.id),
+        userId: String(r.userId),
+        stage: r.stage,
+        symbol: String(r.symbol),
+        side: r.side,
+        type: r.type,
+        quantity: Number(r.quantity),
+        price: r.price !== null && r.price !== undefined ? Number(r.price) : undefined,
+        maxSlippagePct: 1.0,
+        idempotencyKey: String(r.idempotencyKey),
+        status: r.status,
+        riskDecisionId: r.riskDecisionId ? String(r.riskDecisionId) : undefined,
+        createdAt: r.createdAt ? new Date(r.createdAt).toISOString() : undefined,
+      }));
+    } catch (err: any) {
+      console.warn('[DB] listUserRecentTradeIntents fallback to memory:', err?.message || err);
+    }
+  }
+
+  const norm = (userIdentifier || '').trim().toLowerCase();
+  return defaultBinanceExecutionDbAdapter
+    .getInMemoryIntents()
+    .filter((i) => (i.userId || '').trim().toLowerCase() === norm)
+    .sort((a, b) => Date.parse(b.createdAt || '0') - Date.parse(a.createdAt || '0'))
+    .slice(0, safeLimit);
+}
+
 export function resetDbStateForTesting(): void {
   defaultBinanceExecutionDbAdapter.clearInMemoryState();
   defaultKillSwitchDbAdapter.clearKillSwitches();

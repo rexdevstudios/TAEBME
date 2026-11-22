@@ -31,6 +31,7 @@ import { signBybitV5Post, submitBybitSpotOrder } from '../packages/trading/bybit
 import { resolveCexExecutionVenue } from '../packages/trading/venue-router';
 import { validateChainScope } from '../packages/shared/credential-vault';
 import { ProviderRegistry } from '../packages/providers/registry';
+import { defaultBinanceExecutionDbAdapter, listUserRecentTradeIntents } from '../packages/shared/db-pool';
 
 let passed = 0;
 let failed = 0;
@@ -298,6 +299,29 @@ async function runSimulationSuite() {
   assert(
     sanitizedPrompt.includes('[REDACTED_POLICY_GUARD]') && !sanitizedPrompt.includes('\u0000'),
     'AI prompt sanitizer neutralizes risk-override injection and strips control chars'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 10: User-Scoped Trade Intent History Isolation (Phase AP)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 10: User-Scoped Trade Intent History Isolation] ---');
+  defaultBinanceExecutionDbAdapter.seedIntent({
+    id: 'sim-ap-1',
+    userId: 'sim-trader-isolated',
+    stage: 'PAPER',
+    symbol: 'BTCUSDT',
+    side: 'BUY',
+    type: 'MARKET',
+    quantity: 0.02,
+    maxSlippagePct: 1.0,
+    idempotencyKey: 'sim-ap-idem-1',
+    status: 'APPROVED',
+    createdAt: new Date().toISOString(),
+  });
+  const simHist = await listUserRecentTradeIntents('sim-trader-isolated', 5);
+  assert(
+    simHist.length === 1 && simHist[0]?.symbol === 'BTCUSDT',
+    'User-scoped trade intent history returns only authenticated user records'
   );
 
   console.log('\n================================================================');

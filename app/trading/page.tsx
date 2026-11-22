@@ -8,6 +8,7 @@ import { PageWorkflowBanner } from '../components/PageWorkflowBanner';
 import { BinanceKeyVaultPanel } from '../components/BinanceKeyVaultPanel';
 import { BybitKeyVaultPanel } from '../components/BybitKeyVaultPanel';
 import { UserRiskPolicyPanel } from '../components/UserRiskPolicyPanel';
+import { RecentTradeHistoryPanel } from '../components/RecentTradeHistoryPanel';
 
 interface Candle {
   timestamp: number;
@@ -240,6 +241,7 @@ export default function TradingPage() {
   const [proposalStatus, setProposalStatus] = useState<'PENDING' | 'APPROVED' | 'REJECTED'>('PENDING');
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [historyRefreshTick, setHistoryRefreshTick] = useState(0);
 
   // Controlled order parameters & deep-link context (Launchpad ?token= & Agent ?proposalId=)
   const [executionMode, setExecutionMode] = useState<'PAPER' | 'DEX_NON_CUSTODIAL' | 'CEX_SINGLE_SHOT'>('PAPER');
@@ -381,6 +383,7 @@ export default function TradingPage() {
       const json = await res.json();
       if (res.ok && json.success) {
         setProposalStatus('APPROVED');
+        setHistoryRefreshTick((n) => n + 1);
         const execStatus = json.data?.status || 'APPROVED';
         const intentId = json.data?.tradeIntentId || '';
         const resolvedVenue = json.data?.venue || cexVenue;
@@ -866,6 +869,9 @@ export default function TradingPage() {
               </div>
             )}
           </div>
+
+          {/* User-Scoped Recent Trade Intent History (GET /api/trade-intents) */}
+          <RecentTradeHistoryPanel isConnected={isConnected} refreshSignal={historyRefreshTick} />
 
           {/* Investor Safety Nutrition Label (for SocialFi / Bonding Curve tokens) */}
           {symbol.includes('/') && (

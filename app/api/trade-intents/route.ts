@@ -4,7 +4,60 @@ import { rateLimiter } from '@packages/auth/rate-limiter';
 import { ApiResponse, CreateTradeIntentRequest } from '@packages/shared/contracts/api-contracts';
 import { TradeIntentInput, UserRiskLimits } from '@packages/shared/types/domain';
 import { requireCapability } from '@packages/auth/session';
-import { saveTradeIntent, defaultKillSwitchDbAdapter, defaultBillingDbAdapter } from '@packages/shared/db-pool';
+import {
+  saveTradeIntent,
+  listUserRecentTradeIntents,
+  defaultKillSwitchDbAdapter,
+  defaultBillingDbAdapter,
+} from '@packages/shared/db-pool';
+
+export const dynamic = 'force-dynamic';
+
+export async function GET(req: NextRequest) {
+  try {
+    let auth;
+    try {
+      auth = await requireCapability(req, 'TRADE_MANUALLY');
+    } catch (authErr: unknown) {
+      const msg = authErr instanceof Error ? authErr.message : String(authErr);
+      const isForbidden = msg.startsWith('RBAC_FORBIDDEN') || msg.startsWith('AUTH_ACCOUNT_');
+      return NextResponse.json(
+        {
+          success: false,
+          error: { code: isForbidden ? 'FORBIDDEN' : 'UNAUTHORIZED', message: msg },
+          timestamp: new Date().toISOString(),
+        },
+        { status: isForbidden ? 403 : 401 }
+      );
+    }
+
+    const { searchParams } = new URL(req.url);
+    const limitParam = Number(searchParams.get('limit') || 10);
+    const intents = await listUserRecentTradeIntents(auth.user.userId, limitParam);
+
+    return NextResponse.json(
+      {
+        success: true,
+        data: {
+          intents,
+          count: intents.length,
+        },
+        timestamp: new Date().toISOString(),
+      },
+      { status: 200 }
+    );
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'TRADE_INTENTS_READ_FAILED';
+    return NextResponse.json(
+      {
+        success: false,
+        error: { code: 'SERVER_ERROR', message: msg },
+        timestamp: new Date().toISOString(),
+      },
+      { status: 500 }
+    );
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
