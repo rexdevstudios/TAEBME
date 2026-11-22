@@ -36,6 +36,7 @@ import {
 } from '@packages/trading/bybit-vault';
 import { resolveCexExecutionVenue } from '@packages/trading/venue-router';
 import { buildDexPartnerFeePayload } from '@packages/trading/fee-monetization';
+import { fetchZeroXSwapQuote } from '@packages/trading/zerox-swap-client';
 
 export const dynamic = 'force-dynamic';
 
@@ -246,6 +247,24 @@ export async function POST(req: NextRequest) {
         chainId,
       });
 
+      const sellAmountWei = (() => {
+        try {
+          return ethers.parseEther(String(Math.max(0.000001, quantity))).toString();
+        } catch {
+          return ethers.parseEther('0.01').toString();
+        }
+      })();
+      const slippageBps = Math.min(Math.round(maxSlippagePct * 100), quote.maxSlippageBps);
+      const zeroXSwap = await fetchZeroXSwapQuote({
+        chainId,
+        side,
+        tokenAddress,
+        sellAmountWei,
+        takerAddress: auth.walletAddress,
+        slippageBps,
+        partnerFee,
+      });
+
       return NextResponse.json({
         success: true,
         data: {
@@ -258,6 +277,7 @@ export async function POST(req: NextRequest) {
             isSafe: verification.isSafe,
           },
           partnerFee,
+          zeroXSwap,
           decision,
         },
         timestamp: new Date().toISOString(),

@@ -288,6 +288,9 @@ async function runBlackboxSuite() {
   const unauthAdminOps = await fetch(`${BASE_URL}/api/admin/ops-summary`);
   assert(unauthAdminOps.status === 401, 'Unauthenticated GET /api/admin/ops-summary strictly rejected with HTTP 401');
 
+  const unauthAgentTerm = await fetch(`${BASE_URL}/api/agent/terminal-telemetry`);
+  assert(unauthAgentTerm.status === 401, 'Unauthenticated GET /api/agent/terminal-telemetry strictly rejected with HTTP 401');
+
   // -------------------------------------------------------------------------
   // TEST 12: Canonical Frontend Route Integrity & Live Billing Capacity Contract
   // -------------------------------------------------------------------------

@@ -8,6 +8,7 @@ import { PageWorkflowBanner } from '../components/PageWorkflowBanner';
 import { UserRiskPolicyPanel } from '../components/UserRiskPolicyPanel';
 import { CustomAgentBuilderPanel } from '../components/CustomAgentBuilderPanel';
 import { ByokLlmVaultPanel, type SelectedLlmProvider } from '../components/ByokLlmVaultPanel';
+import { AutonomousAgentTerminalCard } from '../components/AutonomousAgentTerminalCard';
 import type { CustomAgentProfile } from '@packages/agent/skill-registry';
 
 export default function AgentPage() {
@@ -159,6 +160,9 @@ export default function AgentPage() {
           <strong>Advisory Only — No Auto-Execution.</strong> AI proposals are recommendations only and require explicit human approval via the Trading Terminal. No trade is submitted or executed from this page.
         </span>
       </div>
+
+      {/* Dual-Rail Autonomous 4-Sub-Agent Terminal (Scout / Sniper / Curve / Graduate) */}
+      <AutonomousAgentTerminalCard isConnected={isConnected} />
 
       {/* Workflow & Plan Entitlement Guide */}
       <PageWorkflowBanner

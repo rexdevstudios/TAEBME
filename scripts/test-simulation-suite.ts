@@ -30,6 +30,8 @@ import { notifyUserWebhookBestEffort } from '../packages/notifications/webhook-d
 import { signBybitV5Post, submitBybitSpotOrder } from '../packages/trading/bybit-vault';
 import { resolveCexExecutionVenue } from '../packages/trading/venue-router';
 import { buildDexPartnerFeePayload, formatBrokerOrderId } from '../packages/trading/fee-monetization';
+import { buildZeroXQuoteUrl, ZEROX_NATIVE_ETH } from '../packages/trading/zerox-swap-client';
+import { buildAutonomousTerminalSnapshot } from '../packages/agent/autonomous-terminal-engine';
 import { validateChainScope } from '../packages/shared/credential-vault';
 import { ProviderRegistry } from '../packages/providers/registry';
 import { defaultBinanceExecutionDbAdapter, listUserRecentTradeIntents } from '../packages/shared/db-pool';
@@ -334,6 +336,38 @@ async function runSimulationSuite() {
   assert(
     dexFee.feeBps === 25 && dexFee.zeroXSwapParams.swapFeeBps === '25' && brokerOrdId.startsWith('x-RTRADER-'),
     'DEX partner fee (25 bps) and CEX broker order tagging format deterministically'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 12: Live 0x Swap v2 Quote URL & Dual-Rail 4-Sub-Agent Terminal (Phase AR)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 12: 0x Swap v2 & Dual-Rail 4-Sub-Agent Terminal] ---');
+  const zeroXUrl = buildZeroXQuoteUrl({
+    chainId: 8453,
+    sellToken: ZEROX_NATIVE_ETH,
+    buyToken: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+    sellAmount: '10000000000000000',
+    taker: '0x4444444444444444444444444444444444444444',
+    slippageBps: 100,
+    feeBps: 25,
+    feeRecipient: dexFee.feeRecipient,
+  });
+  const termSnap = buildAutonomousTerminalSnapshot({
+    planId: 'AGENT',
+    intents: [],
+    activeLaunches: [{ ticker: 'LAVA', isGraduated: false, bondingProgressPct: 50 }],
+    hasActiveCexKey: true,
+    hasZeroXApiKey: true,
+    hasFirecrawlApiKey: true,
+  });
+  assert(
+    zeroXUrl.includes('swapFeeBps=25') &&
+      zeroXUrl.includes(`swapFeeToken=${ZEROX_NATIVE_ETH}`) &&
+      termSnap.agentBreakdown.length === 4 &&
+      termSnap.liveFeed.some((f) => f.rail === 'INTERNAL_LAUNCHPAD') &&
+      termSnap.liveFeed.some((f) => f.rail === 'EXTERNAL_DEX_0X') &&
+      termSnap.liveFeed.some((f) => f.rail === 'EXTERNAL_CEX_AUTO'),
+    '0x v2 auto-ETH fee URL and Dual-Rail 4-Sub-Agent terminal snapshot build cleanly'
   );
 
   console.log('\n================================================================');

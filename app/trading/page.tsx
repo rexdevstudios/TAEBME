@@ -9,6 +9,7 @@ import { BinanceKeyVaultPanel } from '../components/BinanceKeyVaultPanel';
 import { BybitKeyVaultPanel } from '../components/BybitKeyVaultPanel';
 import { UserRiskPolicyPanel } from '../components/UserRiskPolicyPanel';
 import { RecentTradeHistoryPanel } from '../components/RecentTradeHistoryPanel';
+import { ensureBaseNetwork, getBrowserSigner, normalizeWeb3Error } from '@packages/launchpad/web3-provider';
 
 interface Candle {
   timestamp: number;
@@ -257,6 +258,17 @@ export default function TradingPage() {
   const [linkedTokenAddress, setLinkedTokenAddress] = useState<string | null>(null);
   const [linkedProposalId, setLinkedProposalId] = useState<string | null>(null);
   const [mevQuote, setMevQuote] = useState<{ isSafe: boolean; minAmountOut?: string; maxSlippageBps?: number } | null>(null);
+  const [dexSwapPayload, setDexSwapPayload] = useState<{
+    available: boolean;
+    chainId: number;
+    buyAmount?: string;
+    feeBps?: number;
+    feeRecipient?: string;
+    transaction?: { to: string; data: string; value: string; gas?: string };
+    reason?: string;
+  } | null>(null);
+  const [dexSigning, setDexSigning] = useState(false);
+  const [dexTxHash, setDexTxHash] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -384,12 +396,26 @@ export default function TradingPage() {
       if (res.ok && json.success) {
         setProposalStatus('APPROVED');
         setHistoryRefreshTick((n) => n + 1);
+        setDexTxHash(null);
+        if (executionMode === 'DEX_NON_CUSTODIAL' && json.data?.zeroXSwap) {
+          setDexSwapPayload(json.data.zeroXSwap);
+        } else {
+          setDexSwapPayload(null);
+        }
         const execStatus = json.data?.status || 'APPROVED';
         const intentId = json.data?.tradeIntentId || '';
         const resolvedVenue = json.data?.venue || cexVenue;
+        const feePctText =
+          typeof json.data?.partnerFee?.feePct === 'number'
+            ? ` · Fee ${json.data.partnerFee.feePct}%`
+            : '';
         setActionFeedback(
           executionMode === 'DEX_NON_CUSTODIAL'
-            ? `✅ [DEX NON-CUSTODIAL] Intent ${intentId} lolos Risk Gate & MEV Guard (${execStatus}). Siap ditandatangani di dompet Web3.`
+            ? `✅ [DEX NON-CUSTODIAL] Intent ${intentId} lolos Risk Gate & MEV Guard (${execStatus}${feePctText}). ${
+                json.data?.zeroXSwap?.available
+                  ? 'Calldata 0x v2 siap — klik tombol "Sign & Swap via MetaMask" di bawah.'
+                  : 'Siap ditandatangani di dompet Web3.'
+              }`
             : executionMode === 'CEX_SINGLE_SHOT'
             ? `✅ [CEX ${resolvedVenue} SINGLE-SHOT] Intent ${intentId} (${execStatus}) lolos Risk Gate.`
             : `✅ [PAPER TRADING SIMULATION] Proposal APPROVED & Intent ${intentId} (${execStatus}) lolos Risk Gate! Simulasi 100% bebas risiko modal.`
@@ -407,7 +433,34 @@ export default function TradingPage() {
 
   const handleRejectProposal = () => {
     setProposalStatus('REJECTED');
+    setDexSwapPayload(null);
     setActionFeedback('⛔ Proposal REJECTED by user.');
+  };
+
+  const handleSignZeroXSwap = async () => {
+    if (!dexSwapPayload?.available || !dexSwapPayload.transaction) return;
+    setDexSigning(true);
+    try {
+      const netCheck = await ensureBaseNetwork();
+      if (!netCheck.success) {
+        setActionFeedback(`⚠️ ${netCheck.error || 'Harap beralih ke jaringan Base di MetaMask.'}`);
+        return;
+      }
+      const signer = await getBrowserSigner();
+      const tx = await signer.sendTransaction({
+        to: dexSwapPayload.transaction.to,
+        data: dexSwapPayload.transaction.data,
+        value: BigInt(dexSwapPayload.transaction.value || '0'),
+      });
+      setDexTxHash(tx.hash);
+      setActionFeedback(`📡 Transaksi 0x Swap v2 terkirim (${tx.hash.slice(0, 12)}...). Menunggu konfirmasi Base...`);
+      await tx.wait(1);
+      setActionFeedback(`✅ 0x Swap v2 terkonfirmasi on-chain! Tx: ${tx.hash}`);
+    } catch (err: any) {
+      setActionFeedback(`⚠️ MetaMask Swap dibatalkan / gagal: ${normalizeWeb3Error(err)}`);
+    } finally {
+      setDexSigning(false);
+    }
   };
 
   const lastClose = candles.length > 0 ? candles[candles.length - 1].close : 65400;
@@ -815,6 +868,49 @@ export default function TradingPage() {
                 }}
               >
                 {actionFeedback}
+                {dexTxHash && (
+                  <div style={{ marginTop: '6px' }}>
+                    <a
+                      href={`https://basescan.org/tx/${dexTxHash}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ color: '#38BDF8', fontSize: '11px', textDecoration: 'underline' }}
+                    >
+                      Lihat di BaseScan →
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {dexSwapPayload?.available && dexSwapPayload.transaction && (
+              <div
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(16, 185, 129, 0.35)',
+                  background: 'rgba(16, 185, 129, 0.08)',
+                  marginBottom: '12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                }}
+              >
+                <div style={{ fontSize: '11px', fontWeight: 800, color: '#34D399' }}>
+                  ⚡ 0x Swap API v2 Calldata Ready (Chain {dexSwapPayload.chainId})
+                </div>
+                <div className="text-muted" style={{ fontSize: '10px', fontFamily: 'var(--font-mono)' }}>
+                  Protocol Fee: {((dexSwapPayload.feeBps ?? 25) / 100).toFixed(2)}% (Auto-ETH → Treasury)
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSignZeroXSwap}
+                  disabled={dexSigning}
+                  className="btn-primary"
+                  style={{ width: '100%', justifyContent: 'center', fontSize: '12px', padding: '8px 12px' }}
+                >
+                  {dexSigning ? 'Menunggu MetaMask...' : 'Sign & Swap via MetaMask (0x v2)'}
+                </button>
               </div>
             )}
 
