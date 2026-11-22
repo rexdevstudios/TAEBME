@@ -6,6 +6,7 @@ import { Activity, ShieldAlert, BarChart3, Clock, AlertTriangle, Lightbulb, Wall
 import { NutritionLabelCard } from '../components/NutritionLabelCard';
 import { PageWorkflowBanner } from '../components/PageWorkflowBanner';
 import { BinanceKeyVaultPanel } from '../components/BinanceKeyVaultPanel';
+import { BybitKeyVaultPanel } from '../components/BybitKeyVaultPanel';
 import { UserRiskPolicyPanel } from '../components/UserRiskPolicyPanel';
 
 interface Candle {
@@ -672,11 +673,14 @@ export default function TradingPage() {
             <UserRiskPolicyPanel isConnected={isConnected} />
 
             {executionMode === 'CEX_SINGLE_SHOT' && (
-              <BinanceKeyVaultPanel
-                isConnected={isConnected}
-                selectedCredentialId={selectedBinanceCredentialId}
-                onSelectCredentialId={setSelectedBinanceCredentialId}
-              />
+              <>
+                <BinanceKeyVaultPanel
+                  isConnected={isConnected}
+                  selectedCredentialId={selectedBinanceCredentialId}
+                  onSelectCredentialId={setSelectedBinanceCredentialId}
+                />
+                <BybitKeyVaultPanel isConnected={isConnected} />
+              </>
             )}
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
