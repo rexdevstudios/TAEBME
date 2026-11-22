@@ -54,11 +54,15 @@ export async function GET(req: NextRequest) {
     ]);
 
     let firecrawlHints: Array<{ symbol: string; note: string; tokenAddress?: string }> | undefined;
+    let scoutDatasetSyncedAt: string | null = null;
     if (cachedScoutRaw) {
       try {
         const parsed = typeof cachedScoutRaw === 'string' ? JSON.parse(cachedScoutRaw) : cachedScoutRaw;
         if (Array.isArray(parsed?.hints) && parsed.hints.length > 0) {
           firecrawlHints = parsed.hints;
+        }
+        if (typeof parsed?.updatedAt === 'string' && parsed.updatedAt.trim()) {
+          scoutDatasetSyncedAt = parsed.updatedAt.trim();
         }
       } catch {
         // Ignore malformed cache
@@ -80,6 +84,7 @@ export async function GET(req: NextRequest) {
       hasZeroXApiKey,
       hasFirecrawlApiKey,
       firecrawlHints,
+      scoutDatasetSyncedAt,
     });
 
     return NextResponse.json(

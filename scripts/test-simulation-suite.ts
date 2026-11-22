@@ -32,7 +32,7 @@ import { resolveCexExecutionVenue } from '../packages/trading/venue-router';
 import { buildDexPartnerFeePayload, formatBrokerOrderId } from '../packages/trading/fee-monetization';
 import { buildZeroXQuoteUrl, ZEROX_NATIVE_ETH } from '../packages/trading/zerox-swap-client';
 import { EVM_DEX_CHAINS, getEvmExplorerTxUrl } from '../packages/launchpad/web3-provider';
-import { buildAutonomousTerminalSnapshot } from '../packages/agent/autonomous-terminal-engine';
+import { buildAutonomousTerminalSnapshot, formatScoutCacheAgeLabel } from '../packages/agent/autonomous-terminal-engine';
 import { validateChainScope } from '../packages/shared/credential-vault';
 import { ProviderRegistry } from '../packages/providers/registry';
 import { defaultBinanceExecutionDbAdapter, listUserRecentTradeIntents } from '../packages/shared/db-pool';
@@ -400,6 +400,27 @@ async function runSimulationSuite() {
       getEvmExplorerTxUrl(42161, '0x123').startsWith('https://arbiscan.io/tx/') &&
       getEvmExplorerTxUrl(56, '0x123').startsWith('https://bscscan.com/tx/'),
     'All 6 EVM DEX chains (Base, Arbitrum, Ethereum, Optimism, Polygon, BSC) map cleanly to explorers'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 15: Scout Redis Cache Freshness Telemetry (Phase AV)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 15: Scout Redis Cache Freshness Telemetry] ---');
+  const scoutRefNow = Date.parse('2026-11-23T01:00:00.000Z');
+  const scoutSnap = buildAutonomousTerminalSnapshot({
+    planId: 'TRADER',
+    intents: [],
+    activeLaunches: [],
+    hasActiveCexKey: true,
+    hasZeroXApiKey: true,
+    hasFirecrawlApiKey: true,
+    scoutDatasetSyncedAt: '2026-11-23T00:45:00.000Z',
+    firecrawlHints: [{ symbol: 'USDC', note: 'Scout Base liquidity baseline active' }],
+  });
+  assert(
+    scoutSnap.dualRailReadiness.scoutDatasetHintCount === 1 &&
+      formatScoutCacheAgeLabel(scoutSnap.dualRailReadiness.scoutDatasetSyncedAt, scoutRefNow) === 'Synced 15m ago',
+    'Scout Redis cache freshness telemetry formats relative age and hint count cleanly'
   );
 
   console.log('\n================================================================');

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Bot, ArrowUpRight, RefreshCw, ShieldCheck, Globe2, Layers, Cpu } from 'lucide-react';
-import type { AutonomousTerminalSnapshot } from '@packages/agent/autonomous-terminal-engine';
+import { formatScoutCacheAgeLabel, type AutonomousTerminalSnapshot } from '@packages/agent/autonomous-terminal-engine';
 
 interface AutonomousAgentTerminalCardProps {
   isConnected: boolean;
@@ -132,6 +132,12 @@ export function AutonomousAgentTerminalCard({ isConnected }: AutonomousAgentTerm
           </div>
           <div style={{ fontSize: '12px', fontWeight: 700, color: '#E2E8F0', marginTop: '3px' }}>
             {snapshot?.dualRailReadiness.firecrawlReady ? 'Live Web Dataset Active' : 'Quantitative Fallback Active'}
+          </div>
+          <div style={{ fontSize: '10px', color: '#FDBA74', marginTop: '3px', fontFamily: 'var(--font-mono)' }}>
+            {formatScoutCacheAgeLabel(snapshot?.dualRailReadiness.scoutDatasetSyncedAt)}
+            {snapshot?.dualRailReadiness.scoutDatasetHintCount
+              ? ` · ${snapshot.dualRailReadiness.scoutDatasetHintCount} hints`
+              : ''}
           </div>
         </div>
       </div>

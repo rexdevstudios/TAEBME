@@ -76,6 +76,8 @@ export interface AutonomousTerminalSnapshot {
     externalDexZeroXReady: boolean;
     externalCexAutoReady: boolean;
     firecrawlReady: boolean;
+    scoutDatasetSyncedAt?: string | null;
+    scoutDatasetHintCount?: number;
   };
   agentBreakdown: SubAgentAttribution[];
   recentTradeCards: TerminalTradeCard[];
@@ -118,6 +120,23 @@ function classifyIntentAgent(intent: MinimalTradeIntent): { agent: SubAgentId; r
   return { agent: 'SCOUT', rail: 'EXTERNAL_CEX_AUTO' };
 }
 
+export function formatScoutCacheAgeLabel(
+  syncedAtIso: string | null | undefined,
+  nowMs: number = Date.now()
+): string {
+  if (!syncedAtIso || typeof syncedAtIso !== 'string') return 'Awaiting Cron Sync';
+  const parsedMs = Date.parse(syncedAtIso);
+  if (!Number.isFinite(parsedMs)) return 'Awaiting Cron Sync';
+  const diffSec = Math.max(0, Math.floor((nowMs - parsedMs) / 1000));
+  if (diffSec < 60) return 'Synced <1m ago';
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `Synced ${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `Synced ${diffHr}h ago`;
+  const diffDays = Math.floor(diffHr / 24);
+  return `Synced ${diffDays}d ago`;
+}
+
 export function buildAutonomousTerminalSnapshot(params: {
   planId?: string;
   intents: MinimalTradeIntent[];
@@ -126,6 +145,7 @@ export function buildAutonomousTerminalSnapshot(params: {
   hasZeroXApiKey: boolean;
   hasFirecrawlApiKey: boolean;
   firecrawlHints?: Array<{ symbol: string; note: string; tokenAddress?: string }>;
+  scoutDatasetSyncedAt?: string | null;
   goalTradesTarget?: number;
 }): AutonomousTerminalSnapshot {
   const planId = String(params.planId || 'FREE').toUpperCase();
@@ -288,6 +308,11 @@ export function buildAutonomousTerminalSnapshot(params: {
       externalDexZeroXReady: params.hasZeroXApiKey,
       externalCexAutoReady: params.hasActiveCexKey,
       firecrawlReady: params.hasFirecrawlApiKey,
+      scoutDatasetSyncedAt:
+        typeof params.scoutDatasetSyncedAt === 'string' && params.scoutDatasetSyncedAt.trim()
+          ? params.scoutDatasetSyncedAt.trim()
+          : null,
+      scoutDatasetHintCount: Array.isArray(params.firecrawlHints) ? params.firecrawlHints.length : 0,
     },
     agentBreakdown,
     recentTradeCards,
