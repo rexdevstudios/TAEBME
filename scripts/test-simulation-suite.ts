@@ -13,6 +13,7 @@
 import {
   SubscriptionsEngine,
   annotateKeysWithQuotaStatus,
+  buildUserVaultSummary,
   computeEffectiveUserRiskLimits,
   computeEffectiveVaultCapacity,
 } from '../packages/billing/subscriptions-engine';
@@ -250,6 +251,27 @@ async function runSimulationSuite() {
       })) as unknown as typeof fetch,
   });
   assert(simOrder.submitted && simOrder.orderId === 'sim-bybit-01', 'Bybit V5 stateless Spot order executes cleanly via mocked transport');
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 7: Unified Multi-Vault Summary Telemetry (Phase AL)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 7: Unified Multi-Vault Summary Telemetry] ---');
+  const freeSummary = buildUserVaultSummary({
+    planId: 'FREE',
+    addonSlots: { bankrExtraSlots: 0, binanceExtraSlots: 0 },
+    bankrKeys: [{ id: 'b1', isDefault: true, createdAt: '2026-11-22T00:00:00Z' }],
+    binanceAccounts: [{ id: 'bn1', isDefault: true, createdAt: '2026-11-22T00:00:00Z', environment: 'MAINNET' }],
+    bybitKeys: [{ id: 'by1', isDefault: true, createdAt: '2026-11-22T00:00:00Z', chainScope: 'mainnet' }],
+    llmKeys: [{ id: 'l1', isDefault: true, createdAt: '2026-11-22T00:00:00Z' }],
+    webhookKeys: [{ id: 'w1', isDefault: true, createdAt: '2026-11-22T00:00:00Z' }],
+  });
+  assert(
+    freeSummary.vaults.binance.frozenMainnetLocked === 1 &&
+      freeSummary.vaults.bybit.frozenMainnetLocked === 1 &&
+      freeSummary.vaults.byokLlm.frozenOverQuota === 1 &&
+      freeSummary.vaults.webhook.active === 1,
+    'Unified vault summary accurately reports Mainnet locks, LLM freeze, and decoupled webhook quota on FREE tier'
+  );
 
   console.log('\n================================================================');
   console.log(`  🎉 SIMULATION SUITE COMPLETED: ${passed} PASSED, ${failed} FAILED`);

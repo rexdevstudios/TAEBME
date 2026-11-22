@@ -21,6 +21,30 @@ interface LedgerEntry {
   createdAt: string;
 }
 
+interface VaultCategoryCount {
+  total: number;
+  active: number;
+  frozenOverQuota: number;
+  frozenMainnetLocked: number;
+  maxAllowed: number;
+}
+
+interface UserVaultSummaryData {
+  planId: string;
+  allowMainnetCex: boolean;
+  addonSlots: {
+    bankrExtraSlots: number;
+    binanceExtraSlots: number;
+  };
+  vaults: {
+    bankr: VaultCategoryCount;
+    binance: VaultCategoryCount;
+    bybit: VaultCategoryCount;
+    byokLlm: VaultCategoryCount;
+    webhook: VaultCategoryCount;
+  };
+}
+
 interface Plan {
   id: string;
   name: string;
@@ -58,6 +82,7 @@ export default function BillingPage() {
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
   const [ledgerEntries, setLedgerEntries] = useState<LedgerEntry[]>([]);
   const [ledgerLoading, setLedgerLoading] = useState(false);
+  const [vaultSummary, setVaultSummary] = useState<UserVaultSummaryData | null>(null);
 
   // Admin Discount Management State
   const [discountPlanId, setDiscountPlanId] = useState<string>('CREATOR');
@@ -123,9 +148,29 @@ export default function BillingPage() {
     }
   }, [isConnected]);
 
+  const fetchVaultSummary = useCallback(async () => {
+    if (!isConnected) {
+      setVaultSummary(null);
+      return;
+    }
+    try {
+      const res = await fetch('/api/user/vault-summary', { credentials: 'same-origin' });
+      const json = await res.json();
+      if (res.ok && json?.success && json.data) {
+        setVaultSummary(json.data);
+      }
+    } catch {
+      // Non-blocking telemetry
+    }
+  }, [isConnected]);
+
   useEffect(() => {
     fetchLedger();
   }, [fetchLedger, credits, activePlanId]);
+
+  useEffect(() => {
+    fetchVaultSummary();
+  }, [fetchVaultSummary, activePlanId]);
 
   useEffect(() => {
     if (planId) {
@@ -714,7 +759,13 @@ export default function BillingPage() {
       )}
 
       {/* Permanent Capacity Add-On Store (Reuses ledger_entries, Zero Data Loss) */}
-      <BillingAddonStorePanel isConnected={isConnected} onPurchased={() => { refreshSession().catch(() => {}); }} />
+      <BillingAddonStorePanel
+        isConnected={isConnected}
+        onPurchased={() => {
+          refreshSession().catch(() => {});
+          fetchVaultSummary().catch(() => {});
+        }}
+      />
 
       {/* Connected Multi-Account Vaults & Non-Custodial Guardrail Overview */}
       <div
@@ -737,52 +788,103 @@ export default function BillingPage() {
               Kelola banyak API Key terenkripsi AES-256-GCM per akun tanpa pernah menyimpan private key dompet Anda di server.
             </p>
           </div>
+          {vaultSummary && (
+            <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: '#38BDF8', fontWeight: 700 }}>
+              Live Telemetry · Tier {vaultSummary.planId} · Webhooks {vaultSummary.vaults.webhook.active}/{vaultSummary.vaults.webhook.maxAllowed}
+            </span>
+          )}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
-          <div style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
-            <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--color-foreground)', marginBottom: '4px' }}>
-              🚀 Bankr Launchpad Vault (CREATOR+)
-            </div>
-            <p className="text-muted" style={{ fontSize: '11px', margin: '0 0 10px 0', lineHeight: 1.45 }}>
-              Simpan hingga 15 (CREATOR) / 25 (AGENT) API Key Bankr (+ Permanent Add-On Slots) dengan isolasi multi-chain (Base, Robinhood, Arbitrum, Arc).
-            </p>
-            <a href="/launchpad" className="btn-secondary" style={{ fontSize: '11px', padding: '5px 10px', display: 'inline-block' }}>
-              Kelola di /launchpad →
-            </a>
-          </div>
-          <div style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
-            <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--color-foreground)', marginBottom: '4px' }}>
-              ⚡ Binance CEX Multi-Account (TRADER / AGENT)
-            </div>
-            <p className="text-muted" style={{ fontSize: '11px', margin: '0 0 10px 0', lineHeight: 1.45 }}>
-              Simpan hingga 5 (TRADER) / 15 (AGENT) akun API Binance Testnet/Mainnet (+ Add-On Slots) dengan No-Withdrawal Guard &amp; Live Ping.
-            </p>
-            <a href="/trading" className="btn-secondary" style={{ fontSize: '11px', padding: '5px 10px', display: 'inline-block' }}>
-              Kelola di /trading →
-            </a>
-          </div>
-          <div style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
-            <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--color-foreground)', marginBottom: '4px' }}>
-              🧠 BYOK LLM Vault (TRADER / AGENT)
-            </div>
-            <p className="text-muted" style={{ fontSize: '11px', margin: '0 0 10px 0', lineHeight: 1.45 }}>
-              Simpan hingga 3 (TRADER) / 5 (AGENT) key Google Gemini, OpenAI GPT-4o, &amp; Anthropic Claude (Sonnet/Haiku/Opus) — hemat 60% credits (2 Cr/run).
-            </p>
-            <a href="/agent" className="btn-secondary" style={{ fontSize: '11px', padding: '5px 10px', display: 'inline-block' }}>
-              Kelola di /agent →
-            </a>
-          </div>
-          <div style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
-            <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--color-foreground)', marginBottom: '4px' }}>
-              🛡️ Non-Custodial Wallet Agent Guard
-            </div>
-            <p className="text-muted" style={{ fontSize: '11px', margin: '0 0 10px 0', lineHeight: 1.45 }}>
-              AI Desk hanya menghasilkan proposal terverifikasi Risk Gate; eksekusi DEX tetap 100% tanda tangan dompet Anda.
-            </p>
-            <a href="/agent" className="btn-secondary" style={{ fontSize: '11px', padding: '5px 10px', display: 'inline-block' }}>
-              Buka AI Desk →
-            </a>
-          </div>
+          {(() => {
+            const renderCounter = (c?: VaultCategoryCount) => {
+              if (!c) return null;
+              const frozen = c.frozenOverQuota + c.frozenMainnetLocked;
+              return (
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '6px' }}>
+                  <span
+                    style={{
+                      fontSize: '10px',
+                      fontWeight: 800,
+                      fontFamily: 'var(--font-mono)',
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      background: 'rgba(16, 185, 129, 0.14)',
+                      color: '#34D399',
+                    }}
+                  >
+                    {c.active} / {c.maxAllowed} aktif
+                  </span>
+                  {frozen > 0 && (
+                    <span
+                      style={{
+                        fontSize: '10px',
+                        fontWeight: 800,
+                        fontFamily: 'var(--font-mono)',
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        background: 'rgba(245, 158, 11, 0.16)',
+                        color: '#FBBF24',
+                      }}
+                    >
+                      {frozen} frozen
+                    </span>
+                  )}
+                </div>
+              );
+            };
+            return (
+              <>
+                <div style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--color-foreground)', marginBottom: '4px' }}>
+                    🚀 Bankr Launchpad Vault (CREATOR+)
+                  </div>
+                  {renderCounter(vaultSummary?.vaults.bankr)}
+                  <p className="text-muted" style={{ fontSize: '11px', margin: '0 0 10px 0', lineHeight: 1.45 }}>
+                    Simpan hingga 15 (CREATOR) / 25 (AGENT) API Key Bankr (+ Permanent Add-On Slots) dengan isolasi multi-chain (Base, Robinhood, Arbitrum, Arc).
+                  </p>
+                  <a href="/launchpad" className="btn-secondary" style={{ fontSize: '11px', padding: '5px 10px', display: 'inline-block' }}>
+                    Kelola di /launchpad →
+                  </a>
+                </div>
+                <div style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--color-foreground)', marginBottom: '4px' }}>
+                    ⚡ Binance CEX Multi-Account (TRADER / AGENT)
+                  </div>
+                  {renderCounter(vaultSummary?.vaults.binance)}
+                  <p className="text-muted" style={{ fontSize: '11px', margin: '0 0 10px 0', lineHeight: 1.45 }}>
+                    Simpan hingga 5 (TRADER) / 15 (AGENT) akun API Binance Testnet/Mainnet (+ Add-On Slots) dengan No-Withdrawal Guard &amp; Live Ping.
+                  </p>
+                  <a href="/trading" className="btn-secondary" style={{ fontSize: '11px', padding: '5px 10px', display: 'inline-block' }}>
+                    Kelola di /trading →
+                  </a>
+                </div>
+                <div style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--color-foreground)', marginBottom: '4px' }}>
+                    🟠 Bybit V5 CEX Vault (TRADER / AGENT)
+                  </div>
+                  {renderCounter(vaultSummary?.vaults.bybit)}
+                  <p className="text-muted" style={{ fontSize: '11px', margin: '0 0 10px 0', lineHeight: 1.45 }}>
+                    Eksekusi Single-Shot Spot Bybit V5 (Testnet/Mainnet) dengan HMAC-SHA256, No-Withdrawal Guard, dan kuota bersama add-on CEX.
+                  </p>
+                  <a href="/trading" className="btn-secondary" style={{ fontSize: '11px', padding: '5px 10px', display: 'inline-block' }}>
+                    Kelola di /trading →
+                  </a>
+                </div>
+                <div style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--color-foreground)', marginBottom: '4px' }}>
+                    🧠 BYOK LLM Vault (TRADER / AGENT)
+                  </div>
+                  {renderCounter(vaultSummary?.vaults.byokLlm)}
+                  <p className="text-muted" style={{ fontSize: '11px', margin: '0 0 10px 0', lineHeight: 1.45 }}>
+                    Simpan hingga 3 (TRADER) / 5 (AGENT) key Google Gemini, OpenAI GPT-4o, &amp; Anthropic Claude (Sonnet/Haiku/Opus) — hemat 60% credits (2 Cr/run).
+                  </p>
+                  <a href="/agent" className="btn-secondary" style={{ fontSize: '11px', padding: '5px 10px', display: 'inline-block' }}>
+                    Kelola di /agent →
+                  </a>
+                </div>
+              </>
+            );
+          })()}
         </div>
       </div>
 

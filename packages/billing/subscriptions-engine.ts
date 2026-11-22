@@ -355,3 +355,117 @@ export class SubscriptionsEngine {
     );
   }
 }
+
+export interface VaultCategoryTelemetry {
+  total: number;
+  active: number;
+  frozenOverQuota: number;
+  frozenMainnetLocked: number;
+  maxAllowed: number;
+}
+
+export interface UserVaultSummary {
+  planId: PlanId;
+  allowMainnetCex: boolean;
+  addonSlots: {
+    bankrExtraSlots: number;
+    binanceExtraSlots: number;
+  };
+  vaults: {
+    bankr: VaultCategoryTelemetry;
+    binance: VaultCategoryTelemetry;
+    bybit: VaultCategoryTelemetry;
+    byokLlm: VaultCategoryTelemetry;
+    webhook: VaultCategoryTelemetry;
+  };
+}
+
+interface MinimalVaultKeyInput {
+  id: string;
+  isDefault: boolean;
+  createdAt: string;
+  environment?: 'TESTNET' | 'MAINNET';
+  chainScope?: string;
+}
+
+function summarizeAnnotatedKeys(
+  annotated: Array<{ quotaStatus: VaultKeyQuotaStatus }>,
+  maxAllowed: number
+): VaultCategoryTelemetry {
+  let active = 0;
+  let frozenOverQuota = 0;
+  let frozenMainnetLocked = 0;
+  for (const k of annotated) {
+    if (k.quotaStatus === 'ACTIVE') active += 1;
+    else if (k.quotaStatus === 'FROZEN_MAINNET_LOCKED') frozenMainnetLocked += 1;
+    else frozenOverQuota += 1;
+  }
+  return {
+    total: annotated.length,
+    active,
+    frozenOverQuota,
+    frozenMainnetLocked,
+    maxAllowed,
+  };
+}
+
+/**
+ * Pure deterministic multi-vault telemetry aggregator (Phase AL).
+ * Reuses `computeEffectiveVaultCapacity`, `SubscriptionsEngine.getPlanCapacities`,
+ * and `annotateKeysWithQuotaStatus` so `/billing` counters always match backend enforcement.
+ */
+export function buildUserVaultSummary(params: {
+  planId?: string | null;
+  addonSlots?: { bankrExtraSlots?: number; binanceExtraSlots?: number } | null;
+  bankrKeys: MinimalVaultKeyInput[];
+  binanceAccounts: MinimalVaultKeyInput[];
+  bybitKeys: MinimalVaultKeyInput[];
+  llmKeys: MinimalVaultKeyInput[];
+  webhookKeys: MinimalVaultKeyInput[];
+}): UserVaultSummary {
+  const effCap = computeEffectiveVaultCapacity(params.planId, params.addonSlots);
+  const baseCap = SubscriptionsEngine.getPlanCapacities(effCap.planId);
+
+  const bankrAnnotated = annotateKeysWithQuotaStatus(params.bankrKeys, {
+    maxActive: effCap.maxBankrKeys,
+  });
+  const binanceAnnotated = annotateKeysWithQuotaStatus(params.binanceAccounts, {
+    maxActive: effCap.maxBinanceAccounts,
+    allowMainnet: effCap.allowMainnetBinance,
+  });
+  const bybitAnnotated = annotateKeysWithQuotaStatus(
+    params.bybitKeys.map((k) => ({
+      ...k,
+      environment: (k.environment ||
+        (String(k.chainScope || '').toLowerCase() === 'mainnet' ? 'MAINNET' : 'TESTNET')) as
+        | 'TESTNET'
+        | 'MAINNET',
+    })),
+    {
+      maxActive: effCap.maxBinanceAccounts,
+      allowMainnet: effCap.allowMainnetBinance,
+    }
+  );
+  const llmAnnotated = annotateKeysWithQuotaStatus(params.llmKeys, {
+    maxActive: baseCap.maxLlmKeys,
+  });
+  const webhookAnnotated = annotateKeysWithQuotaStatus(params.webhookKeys, {
+    maxActive: 2,
+  });
+
+  return {
+    planId: effCap.planId,
+    allowMainnetCex: effCap.allowMainnetBinance,
+    addonSlots: {
+      bankrExtraSlots: effCap.bankrExtraSlots,
+      binanceExtraSlots: effCap.binanceExtraSlots,
+    },
+    vaults: {
+      bankr: summarizeAnnotatedKeys(bankrAnnotated, effCap.maxBankrKeys),
+      binance: summarizeAnnotatedKeys(binanceAnnotated, effCap.maxBinanceAccounts),
+      bybit: summarizeAnnotatedKeys(bybitAnnotated, effCap.maxBinanceAccounts),
+      byokLlm: summarizeAnnotatedKeys(llmAnnotated, baseCap.maxLlmKeys),
+      webhook: summarizeAnnotatedKeys(webhookAnnotated, 2),
+    },
+  };
+}
