@@ -49,7 +49,8 @@ export class PostgresDualControlDbAdapter implements DualControlDbAdapter {
 
   async createRequest(req: Omit<DualControlRequestRecord, 'id'>): Promise<string> {
     const id = crypto.randomUUID();
-    const record: DualControlRequestRecord = { id, ...req };
+    const enrichedPayload = { ...(req.payload || {}), reason: req.reason };
+    const record: DualControlRequestRecord = { id, ...req, payload: enrichedPayload };
     const deps = this.resolveDeps();
     const pool = deps?.getDbPool() || null;
     if (pool && deps) {
@@ -63,7 +64,7 @@ export class PostgresDualControlDbAdapter implements DualControlDbAdapter {
             id,
             req.actionType,
             validRequesterId,
-            JSON.stringify(req.payload),
+            JSON.stringify(enrichedPayload),
             req.status,
             req.expiresAt,
           ]
@@ -76,6 +77,44 @@ export class PostgresDualControlDbAdapter implements DualControlDbAdapter {
     }
     this.inMemoryRequests.set(id, record);
     return id;
+  }
+
+  async listRecentRequests(limit: number = 15): Promise<DualControlRequestRecord[]> {
+    const safeLimit = Math.max(1, Math.min(50, Math.floor(Number(limit) || 15)));
+    const deps = this.resolveDeps();
+    const pool = deps?.getDbPool() || null;
+    if (pool) {
+      try {
+        const res = await pool.query(
+          `SELECT id, action_type AS "actionType", requested_by AS "requestedBy",
+                  approved_by AS "approvedBy", payload, status,
+                  expires_at AS "expiresAt", created_at AS "createdAt"
+           FROM dual_control_requests
+           ORDER BY created_at DESC
+           LIMIT $1`,
+          [safeLimit]
+        );
+        return res.rows.map((row: any) => {
+          const parsedPayload = typeof row.payload === 'string' ? JSON.parse(row.payload) : row.payload || {};
+          return {
+            id: row.id,
+            actionType: row.actionType,
+            requestedBy: row.requestedBy,
+            approvedBy: row.approvedBy || undefined,
+            payload: parsedPayload,
+            reason: parsedPayload?.reason || 'Dual-control request',
+            status: row.status,
+            expiresAt: new Date(row.expiresAt).toISOString(),
+            createdAt: new Date(row.createdAt).toISOString(),
+          };
+        });
+      } catch {
+        // Fallback to in-memory records
+      }
+    }
+    return Array.from(this.inMemoryRequests.values())
+      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+      .slice(0, safeLimit);
   }
 
   async getRequestById(id: string): Promise<DualControlRequestRecord | null> {

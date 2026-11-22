@@ -36,6 +36,8 @@ import { buildAutonomousTerminalSnapshot, formatScoutCacheAgeLabel } from '../pa
 import { validateChainScope } from '../packages/shared/credential-vault';
 import { ProviderRegistry } from '../packages/providers/registry';
 import { defaultBinanceExecutionDbAdapter, listUserRecentTradeIntents } from '../packages/shared/db-pool';
+import { DualControlManager } from '../packages/admin/dual-control';
+import { PostgresDualControlDbAdapter } from '../packages/db/dual-control-repo';
 
 let passed = 0;
 let failed = 0;
@@ -421,6 +423,39 @@ async function runSimulationSuite() {
     scoutSnap.dualRailReadiness.scoutDatasetHintCount === 1 &&
       formatScoutCacheAgeLabel(scoutSnap.dualRailReadiness.scoutDatasetSyncedAt, scoutRefNow) === 'Synced 15m ago',
     'Scout Redis cache freshness telemetry formats relative age and hint count cleanly'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 16: SOP-07 Dual-Control Propose -> Approve -> Consume Lifecycle (Phase AW)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 16: SOP-07 Dual-Control Governance Lifecycle] ---');
+  const dcRepo = new PostgresDualControlDbAdapter({
+    getDbPool: () => null,
+    ensureUserEntity: async (_p, id) => id,
+    isUuid: () => true,
+  });
+  const dcProposed = await DualControlManager.requestAction(
+    'OVERRIDE_RISK',
+    'admin-1',
+    { scope: 'GLOBAL', killSwitchAction: 'ACTIVATE' },
+    'SOP-07 simulation test',
+    dcRepo
+  );
+  const dcApproved = await DualControlManager.approveAction(dcProposed.id, 'admin-2', dcRepo);
+  const dcConsumed = await DualControlManager.consumeApprovedRequest(
+    dcProposed.id,
+    'OVERRIDE_RISK',
+    'GLOBAL',
+    'admin-1',
+    dcRepo
+  );
+  const dcRecent = await dcRepo.listRecentRequests(5);
+  assert(
+    dcApproved.status === 'APPROVED' &&
+      dcConsumed.status === 'EXECUTED' &&
+      dcRecent.length === 1 &&
+      dcRecent[0].reason === 'SOP-07 simulation test',
+    'SOP-07 Dual-Control propose -> 2nd-admin approve -> atomic consume lifecycle succeeds'
   );
 
   console.log('\n================================================================');

@@ -50,7 +50,7 @@ export class DualControlManager {
     const record: Omit<DualControlRequestRecord, 'id'> = {
       actionType,
       requestedBy: requesterId,
-      payload,
+      payload: { ...payload, reason },
       reason,
       status: 'PENDING',
       expiresAt,

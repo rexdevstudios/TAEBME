@@ -298,6 +298,16 @@ async function runBlackboxSuite() {
   });
   assert(unauthSessionAllow.status === 401, 'Unauthenticated POST /api/agent/session-allowance strictly rejected with HTTP 401');
 
+  const unauthDualCtrlGet = await fetch(`${BASE_URL}/api/admin/dual-control`);
+  assert(unauthDualCtrlGet.status === 401, 'Unauthenticated GET /api/admin/dual-control strictly rejected with HTTP 401');
+
+  const unauthDualCtrlPost = await fetch(`${BASE_URL}/api/admin/dual-control`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ operation: 'PROPOSE', scope: 'GLOBAL' }),
+  });
+  assert(unauthDualCtrlPost.status === 401, 'Unauthenticated POST /api/admin/dual-control strictly rejected with HTTP 401');
+
   // -------------------------------------------------------------------------
   // TEST 12: Canonical Frontend Route Integrity & Live Billing Capacity Contract
   // -------------------------------------------------------------------------

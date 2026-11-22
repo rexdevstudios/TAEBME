@@ -16,6 +16,18 @@ interface OpsSummaryData {
   subscriptionsByPlan: Record<string, number>;
 }
 
+interface DualControlRequestItem {
+  id: string;
+  actionType: string;
+  requestedBy: string;
+  approvedBy?: string;
+  payload?: Record<string, unknown>;
+  reason: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'EXECUTED';
+  expiresAt: string;
+  createdAt: string;
+}
+
 export function AdminOpsHealthPanel() {
   const [data, setData] = useState<OpsSummaryData | null>(null);
   const [timestamp, setTimestamp] = useState<string | null>(null);
@@ -30,6 +42,9 @@ export function AdminOpsHealthPanel() {
   const [ksReason, setKsReason] = useState<string>('Emergency risk halt');
   const [ksSubmitting, setKsSubmitting] = useState<boolean>(false);
   const [ksFeedback, setKsFeedback] = useState<{ ok: boolean; text: string } | null>(null);
+  const [dcRequests, setDcRequests] = useState<DualControlRequestItem[]>([]);
+  const [dcLoading, setDcLoading] = useState<boolean>(false);
+  const [dcBusyId, setDcBusyId] = useState<string | null>(null);
 
   const loadSummary = useCallback(async () => {
     setLoading(true);
@@ -56,6 +71,103 @@ export function AdminOpsHealthPanel() {
   useEffect(() => {
     void loadSummary();
   }, [loadSummary]);
+
+  const loadDualControlRequests = useCallback(async () => {
+    setDcLoading(true);
+    try {
+      const res = await fetch('/api/admin/dual-control?limit=10', {
+        credentials: 'same-origin',
+        cache: 'no-store',
+      });
+      const json = await res.json();
+      if (res.ok && json?.success && Array.isArray(json?.data?.requests)) {
+        setDcRequests(json.data.requests as DualControlRequestItem[]);
+      }
+    } catch {
+      // Non-blocking
+    } finally {
+      setDcLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (showKsConsole) {
+      void loadDualControlRequests();
+    }
+  }, [showKsConsole, loadDualControlRequests]);
+
+  const handleProposeDualControl = async () => {
+    setKsFeedback(null);
+    setDcBusyId('PROPOSE');
+    try {
+      const res = await fetch('/api/admin/dual-control', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          operation: 'PROPOSE',
+          actionType: 'OVERRIDE_RISK',
+          scope: ksScope,
+          killSwitchAction: ksAction,
+          reason: ksReason.trim() || `Dual-control ${ksAction} (${ksScope})`,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json?.success) {
+        const msg = json?.error?.message || json?.error?.code || `HTTP ${res.status}`;
+        setKsFeedback({ ok: false, text: `Propose failed: ${msg}` });
+        return;
+      }
+      const createdId = String(json?.data?.request?.id || '');
+      setKsFeedback({
+        ok: true,
+        text: `✅ Step 1 Selesai: Request PENDING dibuat (#${createdId.slice(0, 8)}…). Minta Admin ke-2 klik Approve.`,
+      });
+      await loadDualControlRequests();
+    } catch (err: unknown) {
+      setKsFeedback({
+        ok: false,
+        text: err instanceof Error ? err.message : 'Failed to propose dual-control request',
+      });
+    } finally {
+      setDcBusyId(null);
+    }
+  };
+
+  const handleApproveDualControl = async (requestId: string) => {
+    setKsFeedback(null);
+    setDcBusyId(requestId);
+    try {
+      const res = await fetch('/api/admin/dual-control', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          operation: 'APPROVE',
+          requestId,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json?.success) {
+        const msg = json?.error?.message || json?.error?.code || `HTTP ${res.status}`;
+        setKsFeedback({ ok: false, text: `Approve rejected: ${msg}` });
+        return;
+      }
+      setKsDualControlId(requestId);
+      setKsFeedback({
+        ok: true,
+        text: `✅ Step 2 Selesai: Request #${requestId.slice(0, 8)}… APPROVED dan otomatis diisi ke Step 3!`,
+      });
+      await loadDualControlRequests();
+    } catch (err: unknown) {
+      setKsFeedback({
+        ok: false,
+        text: err instanceof Error ? err.message : 'Failed to approve dual-control request',
+      });
+    } finally {
+      setDcBusyId(null);
+    }
+  };
 
   const handleSubmitKillSwitch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,7 +212,7 @@ export function AdminOpsHealthPanel() {
         text: `✅ Kill-Switch ${ksAction} (${ksScope}) sukses · Dual-Control #${json?.data?.dualControlId || trimmedId}`,
       });
       setKsDualControlId('');
-      await loadSummary();
+      await Promise.all([loadSummary(), loadDualControlRequests()]);
     } catch (err: unknown) {
       setKsFeedback({
         ok: false,
@@ -407,20 +519,142 @@ export function AdminOpsHealthPanel() {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
               <span className="text-muted" style={{ fontSize: '10px' }}>
-                Setiap eksekusi tercatat otomatis di PostgreSQL `audit_logs` &amp; broadcast ke Redis PubSub.
+                Alur SOP-07: (1) Admin #1 Propose → (2) Admin #2 Approve → (3) SUPER_ADMIN Execute Kill-Switch.
               </span>
-              <button
-                type="submit"
-                disabled={ksSubmitting}
-                className="btn-primary"
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => void handleProposeDualControl()}
+                  disabled={dcBusyId === 'PROPOSE' || ksSubmitting}
+                  className="btn-secondary"
+                  style={{ padding: '7px 12px', fontSize: '11px', borderColor: 'rgba(250, 204, 21, 0.45)', color: '#FDE047' }}
+                >
+                  {dcBusyId === 'PROPOSE' ? 'Proposing...' : `1. Propose Request (${ksScope})`}
+                </button>
+                <button
+                  type="submit"
+                  disabled={ksSubmitting}
+                  className="btn-primary"
+                  style={{
+                    padding: '7px 14px',
+                    fontSize: '11px',
+                    backgroundColor: ksAction === 'ACTIVATE' ? '#DC2626' : '#059669',
+                  }}
+                >
+                  {ksSubmitting ? 'Executing...' : `3. Execute ${ksAction} (${ksScope})`}
+                </button>
+              </div>
+            </div>
+
+            <div
+              style={{
+                padding: '8px 10px',
+                borderRadius: '6px',
+                backgroundColor: 'rgba(15, 23, 42, 0.65)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+              }}
+            >
+              <div
                 style={{
-                  padding: '7px 14px',
-                  fontSize: '11px',
-                  backgroundColor: ksAction === 'ACTIVATE' ? '#DC2626' : '#059669',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '6px',
+                  fontSize: '10px',
+                  fontWeight: 800,
+                  color: '#94A3B8',
                 }}
               >
-                {ksSubmitting ? 'Executing...' : `Execute ${ksAction} (${ksScope})`}
-              </button>
+                <span>RECENT DUAL-CONTROL REQUESTS ({dcRequests.length})</span>
+                <button
+                  type="button"
+                  onClick={() => void loadDualControlRequests()}
+                  disabled={dcLoading}
+                  className="btn-secondary"
+                  style={{ padding: '2px 7px', fontSize: '10px' }}
+                >
+                  {dcLoading ? 'Loading...' : 'Refresh List'}
+                </button>
+              </div>
+              {dcRequests.length === 0 ? (
+                <div className="text-muted" style={{ fontSize: '10px' }}>
+                  Belum ada request Dual-Control. Klik &ldquo;1. Propose Request&rdquo; di atas untuk memulai.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', maxHeight: '150px', overflowY: 'auto' }}>
+                  {dcRequests.slice(0, 6).map((reqItem) => {
+                    const reqScope = String(reqItem.payload?.scope || 'GLOBAL');
+                    return (
+                      <div
+                        key={reqItem.id}
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          gap: '8px',
+                          flexWrap: 'wrap',
+                          padding: '5px 8px',
+                          borderRadius: '4px',
+                          backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                          fontSize: '10px',
+                          fontFamily: 'var(--font-mono)',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          <span
+                            style={{
+                              padding: '1px 5px',
+                              borderRadius: '4px',
+                              fontWeight: 800,
+                              backgroundColor:
+                                reqItem.status === 'APPROVED'
+                                  ? 'rgba(16, 185, 129, 0.2)'
+                                  : reqItem.status === 'PENDING'
+                                  ? 'rgba(245, 158, 11, 0.2)'
+                                  : 'rgba(148, 163, 184, 0.15)',
+                              color:
+                                reqItem.status === 'APPROVED'
+                                  ? '#6EE7B7'
+                                  : reqItem.status === 'PENDING'
+                                  ? '#FDE047'
+                                  : '#94A3B8',
+                            }}
+                          >
+                            {reqItem.status}
+                          </span>
+                          <span style={{ color: '#E2E8F0', fontWeight: 700 }}>#{reqItem.id.slice(0, 8)}</span>
+                          <span className="text-muted">
+                            {reqItem.actionType} · {reqScope} · {reqItem.reason.slice(0, 36)}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '5px' }}>
+                          {reqItem.status === 'PENDING' && (
+                            <button
+                              type="button"
+                              onClick={() => void handleApproveDualControl(reqItem.id)}
+                              disabled={dcBusyId === reqItem.id}
+                              className="btn-secondary"
+                              style={{ padding: '2px 7px', fontSize: '10px', color: '#6EE7B7', borderColor: 'rgba(16, 185, 129, 0.4)' }}
+                            >
+                              {dcBusyId === reqItem.id ? 'Approving...' : '2. Approve (2nd Admin)'}
+                            </button>
+                          )}
+                          {reqItem.status === 'APPROVED' && (
+                            <button
+                              type="button"
+                              onClick={() => setKsDualControlId(reqItem.id)}
+                              className="btn-secondary"
+                              style={{ padding: '2px 7px', fontSize: '10px', color: '#38BDF8' }}
+                            >
+                              Use ID → Step 3
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
             {ksFeedback && (
               <div
