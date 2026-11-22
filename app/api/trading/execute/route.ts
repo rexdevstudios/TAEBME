@@ -34,6 +34,7 @@ import {
   submitBybitSpotOrder,
   verifyBybitCredentialLive,
 } from '@packages/trading/bybit-vault';
+import { resolveCexExecutionVenue } from '@packages/trading/venue-router';
 
 export const dynamic = 'force-dynamic';
 
@@ -256,13 +257,48 @@ export async function POST(req: NextRequest) {
     }
 
     if (executionMode === 'CEX_SINGLE_SHOT') {
-      const venue = (typeof body?.venue === 'string' && body.venue.trim().toUpperCase() === 'BYBIT'
-        ? 'BYBIT'
-        : 'BINANCE') as 'BINANCE' | 'BYBIT';
+      const rawVenue =
+        typeof body?.venue === 'string' && body.venue.trim() ? body.venue.trim().toUpperCase() : 'AUTO';
       const requestedCredentialId =
         typeof body?.credentialId === 'string' && body.credentialId.trim() && body.credentialId !== 'DEFAULT'
           ? body.credentialId.trim()
           : undefined;
+
+      let venue: 'BINANCE' | 'BYBIT';
+      let venueRouting: 'EXPLICIT' | 'AUTO' = 'EXPLICIT';
+
+      if (rawVenue === 'BINANCE' || rawVenue === 'BYBIT') {
+        venue = rawVenue;
+      } else {
+        const poolForAuto = getDbPool();
+        const binanceAutoDb = poolForAuto ? new PostgresBinanceExecutionDbAdapter(poolForAuto) : null;
+        const [autoBinanceAccounts, autoBybitKeys, autoAddonSlots] = await Promise.all([
+          binanceAutoDb ? binanceAutoDb.listBinanceCredentials(auth.walletAddress).catch(() => []) : Promise.resolve([]),
+          defaultProviderKeyVaultAdapter.listKeys(auth.walletAddress, 'BYBIT').catch(() => []),
+          defaultBillingDbAdapter.getUserAddonSlots(auth.walletAddress).catch(() => ({ bankrExtraSlots: 0, binanceExtraSlots: 0 })),
+        ]);
+        const resolvedAuto = resolveCexExecutionVenue({
+          requestedVenue: 'AUTO',
+          planId: userEntitlement.planId,
+          addonSlots: autoAddonSlots,
+          binanceAccounts: autoBinanceAccounts,
+          bybitKeys: autoBybitKeys,
+        });
+        if (!resolvedAuto.venue) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: resolvedAuto.allFrozen
+                ? 'CEX_ALL_KEYS_FROZEN: Seluruh akun CEX (Binance/Bybit) Anda sedang terkunci (Mainnet Lock / Over-Quota). Upgrade paket atau tambah slot di /billing.'
+                : 'CEX_CREDENTIALS_MISSING: Tidak ditemukan akun CEX aktif (Binance atau Bybit V5). Tambahkan API Key trade-only di /trading terlebih dahulu.',
+              timestamp: new Date().toISOString(),
+            },
+            { status: resolvedAuto.allFrozen ? 403 : 422 }
+          );
+        }
+        venue = resolvedAuto.venue;
+        venueRouting = 'AUTO';
+      }
 
       if (venue === 'BYBIT') {
         const [allBybitKeys, addonSlots] = await Promise.all([
@@ -442,6 +478,7 @@ export async function POST(req: NextRequest) {
             tradeIntentId,
             executionMode,
             venue: 'BYBIT',
+            venueRouting,
             status: finalStatus,
             credentialId: resolvedBybit.keyId,
             credentialLabel: resolvedBybit.label,
@@ -540,6 +577,7 @@ export async function POST(req: NextRequest) {
           tradeIntentId,
           executionMode,
           venue: 'BINANCE',
+          venueRouting,
           status: 'APPROVED',
           credentialId: creds.id,
           credentialLabel: creds.label || 'Binance Primary',

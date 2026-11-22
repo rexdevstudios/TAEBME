@@ -27,6 +27,7 @@ import { validateSessionAllowanceSpec } from '../packages/agent/session-allowanc
 import { TradingRiskGate, compute24hRiskExposure } from '../packages/trading/risk-gate';
 import { notifyUserWebhookBestEffort } from '../packages/notifications/webhook-dispatcher';
 import { signBybitV5Post, submitBybitSpotOrder } from '../packages/trading/bybit-vault';
+import { resolveCexExecutionVenue } from '../packages/trading/venue-router';
 import { validateChainScope } from '../packages/shared/credential-vault';
 import { ProviderRegistry } from '../packages/providers/registry';
 
@@ -271,6 +272,21 @@ async function runSimulationSuite() {
       freeSummary.vaults.byokLlm.frozenOverQuota === 1 &&
       freeSummary.vaults.webhook.active === 1,
     'Unified vault summary accurately reports Mainnet locks, LLM freeze, and decoupled webhook quota on FREE tier'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 8: Deterministic Venue-Agnostic CEX Auto-Router (Phase AM)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 8: Deterministic Venue-Agnostic CEX Auto-Router] ---');
+  const failoverRoute = resolveCexExecutionVenue({
+    requestedVenue: 'AUTO',
+    planId: 'FREE',
+    binanceAccounts: [{ id: 'bn-main', isDefault: true, createdAt: '2026-11-22T00:00:00Z', environment: 'MAINNET' }],
+    bybitKeys: [{ id: 'by-test', isDefault: true, createdAt: '2026-11-22T00:00:00Z', chainScope: 'testnet' }],
+  });
+  assert(
+    failoverRoute.venue === 'BYBIT' && failoverRoute.routingMode === 'AUTO' && failoverRoute.reason === 'AUTO_ACTIVE_BYBIT',
+    'Venue Auto-Router fails over to active Bybit V5 Testnet when Binance Mainnet is locked on FREE tier'
   );
 
   console.log('\n================================================================');

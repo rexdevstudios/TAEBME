@@ -51,9 +51,9 @@ export interface AgentActionCard {
 export const AGENT_SKILL_CATALOG: Record<AgentSkillId, AgentSkillDefinition> = {
   SKILL_CEX_TRADE: {
     id: 'SKILL_CEX_TRADE',
-    name: 'Binance CEX Spot Trade',
-    description: 'Eksekusi spot order via akun Binance Trade-Only (No-Withdrawal + 24h Daily Loss Guard).',
-    executionRail: '/trading (CEX_SINGLE_SHOT)',
+    name: 'CEX Spot Trade (Auto-Router)',
+    description: 'Eksekusi spot order venue-agnostic via Auto-Router ke akun aktif Binance atau Bybit V5 (No-Withdrawal + 24h Daily Loss Guard).',
+    executionRail: '/trading (CEX_SINGLE_SHOT · AUTO)',
     nonCustodialGuard: 'No-Withdrawal API Key + UserRiskPolicy',
     badgeColor: '#F59E0B',
   },
@@ -131,10 +131,10 @@ export function buildAgentActionCards(params: {
   if (params.skills.includes('SKILL_CEX_TRADE')) {
     cards.push({
       skillId: 'SKILL_CEX_TRADE',
-      title: `⚡ Execute ${params.action} ${cleanSymbol} via Binance CEX`,
-      subtitle: 'Trade-Only No-Withdrawal Vault + Personal 24h Risk Guard',
+      title: `⚡ Execute ${params.action} ${cleanSymbol} via CEX Auto-Router`,
+      subtitle: 'Auto-Route ke Vault Aktif (Binance / Bybit V5) + 24h Risk Guard',
       href: `/trading?symbol=${encodeURIComponent(cleanSymbol)}&side=${encodeURIComponent(params.action)}&qty=${encodeURIComponent(String(params.quantity))}&mode=CEX_SINGLE_SHOT`,
-      badge: 'BINANCE CEX',
+      badge: 'CEX AUTO',
     });
   }
 

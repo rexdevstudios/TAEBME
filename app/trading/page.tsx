@@ -244,6 +244,8 @@ export default function TradingPage() {
   // Controlled order parameters & deep-link context (Launchpad ?token= & Agent ?proposalId=)
   const [executionMode, setExecutionMode] = useState<'PAPER' | 'DEX_NON_CUSTODIAL' | 'CEX_SINGLE_SHOT'>('PAPER');
   const [cexVenue, setCexVenue] = useState<'BINANCE' | 'BYBIT'>('BINANCE');
+  const [venueManuallyChosen, setVenueManuallyChosen] = useState<boolean>(false);
+  const [cexActiveCounts, setCexActiveCounts] = useState<{ binance: number; bybit: number } | null>(null);
   const [selectedBinanceCredentialId, setSelectedBinanceCredentialId] = useState<string>('DEFAULT');
   const [selectedBybitKeyId, setSelectedBybitKeyId] = useState<string>('DEFAULT');
   const [orderSide, setOrderSide] = useState<'BUY' | 'SELL'>('BUY');
@@ -307,6 +309,31 @@ export default function TradingPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!isConnected) {
+      setCexActiveCounts(null);
+      return;
+    }
+    let cancelled = false;
+    fetch('/api/user/vault-summary', { credentials: 'same-origin' })
+      .then((r) => r.json())
+      .then((json) => {
+        if (cancelled || !json?.success || !json.data?.vaults) return;
+        const binanceActive = Number(json.data.vaults.binance?.active ?? 0);
+        const bybitActive = Number(json.data.vaults.bybit?.active ?? 0);
+        setCexActiveCounts({ binance: binanceActive, bybit: bybitActive });
+        if (!venueManuallyChosen && binanceActive === 0 && bybitActive > 0) {
+          setCexVenue('BYBIT');
+        }
+      })
+      .catch(() => {
+        // Non-blocking auto-detect
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isConnected, venueManuallyChosen]);
 
   useEffect(() => {
     setLoading(true);
@@ -685,19 +712,25 @@ export default function TradingPage() {
                 <div style={{ display: 'flex', gap: '6px', marginTop: '8px', marginBottom: '4px' }}>
                   <button
                     type="button"
-                    onClick={() => setCexVenue('BINANCE')}
+                    onClick={() => {
+                      setVenueManuallyChosen(true);
+                      setCexVenue('BINANCE');
+                    }}
                     className={cexVenue === 'BINANCE' ? 'btn-primary' : 'btn-secondary'}
                     style={{ flex: 1, padding: '5px 8px', fontSize: '11px', justifyContent: 'center' }}
                   >
-                    Binance Spot
+                    Binance Spot{cexActiveCounts ? ` (${cexActiveCounts.binance})` : ''}
                   </button>
                   <button
                     type="button"
-                    onClick={() => setCexVenue('BYBIT')}
+                    onClick={() => {
+                      setVenueManuallyChosen(true);
+                      setCexVenue('BYBIT');
+                    }}
                     className={cexVenue === 'BYBIT' ? 'btn-primary' : 'btn-secondary'}
                     style={{ flex: 1, padding: '5px 8px', fontSize: '11px', justifyContent: 'center' }}
                   >
-                    Bybit V5 Spot
+                    Bybit V5 Spot{cexActiveCounts ? ` (${cexActiveCounts.bybit})` : ''}
                   </button>
                 </div>
                 {cexVenue === 'BINANCE' ? (
