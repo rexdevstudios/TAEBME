@@ -133,6 +133,90 @@ async function runSiweE2eSmoke() {
     });
     const execJson: any = await execRes.json();
     assert(execRes.status === 200 && execJson?.success === true && execJson?.data?.status === 'FILLED_SIMULATED', `POST /api/trading/execute (PAPER) approved & simulated (Got HTTP ${execRes.status})`);
+
+    // 9. Trade Intents History reflects the executed PAPER order (Phase AP)
+    const histRes = await fetch(`${BASE_URL}/api/trade-intents?limit=5`, { headers: authHeaders });
+    const histJson: any = await histRes.json();
+    const intentsList = Array.isArray(histJson?.data?.intents) ? histJson.data.intents : [];
+    assert(
+      histRes.status === 200 && histJson?.success === true && intentsList.some((it: any) => it?.symbol === 'BTCUSDT'),
+      `GET /api/trade-intents?limit=5 returns persisted BTCUSDT order (Got HTTP ${histRes.status}, count=${intentsList.length})`
+    );
+
+    // 10. Autonomous 4-Sub-Agent Dual-Rail Telemetry (Phase AR + AS)
+    const termRes = await fetch(`${BASE_URL}/api/agent/terminal-telemetry`, { headers: authHeaders });
+    const termJson: any = await termRes.json();
+    assert(
+      termRes.status === 200 &&
+        termJson?.success === true &&
+        Array.isArray(termJson?.data?.agentBreakdown) &&
+        termJson.data.agentBreakdown.length === 4 &&
+        termJson?.data?.dualRailReadiness?.externalDexZeroXReady === true,
+      `GET /api/agent/terminal-telemetry returns 4 sub-agents & externalDexZeroXReady=true (Got HTTP ${termRes.status})`
+    );
+
+    // 11. Multi-Chain ERC-7715 Session Allowance on Arbitrum 42161 with FREE-tier cap clamping (Phase AS + AT)
+    const allowRes = await fetch(`${BASE_URL}/api/agent/session-allowance`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({
+        delegateAddress: walletAddress,
+        chainId: 42161,
+        dailySpendCapUsd: 5000,
+        allowedActions: ['SWAP_DEX'],
+      }),
+    });
+    const allowJson: any = await allowRes.json();
+    assert(
+      allowRes.status === 200 &&
+        allowJson?.success === true &&
+        allowJson?.data?.chainId === 42161 &&
+        allowJson?.data?.effectiveDailySpendCapUsd === 250,
+      `POST /api/agent/session-allowance (Arbitrum 42161) clamped FREE cap to $250/day (Got HTTP ${allowRes.status}, cap=${allowJson?.data?.effectiveDailySpendCapUsd})`
+    );
+
+    // 12. Rule 3 Non-Custodial Guard: Reject 64-hex private key in session-allowance (Phase AS)
+    const pkRes = await fetch(`${BASE_URL}/api/agent/session-allowance`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({
+        delegateAddress: `0x${'a'.repeat(64)}`,
+        chainId: 8453,
+        dailySpendCapUsd: 50,
+      }),
+    });
+    const pkJson: any = await pkRes.json();
+    assert(
+      pkRes.status === 400 && String(pkJson?.error || '').includes('FORBIDDEN_PRIVATE_KEY_INPUT'),
+      `POST /api/agent/session-allowance rejects 64-hex private key with HTTP 400 FORBIDDEN_PRIVATE_KEY_INPUT (Got HTTP ${pkRes.status})`
+    );
+
+    // 13. Non-Custodial DEX Swap Quote & Partner Fee Payload (Phase AQ + AR)
+    const dexRes = await fetch(`${BASE_URL}/api/trading/execute`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({
+        executionMode: 'DEX_NON_CUSTODIAL',
+        stage: 'PAPER',
+        symbol: 'USDC',
+        tokenAddress: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+        chainId: 8453,
+        side: 'BUY',
+        type: 'MARKET',
+        quantity: 0.01,
+        maxSlippagePct: 1.0,
+      }),
+    });
+    const dexJson: any = await dexRes.json();
+    assert(
+      dexRes.status === 200 && dexJson?.success === true && dexJson?.data?.status === 'READY_FOR_WALLET_SIGN',
+      `POST /api/trading/execute (DEX_NON_CUSTODIAL Base USDC) returns READY_FOR_WALLET_SIGN (Got HTTP ${dexRes.status})`
+    );
+    assert(
+      Boolean(dexJson?.data?.partnerFee && typeof dexJson.data.partnerFee.feeBps === 'number') &&
+        Boolean(dexJson?.data?.zeroXSwap && typeof dexJson.data.zeroXSwap.status === 'string'),
+      `DEX_NON_CUSTODIAL payload includes partnerFee (${dexJson?.data?.partnerFee?.feeBps} bps) & zeroXSwap (${dexJson?.data?.zeroXSwap?.status})`
+    );
   } finally {
     // 9. Auto-Cleanup: Revoke test key & verify count returns to 0 + logout
     if (sessionToken && createdBybitKeyId) {

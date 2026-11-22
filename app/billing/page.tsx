@@ -10,6 +10,7 @@ import { BillingAddonStorePanel } from '../components/BillingAddonStorePanel';
 import { ProviderRegistryStatusPanel } from '../components/ProviderRegistryStatusPanel';
 import { UserWebhookVaultPanel } from '../components/UserWebhookVaultPanel';
 import { UserSecurityActivityPanel } from '../components/UserSecurityActivityPanel';
+import { AdminOpsHealthPanel } from '../components/AdminOpsHealthPanel';
 
 interface LedgerEntry {
   id: string;
@@ -1153,6 +1154,8 @@ export default function BillingPage() {
               </div>
             )}
           </div>
+
+          <AdminOpsHealthPanel />
 
           <div className="grid-4">
             <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '16px', borderRadius: '6px' }}>

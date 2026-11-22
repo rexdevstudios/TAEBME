@@ -17,11 +17,21 @@ const TARGETS = [
 async function runDualBlackbox() {
   const results: Array<{ name: string; url: string; ok: boolean; durationMs: number }> = [];
 
+  const npxBin = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+  const existingNodeOpts = process.env.NODE_OPTIONS ? `${process.env.NODE_OPTIONS} ` : '';
+  const ipv4NodeOpts = existingNodeOpts.includes('--dns-result-order=ipv4first')
+    ? existingNodeOpts.trim()
+    : `${existingNodeOpts}--dns-result-order=ipv4first`.trim();
+
   for (const target of TARGETS) {
     console.log(`\n>>> [DUAL BLACKBOX] Running live suite against ${target.name} (${target.url})...\n`);
     const start = Date.now();
-    const proc = Bun.spawn(['bun', 'run', 'scripts/test-blackbox-suite.ts'], {
-      env: { ...process.env, TEST_TARGET_URL: target.url },
+    const proc = Bun.spawn([npxBin, 'tsx', 'scripts/test-blackbox-suite.ts'], {
+      env: {
+        ...process.env,
+        TEST_TARGET_URL: target.url,
+        NODE_OPTIONS: ipv4NodeOpts,
+      },
       stdout: 'inherit',
       stderr: 'inherit',
     });
