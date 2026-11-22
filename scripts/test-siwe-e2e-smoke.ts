@@ -214,8 +214,8 @@ async function runSiweE2eSmoke() {
     );
     assert(
       Boolean(dexJson?.data?.partnerFee && typeof dexJson.data.partnerFee.feeBps === 'number') &&
-        Boolean(dexJson?.data?.zeroXSwap && typeof dexJson.data.zeroXSwap.status === 'string'),
-      `DEX_NON_CUSTODIAL payload includes partnerFee (${dexJson?.data?.partnerFee?.feeBps} bps) & zeroXSwap (${dexJson?.data?.zeroXSwap?.status})`
+        Boolean(dexJson?.data?.zeroXSwap && typeof dexJson.data.zeroXSwap.available === 'boolean' && dexJson.data.zeroXSwap.chainId === 8453),
+      `DEX_NON_CUSTODIAL payload includes partnerFee (${dexJson?.data?.partnerFee?.feeBps} bps) & zeroXSwap (available=${dexJson?.data?.zeroXSwap?.available}, chainId=${dexJson?.data?.zeroXSwap?.chainId})`
     );
   } finally {
     // 9. Auto-Cleanup: Revoke test key & verify count returns to 0 + logout
