@@ -15,9 +15,15 @@ interface BybitKeyItem {
 
 interface BybitKeyVaultPanelProps {
   isConnected: boolean;
+  selectedKeyId?: string;
+  onSelectKeyId?: (keyId: string) => void;
 }
 
-export function BybitKeyVaultPanel({ isConnected }: BybitKeyVaultPanelProps) {
+export function BybitKeyVaultPanel({
+  isConnected,
+  selectedKeyId = 'DEFAULT',
+  onSelectKeyId,
+}: BybitKeyVaultPanelProps) {
   const [keys, setKeys] = useState<BybitKeyItem[]>([]);
   const [maxKeys, setMaxKeys] = useState<number>(1);
   const [planId, setPlanId] = useState<string>('FREE');
@@ -238,45 +244,63 @@ export function BybitKeyVaultPanel({ isConnected }: BybitKeyVaultPanelProps) {
 
           {keys.length > 0 && (
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {keys.map((k) => (
-                <div
-                  key={k.id}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '4px 8px',
-                    borderRadius: '6px',
-                    border: '1px solid var(--color-border)',
-                    fontSize: '11px',
-                    opacity: k.quotaStatus === 'FROZEN_OVER_QUOTA' ? 0.65 : 1,
-                  }}
-                >
-                  <strong>{k.label}</strong>
-                  <span style={{ fontSize: '9px', fontWeight: 800, color: k.chainScope === 'mainnet' ? '#F59E0B' : '#38BDF8' }}>
-                    {(k.chainScope || 'testnet').toUpperCase()}
-                  </span>
-                  <code style={{ fontSize: '10px', color: 'var(--color-muted)' }}>{k.maskedKey}</code>
-                  <button
-                    type="button"
-                    onClick={() => handlePing(k)}
-                    disabled={pingingId === k.id}
-                    className="btn-secondary"
-                    style={{ padding: '2px 6px', fontSize: '10px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+              {keys.map((k) => {
+                const isSelected =
+                  selectedKeyId === k.id || (selectedKeyId === 'DEFAULT' && k.isDefault);
+                const isFrozen =
+                  k.quotaStatus === 'FROZEN_OVER_QUOTA' || k.quotaStatus === 'FROZEN_MAINNET_LOCKED';
+                return (
+                  <div
+                    key={k.id}
+                    onClick={() => !isFrozen && onSelectKeyId?.(k.id)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '4px 8px',
+                      borderRadius: '6px',
+                      border: isSelected ? '1px solid #F59E0B' : '1px solid var(--color-border)',
+                      background: isSelected ? 'rgba(245, 158, 11, 0.10)' : 'transparent',
+                      fontSize: '11px',
+                      cursor: onSelectKeyId && !isFrozen ? 'pointer' : 'default',
+                      opacity: isFrozen ? 0.65 : 1,
+                    }}
                   >
-                    <Activity size={10} /> {pingingId === k.id ? '...' : 'Test V5'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleRevoke(k.id)}
-                    className="btn-destructive"
-                    style={{ padding: '2px 5px', fontSize: '10px' }}
-                    aria-label={`Revoke ${k.label}`}
-                  >
-                    <Trash2 size={10} />
-                  </button>
-                </div>
-              ))}
+                    <strong>{k.label}</strong>
+                    <span style={{ fontSize: '9px', fontWeight: 800, color: k.chainScope === 'mainnet' ? '#F59E0B' : '#38BDF8' }}>
+                      {(k.chainScope || 'testnet').toUpperCase()}
+                    </span>
+                    {k.quotaStatus === 'FROZEN_MAINNET_LOCKED' && (
+                      <span style={{ fontSize: '9px', fontWeight: 800, color: '#EF4444' }}>LOCKED</span>
+                    )}
+                    <code style={{ fontSize: '10px', color: 'var(--color-muted)' }}>{k.maskedKey}</code>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handlePing(k);
+                      }}
+                      disabled={pingingId === k.id}
+                      className="btn-secondary"
+                      style={{ padding: '2px 6px', fontSize: '10px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                    >
+                      <Activity size={10} /> {pingingId === k.id ? '...' : 'Test V5'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRevoke(k.id);
+                      }}
+                      className="btn-destructive"
+                      style={{ padding: '2px 5px', fontSize: '10px' }}
+                      aria-label={`Revoke ${k.label}`}
+                    >
+                      <Trash2 size={10} />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           )}
         </>

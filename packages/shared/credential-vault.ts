@@ -14,7 +14,7 @@
 import crypto from 'crypto';
 import { ethers } from 'ethers';
 
-export type ProviderKeyChainScope = 'all' | 'base' | 'robinhood' | 'arbitrum' | 'arc';
+export type ProviderKeyChainScope = 'all' | 'base' | 'robinhood' | 'arbitrum' | 'arc' | 'testnet' | 'mainnet';
 
 export const VALID_PROVIDER_CHAIN_SCOPES = new Set<ProviderKeyChainScope>([
   'all',
@@ -22,6 +22,8 @@ export const VALID_PROVIDER_CHAIN_SCOPES = new Set<ProviderKeyChainScope>([
   'robinhood',
   'arbitrum',
   'arc',
+  'testnet',
+  'mainnet',
 ]);
 
 export interface EncryptedVaultPayload {
@@ -138,7 +140,7 @@ export function validateChainScope(rawScope?: string | null): ProviderKeyChainSc
   const s = (rawScope || 'all').trim().toLowerCase() as ProviderKeyChainScope;
   if (!VALID_PROVIDER_CHAIN_SCOPES.has(s)) {
     throw new Error(
-      `INVALID_CHAIN_SCOPE: "${rawScope}" is not valid. Allowed: all, base, robinhood, arbitrum, arc.`
+      `INVALID_CHAIN_SCOPE: "${rawScope}" is not valid. Allowed: all, base, robinhood, arbitrum, arc, testnet, mainnet.`
     );
   }
   return s;
@@ -146,11 +148,16 @@ export function validateChainScope(rawScope?: string | null): ProviderKeyChainSc
 
 /**
  * Enforces multi-chain blast-radius isolation: a key scoped to 'robinhood' cannot deploy on 'base'.
+ * Allows lookup when either the stored key scope or the requested target is 'all'.
  */
 export function assertChainScopeMatches(keyScope: string, targetChain: string): void {
   const normScope = validateChainScope(keyScope);
-  const normTarget = (targetChain || 'base').trim().toLowerCase().replace(/-mainnet|-testnet|-sepolia/g, '');
-  if (normScope !== 'all' && normScope !== normTarget) {
+  const rawTarget = (targetChain || 'base').trim().toLowerCase();
+  if (normScope === 'all' || rawTarget === 'all') {
+    return;
+  }
+  const normTarget = rawTarget.replace(/-mainnet|-testnet|-sepolia/g, '');
+  if (normScope !== normTarget && normScope !== rawTarget) {
     throw new Error(
       `CHAIN_SCOPE_MISMATCH: Selected API key is restricted to "${normScope.toUpperCase()}" and cannot be used for "${normTarget.toUpperCase()}" deployment.`
     );

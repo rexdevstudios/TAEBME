@@ -71,7 +71,18 @@ export async function GET(req: NextRequest) {
     const effCap = computeEffectiveVaultCapacity(planId, addonSlots);
     const baseCap = SubscriptionsEngine.getPlanCapacities(planId);
     const effectiveMaxKeys = resolveEffectiveMaxKeys(provider, effCap, baseCap);
-    const keys = annotateKeysWithQuotaStatus(rawKeys, { maxActive: effectiveMaxKeys });
+    const keys =
+      provider === 'BYBIT'
+        ? annotateKeysWithQuotaStatus(
+            rawKeys.map((k) => ({
+              ...k,
+              environment: (String(k.chainScope || '').toLowerCase() === 'mainnet' ? 'MAINNET' : 'TESTNET') as
+                | 'TESTNET'
+                | 'MAINNET',
+            })),
+            { maxActive: effectiveMaxKeys, allowMainnet: effCap.allowMainnetBinance }
+          )
+        : annotateKeysWithQuotaStatus(rawKeys, { maxActive: effectiveMaxKeys });
 
     return NextResponse.json(
       {

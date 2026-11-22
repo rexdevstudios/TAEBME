@@ -25,6 +25,8 @@ import { buildAgentActionCards } from '../packages/agent/skill-registry';
 import { validateSessionAllowanceSpec } from '../packages/agent/session-allowance';
 import { TradingRiskGate, compute24hRiskExposure } from '../packages/trading/risk-gate';
 import { notifyUserWebhookBestEffort } from '../packages/notifications/webhook-dispatcher';
+import { signBybitV5Post, submitBybitSpotOrder } from '../packages/trading/bybit-vault';
+import { validateChainScope } from '../packages/shared/credential-vault';
 import { ProviderRegistry } from '../packages/providers/registry';
 
 let passed = 0;
@@ -219,6 +221,35 @@ async function runSimulationSuite() {
 
   const withAddon = computeEffectiveVaultCapacity('FREE', { bankrExtraSlots: 5, binanceExtraSlots: 5 });
   assert(withAddon.maxBankrKeys === 6 && withAddon.maxBinanceAccounts === 6, 'Permanent Capacity Add-Ons stack cleanly on top of base tier');
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 6: Bybit V5 Spot Order Signing, Scope Isolation & Soft-Freeze
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 6: Bybit V5 Spot Order Signing & Scope Isolation] ---');
+  assert(validateChainScope('testnet') === 'testnet' && validateChainScope('mainnet') === 'mainnet', 'Credential vault accepts testnet/mainnet scopes for Bybit V5');
+  const sig = signBybitV5Post({
+    timestamp: '1732200000000',
+    apiKey: 'sim_bybit_key_1234',
+    secretKey: 'sim_bybit_secret_5678',
+    rawBody: '{"category":"spot","symbol":"BTCUSDT"}',
+  });
+  assert(sig.length === 64, 'Bybit V5 POST HMAC-SHA256 signature is 64 hex chars');
+  const simOrder = await submitBybitSpotOrder({
+    apiKey: 'sim_bybit_key_1234',
+    secretKey: 'sim_bybit_secret_5678',
+    environment: 'TESTNET',
+    symbol: 'BTC/USDT',
+    side: 'BUY',
+    orderType: 'MARKET',
+    qty: 0.01,
+    orderLinkId: 'sim-ak-order-1',
+    fetchImpl: (async () =>
+      new Response(JSON.stringify({ retCode: 0, result: { orderId: 'sim-bybit-01', orderLinkId: 'sim-ak-order-1' } }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })) as unknown as typeof fetch,
+  });
+  assert(simOrder.submitted && simOrder.orderId === 'sim-bybit-01', 'Bybit V5 stateless Spot order executes cleanly via mocked transport');
 
   console.log('\n================================================================');
   console.log(`  🎉 SIMULATION SUITE COMPLETED: ${passed} PASSED, ${failed} FAILED`);

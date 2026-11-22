@@ -243,7 +243,9 @@ export default function TradingPage() {
 
   // Controlled order parameters & deep-link context (Launchpad ?token= & Agent ?proposalId=)
   const [executionMode, setExecutionMode] = useState<'PAPER' | 'DEX_NON_CUSTODIAL' | 'CEX_SINGLE_SHOT'>('PAPER');
+  const [cexVenue, setCexVenue] = useState<'BINANCE' | 'BYBIT'>('BINANCE');
   const [selectedBinanceCredentialId, setSelectedBinanceCredentialId] = useState<string>('DEFAULT');
+  const [selectedBybitKeyId, setSelectedBybitKeyId] = useState<string>('DEFAULT');
   const [orderSide, setOrderSide] = useState<'BUY' | 'SELL'>('BUY');
   const [orderType, setOrderType] = useState<'MARKET' | 'LIMIT'>('MARKET');
   const [orderQty, setOrderQty] = useState<number>(0.1);
@@ -339,8 +341,13 @@ export default function TradingPage() {
           maxSlippagePct: orderSlippagePct > 0 ? orderSlippagePct : 1.5,
           tokenAddress: linkedTokenAddress || '0x4200000000000000000000000000000000000006',
           chainId: parsedChainId,
-          ...(executionMode === 'CEX_SINGLE_SHOT' && selectedBinanceCredentialId !== 'DEFAULT'
-            ? { credentialId: selectedBinanceCredentialId }
+          ...(executionMode === 'CEX_SINGLE_SHOT'
+            ? {
+                venue: cexVenue,
+                ...((cexVenue === 'BYBIT' ? selectedBybitKeyId : selectedBinanceCredentialId) !== 'DEFAULT'
+                  ? { credentialId: cexVenue === 'BYBIT' ? selectedBybitKeyId : selectedBinanceCredentialId }
+                  : {}),
+              }
             : {}),
         }),
       });
@@ -349,11 +356,12 @@ export default function TradingPage() {
         setProposalStatus('APPROVED');
         const execStatus = json.data?.status || 'APPROVED';
         const intentId = json.data?.tradeIntentId || '';
+        const resolvedVenue = json.data?.venue || cexVenue;
         setActionFeedback(
           executionMode === 'DEX_NON_CUSTODIAL'
             ? `✅ [DEX NON-CUSTODIAL] Intent ${intentId} lolos Risk Gate & MEV Guard (${execStatus}). Siap ditandatangani di dompet Web3.`
             : executionMode === 'CEX_SINGLE_SHOT'
-            ? `✅ [CEX SINGLE-SHOT] Intent ${intentId} (${execStatus}) lolos Risk Gate.`
+            ? `✅ [CEX ${resolvedVenue} SINGLE-SHOT] Intent ${intentId} (${execStatus}) lolos Risk Gate.`
             : `✅ [PAPER TRADING SIMULATION] Proposal APPROVED & Intent ${intentId} (${execStatus}) lolos Risk Gate! Simulasi 100% bebas risiko modal.`
         );
       } else {
@@ -666,7 +674,7 @@ export default function TradingPage() {
               >
                 <option value="PAPER">Mode: PAPER (Simulated Fill — All Tiers)</option>
                 <option value="DEX_NON_CUSTODIAL">Mode: DEX_NON_CUSTODIAL (MEV Guard + MetaMask Sign — TRADER/AGENT)</option>
-                <option value="CEX_SINGLE_SHOT">Mode: CEX_SINGLE_SHOT (Stateless Binance Trade — TRADER/AGENT)</option>
+                <option value="CEX_SINGLE_SHOT">Mode: CEX_SINGLE_SHOT (Stateless Binance / Bybit V5 — TRADER/AGENT)</option>
               </select>
             </div>
 
@@ -674,12 +682,37 @@ export default function TradingPage() {
 
             {executionMode === 'CEX_SINGLE_SHOT' && (
               <>
-                <BinanceKeyVaultPanel
-                  isConnected={isConnected}
-                  selectedCredentialId={selectedBinanceCredentialId}
-                  onSelectCredentialId={setSelectedBinanceCredentialId}
-                />
-                <BybitKeyVaultPanel isConnected={isConnected} />
+                <div style={{ display: 'flex', gap: '6px', marginTop: '8px', marginBottom: '4px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setCexVenue('BINANCE')}
+                    className={cexVenue === 'BINANCE' ? 'btn-primary' : 'btn-secondary'}
+                    style={{ flex: 1, padding: '5px 8px', fontSize: '11px', justifyContent: 'center' }}
+                  >
+                    Binance Spot
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCexVenue('BYBIT')}
+                    className={cexVenue === 'BYBIT' ? 'btn-primary' : 'btn-secondary'}
+                    style={{ flex: 1, padding: '5px 8px', fontSize: '11px', justifyContent: 'center' }}
+                  >
+                    Bybit V5 Spot
+                  </button>
+                </div>
+                {cexVenue === 'BINANCE' ? (
+                  <BinanceKeyVaultPanel
+                    isConnected={isConnected}
+                    selectedCredentialId={selectedBinanceCredentialId}
+                    onSelectCredentialId={setSelectedBinanceCredentialId}
+                  />
+                ) : (
+                  <BybitKeyVaultPanel
+                    isConnected={isConnected}
+                    selectedKeyId={selectedBybitKeyId}
+                    onSelectKeyId={setSelectedBybitKeyId}
+                  />
+                )}
               </>
             )}
 

@@ -22,6 +22,15 @@ export interface BybitLivePingResult {
   error?: string;
 }
 
+export interface BybitSpotOrderResult {
+  submitted: boolean;
+  environment: 'TESTNET' | 'MAINNET';
+  orderId?: string;
+  orderLinkId?: string;
+  latencyMs: number;
+  error?: string;
+}
+
 /**
  * Parses a stored Bybit credential pair formatted as `apiKey:secretKey` or JSON `{"apiKey","secretKey"}`.
  */
@@ -71,6 +80,131 @@ export function signBybitV5Get(params: {
   const queryString = params.queryString || '';
   const prehash = `${params.timestamp}${params.apiKey}${recvWindow}${queryString}`;
   return crypto.createHmac('sha256', params.secretKey).update(prehash).digest('hex');
+}
+
+/**
+ * Computes Bybit V5 HMAC-SHA256 signature for POST requests:
+ * `HMAC_SHA256(secretKey, timestamp + apiKey + recvWindow + rawJsonBody)`
+ */
+export function signBybitV5Post(params: {
+  timestamp: string;
+  apiKey: string;
+  secretKey: string;
+  recvWindow?: string;
+  rawBody: string;
+}): string {
+  const recvWindow = params.recvWindow || '5000';
+  const prehash = `${params.timestamp}${params.apiKey}${recvWindow}${params.rawBody}`;
+  return crypto.createHmac('sha256', params.secretKey).update(prehash).digest('hex');
+}
+
+/**
+ * Stateless Single-Shot Bybit V5 Spot Order Execution (`POST /v5/order/create`, 6s timeout).
+ * - NEVER logs or echoes raw API keys or secret keys.
+ * - Normalizes symbol (strips `/` separator) and uses `marketUnit: 'baseCoin'` for Spot Market orders.
+ */
+export async function submitBybitSpotOrder(params: {
+  apiKey: string;
+  secretKey: string;
+  environment: 'TESTNET' | 'MAINNET';
+  symbol: string;
+  side: 'BUY' | 'SELL';
+  orderType: 'MARKET' | 'LIMIT';
+  qty: number;
+  price?: number;
+  orderLinkId: string;
+  fetchImpl?: typeof fetch;
+}): Promise<BybitSpotOrderResult> {
+  const start = Date.now();
+  const baseUrl =
+    params.environment === 'MAINNET' ? 'https://api.bybit.com' : 'https://api-testnet.bybit.com';
+  const normalizedSymbol = params.symbol.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+  const payload: Record<string, string> = {
+    category: 'spot',
+    symbol: normalizedSymbol,
+    side: params.side === 'SELL' ? 'Sell' : 'Buy',
+    orderType: params.orderType === 'LIMIT' ? 'Limit' : 'Market',
+    qty: String(params.qty),
+    orderLinkId: params.orderLinkId.slice(0, 36),
+  };
+  if (params.orderType === 'MARKET') {
+    payload.marketUnit = 'baseCoin';
+  } else if (params.price !== undefined && Number.isFinite(params.price) && params.price > 0) {
+    payload.price = String(params.price);
+    payload.timeInForce = 'GTC';
+  }
+
+  const rawBody = JSON.stringify(payload);
+  const timestamp = String(Date.now());
+  const recvWindow = '5000';
+  const signature = signBybitV5Post({
+    timestamp,
+    apiKey: params.apiKey,
+    secretKey: params.secretKey,
+    recvWindow,
+    rawBody,
+  });
+
+  const url = `${baseUrl}/v5/order/create`;
+  const doFetch = params.fetchImpl || fetch;
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 6000);
+    let res: Response;
+    try {
+      res = await doFetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-BAPI-API-KEY': params.apiKey,
+          'X-BAPI-TIMESTAMP': timestamp,
+          'X-BAPI-RECV-WINDOW': recvWindow,
+          'X-BAPI-SIGN': signature,
+        },
+        body: rawBody,
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+
+    const latencyMs = Math.max(1, Date.now() - start);
+    const data: any = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      return {
+        submitted: false,
+        environment: params.environment,
+        latencyMs,
+        error: `BYBIT_HTTP_${res.status}`,
+      };
+    }
+
+    if (typeof data?.retCode === 'number' && data.retCode !== 0) {
+      return {
+        submitted: false,
+        environment: params.environment,
+        latencyMs,
+        error: `Bybit (${data.retCode}): ${String(data.retMsg || 'ORDER_REJECTED')}`,
+      };
+    }
+
+    return {
+      submitted: true,
+      environment: params.environment,
+      orderId: data?.result?.orderId ? String(data.result.orderId) : undefined,
+      orderLinkId: data?.result?.orderLinkId ? String(data.result.orderLinkId) : payload.orderLinkId,
+      latencyMs,
+    };
+  } catch (err: any) {
+    return {
+      submitted: false,
+      environment: params.environment,
+      latencyMs: Math.max(1, Date.now() - start),
+      error: err?.name === 'AbortError' ? 'BYBIT_TIMEOUT' : 'BYBIT_NETWORK_ERROR',
+    };
+  }
 }
 
 /**

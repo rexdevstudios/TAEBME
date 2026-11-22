@@ -29,6 +29,11 @@ import {
   PostgresBinanceExecutionDbAdapter,
 } from '@packages/shared/db-pool';
 import { notifyUserWebhookBestEffort } from '@packages/notifications/webhook-dispatcher';
+import {
+  parseBybitKeyPair,
+  submitBybitSpotOrder,
+  verifyBybitCredentialLive,
+} from '@packages/trading/bybit-vault';
 
 export const dynamic = 'force-dynamic';
 
@@ -251,6 +256,203 @@ export async function POST(req: NextRequest) {
     }
 
     if (executionMode === 'CEX_SINGLE_SHOT') {
+      const venue = (typeof body?.venue === 'string' && body.venue.trim().toUpperCase() === 'BYBIT'
+        ? 'BYBIT'
+        : 'BINANCE') as 'BINANCE' | 'BYBIT';
+      const requestedCredentialId =
+        typeof body?.credentialId === 'string' && body.credentialId.trim() && body.credentialId !== 'DEFAULT'
+          ? body.credentialId.trim()
+          : undefined;
+
+      if (venue === 'BYBIT') {
+        const [allBybitKeys, addonSlots] = await Promise.all([
+          defaultProviderKeyVaultAdapter.listKeys(auth.walletAddress, 'BYBIT').catch(() => []),
+          defaultBillingDbAdapter.getUserAddonSlots(auth.walletAddress).catch(() => ({ bankrExtraSlots: 0, binanceExtraSlots: 0 })),
+        ]);
+        const effVaultCap = computeEffectiveVaultCapacity(userEntitlement.planId, addonSlots);
+        const annotatedBybit = annotateKeysWithQuotaStatus(
+          allBybitKeys.map((k) => ({
+            ...k,
+            environment: (String(k.chainScope || '').toLowerCase() === 'mainnet' ? 'MAINNET' : 'TESTNET') as
+              | 'TESTNET'
+              | 'MAINNET',
+          })),
+          {
+            maxActive: effVaultCap.maxBinanceAccounts,
+            allowMainnet: effVaultCap.allowMainnetBinance,
+          }
+        );
+
+        let resolvedBybit;
+        try {
+          resolvedBybit = await defaultProviderKeyVaultAdapter.resolveDecryptedKeyForDeploy({
+            userIdentifier: auth.walletAddress,
+            targetChain: 'all',
+            keyId: requestedCredentialId,
+            provider: 'BYBIT',
+          });
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : 'CEX_CREDENTIAL_NOT_FOUND';
+          return NextResponse.json(
+            { success: false, error: msg, timestamp: new Date().toISOString() },
+            { status: 422 }
+          );
+        }
+
+        if (!resolvedBybit?.apiKey) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: requestedCredentialId
+                ? 'CEX_CREDENTIAL_NOT_FOUND: Selected Bybit V5 key is inactive or does not belong to your session'
+                : 'CEX_CREDENTIALS_MISSING: Active trade-only Bybit V5 API credentials are required',
+              timestamp: new Date().toISOString(),
+            },
+            { status: 422 }
+          );
+        }
+
+        const matchedBybitMeta = annotatedBybit.find((k) => k.id === resolvedBybit.keyId);
+        if (matchedBybitMeta && matchedBybitMeta.quotaStatus === 'FROZEN_MAINNET_LOCKED') {
+          return NextResponse.json(
+            {
+              success: false,
+              error: `KEY_FROZEN_MAINNET_LOCKED: Akun Bybit Mainnet "${matchedBybitMeta.label}" terkunci pada paket ${effVaultCap.planId}. Perpanjang TRADER/AGENT di /billing untuk membuka kembali.`,
+              timestamp: new Date().toISOString(),
+            },
+            { status: 403 }
+          );
+        }
+        if (matchedBybitMeta && matchedBybitMeta.quotaStatus === 'FROZEN_OVER_QUOTA') {
+          return NextResponse.json(
+            {
+              success: false,
+              error: `KEY_FROZEN_OVER_QUOTA: Akun Bybit "${matchedBybitMeta.label}" terkunci karena kuota aktif paket ${effVaultCap.planId} adalah ${effVaultCap.maxBinanceAccounts} akun. Jadikan Default atau tambah slot di /billing.`,
+              timestamp: new Date().toISOString(),
+            },
+            { status: 403 }
+          );
+        }
+
+        const bybitEnv: 'TESTNET' | 'MAINNET' =
+          String(resolvedBybit.chainScope || '').toLowerCase() === 'mainnet' ? 'MAINNET' : 'TESTNET';
+        const { apiKey, secretKey } = parseBybitKeyPair(resolvedBybit.apiKey);
+
+        let exchangeOrderId: string | undefined;
+        let finalStatus: 'APPROVED' | 'SUBMITTED' = 'APPROVED';
+
+        if (body?.dispatchLive === true) {
+          const permCheck = await verifyBybitCredentialLive({
+            apiKey,
+            secretKey,
+            environment: bybitEnv,
+          });
+          if (!permCheck.connected) {
+            return NextResponse.json(
+              {
+                success: false,
+                error: `BYBIT_AUTH_FAILED: ${permCheck.error || 'Unable to verify Bybit V5 credentials'}`,
+                timestamp: new Date().toISOString(),
+              },
+              { status: 422 }
+            );
+          }
+          if (permCheck.canWithdraw) {
+            return NextResponse.json(
+              {
+                success: false,
+                error:
+                  'WITHDRAWAL_ENABLED_ON_EXCHANGE: Bybit API key has Withdraw permissions enabled. Disable withdrawals on Bybit before live execution.',
+                timestamp: new Date().toISOString(),
+              },
+              { status: 403 }
+            );
+          }
+          if (!permCheck.canTrade) {
+            return NextResponse.json(
+              {
+                success: false,
+                error: 'BYBIT_TRADE_PERMISSION_MISSING: Bybit API key is read-only or lacks Spot trade permissions.',
+                timestamp: new Date().toISOString(),
+              },
+              { status: 403 }
+            );
+          }
+
+          const orderRes = await submitBybitSpotOrder({
+            apiKey,
+            secretKey,
+            environment: bybitEnv,
+            symbol,
+            side,
+            orderType: type,
+            qty: quantity,
+            price,
+            orderLinkId: idempotencyKey,
+          });
+          if (!orderRes.submitted) {
+            return NextResponse.json(
+              {
+                success: false,
+                error: `BYBIT_ORDER_REJECTED: ${orderRes.error || 'Order submission failed'}`,
+                timestamp: new Date().toISOString(),
+              },
+              { status: 422 }
+            );
+          }
+          exchangeOrderId = orderRes.orderId;
+          finalStatus = 'SUBMITTED';
+        }
+
+        const tradeIntentId = await saveTradeIntent({
+          userId: auth.user.userId,
+          stage,
+          symbol,
+          side,
+          type,
+          quantity,
+          price,
+          idempotencyKey,
+          status: 'APPROVED',
+          riskDecisionReason: decision.reason,
+        });
+
+        await notifyUserWebhookBestEffort({
+          resolveWebhookUrl: resolveUserWebhookUrl,
+          payload: {
+            event: 'ORDER_APPROVED',
+            title: `Bybit V5 Order ${finalStatus}: ${side} ${symbol}`,
+            message: `Intent ${tradeIntentId} (${bybitEnv} · ${resolvedBybit.label}) lolos Risk Gate${exchangeOrderId ? ` · OrderId ${exchangeOrderId}` : ''}.`,
+            metadata: {
+              tradeIntentId,
+              venue: 'BYBIT',
+              symbol,
+              side,
+              quantity,
+              executionMode,
+              environment: bybitEnv,
+              ...(exchangeOrderId ? { exchangeOrderId } : {}),
+            },
+          },
+        });
+
+        return NextResponse.json({
+          success: true,
+          data: {
+            tradeIntentId,
+            executionMode,
+            venue: 'BYBIT',
+            status: finalStatus,
+            credentialId: resolvedBybit.keyId,
+            credentialLabel: resolvedBybit.label,
+            credentialEnvironment: bybitEnv,
+            ...(exchangeOrderId ? { exchangeOrderId } : {}),
+            decision,
+          },
+          timestamp: new Date().toISOString(),
+        });
+      }
+
       const pool = getDbPool();
       if (!pool) {
         return NextResponse.json(
@@ -258,10 +460,6 @@ export async function POST(req: NextRequest) {
           { status: 503 }
         );
       }
-      const requestedCredentialId =
-        typeof body?.credentialId === 'string' && body.credentialId.trim() && body.credentialId !== 'DEFAULT'
-          ? body.credentialId.trim()
-          : undefined;
       const execDb = new PostgresBinanceExecutionDbAdapter(pool);
       const creds = await execDb.getBinanceCredentials(auth.user.userId, requestedCredentialId);
       if (!creds || creds.isActive === false) {
@@ -341,6 +539,7 @@ export async function POST(req: NextRequest) {
         data: {
           tradeIntentId,
           executionMode,
+          venue: 'BINANCE',
           status: 'APPROVED',
           credentialId: creds.id,
           credentialLabel: creds.label || 'Binance Primary',
