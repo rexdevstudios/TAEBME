@@ -449,6 +449,96 @@ export function summarizeAndFilterTradeIntents<
   };
 }
 
+export interface TradingPerformanceRecap {
+  totalTrades: number;
+  executedOrApproved: number;
+  blockedOrRejected: number;
+  executionRatePct: number;
+  estimatedVolumeUsd: number;
+  dexCount: number;
+  autoPilotCount: number;
+  trailingStopCount: number;
+  topSymbol: string | null;
+}
+
+/**
+ * Pure portfolio & Auto-Pilot performance recap calculator (Phase CI).
+ * Reuses existing trade_intents payload without additional DB queries or schema changes.
+ */
+export function computeTradingPerformanceRecap(
+  intents: Array<{
+    symbol?: string;
+    quantity?: number;
+    price?: number;
+    status: string;
+    idempotencyKey?: string;
+  }>
+): TradingPerformanceRecap {
+  const list = Array.isArray(intents) ? intents : [];
+  let executedOrApproved = 0;
+  let blockedOrRejected = 0;
+  let estimatedVolumeUsd = 0;
+  let dexCount = 0;
+  let autoPilotCount = 0;
+  let trailingStopCount = 0;
+  const symbolFreq = new Map<string, number>();
+
+  for (const item of list) {
+    const st = String(item.status || '').toUpperCase();
+    const isApproved = st === 'EXECUTED' || st === 'APPROVED';
+    const isBlocked = st === 'REJECTED' || st === 'BLOCKED' || st === 'CANCELLED';
+    const key = String(item.idempotencyKey || '');
+    const keyUpper = key.toUpperCase();
+
+    if (isApproved) {
+      executedOrApproved += 1;
+      const qty = Number(item.quantity);
+      const px = Number(item.price);
+      if (Number.isFinite(qty) && qty > 0 && Number.isFinite(px) && px > 0) {
+        estimatedVolumeUsd += qty * px;
+      }
+    }
+    if (isBlocked) {
+      blockedOrRejected += 1;
+    }
+    if (parseDexSettlementFromIdempotencyKey(key)) {
+      dexCount += 1;
+    }
+    if (keyUpper.startsWith('AUTOPILOT:')) {
+      autoPilotCount += 1;
+    }
+    if (keyUpper.includes('TRAILING_STOP')) {
+      trailingStopCount += 1;
+    }
+    const sym = String(item.symbol || '').trim().toUpperCase();
+    if (sym) {
+      symbolFreq.set(sym, (symbolFreq.get(sym) || 0) + 1);
+    }
+  }
+
+  let topSymbol: string | null = null;
+  let topCount = 0;
+  for (const [sym, count] of symbolFreq.entries()) {
+    if (count > topCount) {
+      topCount = count;
+      topSymbol = sym;
+    }
+  }
+
+  const totalTrades = list.length;
+  return {
+    totalTrades,
+    executedOrApproved,
+    blockedOrRejected,
+    executionRatePct: totalTrades > 0 ? Math.round((executedOrApproved / totalTrades) * 100) : 0,
+    estimatedVolumeUsd: Math.round(estimatedVolumeUsd * 100) / 100,
+    dexCount,
+    autoPilotCount,
+    trailingStopCount,
+    topSymbol,
+  };
+}
+
 function escapeCsvCell(value: unknown): string {
   const raw = value === null || value === undefined ? '' : String(value);
   const formulaSafe = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;

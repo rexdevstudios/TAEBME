@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Download, ExternalLink, History, RefreshCw } from 'lucide-react';
 import {
   EVM_DEX_CHAINS,
+  computeTradingPerformanceRecap,
   parseDexSettlementFromIdempotencyKey,
   serializeTradeIntentsToCsv,
   summarizeAndFilterTradeIntents,
@@ -43,6 +44,8 @@ export function RecentTradeHistoryPanel({
     [intents, activeFilter, selectedChainId]
   );
 
+  const recap = useMemo(() => computeTradingPerformanceRecap(intents), [intents]);
+
   const handleExportCsv = () => {
     if (filtered.length === 0) return;
     const csv = serializeTradeIntentsToCsv(filtered);
@@ -62,7 +65,7 @@ export function RecentTradeHistoryPanel({
     }
     setLoading(true);
     try {
-      const res = await fetch('/api/trade-intents?limit=10', { credentials: 'same-origin' });
+      const res = await fetch('/api/trade-intents?limit=25', { credentials: 'same-origin' });
       const json = await res.json();
       if (res.ok && json?.success && Array.isArray(json.data?.intents)) {
         setIntents(json.data.intents);
@@ -130,6 +133,53 @@ export function RecentTradeHistoryPanel({
           </button>
         </div>
       </div>
+
+      {intents.length > 0 && (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(125px, 1fr))',
+            gap: '6px',
+          }}
+        >
+          <div style={{ padding: '7px 9px', borderRadius: '6px', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)' }}>
+            <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-muted)', textTransform: 'uppercase' }}>Execution Rate</div>
+            <div style={{ fontSize: '13px', fontWeight: 800, color: '#10B981' }}>
+              {recap.executionRatePct}%{' '}
+              <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-muted)' }}>
+                ({recap.executedOrApproved}/{recap.totalTrades})
+              </span>
+            </div>
+          </div>
+          <div style={{ padding: '7px 9px', borderRadius: '6px', background: 'rgba(56,189,248,0.08)', border: '1px solid rgba(56,189,248,0.2)' }}>
+            <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-muted)', textTransform: 'uppercase' }}>Est. Volume</div>
+            <div style={{ fontSize: '13px', fontWeight: 800, color: '#38BDF8' }}>
+              ${recap.estimatedVolumeUsd.toLocaleString()}{' '}
+              <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-muted)' }}>
+                · DEX {recap.dexCount}
+              </span>
+            </div>
+          </div>
+          <div style={{ padding: '7px 9px', borderRadius: '6px', background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.2)' }}>
+            <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-muted)', textTransform: 'uppercase' }}>Auto-Pilot / TSL</div>
+            <div style={{ fontSize: '13px', fontWeight: 800, color: '#C084FC' }}>
+              {recap.autoPilotCount} Auto{' '}
+              <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-muted)' }}>
+                · {recap.trailingStopCount} TSL
+              </span>
+            </div>
+          </div>
+          <div style={{ padding: '7px 9px', borderRadius: '6px', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}>
+            <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-muted)', textTransform: 'uppercase' }}>Risk Guard</div>
+            <div style={{ fontSize: '13px', fontWeight: 800, color: '#F59E0B' }}>
+              {recap.blockedOrRejected} Block{' '}
+              <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-muted)' }}>
+                · {recap.topSymbol || '—'}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {intents.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
