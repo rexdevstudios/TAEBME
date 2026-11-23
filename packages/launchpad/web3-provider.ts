@@ -325,6 +325,42 @@ export function getEvmExplorerTxUrl(chainId: number, txHash: string): string {
   return `${cfg.explorerUrl.replace(/\/+$/, '')}/tx/${txHash}`;
 }
 
+export function encodeDexSettlementIdempotencyKey(params: {
+  chainId: number;
+  txHash: string;
+  intentId: string;
+}): string {
+  const cid = Number(params.chainId);
+  if (!Number.isInteger(cid) || !EVM_DEX_CHAINS[cid]) {
+    throw new Error(`UNSUPPORTED_DEX_SETTLEMENT_CHAIN_${params.chainId}`);
+  }
+  const cleanHash = String(params.txHash || '').trim().toLowerCase();
+  if (!/^0x[a-f0-9]{64}$/.test(cleanHash)) {
+    throw new Error('INVALID_DEX_SETTLEMENT_TX_HASH');
+  }
+  const cleanId = String(params.intentId || '')
+    .trim()
+    .replace(/[^a-zA-Z0-9-]/g, '')
+    .slice(0, 12) || 'intent';
+  return `dex:${cid}:${cleanHash}:${cleanId}`;
+}
+
+export function parseDexSettlementFromIdempotencyKey(
+  idempotencyKey: string | null | undefined
+): { chainId: number; txHash: string; explorerUrl: string } | null {
+  if (!idempotencyKey || typeof idempotencyKey !== 'string') return null;
+  const match = idempotencyKey.trim().match(/^dex:(\d+):(0x[a-fA-F0-9]{64})(?::[a-zA-Z0-9-]+)?$/);
+  if (!match) return null;
+  const chainId = Number(match[1]);
+  if (!EVM_DEX_CHAINS[chainId]) return null;
+  const txHash = match[2].toLowerCase();
+  return {
+    chainId,
+    txHash,
+    explorerUrl: getEvmExplorerTxUrl(chainId, txHash),
+  };
+}
+
 export interface DexTokenPreset {
   symbol: string;
   name: string;

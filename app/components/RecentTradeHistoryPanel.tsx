@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { History, RefreshCw } from 'lucide-react';
+import { ExternalLink, History, RefreshCw } from 'lucide-react';
+import { parseDexSettlementFromIdempotencyKey } from '@packages/launchpad/web3-provider';
 
 interface TradeIntentItem {
   id: string;
@@ -11,6 +12,7 @@ interface TradeIntentItem {
   type: string;
   quantity: number;
   price?: number;
+  idempotencyKey?: string;
   status: string;
   createdAt?: string;
 }
@@ -133,6 +135,29 @@ export function RecentTradeHistoryPanel({
                   >
                     {item.status}
                   </span>
+                  {(() => {
+                    const settlement = parseDexSettlementFromIdempotencyKey(item.idempotencyKey);
+                    if (!settlement) return null;
+                    return (
+                      <a
+                        href={settlement.explorerUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          fontSize: '9px',
+                          fontWeight: 800,
+                          color: '#38BDF8',
+                          textDecoration: 'none',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '2px',
+                        }}
+                        title={`Tx: ${settlement.txHash} (Chain ${settlement.chainId})`}
+                      >
+                        Explorer <ExternalLink size={9} />
+                      </a>
+                    );
+                  })()}
                   {item.createdAt && (
                     <span className="text-muted" style={{ fontSize: '10px' }}>
                       {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

@@ -39,11 +39,13 @@ import {
 } from '../packages/trading/zerox-swap-client';
 import {
   EVM_DEX_CHAINS,
+  encodeDexSettlementIdempotencyKey,
   findDexTokenPresetByAddress,
   formatDexQuoteOutputSummary,
   getDefaultDexTokenForChain,
   getDexTokenPresetsForChain,
   getEvmExplorerTxUrl,
+  parseDexSettlementFromIdempotencyKey,
   resolveDexSellAmountAtomic,
 } from '../packages/launchpad/web3-provider';
 import {
@@ -626,6 +628,24 @@ async function runSimulationSuite() {
       quoteSummary.buyTokenSymbol === 'USDC' &&
       quoteSummary.estimatedOutFormatted === '32.45',
     'Human-readable 0x quote output summary and DEX route sources format cleanly'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 24: On-Chain DEX Settlement Metadata & Block Explorer Link (Phase BF)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 24: DEX Settlement Metadata & Explorer Link] ---');
+  const dummyTxHash = `0x${'b'.repeat(64)}`;
+  const encodedDexKey = encodeDexSettlementIdempotencyKey({
+    chainId: 42161,
+    txHash: dummyTxHash,
+    intentId: 'intent-arb-001',
+  });
+  const parsedDexKey = parseDexSettlementFromIdempotencyKey(encodedDexKey);
+  assert(
+    parsedDexKey?.chainId === 42161 &&
+      parsedDexKey?.txHash === dummyTxHash &&
+      parsedDexKey?.explorerUrl === `https://arbiscan.io/tx/${dummyTxHash}`,
+    'DEX settlement idempotency key encodes and resolves Arbitrum explorer tx URL cleanly'
   );
 
   console.log('\n================================================================');

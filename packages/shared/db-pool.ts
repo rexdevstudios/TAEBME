@@ -11,6 +11,7 @@ import { BountyDbAdapter, BountyClaimItem } from '../launchpad/bounty-escrow';
 import { KolProfile, BountyCampaign, BountyClaim, UserGameFiProfile, QuestDefinition, QuestCompletion, NftItemRecord, NftCollectionRecord } from './types/domain';
 import { normalizeTokenIdentifier } from './token-identifier';
 import { DexPairFactoryService } from '../launchpad/dex-pair-factory';
+import { encodeDexSettlementIdempotencyKey } from '../launchpad/web3-provider';
 import { TrustEvidenceService } from '../social/trust-evidence-service';
 import { KillSwitchDbAdapter, KillSwitchRecord } from '../admin/kill-switch-manager';
 import {
@@ -885,6 +886,81 @@ export async function listUserRecentTradeIntents(
     .filter((i) => (i.userId || '').trim().toLowerCase() === norm)
     .sort((a, b) => Date.parse(b.createdAt || '0') - Date.parse(a.createdAt || '0'))
     .slice(0, safeLimit);
+}
+
+/**
+ * Confirms an on-chain DEX swap settlement strictly scoped to the authenticated user (Phase BF).
+ * - Transitions `status` from `APPROVED` -> `EXECUTED`.
+ * - Encodes `dex:${chainId}:${txHash}:${intentPrefix}` into `idempotency_key` (0 DDL migration).
+ * - Appends an audit log record (`DEX_SWAP_TX_CONFIRMED`).
+ */
+export async function confirmUserDexTradeIntentSettlement(params: {
+  userIdentifier: string;
+  tradeIntentId: string;
+  txHash: string;
+  chainId: number;
+}): Promise<{ tradeIntentId: string; status: 'EXECUTED'; idempotencyKey: string }> {
+  const intentId = String(params.tradeIntentId || '').trim();
+  if (!intentId) {
+    throw new Error('INVALID_TRADE_INTENT_ID');
+  }
+  const encodedKey = encodeDexSettlementIdempotencyKey({
+    chainId: params.chainId,
+    txHash: params.txHash,
+    intentId,
+  });
+
+  const pool = getDbPool();
+  if (pool) {
+    const validUserId = await ensureUserEntity(pool, params.userIdentifier);
+    const res = await pool.query(
+      `UPDATE trade_intents
+       SET status = 'EXECUTED',
+           idempotency_key = $3
+       WHERE id = $1 AND user_id = $2
+       RETURNING id`,
+      [intentId, validUserId, encodedKey]
+    );
+    if (res.rowCount === 0) {
+      throw new Error('TRADE_INTENT_NOT_FOUND_OR_FORBIDDEN');
+    }
+    await pool
+      .query(
+        `INSERT INTO audit_logs (actor_id, action, entity_id, reason, created_at)
+         VALUES ($1, 'DEX_SWAP_TX_CONFIRMED', $2, $3, NOW())`,
+        [
+          validUserId,
+          isUuid(intentId) ? intentId : null,
+          `On-chain 0x Swap v2 tx confirmed on chain ${params.chainId}: ${params.txHash}`,
+        ]
+      )
+      .catch(() => {});
+  } else {
+    const normUser = (params.userIdentifier || '').trim().toLowerCase();
+    const memMatch = defaultBinanceExecutionDbAdapter
+      .getInMemoryIntents()
+      .find((i) => i.id === intentId && (i.userId || '').trim().toLowerCase() === normUser);
+    if (!memMatch) {
+      throw new Error('TRADE_INTENT_NOT_FOUND_OR_FORBIDDEN');
+    }
+    memMatch.status = 'EXECUTED';
+    memMatch.idempotencyKey = encodedKey;
+  }
+
+  // Keep in-memory mirror in sync if present
+  const memMirror = defaultBinanceExecutionDbAdapter
+    .getInMemoryIntents()
+    .find((i) => i.id === intentId);
+  if (memMirror) {
+    memMirror.status = 'EXECUTED';
+    memMirror.idempotencyKey = encodedKey;
+  }
+
+  return {
+    tradeIntentId: intentId,
+    status: 'EXECUTED',
+    idempotencyKey: encodedKey,
+  };
 }
 
 export function resetDbStateForTesting(): void {

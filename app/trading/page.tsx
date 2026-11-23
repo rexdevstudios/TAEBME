@@ -297,6 +297,7 @@ export default function TradingPage() {
   const [dexSigning, setDexSigning] = useState(false);
   const [dexApprovingErc20, setDexApprovingErc20] = useState(false);
   const [dexTxHash, setDexTxHash] = useState<string | null>(null);
+  const [lastApprovedIntentId, setLastApprovedIntentId] = useState<string | null>(null);
 
   const syncDexTokenSelection = (nextAddress: string | null, nextChainId: number) => {
     setLinkedTokenAddress(nextAddress);
@@ -447,6 +448,7 @@ export default function TradingPage() {
         }
         const execStatus = json.data?.status || 'APPROVED';
         const intentId = json.data?.tradeIntentId || '';
+        setLastApprovedIntentId(intentId || null);
         const resolvedVenue = json.data?.venue || cexVenue;
         const feePctText =
           typeof json.data?.partnerFee?.feePct === 'number'
@@ -541,6 +543,19 @@ export default function TradingPage() {
       const chainLabel = EVM_DEX_CHAINS[targetChain]?.name || `Chain ${targetChain}`;
       setActionFeedback(`📡 Transaksi 0x Swap v2 terkirim di ${chainLabel} (${tx.hash.slice(0, 12)}...). Menunggu konfirmasi...`);
       await tx.wait(1);
+      if (lastApprovedIntentId) {
+        await fetch('/api/trade-intents', {
+          method: 'PATCH',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tradeIntentId: lastApprovedIntentId,
+            txHash: tx.hash,
+            chainId: targetChain,
+          }),
+        }).catch(() => {});
+        setHistoryRefreshTick((n) => n + 1);
+      }
       setActionFeedback(`✅ 0x Swap v2 terkonfirmasi on-chain di ${chainLabel}! Tx: ${tx.hash}`);
     } catch (err: any) {
       setActionFeedback(`⚠️ MetaMask Swap dibatalkan / gagal: ${normalizeWeb3Error(err)}`);

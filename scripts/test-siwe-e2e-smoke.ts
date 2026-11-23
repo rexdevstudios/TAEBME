@@ -287,6 +287,36 @@ async function runSiweE2eSmoke() {
       sellDexJson?.data?.zeroXSwap?.sellAmount === '10000',
       `SELL 0.01 Base USDC resolves 6-decimal atomic sellAmount === "10000" (Got ${sellDexJson?.data?.zeroXSwap?.sellAmount})`
     );
+
+    // 16. Confirm On-Chain DEX Settlement via PATCH /api/trade-intents & verify EXECUTED + Explorer key (Phase BF)
+    const arbIntentId = String(arbDexJson?.data?.tradeIntentId || '');
+    const simulatedArbTxHash = `0x${'e'.repeat(64)}`;
+    const patchRes = await fetch(`${BASE_URL}/api/trade-intents`, {
+      method: 'PATCH',
+      headers: authHeaders,
+      body: JSON.stringify({
+        tradeIntentId: arbIntentId,
+        txHash: simulatedArbTxHash,
+        chainId: 42161,
+      }),
+    });
+    const patchJson: any = await patchRes.json();
+    assert(
+      patchRes.status === 200 &&
+        patchJson?.success === true &&
+        patchJson?.data?.status === 'EXECUTED' &&
+        String(patchJson?.data?.idempotencyKey || '').startsWith(`dex:42161:${simulatedArbTxHash}:`),
+      `PATCH /api/trade-intents marks Arbitrum DEX intent EXECUTED with settlement key (Got HTTP ${patchRes.status})`
+    );
+
+    const hist2Res = await fetch(`${BASE_URL}/api/trade-intents?limit=5`, { headers: authHeaders });
+    const hist2Json: any = await hist2Res.json();
+    const matchedExec = (hist2Json?.data?.intents || []).find((it: any) => it?.id === arbIntentId);
+    assert(
+      matchedExec?.status === 'EXECUTED' &&
+        String(matchedExec?.idempotencyKey || '').includes(simulatedArbTxHash),
+      `GET /api/trade-intents reflects EXECUTED status & Arbitrum txHash for RecentTradeHistoryPanel Explorer link`
+    );
   } finally {
     // 9. Auto-Cleanup: Revoke test key & verify count returns to 0 + logout
     if (sessionToken && createdBybitKeyId) {

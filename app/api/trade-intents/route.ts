@@ -7,6 +7,7 @@ import { requireCapability } from '@packages/auth/session';
 import {
   saveTradeIntent,
   listUserRecentTradeIntents,
+  confirmUserDexTradeIntentSettlement,
   defaultKillSwitchDbAdapter,
   defaultBillingDbAdapter,
 } from '@packages/shared/db-pool';
@@ -171,5 +172,66 @@ export async function POST(req: NextRequest) {
       timestamp: new Date().toISOString(),
     };
     return NextResponse.json(response, { status: 500 });
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  try {
+    let auth;
+    try {
+      auth = await requireCapability(req, 'TRADE_MANUALLY');
+    } catch (authErr: unknown) {
+      const msg = authErr instanceof Error ? authErr.message : String(authErr);
+      const isForbidden = msg.startsWith('RBAC_FORBIDDEN') || msg.startsWith('AUTH_ACCOUNT_');
+      return NextResponse.json(
+        {
+          success: false,
+          error: { code: isForbidden ? 'FORBIDDEN' : 'UNAUTHORIZED', message: msg },
+          timestamp: new Date().toISOString(),
+        },
+        { status: isForbidden ? 403 : 401 }
+      );
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const tradeIntentId = typeof body?.tradeIntentId === 'string' ? body.tradeIntentId.trim() : '';
+    const txHash = typeof body?.txHash === 'string' ? body.txHash.trim() : '';
+    const chainId = Number(body?.chainId ?? 8453);
+
+    const confirmed = await confirmUserDexTradeIntentSettlement({
+      userIdentifier: auth.user.userId,
+      tradeIntentId,
+      txHash,
+      chainId,
+    });
+
+    return NextResponse.json(
+      {
+        success: true,
+        data: {
+          ...confirmed,
+          chainId,
+          txHash: txHash.toLowerCase(),
+        },
+        timestamp: new Date().toISOString(),
+      },
+      { status: 200 }
+    );
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'DEX_SETTLEMENT_CONFIRM_FAILED';
+    const isNotFound = msg.includes('TRADE_INTENT_NOT_FOUND_OR_FORBIDDEN');
+    const isBadReq =
+      msg.includes('INVALID_') || msg.includes('UNSUPPORTED_DEX_SETTLEMENT_CHAIN');
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: isNotFound ? 'NOT_FOUND' : isBadReq ? 'BAD_REQUEST' : 'SERVER_ERROR',
+          message: msg,
+        },
+        timestamp: new Date().toISOString(),
+      },
+      { status: isNotFound ? 404 : isBadReq ? 400 : 500 }
+    );
   }
 }
