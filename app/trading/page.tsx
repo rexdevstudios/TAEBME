@@ -24,6 +24,7 @@ import {
   type ExecutionRailId,
   type SubAgentId,
 } from '@packages/agent/autonomous-terminal-engine';
+import { buildErc20ApproveTransaction } from '@packages/trading/zerox-swap-client';
 
 interface Candle {
   timestamp: number;
@@ -281,13 +282,17 @@ export default function TradingPage() {
   const [dexSwapPayload, setDexSwapPayload] = useState<{
     available: boolean;
     chainId: number;
+    sellToken?: string;
+    sellAmount?: string;
     buyAmount?: string;
+    allowanceTarget?: string | null;
     feeBps?: number;
     feeRecipient?: string;
     transaction?: { to: string; data: string; value: string; gas?: string };
     reason?: string;
   } | null>(null);
   const [dexSigning, setDexSigning] = useState(false);
+  const [dexApprovingErc20, setDexApprovingErc20] = useState(false);
   const [dexTxHash, setDexTxHash] = useState<string | null>(null);
 
   const syncDexTokenSelection = (nextAddress: string | null, nextChainId: number) => {
@@ -470,6 +475,47 @@ export default function TradingPage() {
     setProposalStatus('REJECTED');
     setDexSwapPayload(null);
     setActionFeedback('⛔ Proposal REJECTED by user.');
+  };
+
+  const handleApproveZeroXErc20 = async () => {
+    if (!dexSwapPayload?.allowanceTarget) return;
+    const tokenAddr =
+      dexSwapPayload.sellToken ||
+      linkedTokenAddress ||
+      getDefaultDexTokenForChain(dexChainId).address;
+    setDexApprovingErc20(true);
+    try {
+      const targetChain = dexSwapPayload.chainId || dexChainId;
+      const netCheck = await ensureEvmNetwork(targetChain);
+      if (!netCheck.success) {
+        setActionFeedback(`⚠️ ${netCheck.error || 'Harap beralih ke jaringan EVM yang dipilih di MetaMask.'}`);
+        return;
+      }
+      const approveTxSpec = buildErc20ApproveTransaction({
+        tokenAddress: tokenAddr,
+        spender: dexSwapPayload.allowanceTarget,
+        amountWei: dexSwapPayload.sellAmount || '10000000000000000',
+      });
+      const signer = await getBrowserSigner();
+      const tx = await signer.sendTransaction({
+        to: approveTxSpec.to,
+        data: approveTxSpec.data,
+        value: 0n,
+      });
+      setDexTxHash(tx.hash);
+      const chainLabel = EVM_DEX_CHAINS[targetChain]?.name || `Chain ${targetChain}`;
+      setActionFeedback(
+        `📡 Transaksi ERC-20 Approve terkirim di ${chainLabel} (${tx.hash.slice(0, 12)}...). Menunggu konfirmasi...`
+      );
+      await tx.wait(1);
+      setActionFeedback(
+        `✅ ERC-20 Allowance (0x AllowanceHolder) terkonfirmasi di ${chainLabel}! Klik "Approve Proposal" ulang untuk refresh calldata swap.`
+      );
+    } catch (err: any) {
+      setActionFeedback(`⚠️ MetaMask ERC-20 Approve dibatalkan / gagal: ${normalizeWeb3Error(err)}`);
+    } finally {
+      setDexApprovingErc20(false);
+    }
   };
 
   const handleSignZeroXSwap = async () => {
@@ -937,7 +983,11 @@ export default function TradingPage() {
               <select
                 aria-label="Order side"
                 value={orderSide}
-                onChange={(e) => setOrderSide(e.target.value as 'BUY' | 'SELL')}
+                onChange={(e) => {
+                  setOrderSide(e.target.value as 'BUY' | 'SELL');
+                  setDexSwapPayload(null);
+                  setDexTxHash(null);
+                }}
                 className="input"
                 style={{ padding: '6px 8px', fontSize: '11px', fontWeight: 700 }}
               >
@@ -1011,7 +1061,8 @@ export default function TradingPage() {
               </div>
             )}
 
-            {dexSwapPayload?.available && dexSwapPayload.transaction && (
+            {((dexSwapPayload?.available && dexSwapPayload.transaction) ||
+              (orderSide === 'SELL' && Boolean(dexSwapPayload?.allowanceTarget))) && (
               <div
                 style={{
                   padding: '10px 12px',
@@ -1025,20 +1076,38 @@ export default function TradingPage() {
                 }}
               >
                 <div style={{ fontSize: '11px', fontWeight: 800, color: '#34D399' }}>
-                  ⚡ 0x Swap API v2 Calldata Ready (Chain {dexSwapPayload.chainId})
+                  ⚡ 0x Swap API v2 {dexSwapPayload?.available ? 'Calldata Ready' : 'ERC-20 Allowance Required'} (Chain {dexSwapPayload?.chainId || dexChainId})
                 </div>
                 <div className="text-muted" style={{ fontSize: '10px', fontFamily: 'var(--font-mono)' }}>
-                  Protocol Fee: {((dexSwapPayload.feeBps ?? 25) / 100).toFixed(2)}% (Auto-ETH → Treasury)
+                  Protocol Fee: {((dexSwapPayload?.feeBps ?? 25) / 100).toFixed(2)}% (Auto-ETH → Treasury)
                 </div>
-                <button
-                  type="button"
-                  onClick={handleSignZeroXSwap}
-                  disabled={dexSigning}
-                  className="btn-primary"
-                  style={{ width: '100%', justifyContent: 'center', fontSize: '12px', padding: '8px 12px' }}
-                >
-                  {dexSigning ? 'Menunggu MetaMask...' : 'Sign & Swap via MetaMask (0x v2)'}
-                </button>
+                {orderSide === 'SELL' && dexSwapPayload?.allowanceTarget && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div className="text-muted" style={{ fontSize: '10px', fontFamily: 'var(--font-mono)' }}>
+                      0x AllowanceHolder: {dexSwapPayload.allowanceTarget.slice(0, 10)}...{dexSwapPayload.allowanceTarget.slice(-6)}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleApproveZeroXErc20}
+                      disabled={dexApprovingErc20 || dexSigning}
+                      className="btn-secondary"
+                      style={{ width: '100%', justifyContent: 'center', fontSize: '11px', padding: '7px 10px', borderColor: 'rgba(250, 204, 21, 0.45)', color: '#FDE047' }}
+                    >
+                      {dexApprovingErc20 ? 'Menunggu MetaMask Approve...' : 'Step 1: Approve ERC-20 Allowance via MetaMask'}
+                    </button>
+                  </div>
+                )}
+                {dexSwapPayload?.available && dexSwapPayload.transaction && (
+                  <button
+                    type="button"
+                    onClick={handleSignZeroXSwap}
+                    disabled={dexSigning || dexApprovingErc20}
+                    className="btn-primary"
+                    style={{ width: '100%', justifyContent: 'center', fontSize: '12px', padding: '8px 12px' }}
+                  >
+                    {dexSigning ? 'Menunggu MetaMask...' : 'Sign & Swap via MetaMask (0x v2)'}
+                  </button>
+                )}
               </div>
             )}
 

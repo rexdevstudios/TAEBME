@@ -251,6 +251,32 @@ async function runSiweE2eSmoke() {
         Boolean(arbDexJson?.data?.zeroXSwap && arbDexJson.data.zeroXSwap.chainId === 42161),
       `Arbitrum 42161 DEX payload includes partnerFee (${arbDexJson?.data?.partnerFee?.feeBps} bps) & zeroXSwap (available=${arbDexJson?.data?.zeroXSwap?.available}, chainId=${arbDexJson?.data?.zeroXSwap?.chainId})`
     );
+
+    // 15. Non-Custodial DEX SELL Quote includes ERC-20 AllowanceHolder target (Phase BC)
+    const sellDexRes = await fetch(`${BASE_URL}/api/trading/execute`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({
+        executionMode: 'DEX_NON_CUSTODIAL',
+        stage: 'PAPER',
+        symbol: 'USDC',
+        tokenAddress: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+        chainId: 8453,
+        side: 'SELL',
+        type: 'MARKET',
+        quantity: 0.01,
+        maxSlippagePct: 1.0,
+      }),
+    });
+    const sellDexJson: any = await sellDexRes.json();
+    assert(
+      sellDexRes.status === 200 &&
+        sellDexJson?.success === true &&
+        typeof sellDexJson?.data?.zeroXSwap?.allowanceTarget === 'string' &&
+        sellDexJson.data.zeroXSwap.allowanceTarget.startsWith('0x') &&
+        sellDexJson?.data?.zeroXSwap?.sellToken === '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+      `POST /api/trading/execute (DEX_NON_CUSTODIAL SELL Base USDC) returns valid ERC-20 allowanceTarget (${sellDexJson?.data?.zeroXSwap?.allowanceTarget})`
+    );
   } finally {
     // 9. Auto-Cleanup: Revoke test key & verify count returns to 0 + logout
     if (sessionToken && createdBybitKeyId) {

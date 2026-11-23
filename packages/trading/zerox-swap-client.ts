@@ -14,7 +14,39 @@ import type { DexPartnerFeePayload } from './fee-monetization';
 
 export const ZEROX_API_BASE = 'https://api.0x.org/swap/allowance-holder/quote';
 export const ZEROX_NATIVE_ETH = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
+export const ZEROX_ALLOWANCE_HOLDER_ADDRESS = '0x0000000000001fF3684f28c67538d4D072C22734';
 export const ZEROX_SUPPORTED_CHAIN_IDS = new Set<number>([1, 10, 56, 137, 8453, 42161]);
+
+const ERC20_APPROVE_IFACE = new ethers.Interface([
+  'function approve(address spender, uint256 amount) returns (bool)',
+]);
+
+export function buildErc20ApproveTransaction(params: {
+  tokenAddress: string;
+  spender?: string | null;
+  amountWei: string | bigint;
+}): { to: string; spender: string; data: string; value: '0' } {
+  if (!params.tokenAddress || !ethers.isAddress(params.tokenAddress)) {
+    throw new Error('INVALID_ERC20_TOKEN_ADDRESS');
+  }
+  const rawSpender = (params.spender || ZEROX_ALLOWANCE_HOLDER_ADDRESS).trim();
+  if (!ethers.isAddress(rawSpender)) {
+    throw new Error('INVALID_ERC20_SPENDER_ADDRESS');
+  }
+  const parsedAmount = BigInt(params.amountWei);
+  if (parsedAmount <= 0n) {
+    throw new Error('INVALID_ERC20_APPROVE_AMOUNT');
+  }
+  const to = ethers.getAddress(params.tokenAddress);
+  const spender = ethers.getAddress(rawSpender);
+  const data = ERC20_APPROVE_IFACE.encodeFunctionData('approve', [spender, parsedAmount]);
+  return {
+    to,
+    spender,
+    data,
+    value: '0',
+  };
+}
 
 export interface ZeroXQuoteParams {
   chainId: number;
@@ -162,11 +194,23 @@ export async function fetchZeroXSwapQuote(params: ZeroXQuoteParams): Promise<Zer
 
     const latencyMs = Math.max(1, Date.now() - start);
     const data: any = await res.json().catch(() => ({}));
+    const resolvedAllowanceTarget =
+      params.side === 'SELL'
+        ? String(
+            data?.issues?.allowance?.spender ||
+              data?.allowanceTarget ||
+              ZEROX_ALLOWANCE_HOLDER_ADDRESS
+          )
+        : null;
 
     if (!res.ok || !data?.transaction?.to || !data?.transaction?.data) {
       return {
         available: false,
         chainId: params.chainId,
+        sellToken,
+        buyToken,
+        sellAmount: String(data?.sellAmount || params.sellAmountWei),
+        allowanceTarget: resolvedAllowanceTarget,
         latencyMs,
         reason: data?.name || data?.message || `ZEROX_HTTP_${res.status}`,
       };
@@ -180,7 +224,7 @@ export async function fetchZeroXSwapQuote(params: ZeroXQuoteParams): Promise<Zer
       sellAmount: String(data.sellAmount || params.sellAmountWei),
       buyAmount: String(data.buyAmount || '0'),
       minBuyAmount: String(data.minBuyAmount || data.buyAmount || '0'),
-      allowanceTarget: data?.issues?.allowance?.spender || data?.allowanceTarget || null,
+      allowanceTarget: resolvedAllowanceTarget,
       transaction: {
         to: String(data.transaction.to),
         data: String(data.transaction.data),

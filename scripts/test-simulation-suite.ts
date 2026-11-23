@@ -30,7 +30,12 @@ import { notifyUserWebhookBestEffort } from '../packages/notifications/webhook-d
 import { signBybitV5Post, submitBybitSpotOrder } from '../packages/trading/bybit-vault';
 import { resolveCexExecutionVenue } from '../packages/trading/venue-router';
 import { buildDexPartnerFeePayload, formatBrokerOrderId } from '../packages/trading/fee-monetization';
-import { buildZeroXQuoteUrl, ZEROX_NATIVE_ETH } from '../packages/trading/zerox-swap-client';
+import {
+  ZEROX_ALLOWANCE_HOLDER_ADDRESS,
+  ZEROX_NATIVE_ETH,
+  buildErc20ApproveTransaction,
+  buildZeroXQuoteUrl,
+} from '../packages/trading/zerox-swap-client';
 import {
   EVM_DEX_CHAINS,
   findDexTokenPresetByAddress,
@@ -556,6 +561,23 @@ async function runSimulationSuite() {
       getDexTokenPresetsForChain(8453).length >= 4 &&
       findDexTokenPresetByAddress(42161, '0x912ce59144191c1204e64559fe8253a0e49e6548')?.symbol === 'ARB',
     'All 6 EVM DEX chains resolve canonical checksummed blue-chip token presets cleanly'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 21: Non-Custodial ERC-20 approve() Calldata Builder for 0x SELL (Phase BC)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 21: Non-Custodial ERC-20 approve() Calldata Builder] ---');
+  const approveSpec = buildErc20ApproveTransaction({
+    tokenAddress: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+    spender: ZEROX_ALLOWANCE_HOLDER_ADDRESS,
+    amountWei: '50000000',
+  });
+  assert(
+    approveSpec.to === '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913' &&
+      approveSpec.spender === ZEROX_ALLOWANCE_HOLDER_ADDRESS &&
+      approveSpec.data.startsWith('0x095ea7b3') &&
+      approveSpec.value === '0',
+    'Non-custodial ERC-20 approve() calldata encodes 0x AllowanceHolder spender cleanly'
   );
 
   console.log('\n================================================================');
