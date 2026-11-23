@@ -317,6 +317,19 @@ async function runSiweE2eSmoke() {
         String(matchedExec?.idempotencyKey || '').includes(simulatedArbTxHash),
       `GET /api/trade-intents reflects EXECUTED status & Arbitrum txHash for RecentTradeHistoryPanel Explorer link`
     );
+
+    // 17. Verify Autonomous Terminal Telemetry recentTradeCards reflects settled chainId & explorerUrl (Phase BG)
+    const termBgRes = await fetch(`${BASE_URL}/api/agent/terminal-telemetry`, { headers: authHeaders });
+    const termBgJson: any = await termBgRes.json();
+    const settledTerminalCard = (termBgJson?.data?.recentTradeCards || []).find((c: any) => c?.id === arbIntentId);
+    assert(
+      termBgRes.status === 200 &&
+        settledTerminalCard?.chainId === 42161 &&
+        typeof settledTerminalCard?.explorerUrl === 'string' &&
+        settledTerminalCard.explorerUrl.startsWith('https://arbiscan.io/tx/') &&
+        String(settledTerminalCard?.href || '').includes('chainId=42161'),
+      `GET /api/agent/terminal-telemetry enriches settled Arbitrum card with chainId=42161 & explorerUrl (${settledTerminalCard?.explorerUrl})`
+    );
   } finally {
     // 9. Auto-Cleanup: Revoke test key & verify count returns to 0 + logout
     if (sessionToken && createdBybitKeyId) {

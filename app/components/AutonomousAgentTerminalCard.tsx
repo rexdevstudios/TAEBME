@@ -266,13 +266,29 @@ export function AutonomousAgentTerminalCard({ isConnected }: AutonomousAgentTerm
                       </div>
                       {card.href && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px', paddingTop: '4px', borderTop: '1px solid rgba(148, 163, 184, 0.12)', fontSize: '9px' }}>
-                          <span className="text-muted">{card.agent}</span>
-                          <a
-                            href={card.href}
-                            style={{ color: '#38BDF8', fontWeight: 800, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '2px' }}
-                          >
-                            Re-Trade <ArrowUpRight size={10} />
-                          </a>
+                          <span className="text-muted">
+                            {card.agent}
+                            {card.chainId ? ` · #${card.chainId}` : ''}
+                          </span>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                            {card.explorerUrl && (
+                              <a
+                                href={card.explorerUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                style={{ color: '#6EE7B7', fontWeight: 800, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '1px' }}
+                                title={`On-chain Tx: ${card.txHash || ''}`}
+                              >
+                                Tx <ArrowUpRight size={9} />
+                              </a>
+                            )}
+                            <a
+                              href={card.href}
+                              style={{ color: '#38BDF8', fontWeight: 800, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '2px' }}
+                            >
+                              Re-Trade <ArrowUpRight size={10} />
+                            </a>
+                          </div>
                         </div>
                       )}
                     </div>

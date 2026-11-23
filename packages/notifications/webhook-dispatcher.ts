@@ -8,6 +8,7 @@
 
 export type AlertEventType =
   | 'ORDER_APPROVED'
+  | 'DEX_SWAP_EXECUTED'
   | 'DAILY_LOSS_WARNING'
   | 'TOKEN_DEPLOYED'
   | 'KEY_FROZEN_OVER_QUOTA';

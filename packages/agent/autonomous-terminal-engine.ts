@@ -15,6 +15,8 @@
  * - ZERO fake PnL claims: strictly computes deterministic counts, approval rate, and transparent status.
  */
 
+import { parseDexSettlementFromIdempotencyKey } from '../launchpad/web3-provider';
+
 export interface MinimalTradeIntent {
   id: string;
   userId?: string;
@@ -24,6 +26,7 @@ export interface MinimalTradeIntent {
   type?: string;
   quantity: number;
   status: string;
+  idempotencyKey?: string;
   createdAt?: string;
 }
 
@@ -48,6 +51,9 @@ export interface TerminalTradeCard {
   status: string;
   agent: SubAgentId;
   rail: ExecutionRailId;
+  chainId?: number;
+  txHash?: string;
+  explorerUrl?: string;
   href?: string;
   createdAt?: string;
 }
@@ -365,16 +371,20 @@ export function buildAutonomousTerminalSnapshot(params: {
   };
 
   const recentTradeCards: TerminalTradeCard[] = intents.slice(0, 9).map((intent) => {
-    const { agent, rail } = classifyIntentAgent(intent);
+    const settlement = parseDexSettlementFromIdempotencyKey(intent.idempotencyKey);
+    const classified = classifyIntentAgent(intent);
+    const agent = classified.agent;
+    const rail: ExecutionRailId = settlement ? 'EXTERNAL_DEX_0X' : classified.rail;
     counts[agent] += 1;
     const normalizedSide: 'BUY' | 'SELL' = intent.side === 'SELL' ? 'SELL' : 'BUY';
     const normalizedQty = Number(intent.quantity || 0) > 0 ? Number(intent.quantity) : 0.02;
     const cardMode: TradingExecutionModeParam =
-      rail === 'INTERNAL_LAUNCHPAD' || rail === 'EXTERNAL_DEX_0X'
+      settlement || rail === 'INTERNAL_LAUNCHPAD' || rail === 'EXTERNAL_DEX_0X'
         ? 'DEX_NON_CUSTODIAL'
         : intent.stage === 'LIVE' || intent.stage === 'TESTNET'
         ? 'CEX_SINGLE_SHOT'
         : 'PAPER';
+    const resolvedChainId = settlement?.chainId || (cardMode === 'DEX_NON_CUSTODIAL' ? 8453 : null);
     return {
       id: intent.id,
       symbol: intent.symbol,
@@ -384,6 +394,13 @@ export function buildAutonomousTerminalSnapshot(params: {
       status: intent.status,
       agent,
       rail,
+      ...(settlement
+        ? {
+            chainId: settlement.chainId,
+            txHash: settlement.txHash,
+            explorerUrl: settlement.explorerUrl,
+          }
+        : {}),
       href: buildTerminalTradeHandoffUrl({
         symbol: intent.symbol,
         side: normalizedSide,
@@ -391,7 +408,7 @@ export function buildAutonomousTerminalSnapshot(params: {
         mode: cardMode,
         rail,
         agent,
-        chainId: cardMode === 'DEX_NON_CUSTODIAL' ? 8453 : null,
+        chainId: resolvedChainId,
       }),
       createdAt: intent.createdAt,
     };

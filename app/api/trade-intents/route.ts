@@ -10,7 +10,10 @@ import {
   confirmUserDexTradeIntentSettlement,
   defaultKillSwitchDbAdapter,
   defaultBillingDbAdapter,
+  defaultProviderKeyVaultAdapter,
 } from '@packages/shared/db-pool';
+import { notifyUserWebhookBestEffort } from '@packages/notifications/webhook-dispatcher';
+import { getEvmExplorerTxUrl } from '@packages/launchpad/web3-provider';
 
 export const dynamic = 'force-dynamic';
 
@@ -205,6 +208,31 @@ export async function PATCH(req: NextRequest) {
       chainId,
     });
 
+    const explorerUrl = getEvmExplorerTxUrl(chainId, txHash.toLowerCase());
+    await notifyUserWebhookBestEffort({
+      resolveWebhookUrl: async () => {
+        const hook = await defaultProviderKeyVaultAdapter
+          .resolveDecryptedKeyForDeploy({
+            userIdentifier: auth.walletAddress,
+            targetChain: 'all',
+            provider: 'WEBHOOK',
+          })
+          .catch(() => null);
+        return hook?.apiKey || null;
+      },
+      payload: {
+        event: 'DEX_SWAP_EXECUTED',
+        title: `0x Swap v2 Executed (Chain ${chainId})`,
+        message: `Intent ${tradeIntentId} terkonfirmasi on-chain: ${txHash.toLowerCase()}`,
+        metadata: {
+          tradeIntentId,
+          chainId,
+          txHash: txHash.toLowerCase(),
+          explorerUrl,
+        },
+      },
+    });
+
     return NextResponse.json(
       {
         success: true,
@@ -212,6 +240,7 @@ export async function PATCH(req: NextRequest) {
           ...confirmed,
           chainId,
           txHash: txHash.toLowerCase(),
+          explorerUrl,
         },
         timestamp: new Date().toISOString(),
       },

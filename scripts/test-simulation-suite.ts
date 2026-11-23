@@ -648,6 +648,38 @@ async function runSimulationSuite() {
     'DEX settlement idempotency key encodes and resolves Arbitrum explorer tx URL cleanly'
   );
 
+  // -------------------------------------------------------------------------
+  // SCENARIO 25: Terminal Settlement Card Enrichment & Chain Handoff (Phase BG)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 25: Terminal Settlement Card Enrichment] ---');
+  const bgSnapshot = buildAutonomousTerminalSnapshot({
+    planId: 'TRADER',
+    intents: [
+      {
+        id: 'intent-arb-001',
+        symbol: '0xaf88d065e77c8cc2239327c5edb3a432268e5831/WETH',
+        side: 'BUY',
+        stage: 'LIVE',
+        quantity: 0.02,
+        status: 'EXECUTED',
+        idempotencyKey: encodedDexKey,
+        createdAt: '2026-11-23T08:00:00.000Z',
+      },
+    ],
+    activeLaunches: [],
+    hasActiveCexKey: false,
+    hasZeroXApiKey: true,
+    hasFirecrawlApiKey: true,
+  });
+  const bgCard = bgSnapshot.recentTradeCards[0];
+  assert(
+    bgCard?.chainId === 42161 &&
+      bgCard?.txHash === dummyTxHash &&
+      bgCard?.explorerUrl === `https://arbiscan.io/tx/${dummyTxHash}` &&
+      bgCard?.href.includes('chainId=42161'),
+    'Autonomous terminal trade card exposes settled chainId, txHash, explorerUrl, and chainId handoff link'
+  );
+
   console.log('\n================================================================');
   console.log(`  🎉 SIMULATION SUITE COMPLETED: ${passed} PASSED, ${failed} FAILED`);
   console.log('================================================================\n');
