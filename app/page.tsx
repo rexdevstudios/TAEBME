@@ -407,6 +407,70 @@ export default function OverviewPage() {
           </div>
         </div>
 
+        {/* 3-Minute Interactive Beginner Onboarding Checklist (Phase CG2) */}
+        {(() => {
+          const step1Done = Boolean(isConnected && walletAddress);
+          const step2Done = Boolean(
+            gameFiProfile?.completedQuests?.includes('first_trade_or_launch') ||
+              gameFiProfile?.questEligibility?.first_trade_or_launch
+          );
+          const step3Done = Boolean(
+            gameFiProfile?.completedQuests?.includes('verify_sybil') ||
+              gameFiProfile?.questEligibility?.verify_sybil ||
+              (activeTier !== 'FREE')
+          );
+          const completedSteps = [step1Done, step2Done, step3Done].filter(Boolean).length;
+          return (
+            <div
+              className="card"
+              style={{
+                border: `1px solid ${completedSteps === 3 ? 'rgba(16, 185, 129, 0.4)' : 'rgba(56, 189, 248, 0.35)'}`,
+                background: completedSteps === 3 ? 'rgba(16, 185, 129, 0.06)' : 'rgba(56, 189, 248, 0.05)',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: completedSteps === 3 ? 0 : '10px' }}>
+                <div style={{ fontSize: '13px', fontWeight: 800, color: completedSteps === 3 ? '#34D399' : '#38BDF8' }}>
+                  {completedSteps === 3
+                    ? '✅ Onboarding Pemula Selesai (3/3) — Akun Anda siap untuk Trading, AI Desk & Launchpad!'
+                    : `🚀 Panduan Cepat 3 Menit untuk Pemula (${completedSteps}/3 Selesai)`}
+                </div>
+                <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--color-muted)' }}>
+                  100% Non-Custodial · GoPlus Anti-Insider Aktif
+                </span>
+              </div>
+              {completedSteps < 3 && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '10px', fontSize: '12px' }}>
+                  <div className="bg-panel" style={{ padding: '10px', borderRadius: '6px', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+                    <div style={{ fontWeight: 800, color: '#34D399', marginBottom: '4px' }}>✓ 1. Hubungkan Dompet SIWE</div>
+                    <div className="text-muted" style={{ fontSize: '11px' }}>Dompet aktif tanpa kustodi. Klaim +100 XP di kartu GameFi di bawah.</div>
+                  </div>
+                  <div className="bg-panel" style={{ padding: '10px', borderRadius: '6px', border: `1px solid ${step2Done ? 'rgba(16, 185, 129, 0.3)' : 'var(--color-border)'}` }}>
+                    <div style={{ fontWeight: 800, color: step2Done ? '#34D399' : 'var(--color-foreground)', marginBottom: '4px' }}>
+                      {step2Done ? '✓' : '2.'} Coba 1 Paper Trade / Scan Token
+                    </div>
+                    <div className="text-muted" style={{ fontSize: '11px', marginBottom: '6px' }}>Uji terminal bebas risiko + GoPlus Anti-Insider Guard (+500 XP).</div>
+                    {!step2Done && (
+                      <a href="/trading" style={{ color: '#38BDF8', fontSize: '11px', fontWeight: 700, textDecoration: 'underline' }}>
+                        Buka Terminal /trading →
+                      </a>
+                    )}
+                  </div>
+                  <div className="bg-panel" style={{ padding: '10px', borderRadius: '6px', border: `1px solid ${step3Done ? 'rgba(16, 185, 129, 0.3)' : 'var(--color-border)'}` }}>
+                    <div style={{ fontWeight: 800, color: step3Done ? '#34D399' : 'var(--color-foreground)', marginBottom: '4px' }}>
+                      {step3Done ? '✓' : '3.'} Aktifkan AI Preset / KOL / Launch
+                    </div>
+                    <div className="text-muted" style={{ fontSize: '11px', marginBottom: '6px' }}>Pilih preset Auto-Pilot pemula atau luncurkan token gasless.</div>
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                      <a href="/agent" style={{ color: '#38BDF8', fontSize: '11px', fontWeight: 700, textDecoration: 'underline' }}>AI Desk →</a>
+                      <a href="/launchpad" style={{ color: '#C084FC', fontSize: '11px', fontWeight: 700, textDecoration: 'underline' }}>Launchpad →</a>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* GameFi Trader Pass & Quest Progression Card */}
         <div className="card" style={{ border: '1px solid rgba(168, 85, 247, 0.35)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '12px' }}>

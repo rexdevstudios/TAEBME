@@ -29,3 +29,9 @@ jobs:
 
       - name: Run unified verification gate (verify:all)
         run: bun run verify:all
+
+      - name: Run dual Neon schema & index drift guard (verify:db:drift)
+        env:
+          DATABASE_URL_TESTNET: ${{ secrets.DATABASE_URL_TESTNET }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: bun run verify:db:drift
