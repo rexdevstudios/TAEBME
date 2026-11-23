@@ -361,6 +361,84 @@ export function parseDexSettlementFromIdempotencyKey(
   };
 }
 
+/**
+ * Extracts structured on-chain DEX settlement metadata from `audit_logs.reason`
+ * written by `confirmUserDexTradeIntentSettlement` (Phase BH2).
+ */
+export function parseDexSettlementFromAuditReason(
+  reason: string | null | undefined
+): { chainId: number; txHash: string; explorerUrl: string } | null {
+  if (!reason || typeof reason !== 'string') return null;
+  const match = reason.match(/chain\s+(\d+)\s*:\s*(0x[a-fA-F0-9]{64})/i);
+  if (!match) return null;
+  const chainId = Number(match[1]);
+  if (!EVM_DEX_CHAINS[chainId]) return null;
+  const txHash = match[2].toLowerCase();
+  return {
+    chainId,
+    txHash,
+    explorerUrl: getEvmExplorerTxUrl(chainId, txHash),
+  };
+}
+
+export type TradeIntentHistoryFilter = 'ALL' | 'DEX_SETTLED' | 'CEX_OR_PAPER' | 'REJECTED';
+
+export interface TradeIntentSummaryCounts {
+  total: number;
+  dexSettled: number;
+  cexOrPaper: number;
+  approved: number;
+  rejected: number;
+}
+
+/**
+ * Pure summary & filter helper for `RecentTradeHistoryPanel` (Phase BH1).
+ */
+export function summarizeAndFilterTradeIntents<
+  T extends { status: string; idempotencyKey?: string }
+>(
+  intents: T[],
+  filter: TradeIntentHistoryFilter = 'ALL'
+): { counts: TradeIntentSummaryCounts; filtered: T[] } {
+  const list = Array.isArray(intents) ? intents : [];
+  let dexSettled = 0;
+  let cexOrPaper = 0;
+  let approved = 0;
+  let rejected = 0;
+
+  for (const item of list) {
+    const isDex = Boolean(parseDexSettlementFromIdempotencyKey(item.idempotencyKey));
+    const st = String(item.status || '').toUpperCase();
+    const isRej = st === 'REJECTED' || st === 'BLOCKED' || st === 'CANCELLED';
+    const isApp = st === 'APPROVED' || st === 'EXECUTED';
+    if (isDex) dexSettled += 1;
+    if (!isDex && !isRej) cexOrPaper += 1;
+    if (isApp) approved += 1;
+    if (isRej) rejected += 1;
+  }
+
+  const filtered = list.filter((item) => {
+    const isDex = Boolean(parseDexSettlementFromIdempotencyKey(item.idempotencyKey));
+    const st = String(item.status || '').toUpperCase();
+    const isRej = st === 'REJECTED' || st === 'BLOCKED' || st === 'CANCELLED';
+    if (filter === 'DEX_SETTLED') return isDex;
+    if (filter === 'CEX_OR_PAPER') return !isDex && !isRej;
+    if (filter === 'REJECTED') return isRej;
+    return true;
+  });
+
+  return {
+    counts: {
+      total: list.length,
+      dexSettled,
+      cexOrPaper,
+      approved,
+      rejected,
+    },
+    filtered,
+  };
+}
+
 export interface DexTokenPreset {
   symbol: string;
   name: string;

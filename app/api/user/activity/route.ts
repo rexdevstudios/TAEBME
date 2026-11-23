@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireCapability } from '@packages/auth/session';
 import { defaultBillingDbAdapter } from '@packages/shared/db-pool';
+import { parseDexSettlementFromAuditReason } from '@packages/launchpad/web3-provider';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,7 +29,18 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const limit = Number(searchParams.get('limit') || 10);
-    const activities = await defaultBillingDbAdapter.getUserSecurityActivity(auth.walletAddress, limit);
+    const rawActivities = await defaultBillingDbAdapter.getUserSecurityActivity(auth.walletAddress, limit);
+    const activities = rawActivities.map((item) => {
+      const settlement = parseDexSettlementFromAuditReason(item.reason);
+      return settlement
+        ? {
+            ...item,
+            chainId: settlement.chainId,
+            txHash: settlement.txHash,
+            explorerUrl: settlement.explorerUrl,
+          }
+        : item;
+    });
 
     return NextResponse.json(
       {

@@ -1,8 +1,12 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ExternalLink, History, RefreshCw } from 'lucide-react';
-import { parseDexSettlementFromIdempotencyKey } from '@packages/launchpad/web3-provider';
+import {
+  parseDexSettlementFromIdempotencyKey,
+  summarizeAndFilterTradeIntents,
+  type TradeIntentHistoryFilter,
+} from '@packages/launchpad/web3-provider';
 
 interface TradeIntentItem {
   id: string;
@@ -28,6 +32,12 @@ export function RecentTradeHistoryPanel({
 }: RecentTradeHistoryPanelProps) {
   const [intents, setIntents] = useState<TradeIntentItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<TradeIntentHistoryFilter>('ALL');
+
+  const { counts, filtered } = useMemo(
+    () => summarizeAndFilterTradeIntents(intents, activeFilter),
+    [intents, activeFilter]
+  );
 
   const loadHistory = async () => {
     if (!isConnected) {
@@ -92,13 +102,49 @@ export function RecentTradeHistoryPanel({
         </button>
       </div>
 
-      {intents.length === 0 ? (
+      {intents.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+          {(
+            [
+              { key: 'ALL', label: `All (${counts.total})` },
+              { key: 'DEX_SETTLED', label: `DEX Settled (${counts.dexSettled})` },
+              { key: 'CEX_OR_PAPER', label: `CEX/Paper (${counts.cexOrPaper})` },
+              { key: 'REJECTED', label: `Rejected (${counts.rejected})` },
+            ] as const
+          ).map((tab) => {
+            const active = activeFilter === tab.key;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveFilter(tab.key)}
+                style={{
+                  fontSize: '10px',
+                  fontWeight: 700,
+                  padding: '2px 7px',
+                  borderRadius: '999px',
+                  cursor: 'pointer',
+                  border: active ? '1px solid #38BDF8' : '1px solid var(--color-border)',
+                  background: active ? 'rgba(56, 189, 248, 0.14)' : 'transparent',
+                  color: active ? '#38BDF8' : 'var(--color-muted)',
+                }}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {filtered.length === 0 ? (
         <div className="text-muted" style={{ fontSize: '11px' }}>
-          Belum ada riwayat order yang tercatat untuk dompet ini.
+          {intents.length === 0
+            ? 'Belum ada riwayat order yang tercatat untuk dompet ini.'
+            : 'Tidak ada order pada filter kategori ini.'}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '220px', overflowY: 'auto' }}>
-          {intents.map((item) => {
+          {filtered.map((item) => {
             const isBuy = item.side === 'BUY';
             const isApproved = item.status === 'APPROVED' || item.status === 'EXECUTED';
             return (
@@ -152,9 +198,9 @@ export function RecentTradeHistoryPanel({
                           alignItems: 'center',
                           gap: '2px',
                         }}
-                        title={`Tx: ${settlement.txHash} (Chain ${settlement.chainId})`}
+                        title={`Tx: ${settlement.txHash} (Chain #${settlement.chainId})`}
                       >
-                        Explorer <ExternalLink size={9} />
+                        #{settlement.chainId} Explorer <ExternalLink size={9} />
                       </a>
                     );
                   })()}

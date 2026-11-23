@@ -43,6 +43,8 @@ import {
   findDexTokenPresetByAddress,
   formatDexQuoteOutputSummary,
   getDefaultDexTokenForChain,
+  parseDexSettlementFromAuditReason,
+  summarizeAndFilterTradeIntents,
   getDexTokenPresetsForChain,
   getEvmExplorerTxUrl,
   parseDexSettlementFromIdempotencyKey,
@@ -678,6 +680,30 @@ async function runSimulationSuite() {
       bgCard?.explorerUrl === `https://arbiscan.io/tx/${dummyTxHash}` &&
       bgCard?.href.includes('chainId=42161'),
     'Autonomous terminal trade card exposes settled chainId, txHash, explorerUrl, and chainId handoff link'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 26: Trade History Filter/Counters & Activity Audit Explorer (Phase BH)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 26: Trade History Filter & Activity Explorer] ---');
+  const bhSummary = summarizeAndFilterTradeIntents(
+    [
+      { id: '1', status: 'EXECUTED', idempotencyKey: encodedDexKey },
+      { id: '2', status: 'APPROVED', idempotencyKey: 'paper-2' },
+      { id: '3', status: 'REJECTED', idempotencyKey: 'blocked-3' },
+    ],
+    'DEX_SETTLED'
+  );
+  const bhAuditParsed = parseDexSettlementFromAuditReason(
+    `On-chain 0x Swap v2 tx confirmed on chain 42161: ${dummyTxHash}`
+  );
+  assert(
+    bhSummary.counts.total === 3 &&
+      bhSummary.counts.dexSettled === 1 &&
+      bhSummary.filtered.length === 1 &&
+      bhAuditParsed?.chainId === 42161 &&
+      bhAuditParsed?.explorerUrl === `https://arbiscan.io/tx/${dummyTxHash}`,
+    'Trade history filter counts & activity audit reason parser resolve Arbitrum explorer link cleanly'
   );
 
   console.log('\n================================================================');

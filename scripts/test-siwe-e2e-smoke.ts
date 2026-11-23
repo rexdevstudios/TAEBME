@@ -330,6 +330,20 @@ async function runSiweE2eSmoke() {
         String(settledTerminalCard?.href || '').includes('chainId=42161'),
       `GET /api/agent/terminal-telemetry enriches settled Arbitrum card with chainId=42161 & explorerUrl (${settledTerminalCard?.explorerUrl})`
     );
+
+    // 18. Verify GET /api/user/activity enriches DEX_SWAP_TX_CONFIRMED with chainId=42161 & explorerUrl (Phase BH)
+    const actBhRes = await fetch(`${BASE_URL}/api/user/activity?limit=10`, { headers: authHeaders });
+    const actBhJson: any = await actBhRes.json();
+    const matchedAct = (actBhJson?.data?.activities || []).find(
+      (a: any) => a?.action === 'DEX_SWAP_TX_CONFIRMED' && a?.txHash === simulatedArbTxHash
+    );
+    assert(
+      actBhRes.status === 200 &&
+        matchedAct?.chainId === 42161 &&
+        typeof matchedAct?.explorerUrl === 'string' &&
+        matchedAct.explorerUrl.startsWith('https://arbiscan.io/tx/'),
+      `GET /api/user/activity enriches DEX_SWAP_TX_CONFIRMED with chainId=42161 & explorerUrl (${matchedAct?.explorerUrl})`
+    );
   } finally {
     // 9. Auto-Cleanup: Revoke test key & verify count returns to 0 + logout
     if (sessionToken && createdBybitKeyId) {
