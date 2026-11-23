@@ -116,3 +116,81 @@ export async function deployTokenViaBankrApi(
     };
   }
 }
+
+export const MAX_BANKR_BATCH_ACCOUNTS = 5;
+
+export interface BankrMultiAccountBatchValidation {
+  valid: boolean;
+  dedupedKeyIds: string[];
+  requiredCredits: number;
+  errorCode?: 'PLAN_MULTI_BANKR_REQUIRED' | 'BATCH_LIMIT_EXCEEDED' | 'INSUFFICIENT_CREDITS';
+  errorMessage?: string;
+}
+
+/**
+ * Pure deterministic validator for Sequential Multi-Account Bankr Fleet Deploy (Phase CD1).
+ * - Exclusive to CREATOR (15 keys) & AGENT (25 keys) plans.
+ * - Caps batch size at MAX_BANKR_BATCH_ACCOUNTS (5) to prevent serverless timeout & accidental spam.
+ * - Pre-validates upfront credit balance (`launchCostCr * count`) when balance is provided.
+ */
+export function validateBankrMultiAccountBatch(params: {
+  providerKeyIds: string[];
+  planId: string;
+  launchCostCr: number;
+  userCreditBalance?: number | null;
+  maxBatchSize?: number;
+}): BankrMultiAccountBatchValidation {
+  const dedupedKeyIds = Array.from(
+    new Set(
+      (Array.isArray(params.providerKeyIds) ? params.providerKeyIds : [])
+        .map((id) => String(id || '').trim())
+        .filter((id) => id.length > 0 && id !== 'PLATFORM_DEFAULT')
+    )
+  );
+  const maxBatch = Math.max(1, Math.min(MAX_BANKR_BATCH_ACCOUNTS, Number(params.maxBatchSize ?? MAX_BANKR_BATCH_ACCOUNTS)));
+  const perLaunchCost = Math.max(0, Number(params.launchCostCr ?? 50));
+  const requiredCredits = perLaunchCost * dedupedKeyIds.length;
+  const normPlan = String(params.planId || 'FREE').trim().toUpperCase();
+
+  if (dedupedKeyIds.length > 1 && normPlan !== 'CREATOR' && normPlan !== 'AGENT') {
+    return {
+      valid: false,
+      dedupedKeyIds,
+      requiredCredits,
+      errorCode: 'PLAN_MULTI_BANKR_REQUIRED',
+      errorMessage:
+        'PLAN_MULTI_BANKR_REQUIRED: Multi-Account Bankr Fleet Deploy eksklusif untuk paket Token Creator (CREATOR) dan AI Autonomous Desk (AGENT).',
+    };
+  }
+
+  if (dedupedKeyIds.length > maxBatch) {
+    return {
+      valid: false,
+      dedupedKeyIds,
+      requiredCredits,
+      errorCode: 'BATCH_LIMIT_EXCEEDED',
+      errorMessage: `BATCH_LIMIT_EXCEEDED: Maksimal ${maxBatch} akun Bankr per batch deploy untuk keamanan & kestabilan eksekusi.`,
+    };
+  }
+
+  if (
+    typeof params.userCreditBalance === 'number' &&
+    Number.isFinite(params.userCreditBalance) &&
+    requiredCredits > 0 &&
+    params.userCreditBalance < requiredCredits
+  ) {
+    return {
+      valid: false,
+      dedupedKeyIds,
+      requiredCredits,
+      errorCode: 'INSUFFICIENT_CREDITS',
+      errorMessage: `INSUFFICIENT_CREDITS: Diperlukan ${requiredCredits} cr untuk ${dedupedKeyIds.length} akun Bankr (saldo Anda: ${params.userCreditBalance} cr).`,
+    };
+  }
+
+  return {
+    valid: true,
+    dedupedKeyIds,
+    requiredCredits,
+  };
+}

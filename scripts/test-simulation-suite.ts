@@ -43,6 +43,7 @@ import {
 } from '../packages/agent/autopilot-market-feed';
 import { analyzeGoPlusTokenSecurity } from '../packages/intelligence/onchain-insider-guard';
 import { analyzeFreeWalletIntelligence } from '../packages/intelligence/free-wallet-intelligence';
+import { validateBankrMultiAccountBatch } from '../packages/launchpad/bankr-client';
 import { runScheduledPulses } from '../workers/cloudflare-autopilot-cron/src/index';
 import { buildRetentionCleanupQueries } from '../packages/db/data-retention';
 import { TradingRiskGate, compute24hRiskExposure } from '../packages/trading/risk-gate';
@@ -1055,6 +1056,30 @@ async function runSimulationSuite() {
   assert(
     caFreshReentry[0]?.peakPrice === 95,
     'Clearing peak price on SELL exit resets high-water mark so fresh re-entry starts at 95 instead of stale 115'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 42: Creator/Agent Multi-Account Bankr Fleet Batch Guard (Phase CD)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 42: Multi-Account Bankr Fleet Batch Guard] ---');
+  const cdFreeBlocked = validateBankrMultiAccountBatch({
+    providerKeyIds: ['k1', 'k2'],
+    planId: 'FREE',
+    launchCostCr: 50,
+    userCreditBalance: 500,
+  });
+  const cdCreatorOk = validateBankrMultiAccountBatch({
+    providerKeyIds: ['k1', 'k2', 'k3'],
+    planId: 'CREATOR',
+    launchCostCr: 50,
+    userCreditBalance: 500,
+  });
+  assert(
+    cdFreeBlocked.valid === false &&
+      cdFreeBlocked.errorCode === 'PLAN_MULTI_BANKR_REQUIRED' &&
+      cdCreatorOk.valid === true &&
+      cdCreatorOk.requiredCredits === 150,
+    'Multi-Account Bankr Fleet deploy enforces CREATOR/AGENT tier gate & upfront 50 cr/account credit check'
   );
 
   console.log('\n================================================================');

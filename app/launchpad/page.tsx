@@ -34,6 +34,7 @@ export default function LaunchpadPage() {
   const { isConnected, userRole, entitlements, walletAddress, connectMetaMask, isConnecting, refreshSession, switchNetwork, hasCapability, planId, credits } = useAuth();
   const [connectError, setConnectError] = useState<string | null>(null);
   const [selectedBankrKeyId, setSelectedBankrKeyId] = useState<string>('PLATFORM_DEFAULT');
+  const [selectedBatchBankrKeyIds, setSelectedBatchBankrKeyIds] = useState<string[]>([]);
   const [ssotFactoryAddress, setSsotFactoryAddress] = useState<string>('');
   const [billingConfig, setBillingConfig] = useState<{
     treasuryFeePct: number;
@@ -240,6 +241,7 @@ export default function LaunchpadPage() {
           degenMode: isDegenMode,
           simulateOnly,
           providerKeyId: selectedBankrKeyId,
+          ...(selectedBatchBankrKeyIds.length > 1 ? { providerKeyIds: selectedBatchBankrKeyIds } : {}),
           ...(tokenDescription.trim() ? { description: tokenDescription.trim() } : {}),
           ...(tokenImageUrl.trim() ? { imageUrl: tokenImageUrl.trim() } : {}),
         }),
@@ -251,6 +253,14 @@ export default function LaunchpadPage() {
         return;
       }
       const d = json.data || {};
+      if (d.batchMode) {
+        refreshSession().catch(() => {});
+        fetchActiveTokens();
+        setOnChainFeedback(
+          `✅ Bankr Fleet Batch (${simulateOnly ? 'SIMULATED' : 'DEPLOYED'}): Berhasil ${d.succeededCount}/${d.totalRequested} akun di ${selectedChain.toUpperCase()} · -${d.creditsBurned ?? 0} Credits`
+        );
+        return;
+      }
       if (d.tokenAddress) setOnChainTokenAddress(d.tokenAddress);
       if (d.txHash) setPublishedTxHash(d.txHash);
       refreshSession().catch(() => {});
@@ -912,12 +922,45 @@ export default function LaunchpadPage() {
               />
             </div>
 
+            {/* 3-Point Launchpad Mechanism Explainer (Phase CD2) */}
+            <div
+              style={{
+                padding: '10px 12px',
+                borderRadius: '8px',
+                border: '1px solid var(--color-border)',
+                background: 'rgba(56, 189, 248, 0.06)',
+                fontSize: '11px',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                gap: '8px',
+              }}
+            >
+              <div>
+                <strong style={{ color: '#38BDF8' }}>1. Angel Deal Room:</strong>{' '}
+                <span className="text-muted">Mode Whitelist Merkle Proof agar investor/KOL awal bisa beli sebelum publik (anti-sniper).</span>
+              </div>
+              <div>
+                <strong style={{ color: '#34D399' }}>2. Bankr Fee Recipient:</strong>{' '}
+                <span className="text-muted">Royalti swap mengikuti protokol Bankr; Anda bebas tentukan penerima (0x / X / Farcaster / ENS).</span>
+              </div>
+              <div>
+                <strong style={{ color: '#C084FC' }}>3. Multi-Account Fleet:</strong>{' '}
+                <span className="text-muted">Paket CREATOR (15 key) &amp; AGENT (25 key) dapat mencentang hingga 5 akun Bankr untuk batch deploy.</span>
+              </div>
+            </div>
+
             {/* Multi-Key Bankr BYOK Vault (Encrypted AES-256-GCM · Multi-Chain Safe) */}
             <BankrKeyVaultPanel
               isConnected={isConnected}
               selectedChain={selectedChain}
               selectedKeyId={selectedBankrKeyId}
               onSelectKeyId={setSelectedBankrKeyId}
+              selectedBatchKeyIds={selectedBatchBankrKeyIds}
+              onToggleBatchKeyId={(kid) =>
+                setSelectedBatchBankrKeyIds((prev) =>
+                  prev.includes(kid) ? prev.filter((id) => id !== kid) : prev.length < 5 ? [...prev, kid] : prev
+                )
+              }
               canPublishLaunch={Boolean(hasCapability?.('PUBLISH_LAUNCH') || entitlements?.createLaunch)}
               activePlanLabel={planId || 'FREE'}
             />

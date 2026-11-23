@@ -9,7 +9,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireCapability } from '@packages/auth/session';
 import { rateLimiter } from '@packages/auth/rate-limiter';
-import { deployTokenViaBankrApi, type BankrSupportedChain } from '@packages/launchpad/bankr-client';
+import {
+  deployTokenViaBankrApi,
+  validateBankrMultiAccountBatch,
+  type BankrSupportedChain,
+} from '@packages/launchpad/bankr-client';
 import {
   SubscriptionsEngine,
   annotateKeysWithQuotaStatus,
@@ -82,6 +86,168 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { success: false, error: feeErr instanceof Error ? feeErr.message : 'INVALID_FEE_RECIPIENT', timestamp: new Date().toISOString() },
         { status: 400 }
+      );
+    }
+
+    // 1.5 Sequential Multi-Account Bankr Fleet Deploy (CREATOR / AGENT exclusive — Phase CD1)
+    const rawBatchIds = Array.isArray(body?.providerKeyIds)
+      ? body.providerKeyIds.map((id: unknown) => String(id || '').trim()).filter((id: string) => id && id !== 'PLATFORM_DEFAULT')
+      : [];
+
+    if (rawBatchIds.length > 1) {
+      const [allUserKeys, userPlan, addonSlots, platformCfg, creditBalance] = await Promise.all([
+        defaultProviderKeyVaultAdapter.listKeys(auth.walletAddress, 'BANKR'),
+        defaultBillingDbAdapter.getUserPlan(auth.walletAddress).catch(() => 'FREE' as const),
+        defaultBillingDbAdapter.getUserAddonSlots(auth.walletAddress).catch(() => ({ bankrExtraSlots: 0, binanceExtraSlots: 0 })),
+        defaultBillingDbAdapter.getPlatformFeeAndRiskConfig().catch(() => null),
+        getDbPool()
+          ? defaultBillingDbAdapter.getUserCreditBalance(auth.walletAddress).catch(() => null)
+          : Promise.resolve(null),
+      ]);
+
+      const launchCostCr = Math.max(0, Number(platformCfg?.launchCostCr ?? 50));
+      const batchCheck = validateBankrMultiAccountBatch({
+        providerKeyIds: rawBatchIds,
+        planId: userPlan,
+        launchCostCr,
+        userCreditBalance: creditBalance,
+      });
+
+      if (!batchCheck.valid) {
+        const status =
+          batchCheck.errorCode === 'PLAN_MULTI_BANKR_REQUIRED'
+            ? 403
+            : batchCheck.errorCode === 'INSUFFICIENT_CREDITS'
+            ? 402
+            : 400;
+        return NextResponse.json(
+          { success: false, error: batchCheck.errorMessage, timestamp: new Date().toISOString() },
+          { status }
+        );
+      }
+
+      const effCap = computeEffectiveVaultCapacity(userPlan, addonSlots);
+      const annotated = annotateKeysWithQuotaStatus(allUserKeys, { maxActive: effCap.maxBankrKeys });
+      const results: Array<{
+        keyId: string;
+        label?: string;
+        maskedKey?: string;
+        status: string;
+        tokenAddress?: string;
+        txHash?: string;
+        message: string;
+      }> = [];
+      let succeededCount = 0;
+      let creditsBurned = 0;
+
+      for (const kid of batchCheck.dedupedKeyIds) {
+        const targetMeta = annotated.find((k) => k.id === kid);
+        if (!targetMeta || targetMeta.quotaStatus !== 'ACTIVE') {
+          results.push({
+            keyId: kid,
+            label: targetMeta?.label,
+            status: 'failed',
+            message: targetMeta
+              ? `KEY_FROZEN_OVER_QUOTA: "${targetMeta.label}" terkunci oleh kuota paket ${effCap.planId}.`
+              : 'KEY_NOT_FOUND: API Key tidak ditemukan di vault Anda.',
+          });
+          continue;
+        }
+
+        let resolved: { apiKey: string; keyId: string; label: string; maskedKey: string } | null = null;
+        try {
+          resolved = await defaultProviderKeyVaultAdapter.resolveDecryptedKeyForDeploy({
+            userIdentifier: auth.walletAddress,
+            targetChain: chain,
+            keyId: kid,
+            provider: 'BANKR',
+          });
+        } catch (err: unknown) {
+          results.push({
+            keyId: kid,
+            label: targetMeta.label,
+            maskedKey: targetMeta.maskedKey,
+            status: 'failed',
+            message: err instanceof Error ? err.message : 'BYOK_RESOLVE_ERROR',
+          });
+          continue;
+        }
+
+        if (!resolved) {
+          results.push({ keyId: kid, label: targetMeta.label, status: 'failed', message: 'BYOK_KEY_UNAVAILABLE' });
+          continue;
+        }
+
+        const effectiveFeeRecipient = resolveBankrEffectiveFeeRecipient({
+          requestedFeeRecipient: body?.feeRecipient,
+          usingPlatformDefaultKey: false,
+          treasuryWallet: platformCfg?.treasuryWallet,
+        });
+
+        const resItem = await deployTokenViaBankrApi({
+          tokenName,
+          tokenSymbol,
+          description: typeof body?.description === 'string' ? body.description : undefined,
+          image: typeof body?.image === 'string' ? body.image : undefined,
+          websiteUrl: typeof body?.websiteUrl === 'string' ? body.websiteUrl : undefined,
+          tweetUrl: typeof body?.tweetUrl === 'string' ? body.tweetUrl : undefined,
+          chain,
+          feeRecipient: effectiveFeeRecipient as any,
+          degenMode: body?.degenMode !== false,
+          simulateOnly: Boolean(body?.simulateOnly),
+          apiKeyOverride: resolved.apiKey,
+        });
+
+        const ok = resItem.status === 'deployed' || resItem.status === 'simulated';
+        if (ok) {
+          succeededCount += 1;
+          if (getDbPool() && launchCostCr > 0) {
+            try {
+              await SubscriptionsEngine.deductMeteredCredits(
+                auth.walletAddress,
+                launchCostCr,
+                'TOKEN_LAUNCH_BANKR_BATCH',
+                resItem.txHash || resItem.tokenAddress || `bankr-batch-${kid.slice(0, 8)}-${Date.now()}`,
+                defaultBillingDbAdapter
+              );
+              creditsBurned += launchCostCr;
+            } catch {}
+          }
+        }
+
+        results.push({
+          keyId: kid,
+          label: resolved.label,
+          maskedKey: resolved.maskedKey,
+          status: resItem.status,
+          tokenAddress: resItem.tokenAddress,
+          txHash: resItem.txHash,
+          message: resItem.message,
+        });
+      }
+
+      const remainingCredits = getDbPool()
+        ? await defaultBillingDbAdapter.getUserCreditBalance(auth.walletAddress).catch(() => undefined)
+        : undefined;
+
+      return NextResponse.json(
+        {
+          success: succeededCount > 0,
+          data: {
+            batchMode: true,
+            chain,
+            tokenSymbol,
+            totalRequested: batchCheck.dedupedKeyIds.length,
+            succeededCount,
+            failedCount: batchCheck.dedupedKeyIds.length - succeededCount,
+            creditsBurned,
+            remainingCredits,
+            results,
+          },
+          error: succeededCount === 0 ? 'Semua akun Bankr dalam batch gagal mengeksekusi deploy.' : undefined,
+          timestamp: new Date().toISOString(),
+        },
+        { status: succeededCount > 0 ? 200 : 422 }
       );
     }
 

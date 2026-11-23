@@ -19,6 +19,8 @@ interface BankrKeyVaultPanelProps {
   selectedChain: string;
   selectedKeyId: string;
   onSelectKeyId: (keyId: string) => void;
+  selectedBatchKeyIds?: string[];
+  onToggleBatchKeyId?: (keyId: string) => void;
   canPublishLaunch: boolean;
   activePlanLabel?: string;
 }
@@ -28,6 +30,8 @@ export function BankrKeyVaultPanel({
   selectedChain,
   selectedKeyId,
   onSelectKeyId,
+  selectedBatchKeyIds = [],
+  onToggleBatchKeyId,
   canPublishLaunch,
   activePlanLabel = 'FREE',
 }: BankrKeyVaultPanelProps) {
@@ -259,6 +263,22 @@ export function BankrKeyVaultPanel({
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                  {onToggleBatchKeyId &&
+                    (vaultPlanId === 'CREATOR' || vaultPlanId === 'AGENT') &&
+                    (!k.quotaStatus || k.quotaStatus === 'ACTIVE') && (
+                      <label
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '10px', color: '#38BDF8', fontWeight: 700 }}
+                        title="Centang untuk Multi-Account Fleet Deploy (maks 5 akun/batch)"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedBatchKeyIds.includes(k.id)}
+                          disabled={!selectedBatchKeyIds.includes(k.id) && selectedBatchKeyIds.length >= 5}
+                          onChange={() => onToggleBatchKeyId(k.id)}
+                        />
+                        Fleet
+                      </label>
+                    )}
                   <strong style={{ color: 'var(--color-foreground)' }}>{k.label}</strong>
                   <code style={{ color: 'var(--color-muted)', fontSize: '10px' }}>{k.maskedKey}</code>
                   <span
