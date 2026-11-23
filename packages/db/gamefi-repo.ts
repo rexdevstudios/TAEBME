@@ -107,25 +107,36 @@ export class PostgresGameFiDbAdapter {
     }
 
     const pool = this.getPool();
-    if (pool && this.checkIsUuid(userId)) {
-      try {
-        const res = await pool.query(
-          `SELECT 1 FROM trust_evidence
-           WHERE subject_user_id = $1 AND direction = 'POSITIVE'
-             AND evidence_type IN ('WORLD_ID_ORB', 'WORLD_ID_DEVICE', 'GITCOIN_PASSPORT')
-           LIMIT 1`,
-          [userId]
-        );
-        if (res.rows.length > 0) return true;
-      } catch {}
+    if (pool) {
+      const resolvedUuid = await this.resolveGameFiUserUuid(pool, userId, walletAddress);
+      if (resolvedUuid) {
+        try {
+          const res = await pool.query(
+            `SELECT 1 FROM trust_evidence
+             WHERE subject_user_id = $1 AND direction = 'POSITIVE'
+               AND evidence_type IN ('WORLD_ID_ORB', 'WORLD_ID_DEVICE', 'GITCOIN_PASSPORT')
+             LIMIT 1`,
+            [resolvedUuid]
+          );
+          if (res.rows.length > 0) return true;
+        } catch {}
 
-      if (walletAddress) {
+        try {
+          const kolRes = await pool.query(
+            `SELECT 1 FROM kol_profiles WHERE user_id = $1 LIMIT 1`,
+            [resolvedUuid]
+          );
+          if (kolRes.rows.length > 0) return true;
+        } catch {}
+      }
+
+      if (walletAddress || resolvedUuid) {
         try {
           const nullifierRes = await pool.query(
             `SELECT 1 FROM verified_nullifiers
              WHERE LOWER(signal) = LOWER($1) OR scope_id = $2
              LIMIT 1`,
-            [walletAddress, userId]
+            [walletAddress || '', resolvedUuid || userId]
           );
           if (nullifierRes.rows.length > 0) return true;
         } catch {}
@@ -143,14 +154,25 @@ export class PostgresGameFiDbAdapter {
     }
 
     const pool = this.getPool();
-    if (pool && this.checkIsUuid(userId)) {
-      try {
-        const draftRes = await pool.query(
-          `SELECT 1 FROM launch_drafts WHERE user_id = $1 AND status IN ('PUBLISHED', 'LAUNCHED') LIMIT 1`,
-          [userId]
-        );
-        if (draftRes.rows.length > 0) return true;
-      } catch {}
+    if (pool) {
+      const resolvedUuid = await this.resolveGameFiUserUuid(pool, userId, walletAddress);
+      if (resolvedUuid) {
+        try {
+          const tradeRes = await pool.query(
+            `SELECT 1 FROM trade_intents WHERE user_id = $1 LIMIT 1`,
+            [resolvedUuid]
+          );
+          if (tradeRes.rows.length > 0) return true;
+        } catch {}
+
+        try {
+          const draftRes = await pool.query(
+            `SELECT 1 FROM launch_drafts WHERE user_id = $1 AND status IN ('PUBLISHED', 'LAUNCHED') LIMIT 1`,
+            [resolvedUuid]
+          );
+          if (draftRes.rows.length > 0) return true;
+        } catch {}
+      }
 
       if (walletAddress) {
         try {

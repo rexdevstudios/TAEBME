@@ -154,12 +154,12 @@ export function getConfiguredAdminWallet(): string | null {
     return null;
   }
 
-  if (!ethers.isAddress(raw)) {
+  if (!/^0x[a-fA-F0-9]{40}$/.test(raw)) {
     console.error(`[CONFIG_ERROR] ADMIN_WALLET_PUBLIC_ADDRESS "${raw}" is not a valid Ethereum address.`);
     return null;
   }
 
-  return ethers.getAddress(raw).toLowerCase();
+  return ethers.getAddress(raw.toLowerCase()).toLowerCase();
 }
 
 /**
@@ -227,7 +227,8 @@ export async function resolveUserRoles(
       }
     } catch (dbErr: any) {
       // Fail closed: Do NOT silently convert database failure into ACTIVE TRADER status!
-      throw new Error(`DATABASE_UNAVAILABLE: Failed to resolve authoritative user account status: ${dbErr?.message || 'Database query error'}`);
+      console.error('[Session] PostgreSQL authoritative status resolution error:', dbErr?.message || 'Database error');
+      throw new Error('DATABASE_UNAVAILABLE: Database service temporarily unavailable. Please retry shortly.');
     }
   }
 
@@ -300,3 +301,24 @@ export async function requireCapability(
 
   return session;
 }
+
+/**
+ * Authorizes that the request contains a valid authenticated session AND the account is ACTIVE.
+ * Throws UNAUTHORIZED (401) if unauthenticated or token invalid.
+ * Throws AUTH_ACCOUNT_<status> (403) if account is SUSPENDED, FROZEN, or not ACTIVE.
+ */
+export async function requireActiveSession(
+  req: Request | { headers: Headers; cookies?: any }
+): Promise<AuthenticatedUserSession> {
+  const session = await authenticateSession(req);
+  if (!session) {
+    throw new Error('UNAUTHORIZED: Valid cryptographic SIWE session token is required.');
+  }
+
+  if (session.user.status !== 'ACTIVE') {
+    throw new Error(`AUTH_ACCOUNT_${session.user.status}: User account is ${session.user.status}. Access denied.`);
+  }
+
+  return session;
+}
+

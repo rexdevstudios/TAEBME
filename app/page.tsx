@@ -29,6 +29,8 @@ export default function OverviewPage() {
     passTier: string;
     completedQuests: string[];
     dailyCheckInAvailable?: boolean;
+    questEligibility?: Record<string, boolean>;
+    nftMintingStatus?: { available: boolean };
   } | null>(null);
   const [questFeedback, setQuestFeedback] = useState<string | null>(null);
   const [questLoading, setQuestLoading] = useState<string | null>(null);
@@ -426,15 +428,32 @@ export default function OverviewPage() {
               <span style={{ padding: '4px 10px', borderRadius: '6px', backgroundColor: 'rgba(255, 196, 0, 0.15)', color: '#FDE047', border: '1px solid rgba(255, 196, 0, 0.35)', fontWeight: 800 }}>
                 PASS: {gameFiProfile?.passTier || 'BRONZE'}
               </span>
-              <button
-                type="button"
-                onClick={handleRequestPassVoucher}
-                disabled={voucherLoading}
-                className="btn-secondary"
-                style={{ padding: '4px 10px', fontSize: '11px', borderColor: '#C084FC', color: '#E9D5FF' }}
-              >
-                {voucherLoading ? 'Verifying...' : `Request ${gameFiProfile?.passTier || 'BRONZE'} NFT Voucher`}
-              </button>
+              {gameFiProfile?.nftMintingStatus?.available ? (
+                <button
+                  type="button"
+                  onClick={handleRequestPassVoucher}
+                  disabled={voucherLoading}
+                  className="btn-secondary"
+                  style={{ padding: '4px 10px', fontSize: '11px', borderColor: '#C084FC', color: '#E9D5FF' }}
+                >
+                  {voucherLoading ? 'Verifying...' : `Request ${gameFiProfile?.passTier || 'BRONZE'} NFT Voucher`}
+                </button>
+              ) : (
+                <span
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    backgroundColor: 'rgba(148, 163, 184, 0.12)',
+                    color: '#CBD5E1',
+                    border: '1px solid rgba(148, 163, 184, 0.3)',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                  }}
+                  title="XP & bonus Credits aktif dan tercatat di PostgreSQL SSOT. Minting on-chain NFT menunggu aktivasi isolated signer."
+                >
+                  NFT Mint: Segera Hadir (XP &amp; Credits Aktif)
+                </span>
+              )}
             </div>
           </div>
 
@@ -465,15 +484,19 @@ export default function OverviewPage() {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
             {[
-              { id: 'daily_checkin', badge: 'DAILY UTC', title: 'Daily Check-In', xp: '+25 XP · +5 cr', desc: 'Klaim bonus harian 1× per hari (reset otomatis 00:00 UTC).' },
-              { id: 'connect_siwe', badge: 'ONE-TIME', title: '1. Non-Custodial SIWE Login', xp: '+100 XP · +10 cr', desc: 'Verifikasi sesi dompet EIP-4361 SIWE aktif.' },
-              { id: 'verify_sybil', badge: 'ONE-TIME', title: '2. Anti-Sybil Social Passport', xp: '+250 XP · +25 cr', desc: 'Verifikasi profil KOL / World ID / Farcaster di KOL Hub.' },
-              { id: 'first_trade_or_launch', badge: 'ONE-TIME', title: '3. First Trade or Token Launch', xp: '+500 XP · +50 cr', desc: 'Buat 1 trade intent di Terminal/5-Agent Desk atau launch token.' },
+              { id: 'daily_checkin', badge: 'DAILY UTC', title: 'Daily Check-In', xp: '+25 XP · +5 cr', desc: 'Klaim bonus harian 1× per hari (reset otomatis 00:00 UTC).', actionHref: null, actionLabel: null },
+              { id: 'connect_siwe', badge: 'ONE-TIME', title: '1. Non-Custodial SIWE Login', xp: '+100 XP · +10 cr', desc: 'Verifikasi sesi dompet EIP-4361 SIWE aktif.', actionHref: null, actionLabel: null },
+              { id: 'verify_sybil', badge: 'ONE-TIME', title: '2. Anti-Sybil Social Passport', xp: '+250 XP · +25 cr', desc: 'Verifikasi profil KOL / World ID / Farcaster di KOL Hub.', actionHref: '/kol', actionLabel: 'Lengkapi di KOL Hub →' },
+              { id: 'first_trade_or_launch', badge: 'ONE-TIME', title: '3. First Trade or Token Launch', xp: '+500 XP · +50 cr', desc: 'Buat 1 trade intent di Terminal/5-Agent Desk atau launch token.', actionHref: '/trading', actionLabel: 'Buat 1 Trade di /trading →' },
             ].map((q) => {
               const isDone =
                 q.id === 'daily_checkin'
                   ? gameFiProfile?.dailyCheckInAvailable === false
                   : Boolean(gameFiProfile?.completedQuests?.includes(q.id));
+              const isEligible =
+                gameFiProfile?.questEligibility && typeof gameFiProfile.questEligibility[q.id] === 'boolean'
+                  ? Boolean(gameFiProfile.questEligibility[q.id])
+                  : true;
               return (
                 <div key={q.id} className="bg-panel" style={{ border: `1px solid ${isDone ? 'rgba(34, 197, 94, 0.3)' : 'var(--color-border)'}`, borderRadius: '6px', padding: '12px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '10px' }}>
                   <div>
@@ -486,15 +509,25 @@ export default function OverviewPage() {
                     <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 900, color: 'var(--color-accent)', marginBottom: '4px' }}>{q.xp}</div>
                     <div className="text-muted" style={{ fontSize: '11px' }}>{q.desc}</div>
                   </div>
-                  <button
-                    type="button"
-                    disabled={isDone || questLoading !== null}
-                    onClick={() => handleCompleteQuest(q.id)}
-                    className={isDone ? 'btn-secondary' : 'btn-primary'}
-                    style={{ width: '100%', justifyContent: 'center', padding: '7px 10px', fontSize: '11px', opacity: isDone ? 0.75 : 1 }}
-                  >
-                    {isDone ? (q.id === 'daily_checkin' ? '✓ Claimed Today (UTC)' : '✓ Completed') : questLoading === q.id ? 'Verifying...' : `Claim ${q.xp}`}
-                  </button>
+                  {!isDone && !isEligible && q.actionHref ? (
+                    <a
+                      href={q.actionHref}
+                      className="btn-secondary"
+                      style={{ width: '100%', justifyContent: 'center', padding: '7px 10px', fontSize: '11px', textDecoration: 'none', textAlign: 'center', borderColor: 'rgba(250, 204, 21, 0.45)', color: '#FDE047' }}
+                    >
+                      {q.actionLabel}
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={isDone || questLoading !== null}
+                      onClick={() => handleCompleteQuest(q.id)}
+                      className={isDone ? 'btn-secondary' : 'btn-primary'}
+                      style={{ width: '100%', justifyContent: 'center', padding: '7px 10px', fontSize: '11px', opacity: isDone ? 0.75 : 1 }}
+                    >
+                      {isDone ? (q.id === 'daily_checkin' ? '✓ Claimed Today (UTC)' : '✓ Completed') : questLoading === q.id ? 'Verifying...' : `Claim ${q.xp}`}
+                    </button>
+                  )}
                 </div>
               );
             })}

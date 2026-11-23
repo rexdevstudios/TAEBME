@@ -1,8 +1,9 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { ethers } from 'ethers';
 import { z } from 'zod';
-import { authenticateSession } from '@packages/auth/session';
+import { requireActiveSession } from '@packages/auth/session';
 import { defaultGameFiService } from '@packages/gamefi/gamefi-service';
+import { getAuthoritativeGameFiChainConfig } from '@packages/gamefi/gamefi-chain-config';
 import { defaultGameFiDbAdapter } from '@packages/shared/db-pool';
 import { NftPassTier } from '@packages/shared/types/domain';
 
@@ -21,13 +22,7 @@ const VoucherResponseSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await authenticateSession(req);
-    if (!session || !session.walletAddress) {
-      return NextResponse.json(
-        { success: false, error: 'UNAUTHORIZED: SIWE session required to request mint voucher' },
-        { status: 401 }
-      );
-    }
+    const session = await requireActiveSession(req);
 
     const body = await req.json().catch(() => ({}));
     const { tier } = body || {};
@@ -41,7 +36,7 @@ export async function POST(req: NextRequest) {
     }
 
     const userId = session.user.userId;
-    const profile = await defaultGameFiDbAdapter.getUserGameFiProfile(userId);
+    const profile = await defaultGameFiDbAdapter.getUserGameFiProfile(userId, session.walletAddress);
 
     // 2. Authoritative XP threshold verification
     if (tier === 'SILVER' && profile.xp < 250) {
@@ -58,22 +53,63 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 3. Strict server-authoritative verifying contract binding.
+    // 3. Authoritative PostgreSQL Collection SSOT Resolution.
     // Client-provided contract address override is strictly prohibited.
-    const configuredContract =
-      process.env.GAMEFI_PASS_CONTRACT_ADDRESS ||
-      process.env.NEXT_PUBLIC_GAMEFI_PASS_CONTRACT_ADDRESS;
+    // Silent fallback to environment variables without DB registry is strictly prohibited.
+    let verifiedCollection;
+    try {
+      const chainConfig = getAuthoritativeGameFiChainConfig();
+      const provider =
+        defaultGameFiService.getProvider() ||
+        (chainConfig.rpcUrl ? new ethers.JsonRpcProvider(chainConfig.rpcUrl) : null);
 
-    if (!configuredContract || !ethers.isAddress(configuredContract)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'CONTRACT_UNCONFIGURED: Trusted GameFi pass contract address is unconfigured or invalid. Fail closed.',
-        },
-        { status: 503 }
-      );
+      verifiedCollection = await defaultGameFiService.resolveAndVerifyCollection({
+        collectionName: 'RTrader Trader Pass',
+        provider,
+      });
+    } catch (colErr: any) {
+      const colMsg = colErr?.message || 'COLLECTION_RESOLUTION_FAILED';
+      if (colMsg.startsWith('COLLECTION_NOT_FOUND')) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'COLLECTION_NOT_FOUND: Authoritative collection is not registered in PostgreSQL SSOT. Fail closed.',
+          },
+          { status: 503 }
+        );
+      }
+      if (
+        colMsg.startsWith('COLLECTION_UNDEPLOYED') ||
+        colMsg.startsWith('INVALID_CONTRACT_') ||
+        colMsg.startsWith('AMBIGUOUS_COLLECTION_REGISTRY') ||
+        colMsg.startsWith('PROVIDER_REQUIRED') ||
+        colMsg.startsWith('CHAIN_MISMATCH') ||
+        colMsg.startsWith('CONTRACT_NOT_DEPLOYED_ON_CHAIN') ||
+        colMsg.startsWith('INTERFACE_VERIFICATION_FAILED') ||
+        colMsg.startsWith('CONTRACT_METADATA_MISMATCH')
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `COLLECTION_INVALID: ${colMsg}`,
+          },
+          { status: 503 }
+        );
+      }
+      if (colMsg.startsWith('DATABASE_UNAVAILABLE')) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'DATABASE_UNAVAILABLE: Database service temporarily unavailable. Please retry shortly.',
+          },
+          { status: 503 }
+        );
+      }
+      throw colErr;
     }
-    const contractAddress = ethers.getAddress(configuredContract);
+
+    const contractAddress = verifiedCollection.contractAddress;
+    const targetChainId = verifiedCollection.chainId;
 
     // 4. Invariant (Rule 3): Non-Custodial Guarantee.
     // NEVER store private keys, seed phrases, or custody user funds in Vercel environment variables.
@@ -108,7 +144,7 @@ export async function POST(req: NextRequest) {
             recipient: session.walletAddress,
             tier,
             contractAddress,
-            chainId: 8453,
+            chainId: targetChainId,
           }),
           signal: AbortSignal.timeout(5000),
         });
@@ -140,8 +176,9 @@ export async function POST(req: NextRequest) {
             { status: 504 }
           );
         }
+        const safeError = err?.message?.replace(/Bearer\s+[^\s]+/gi, 'Bearer [REDACTED]') || 'Remote signer offline';
         return NextResponse.json(
-          { success: false, error: `SIGNER_SERVICE_UNREACHABLE: ${err?.message || 'Remote signer offline'}` },
+          { success: false, error: `SIGNER_SERVICE_UNREACHABLE: ${safeError}` },
           { status: 502 }
         );
       }
@@ -153,7 +190,7 @@ export async function POST(req: NextRequest) {
       tier: tier as NftPassTier,
       signerPrivateKey: testSignerKey!,
       contractAddress,
-      chainId: 8453,
+      chainId: targetChainId,
       ttlSeconds: 600,
     });
 
@@ -162,8 +199,18 @@ export async function POST(req: NextRequest) {
       voucher,
     });
   } catch (err: any) {
+    const msg = err?.message || 'MINT_VOUCHER_FAILED';
+    if (msg.startsWith('UNAUTHORIZED')) {
+      return NextResponse.json({ success: false, error: msg }, { status: 401 });
+    }
+    if (msg.startsWith('AUTH_ACCOUNT_') || msg.startsWith('FORBIDDEN') || msg.startsWith('RBAC_FORBIDDEN')) {
+      return NextResponse.json({ success: false, error: msg }, { status: 403 });
+    }
+    if (msg.startsWith('DATABASE_UNAVAILABLE')) {
+      return NextResponse.json({ success: false, error: 'DATABASE_UNAVAILABLE: Database service temporarily unavailable. Please retry shortly.' }, { status: 503 });
+    }
     return NextResponse.json(
-      { success: false, error: err?.message || 'MINT_VOUCHER_FAILED' },
+      { success: false, error: 'MINT_VOUCHER_FAILED' },
       { status: 500 }
     );
   }
