@@ -1110,7 +1110,7 @@ export default function LaunchpadPage() {
                 </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                <span className="text-muted">Arkham Risk Passport:</span>
+                <span className="text-muted">On-Chain Risk Passport:</span>
                 <span style={{ color: 'var(--color-accent)', fontWeight: 900 }}>{draftResult.riskPassportScore} / 100 (LOW_RISK)</span>
               </div>
               <div style={{ backgroundColor: 'var(--color-badge-success-bg)', border: '1px solid var(--color-badge-success-border)', color: 'var(--color-badge-success-text)', padding: '12px', borderRadius: '8px', textAlign: 'center', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '16px' }}>
@@ -1155,6 +1155,25 @@ export default function LaunchpadPage() {
                   </div>
                 )}
 
+                {selectedBatchBankrKeyIds.length > 1 && (
+                  <div
+                    style={{
+                      marginTop: '10px',
+                      padding: '8px 10px',
+                      borderRadius: '6px',
+                      border: '1px solid rgba(56, 189, 248, 0.45)',
+                      background: 'rgba(56, 189, 248, 0.08)',
+                      fontSize: '11px',
+                      fontFamily: 'var(--font-mono)',
+                      color: '#E0F2FE',
+                    }}
+                  >
+                    <strong>🚀 Multi-Account Fleet Preview:</strong> {selectedBatchBankrKeyIds.length} akun Bankr dipilih · Estimasi total biaya:{' '}
+                    <strong style={{ color: '#FDE047' }}>{billingConfig.launchCostCr * selectedBatchBankrKeyIds.length} cr</strong>{' '}
+                    ({billingConfig.launchCostCr} cr × {selectedBatchBankrKeyIds.length}). Disarankan jalankan <strong>Simulate</strong> dahulu sebelum Live Deploy.
+                  </div>
+                )}
+
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '10px' }}>
                   <button
                     type="button"
@@ -1163,7 +1182,11 @@ export default function LaunchpadPage() {
                     disabled={isBankrDeploying || isRegisteringOnChain}
                     style={{ flex: 1, padding: '8px 10px', fontSize: '11px', justifyContent: 'center', borderColor: 'var(--color-badge-info-border)', color: 'var(--color-badge-info-text)' }}
                   >
-                    {isBankrDeploying ? '⏳ Running Bankr...' : `🧪 Simulate Bankr Launch (-${billingConfig.launchCostCr} cr)`}
+                    {isBankrDeploying
+                      ? '⏳ Running Bankr...'
+                      : selectedBatchBankrKeyIds.length > 1
+                      ? `🧪 Simulate Fleet (${selectedBatchBankrKeyIds.length} akun · -${billingConfig.launchCostCr * selectedBatchBankrKeyIds.length} cr)`
+                      : `🧪 Simulate Bankr Launch (-${billingConfig.launchCostCr} cr)`}
                   </button>
                   <button
                     type="button"
@@ -1172,7 +1195,11 @@ export default function LaunchpadPage() {
                     disabled={isBankrDeploying || isRegisteringOnChain}
                     style={{ flex: 1, padding: '8px 10px', fontSize: '11px', justifyContent: 'center' }}
                   >
-                    {isBankrDeploying ? '⏳ Deploying...' : `⚡ Bankr Deploy ${selectedChain.toUpperCase()} (-${billingConfig.launchCostCr} cr)`}
+                    {isBankrDeploying
+                      ? '⏳ Deploying...'
+                      : selectedBatchBankrKeyIds.length > 1
+                      ? `⚡ Fleet Deploy ${selectedBatchBankrKeyIds.length} Akun (-${billingConfig.launchCostCr * selectedBatchBankrKeyIds.length} cr)`
+                      : `⚡ Bankr Deploy ${selectedChain.toUpperCase()} (-${billingConfig.launchCostCr} cr)`}
                   </button>
                 </div>
 
