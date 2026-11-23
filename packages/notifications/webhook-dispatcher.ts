@@ -10,6 +10,8 @@ export type AlertEventType =
   | 'ORDER_APPROVED'
   | 'DEX_SWAP_EXECUTED'
   | 'AUTOPILOT_ORDER_QUEUED'
+  | 'TRAILING_STOP_TRIGGERED'
+  | 'HONEYPOT_HARD_BLOCKED'
   | 'DAILY_LOSS_WARNING'
   | 'TOKEN_DEPLOYED'
   | 'KEY_FROZEN_OVER_QUOTA';
@@ -59,8 +61,89 @@ export function assertSafeWebhookUrl(rawUrl: string): string {
   return parsed.toString();
 }
 
+const EVENT_EMOJI: Record<AlertEventType, string> = {
+  ORDER_APPROVED: '✅',
+  DEX_SWAP_EXECUTED: '⚡',
+  AUTOPILOT_ORDER_QUEUED: '🤖',
+  TRAILING_STOP_TRIGGERED: '📉',
+  HONEYPOT_HARD_BLOCKED: '🚨',
+  DAILY_LOSS_WARNING: '⚠️',
+  TOKEN_DEPLOYED: '🚀',
+  KEY_FROZEN_OVER_QUOTA: '🧊',
+};
+
 /**
- * Dispatches an outbound alert to a validated HTTPS webhook (auto-formats for Discord or generic JSON).
+ * Pure request builder that auto-detects Telegram Bot API, Discord Webhooks, or generic HTTPS JSON.
+ * - Telegram format: https://api.telegram.org/bot<TOKEN>/sendMessage?chat_id=<CHAT_ID>
+ */
+export function buildOutboundWebhookRequest(
+  safeUrl: string,
+  payload: OutboundAlertPayload,
+  ts: string
+): { targetUrl: string; channel: 'TELEGRAM' | 'DISCORD' | 'GENERIC'; body: Record<string, unknown> } {
+  const parsed = new URL(safeUrl);
+  const host = parsed.hostname.toLowerCase();
+
+  // 1. Telegram Bot API (https://api.telegram.org/bot<TOKEN>/sendMessage?chat_id=<CHAT_ID>)
+  if (host === 'api.telegram.org' && /^\/bot[^/]+\/sendMessage$/i.test(parsed.pathname)) {
+    const chatId = parsed.searchParams.get('chat_id')?.trim();
+    if (!chatId) {
+      throw new Error(
+        'INVALID_TELEGRAM_WEBHOOK_URL: Missing chat_id query parameter (use https://api.telegram.org/bot<TOKEN>/sendMessage?chat_id=<CHAT_ID>).'
+      );
+    }
+    const emoji = EVENT_EMOJI[payload.event] || '🔔';
+    const metaLines = Object.entries(payload.metadata || {})
+      .slice(0, 4)
+      .map(([k, v]) => `• ${k}: ${String(v)}`);
+    const text = [
+      `${emoji} [POOLNET · ${payload.event}]`,
+      payload.title,
+      payload.message,
+      ...(metaLines.length > 0 ? ['', ...metaLines] : []),
+    ].join('\n');
+
+    const cleanEndpoint = `${parsed.origin}${parsed.pathname}`;
+    return {
+      targetUrl: cleanEndpoint,
+      channel: 'TELEGRAM',
+      body: {
+        chat_id: chatId,
+        text,
+        disable_web_page_preview: true,
+      },
+    };
+  }
+
+  // 2. Discord Webhook
+  const isDiscord = safeUrl.includes('discord.com/api/webhooks/') || safeUrl.includes('discordapp.com/api/webhooks/');
+  if (isDiscord) {
+    return {
+      targetUrl: safeUrl,
+      channel: 'DISCORD',
+      body: {
+        content: `**[POOLNET · ${payload.event}] ${payload.title}**\n${payload.message}`,
+      },
+    };
+  }
+
+  // 3. Generic HTTPS JSON Webhook
+  return {
+    targetUrl: safeUrl,
+    channel: 'GENERIC',
+    body: {
+      source: 'POOLNET_V25',
+      event: payload.event,
+      title: payload.title,
+      message: payload.message,
+      metadata: payload.metadata || {},
+      timestamp: ts,
+    },
+  };
+}
+
+/**
+ * Dispatches an outbound alert to a validated HTTPS webhook (auto-formats for Telegram, Discord, or generic JSON).
  */
 export async function dispatchOutboundAlert(params: {
   webhookUrl: string;
@@ -71,26 +154,14 @@ export async function dispatchOutboundAlert(params: {
   const doFetch = params.fetchImpl || fetch;
   const ts = params.payload.timestamp || new Date().toISOString();
 
-  const isDiscord = safeUrl.includes('discord.com/api/webhooks/') || safeUrl.includes('discordapp.com/api/webhooks/');
-  const body = isDiscord
-    ? {
-        content: `**[POOLNET · ${params.payload.event}] ${params.payload.title}**\n${params.payload.message}`,
-      }
-    : {
-        source: 'POOLNET_V25',
-        event: params.payload.event,
-        title: params.payload.title,
-        message: params.payload.message,
-        metadata: params.payload.metadata || {},
-        timestamp: ts,
-      };
+  const { targetUrl, body } = buildOutboundWebhookRequest(safeUrl, params.payload, ts);
 
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 4000);
     let res: Response;
     try {
-      res = await doFetch(safeUrl, {
+      res = await doFetch(targetUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

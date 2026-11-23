@@ -137,6 +137,10 @@ export async function runAutoPilotWorkerTick(opts: AutoPilotWorkerTickOptions): 
         }
       }
 
+      const isTrailingStop =
+        Boolean(intent.riskDecisionReason?.includes('TRAILING_STOP')) ||
+        intent.idempotencyKey.includes('TRAILING_STOP');
+
       await notifyUserWebhookBestEffort({
         resolveWebhookUrl: async () => {
           const hook = await defaultProviderKeyVaultAdapter
@@ -149,10 +153,10 @@ export async function runAutoPilotWorkerTick(opts: AutoPilotWorkerTickOptions): 
           return hook?.apiKey || null;
         },
         payload: {
-          event: 'AUTOPILOT_ORDER_QUEUED',
+          event: isTrailingStop ? 'TRAILING_STOP_TRIGGERED' : 'AUTOPILOT_ORDER_QUEUED',
           title: cexOrderId
-            ? `Auto-Pilot Executed ${intent.side} ${intent.symbol} (Bybit)`
-            : `Auto-Pilot Queued ${intent.side} ${intent.symbol}`,
+            ? `${isTrailingStop ? 'Trailing Stop' : 'Auto-Pilot'} Executed ${intent.side} ${intent.symbol} (Bybit)`
+            : `${isTrailingStop ? 'Trailing Stop' : 'Auto-Pilot'} Queued ${intent.side} ${intent.symbol}`,
           message: `${intent.riskDecisionReason || 'Auto-Pilot Signal'} · Stage: ${intent.stage} · Qty: ${intent.quantity}${cexOrderId ? ` · OrderId: ${cexOrderId}` : ''}`,
           metadata: {
             symbol: intent.symbol,

@@ -22,6 +22,7 @@ import {
 } from '@packages/shared/db-pool';
 import { SubscriptionsEngine } from '@packages/billing/subscriptions-engine';
 import { buildAgentActionCards } from '@packages/agent/skill-registry';
+import { notifyUserWebhookBestEffort } from '@packages/notifications/webhook-dispatcher';
 import {
   generateMarketAdvisoryNote,
   type ByokLlmProvider,
@@ -154,6 +155,32 @@ export async function POST(req: NextRequest) {
       }
     } catch {
       // Non-blocking in unit test environments without DB
+    }
+
+    if (report.tokenSecurity?.hardBlocked) {
+      await notifyUserWebhookBestEffort({
+        resolveWebhookUrl: async () => {
+          const hook = await defaultProviderKeyVaultAdapter
+            .resolveDecryptedKeyForDeploy({
+              userIdentifier: auth.walletAddress,
+              targetChain: 'all',
+              provider: 'WEBHOOK',
+            })
+            .catch(() => null);
+          return hook?.apiKey || null;
+        },
+        payload: {
+          event: 'HONEYPOT_HARD_BLOCKED',
+          title: `Honeypot / Insider Guard Blocked ${symbol}`,
+          message: report.tokenSecurity.summary || 'Token diblokir otomatis oleh On-Chain Anti-Insider & Honeypot Guard.',
+          metadata: {
+            symbol,
+            riskLevel: report.tokenSecurity.riskLevel,
+            top10HolderPct: report.tokenSecurity.top10HolderPct,
+            ...(tokenAddress ? { tokenAddress } : {}),
+          },
+        },
+      });
     }
 
     const agentActionCards = buildAgentActionCards({

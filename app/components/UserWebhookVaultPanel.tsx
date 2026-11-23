@@ -139,7 +139,7 @@ export function UserWebhookVaultPanel({ isConnected }: UserWebhookVaultPanelProp
             </span>
           </h3>
           <p className="text-muted" style={{ margin: 0, fontSize: '12px' }}>
-            Terima notifikasi real-time untuk Order Approved, Daily Loss Warning, dan Token Launch ke Discord atau endpoint HTTPS Anda.
+            Terima notifikasi real-time untuk <strong>Auto-Pilot TP/SL &amp; Trailing Stop</strong>, <strong>Honeypot Hard-Block</strong>, dan <strong>Token Launch</strong> langsung ke <strong>Telegram Bot</strong>, <strong>Discord</strong>, atau endpoint HTTPS Anda.
           </p>
         </div>
 
@@ -164,30 +164,35 @@ export function UserWebhookVaultPanel({ isConnected }: UserWebhookVaultPanelProp
           {showAdd && (
             <form
               onSubmit={handleAdd}
-              style={{ display: 'grid', gridTemplateColumns: '180px 1fr auto', gap: '8px', alignItems: 'center' }}
+              style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}
             >
-              <input
-                type="text"
-                placeholder="Label (mis: Discord Desk)"
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-                className="input"
-                style={{ padding: '7px 10px', fontSize: '12px' }}
-                required
-              />
-              <input
-                type="url"
-                placeholder="https://discord.com/api/webhooks/..."
-                value={webhookUrl}
-                onChange={(e) => setWebhookUrl(e.target.value)}
-                className="input"
-                style={{ padding: '7px 10px', fontSize: '12px', fontFamily: 'var(--font-mono)' }}
-                autoComplete="off"
-                required
-              />
-              <button type="submit" disabled={saving} className="btn-primary" style={{ padding: '7px 12px', fontSize: '12px' }}>
-                {saving ? '...' : 'Simpan'}
-              </button>
+              <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr auto', gap: '8px', alignItems: 'center' }}>
+                <input
+                  type="text"
+                  placeholder="Label (mis: Telegram HP)"
+                  value={label}
+                  onChange={(e) => setLabel(e.target.value)}
+                  className="input"
+                  style={{ padding: '7px 10px', fontSize: '12px' }}
+                  required
+                />
+                <input
+                  type="url"
+                  placeholder="https://api.telegram.org/bot<TOKEN>/sendMessage?chat_id=<ID> atau Discord"
+                  value={webhookUrl}
+                  onChange={(e) => setWebhookUrl(e.target.value)}
+                  className="input"
+                  style={{ padding: '7px 10px', fontSize: '12px', fontFamily: 'var(--font-mono)' }}
+                  autoComplete="off"
+                  required
+                />
+                <button type="submit" disabled={saving} className="btn-primary" style={{ padding: '7px 12px', fontSize: '12px' }}>
+                  {saving ? '...' : 'Simpan'}
+                </button>
+              </div>
+              <div style={{ fontSize: '10px', color: 'var(--color-muted)' }}>
+                Format Telegram: <code>https://api.telegram.org/bot&lt;BOT_TOKEN&gt;/sendMessage?chat_id=&lt;CHAT_ID&gt;</code> · Format Discord: <code>https://discord.com/api/webhooks/...</code>
+              </div>
             </form>
           )}
 
