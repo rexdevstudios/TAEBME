@@ -37,6 +37,7 @@ import {
   updateActiveAutoPilotWalletList,
 } from '../packages/agent/autopilot-market-feed';
 import { runScheduledPulses } from '../workers/cloudflare-autopilot-cron/src/index';
+import { buildRetentionCleanupQueries } from '../packages/db/data-retention';
 import { TradingRiskGate, compute24hRiskExposure } from '../packages/trading/risk-gate';
 import { notifyUserWebhookBestEffort } from '../packages/notifications/webhook-dispatcher';
 import { signBybitV5Post, submitBybitSpotOrder } from '../packages/trading/bybit-vault';
@@ -896,6 +897,18 @@ async function runSimulationSuite() {
   assert(
     boResults.length === 4 && boResults.every((r) => r.ok && r.status === 200),
     'Cloudflare Worker cron dispatches 4 authenticated pulses (Scout + Auto-Pilot) across Testnet & Production'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 34: Automated Data Retention Guard & Cost-Control (Phase BR)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 34: Automated Data Retention & Cost-Control] ---');
+  const brQueries = buildRetentionCleanupQueries();
+  assert(
+    brQueries.length === 3 &&
+      brQueries[0].sql.includes("ti.status <> 'EXECUTED'") &&
+      brQueries[2].sql.includes('DEX_SWAP_TX_CONFIRMED'),
+    'Automated data retention prunes expired residue while strictly preserving EXECUTED & financial audit logs'
   );
 
   console.log('\n================================================================');

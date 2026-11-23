@@ -14,6 +14,10 @@ interface OpsSummaryData {
     executed: number;
   };
   subscriptionsByPlan: Record<string, number>;
+  autoPilot?: {
+    activeWalletsCount: number;
+    lastPulseAt: string | null;
+  };
 }
 
 interface DualControlRequestItem {
@@ -263,6 +267,13 @@ export function AdminOpsHealthPanel() {
           <div className="text-muted" style={{ fontSize: '11px', marginTop: '2px' }}>
             Read-only PostgreSQL SSOT, Redis cache, Kill-Switch guard &amp; 24h Trade Intents.
             {timestamp ? ` · Synced: ${new Date(timestamp).toLocaleTimeString()}` : ''}
+            {data?.autoPilot
+              ? ` · 24/7 Auto-Pilot: ${data.autoPilot.activeWalletsCount} active wallets (${
+                  data.autoPilot.lastPulseAt
+                    ? `last pulse ${new Date(data.autoPilot.lastPulseAt).toLocaleTimeString()}`
+                    : 'idle'
+                })`
+              : ''}
           </div>
         </div>
         <button

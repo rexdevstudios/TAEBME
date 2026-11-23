@@ -9,6 +9,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getDbPool, PostgresBinanceExecutionDbAdapter } from '@packages/shared/db-pool';
+import { runSafeDataRetentionSweep } from '@packages/db/data-retention';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,11 +56,14 @@ export async function GET(req: NextRequest) {
       flagged.push(intent.id);
     }
 
+    const retention = await runSafeDataRetentionSweep({ pool });
+
     return NextResponse.json({
       success: true,
       data: {
         scannedStaleCount: staleIntents.length,
         flaggedIntentIds: flagged,
+        retentionDeleted: retention.deleted,
         elapsedMs: Math.round(performance.now() - startMs),
       },
       timestamp: new Date().toISOString(),

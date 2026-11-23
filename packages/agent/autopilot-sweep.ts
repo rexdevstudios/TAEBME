@@ -115,8 +115,20 @@ export async function runMultiTenantAutoPilotSweep(params?: {
   executedWallets: number;
   deregisteredDowngraded: number;
   totalQueued: number;
+  fastPathIdle: boolean;
 }> {
   const wallets = await listActiveAutoPilotWallets();
+  if (wallets.length === 0) {
+    // Zero-DB Fast-Path: keep Neon PostgreSQL auto-suspended ($0 compute burn when idle)
+    return {
+      scannedWallets: 0,
+      executedWallets: 0,
+      deregisteredDowngraded: 0,
+      totalQueued: 0,
+      fastPathIdle: true,
+    };
+  }
+
   let executedWallets = 0;
   let deregisteredDowngraded = 0;
   let totalQueued = 0;
@@ -171,5 +183,6 @@ export async function runMultiTenantAutoPilotSweep(params?: {
     executedWallets,
     deregisteredDowngraded,
     totalQueued,
+    fastPathIdle: false,
   };
 }

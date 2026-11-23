@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireActiveSession } from '@packages/auth/session';
 import { getDbPool, defaultKillSwitchDbAdapter } from '@packages/shared/db-pool';
 import { upstashRedis } from '@packages/shared/redis-client';
+import { listActiveAutoPilotWallets } from '@packages/agent/autopilot-market-feed';
 import type { Role } from '@packages/shared/types/domain';
 
 export const dynamic = 'force-dynamic';
@@ -59,9 +60,23 @@ export async function GET(req: NextRequest) {
     const tradeIntents24h = { total: 0, approved: 0, rejected: 0, executed: 0 };
     const subscriptionsByPlan: Record<string, number> = {};
 
-    const [activeKillSwitches] = await Promise.all([
+    const [activeKillSwitches, activeAutoPilotWallets, lastPulseRaw] = await Promise.all([
       defaultKillSwitchDbAdapter.getActiveKillSwitches().catch(() => []),
+      listActiveAutoPilotWallets().catch(() => []),
+      upstashRedis.isConfigured()
+        ? upstashRedis.get<string>('agent:autopilot:last_tick').catch(() => null)
+        : Promise.resolve(null),
     ]);
+
+    let lastPulseAt: string | null = null;
+    if (lastPulseRaw) {
+      try {
+        const parsed = typeof lastPulseRaw === 'string' ? JSON.parse(lastPulseRaw) : lastPulseRaw;
+        if (parsed?.updatedAt) lastPulseAt = String(parsed.updatedAt);
+      } catch {
+        // ignore malformed cache
+      }
+    }
 
     if (pool) {
       try {
@@ -113,6 +128,10 @@ export async function GET(req: NextRequest) {
           },
           tradeIntents24h,
           subscriptionsByPlan,
+          autoPilot: {
+            activeWalletsCount: activeAutoPilotWallets.length,
+            lastPulseAt,
+          },
         },
         timestamp: new Date().toISOString(),
       },
