@@ -207,7 +207,7 @@ export class PostgresGameFiDbAdapter {
 
         try {
           const draftRes = await pool.query(
-            `SELECT 1 FROM launch_drafts WHERE user_id = $1 AND status IN ('PUBLISHED', 'LAUNCHED') LIMIT 1`,
+            `SELECT 1 FROM launch_drafts WHERE creator_id = $1 AND status IN ('PUBLISHED', 'LAUNCHED') LIMIT 1`,
             [resolvedUuid]
           );
           if (draftRes.rows.length > 0) return true;

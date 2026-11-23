@@ -39,6 +39,21 @@ describe('Phase CB: Admin Checksum Normalization & Authoritative GameFi Quest El
     const eligible = await adapter.hasTradeOrLaunchActivity('11111111-1111-1111-1111-111111111111', '0x1111111111111111111111111111111111111111');
     expect(eligible).toBe(true);
     expect(queriedSql.some((q) => q.includes('FROM trade_intents'))).toBe(true);
+
+    // Also verify launch_drafts fallback queries creator_id (actual DB column, Phase CE2)
+    const draftQueriedSql: string[] = [];
+    const draftOnlyPool = {
+      query: async (sql: string) => {
+        draftQueriedSql.push(sql);
+        if (sql.includes('FROM launch_drafts') && sql.includes('creator_id')) {
+          return { rows: [{ '?column?': 1 }] };
+        }
+        return { rows: [] };
+      },
+    } as any;
+    const draftAdapter = new PostgresGameFiDbAdapter(draftOnlyPool, false);
+    expect(await draftAdapter.hasTradeOrLaunchActivity('11111111-1111-1111-1111-111111111111')).toBe(true);
+    expect(draftQueriedSql.some((q) => q.includes('FROM launch_drafts WHERE creator_id = $1'))).toBe(true);
   });
 
   test('CB2.2 hasSybilEvidence recognizes registered kol_profiles in PostgreSQL', async () => {
