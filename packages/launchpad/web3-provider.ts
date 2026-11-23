@@ -824,6 +824,13 @@ export function normalizeWeb3Error(error: any): string {
     return 'Saldo ETH tidak mencukupi untuk membayar biaya gas atau harga pembelian.';
   }
 
+  if (
+    msg.includes('missing revert data') ||
+    (code === 'CALL_EXCEPTION' && msg.includes('estimateGas'))
+  ) {
+    return 'Estimasi gas gagal di RPC jaringan (saldo ETH tidak mencukupi untuk nilai transaksi + gas, atau jaringan MetaMask tidak sesuai). Pastikan saldo ETH cukup di jaringan Base aktif.';
+  }
+
   if (msg.includes('BLOCKED')) {
     return msg;
   }

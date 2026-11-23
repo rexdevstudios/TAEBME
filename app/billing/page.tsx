@@ -312,9 +312,33 @@ export default function BillingPage() {
         return;
       }
       const signer = await getBrowserSigner();
+      const networkLabel = netCheck.hexChainId === '0x14a34' ? 'Base Sepolia (Testnet)' : 'Base Mainnet';
+      const treasuryTo = ethers.getAddress(
+        (treasuryWallet || '0x0c9f4a82b5ae258e8e65ca40ac4f1abc455c34b6').trim().toLowerCase()
+      );
+      const requiredWei = ethers.parseEther(ethStr);
+
+      // Pre-flight balance check to prevent cryptic ethers estimateGas "missing revert data" errors
+      if (signer.provider) {
+        const senderAddr = await signer.getAddress();
+        const balanceWei = await signer.provider.getBalance(senderAddr).catch(() => null);
+        if (balanceWei !== null && balanceWei < requiredWei) {
+          const formattedBal = Number(ethers.formatEther(balanceWei)).toFixed(6);
+          setPaymentFeedback(
+            `⚠️ Saldo ETH di ${networkLabel} tidak mencukupi: saldo Anda ${formattedBal} ETH, dibutuhkan minimal ${ethStr} ETH + biaya gas. Silakan isi ETH di ${networkLabel} terlebih dahulu.`
+          );
+          return;
+        }
+      }
+
+      // For plain EOA treasury transfers, pass explicit 21,000 gasLimit to bypass flaky RPC estimateGas reverts
+      const targetCode = signer.provider ? await signer.provider.getCode(treasuryTo).catch(() => '0x') : '0x';
+      const isPlainEoa = !targetCode || targetCode === '0x' || targetCode === '0x0';
+
       const tx = await signer.sendTransaction({
-        to: ethers.getAddress(treasuryWallet || '0x0c9f4a82b5ae258e8e65ca40ac4f1abc455c34b6'),
-        value: ethers.parseEther(ethStr),
+        to: treasuryTo,
+        value: requiredWei,
+        ...(isPlainEoa ? { gasLimit: BigInt(21000) } : {}),
       });
       setTxHashInput(tx.hash);
       setPaymentFeedback(`📡 Transaksi terkirim (${tx.hash.slice(0, 12)}...). Menunggu 1 konfirmasi blok Base...`);

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import {
   computeTradingPerformanceRecap,
   encodeDexSettlementIdempotencyKey,
+  normalizeWeb3Error,
 } from '../packages/launchpad/web3-provider';
 
 describe('Phase CI: Live Portfolio & Auto-Pilot Performance Recap Calculator', () => {
@@ -81,5 +82,15 @@ describe('Phase CI: Live Portfolio & Auto-Pilot Performance Recap Calculator', (
     expect(recap.executionRatePct).toBe(100);
     expect(recap.estimatedVolumeUsd).toBe(0);
     expect(recap.topSymbol).toBe('ETHUSDT');
+  });
+
+  it('CI1.4 normalizes ethers v6 estimateGas missing revert data error into clear Indonesian guidance', () => {
+    const msg = normalizeWeb3Error({
+      code: 'CALL_EXCEPTION',
+      message: 'missing revert data (action="estimateGas", data=null, reason=null, transaction={ "data": "0x" })',
+    });
+    expect(msg).toContain('Estimasi gas gagal');
+    expect(msg).toContain('saldo ETH');
+    expect(msg).not.toContain('missing revert data');
   });
 });
