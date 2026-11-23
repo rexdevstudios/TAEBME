@@ -33,6 +33,8 @@ import {
 import { runAutonomousCycleEvaluation } from '../packages/agent/autopilot-cycle-runner';
 import { buildTradeIntentsFromAutoPilotReport } from '../packages/agent/autopilot-intent-bridge';
 import {
+  computeDynamicSignalConfidence,
+  deriveOpenPositionsFromTradeIntents,
   hydrateOpenPositionsWithLivePrices,
   updateActiveAutoPilotWalletList,
 } from '../packages/agent/autopilot-market-feed';
@@ -926,6 +928,19 @@ async function runSimulationSuite() {
   assert(
     bsCexOptIn.config.autoExecuteCex === true && bsDexGuard.config.autoExecuteCex === false,
     'Auto-Pilot opt-in autoExecuteCex activates on CEX_AUTO and strictly stays false on DEX_SESSION'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 36: Dynamic 24h Momentum Scorer & Open Position Hydration (Phase BV)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 36: Dynamic AI Confidence & Open Position Hydration] ---');
+  const bvScore = computeDynamicSignalConfidence({ priceChangePct24h: 6.5, quoteVolumeUsd: 80_000_000 });
+  const bvOpen = deriveOpenPositionsFromTradeIntents([
+    { symbol: 'ETHUSDT', side: 'BUY', quantity: 0.5, price: 3000, status: 'EXECUTED', createdAt: '2026-11-22T00:00:00Z' },
+  ]);
+  assert(
+    bvScore >= 82 && bvOpen.length === 1 && bvOpen[0]?.symbol === 'ETHUSDT',
+    'Dynamic momentum scorer rewards healthy volume trend & derives open EXECUTED BUY positions cleanly'
   );
 
   console.log('\n================================================================');

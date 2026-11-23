@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Bot, Lock, ShieldCheck, Sparkles } from 'lucide-react';
 import { formatScoutCacheAgeLabel } from '@packages/agent/autonomous-terminal-engine';
+import { AUTOPILOT_STRATEGY_PRESETS } from '@packages/agent/autopilot-policy';
 
 interface AutoPilotApiPayload {
   planId: 'FREE' | 'CREATOR' | 'TRADER' | 'AGENT';
@@ -221,6 +222,46 @@ export function AutoPilotControlPanel({ isConnected }: AutoPilotControlPanelProp
         </div>
       ) : data?.eligible ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {/* 1-Click Beginner Strategy Presets (Phase BV2) */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-muted)' }}>
+              Preset Cepat 1-Klik (Ramah Pemula — Otomatis Menyesuaikan Batas Paket Anda):
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              {AUTOPILOT_STRATEGY_PRESETS.map((preset) => (
+                <button
+                  key={preset.id}
+                  type="button"
+                  onClick={() => {
+                    const clampedOrder = Math.min(preset.maxOrderUsd, data.capacities.maxAutoPilotOrderUsd);
+                    setMaxOrderUsd(clampedOrder);
+                    setTakeProfitPct(preset.takeProfitPct);
+                    setStopLossPct(preset.stopLossPct);
+                    setMinConfidenceScore(preset.minConfidenceScore);
+                    setSymbolsText(preset.allowedSymbols.join(', '));
+                    setFeedback(`ℹ️ Preset "${preset.label}" diterapkan. Klik "Simpan Konfigurasi Auto-Pilot" untuk mengaktifkan.`);
+                  }}
+                  className="btn-secondary"
+                  style={{
+                    flex: '1 1 170px',
+                    padding: '8px 10px',
+                    textAlign: 'left',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'flex-start',
+                    gap: '2px',
+                    minHeight: '44px',
+                  }}
+                >
+                  <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-foreground)' }}>
+                    {preset.label}
+                  </span>
+                  <span style={{ fontSize: '10px', color: 'var(--color-muted)' }}>{preset.description}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="grid-4" style={{ gap: '10px' }}>
             <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '11px', fontWeight: 700 }}>
               Status Auto-Pilot

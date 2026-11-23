@@ -36,6 +36,50 @@ export interface AutoPilotConfigInput {
   allowedSymbols?: string[] | string;
 }
 
+export interface AutoPilotStrategyPreset {
+  id: 'CONSERVATIVE' | 'BALANCED' | 'AGGRESSIVE';
+  label: string;
+  description: string;
+  maxOrderUsd: number;
+  takeProfitPct: number;
+  stopLossPct: number;
+  minConfidenceScore: number;
+  allowedSymbols: string[];
+}
+
+export const AUTOPILOT_STRATEGY_PRESETS: AutoPilotStrategyPreset[] = [
+  {
+    id: 'CONSERVATIVE',
+    label: 'Konservatif (Pemula)',
+    description: 'Blue-chip BTC & ETH · TP 8% / SL 3% · Filter AI ketat (82+)',
+    maxOrderUsd: 50,
+    takeProfitPct: 8,
+    stopLossPct: 3,
+    minConfidenceScore: 82,
+    allowedSymbols: ['BTCUSDT', 'ETHUSDT'],
+  },
+  {
+    id: 'BALANCED',
+    label: 'Seimbang (Swing)',
+    description: 'BTC, ETH, SOL · TP 15% / SL 5% · Filter AI seimbang (75+)',
+    maxOrderUsd: 150,
+    takeProfitPct: 15,
+    stopLossPct: 5,
+    minConfidenceScore: 75,
+    allowedSymbols: ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'],
+  },
+  {
+    id: 'AGGRESSIVE',
+    label: 'Agresif (Momentum)',
+    description: 'Multi-pair momentum · TP 25% / SL 8% · Filter AI responsif (68+)',
+    maxOrderUsd: 250,
+    takeProfitPct: 25,
+    stopLossPct: 8,
+    minConfidenceScore: 68,
+    allowedSymbols: ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT'],
+  },
+];
+
 export function getDefaultAutoPilotConfig(planId?: string | null): AutoPilotConfig {
   const cap = SubscriptionsEngine.getPlanCapacities(planId);
   return {

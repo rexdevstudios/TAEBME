@@ -10,6 +10,7 @@ import {
   defaultBillingDbAdapter,
   defaultKillSwitchDbAdapter,
   defaultProviderKeyVaultAdapter,
+  listUserRecentTradeIntents,
   saveTradeIntent,
 } from '../shared/db-pool';
 import { upstashRedis } from '../shared/redis-client';
@@ -22,6 +23,9 @@ import {
 import { buildTradeIntentsFromAutoPilotReport } from './autopilot-intent-bridge';
 import type { AutoPilotConfig } from './autopilot-policy';
 import {
+  computeDynamicSignalConfidence,
+  deriveOpenPositionsFromTradeIntents,
+  fetchAutoPilot24hTickers,
   fetchAutoPilotSpotPrices,
   hydrateOpenPositionsWithLivePrices,
   listActiveAutoPilotWallets,
@@ -218,12 +222,48 @@ export async function runMultiTenantAutoPilotSweep(params?: {
     }
     if (!config.enabled) continue;
 
-    const rawPositions = params?.openPositionsByWallet?.[wallet] || [];
+    const rawPositions =
+      params?.openPositionsByWallet?.[wallet] ??
+      deriveOpenPositionsFromTradeIntents(
+        await listUserRecentTradeIntents(wallet, 25).catch(() => [])
+      );
     const symbolsToPrice = Array.from(
       new Set([...config.allowedSymbols, ...rawPositions.map((p) => p.symbol)])
     );
-    const livePrices = await fetchAutoPilotSpotPrices(symbolsToPrice, params?.fetchImpl);
+    const tickers24h = await fetchAutoPilot24hTickers(symbolsToPrice, params?.fetchImpl);
+    const livePrices: Record<string, number> = {};
+    for (const [sym, t] of Object.entries(tickers24h)) {
+      livePrices[sym] = t.lastPrice;
+    }
+    if (Object.keys(livePrices).length === 0) {
+      Object.assign(livePrices, await fetchAutoPilotSpotPrices(symbolsToPrice, params?.fetchImpl));
+    }
     const hydratedPositions = hydrateOpenPositionsWithLivePrices(rawPositions, livePrices);
+
+    const dynamicSignals: AutoPilotMarketSignal[] =
+      params?.marketSignals && params.marketSignals.length > 0
+        ? params.marketSignals.map((sig) => {
+            const cleanSym = String(sig.symbol || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+            const t = tickers24h[cleanSym];
+            return t
+              ? {
+                  ...sig,
+                  confidenceScore: computeDynamicSignalConfidence({
+                    priceChangePct24h: t.priceChangePct24h,
+                    quoteVolumeUsd: t.quoteVolumeUsd,
+                  }),
+                }
+              : sig;
+          })
+        : Object.values(tickers24h).map((t) => ({
+            symbol: t.symbol,
+            confidenceScore: computeDynamicSignalConfidence({
+              priceChangePct24h: t.priceChangePct24h,
+              quoteVolumeUsd: t.quoteVolumeUsd,
+            }),
+            suggestedOrderUsd: config.maxOrderUsd,
+            source: 'BINANCE_24H_MOMENTUM',
+          }));
 
     const tick = await runAutoPilotWorkerTick({
       userId: wallet,
@@ -231,9 +271,10 @@ export async function runMultiTenantAutoPilotSweep(params?: {
       planId,
       stage: params?.stage || (params?.dryRun ? 'PAPER' : 'TESTNET'),
       config,
-      marketSignals: params?.marketSignals || [],
+      marketSignals: dynamicSignals,
       openPositions: hydratedPositions,
       dryRun: params?.dryRun,
+      fetchImpl: params?.fetchImpl,
     });
 
     executedWallets += 1;
