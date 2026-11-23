@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { Activity, ShieldAlert, BarChart3, Clock, AlertTriangle, Lightbulb, Wallet, BrainCircuit, ActivitySquare, Lock } from 'lucide-react';
 import { NutritionLabelCard } from '../components/NutritionLabelCard';
 import { TokenSafetyBadgeCard } from '../components/TokenSafetyBadgeCard';
+import type { OnChainTokenSecurityReport } from '@packages/intelligence/onchain-insider-guard';
 import { PageWorkflowBanner } from '../components/PageWorkflowBanner';
 import { BinanceKeyVaultPanel } from '../components/BinanceKeyVaultPanel';
 import { BybitKeyVaultPanel } from '../components/BybitKeyVaultPanel';
@@ -264,6 +265,7 @@ export default function TradingPage() {
 
   // Controlled order parameters & deep-link context (Launchpad ?token= & Agent ?proposalId=)
   const [executionMode, setExecutionMode] = useState<'PAPER' | 'DEX_NON_CUSTODIAL' | 'CEX_SINGLE_SHOT'>('PAPER');
+  const [dexTokenSafety, setDexTokenSafety] = useState<OnChainTokenSecurityReport | null>(null);
   const [dexChainId, setDexChainId] = useState<number>(8453);
   const [cexVenue, setCexVenue] = useState<'BINANCE' | 'BYBIT'>('BINANCE');
   const [venueManuallyChosen, setVenueManuallyChosen] = useState<boolean>(false);
@@ -1040,6 +1042,7 @@ export default function TradingPage() {
                 <TokenSafetyBadgeCard
                   address={linkedTokenAddress || getDefaultDexTokenForChain(dexChainId).address}
                   chainId={dexChainId}
+                  onReportChange={setDexTokenSafety}
                 />
               </div>
             )}
@@ -1230,11 +1233,15 @@ export default function TradingPage() {
                   <button
                     type="button"
                     onClick={handleSignZeroXSwap}
-                    disabled={dexSigning || dexApprovingErc20}
+                    disabled={dexSigning || dexApprovingErc20 || Boolean(dexTokenSafety?.hardBlocked)}
                     className="btn-primary"
                     style={{ width: '100%', justifyContent: 'center', fontSize: '12px', padding: '8px 12px' }}
                   >
-                    {dexSigning ? 'Menunggu MetaMask...' : 'Sign & Swap via MetaMask (0x v2)'}
+                    {dexTokenSafety?.hardBlocked
+                      ? '🛡️ Swap Diblokir (Honeypot / Tax >20%)'
+                      : dexSigning
+                      ? 'Menunggu MetaMask...'
+                      : 'Sign & Swap via MetaMask (0x v2)'}
                   </button>
                 )}
               </div>
@@ -1268,26 +1275,61 @@ export default function TradingPage() {
                 )}
               </div>
             ) : (
-              <div className="flex-row gap-sm">
-                <button
-                  onClick={handleApproveProposal}
-                  disabled={isSubmitting || proposalStatus === 'APPROVED'}
-                  className="btn-primary"
-                  style={{ flex: 1, justifyContent: 'center', opacity: proposalStatus === 'APPROVED' ? 0.5 : 1 }}
-                  aria-label="Approve trade proposal and submit as trade intent"
-                >
-                  {isSubmitting ? 'Processing...' : proposalStatus === 'APPROVED' ? 'Approved ✓' : 'Approve Proposal'}
-                </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {executionMode === 'DEX_NON_CUSTODIAL' && dexTokenSafety?.hardBlocked && (
+                  <div
+                    style={{
+                      padding: '8px 10px',
+                      borderRadius: '6px',
+                      border: '1px solid rgba(239, 68, 68, 0.5)',
+                      background: 'rgba(239, 68, 68, 0.12)',
+                      color: '#FCA5A5',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                    }}
+                  >
+                    🛡️ PRE-TRADE HARD-BLOCK AKTIF: GoPlus On-Chain Guard mendeteksi Honeypot atau Pajak &gt;20%. Eksekusi DEX dikunci otomatis demi keamanan dana Anda.
+                  </div>
+                )}
+                <div className="flex-row gap-sm">
+                  <button
+                    onClick={handleApproveProposal}
+                    disabled={
+                      isSubmitting ||
+                      proposalStatus === 'APPROVED' ||
+                      (executionMode === 'DEX_NON_CUSTODIAL' && Boolean(dexTokenSafety?.hardBlocked))
+                    }
+                    className="btn-primary"
+                    style={{
+                      flex: 1,
+                      justifyContent: 'center',
+                      opacity:
+                        proposalStatus === 'APPROVED' ||
+                        (executionMode === 'DEX_NON_CUSTODIAL' && Boolean(dexTokenSafety?.hardBlocked))
+                          ? 0.5
+                          : 1,
+                    }}
+                    aria-label="Approve trade proposal and submit as trade intent"
+                  >
+                    {executionMode === 'DEX_NON_CUSTODIAL' && dexTokenSafety?.hardBlocked
+                      ? '🛡️ Diblokir (Honeypot)'
+                      : isSubmitting
+                      ? 'Processing...'
+                      : proposalStatus === 'APPROVED'
+                      ? 'Approved ✓'
+                      : 'Approve Proposal'}
+                  </button>
 
-                <button
-                  onClick={handleRejectProposal}
-                  disabled={isSubmitting || proposalStatus === 'REJECTED'}
-                  className="btn-destructive"
-                  style={{ flex: 1, justifyContent: 'center', opacity: proposalStatus === 'REJECTED' ? 0.5 : 1 }}
-                  aria-label="Reject trade proposal"
-                >
-                  {proposalStatus === 'REJECTED' ? 'Rejected ✗' : 'Reject Proposal'}
-                </button>
+                  <button
+                    onClick={handleRejectProposal}
+                    disabled={isSubmitting || proposalStatus === 'REJECTED'}
+                    className="btn-destructive"
+                    style={{ flex: 1, justifyContent: 'center', opacity: proposalStatus === 'REJECTED' ? 0.5 : 1 }}
+                    aria-label="Reject trade proposal"
+                  >
+                    {proposalStatus === 'REJECTED' ? 'Rejected ✗' : 'Reject Proposal'}
+                  </button>
+                </div>
               </div>
             )}
           </div>

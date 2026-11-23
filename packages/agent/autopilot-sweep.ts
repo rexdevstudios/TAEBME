@@ -28,6 +28,7 @@ import {
   fetchAutoPilot24hTickers,
   fetchAutoPilotSpotPrices,
   hydrateOpenPositionsWithLivePrices,
+  hydrateOpenPositionsWithPeakPrices,
   listActiveAutoPilotWallets,
   syncActiveAutoPilotRegistry,
 } from './autopilot-market-feed';
@@ -238,7 +239,10 @@ export async function runMultiTenantAutoPilotSweep(params?: {
     if (Object.keys(livePrices).length === 0) {
       Object.assign(livePrices, await fetchAutoPilotSpotPrices(symbolsToPrice, params?.fetchImpl));
     }
-    const hydratedPositions = hydrateOpenPositionsWithLivePrices(rawPositions, livePrices);
+    const hydratedPositions = await hydrateOpenPositionsWithPeakPrices(
+      wallet,
+      hydrateOpenPositionsWithLivePrices(rawPositions, livePrices)
+    );
 
     const dynamicSignals: AutoPilotMarketSignal[] =
       params?.marketSignals && params.marketSignals.length > 0

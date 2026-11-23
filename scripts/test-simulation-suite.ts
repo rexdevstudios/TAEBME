@@ -34,8 +34,10 @@ import { runAutonomousCycleEvaluation } from '../packages/agent/autopilot-cycle-
 import { buildTradeIntentsFromAutoPilotReport } from '../packages/agent/autopilot-intent-bridge';
 import {
   computeDynamicSignalConfidence,
+  computeUpdatedPeakPrice,
   deriveOpenPositionsFromTradeIntents,
   hydrateOpenPositionsWithLivePrices,
+  hydrateOpenPositionsWithPeakPrices,
   updateActiveAutoPilotWalletList,
 } from '../packages/agent/autopilot-market-feed';
 import { analyzeGoPlusTokenSecurity } from '../packages/intelligence/onchain-insider-guard';
@@ -1022,6 +1024,23 @@ async function runSimulationSuite() {
       byKnownRouter.riskPassportScore === 95 &&
       byKnownRouter.arkhamEntityName === '0x Protocol AllowanceHolder',
     'Free GoPlus+RPC Wallet Intelligence hard-blocks sanctioned addresses & recognizes verified DeFi routers at $0 cost'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 40: Persistent High-Water Mark Peak Tracking for 24/7 Trailing Stop (Phase BZ)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 40: High-Water Mark Peak-Price Tracking (24/7 Trailing Stop)] ---');
+  const bzWallet = `0xsimbz${Date.now()}`;
+  const bzPulse1 = await hydrateOpenPositionsWithPeakPrices(bzWallet, [
+    { symbol: 'SOLUSDT', entryPrice: 100, currentPrice: 115, quantity: 2 },
+  ]);
+  const bzPulse2 = await hydrateOpenPositionsWithPeakPrices(bzWallet, [
+    { symbol: 'SOLUSDT', entryPrice: 100, currentPrice: 109, quantity: 2 },
+  ]);
+  const bzUpdatedPeak = computeUpdatedPeakPrice({ entryPrice: 100, currentPrice: 109, storedPeakPrice: 115 });
+  assert(
+    bzPulse1[0]?.peakPrice === 115 && bzPulse2[0]?.peakPrice === 115 && bzUpdatedPeak === 115,
+    'High-water mark peak-price tracker retains 115 peak on pullback to 109 for live 24/7 TRAILING_STOP_SELL'
   );
 
   console.log('\n================================================================');

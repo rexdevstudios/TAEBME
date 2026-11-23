@@ -246,3 +246,70 @@ export function deriveOpenPositionsFromTradeIntents(
 
   return openPositions;
 }
+
+const PEAK_PRICE_TTL_SECONDS = 14 * 86400; // 14 days
+const inMemoryPeakPrices = new Map<string, number>();
+
+export function buildAutoPilotPeakPriceKey(wallet: string, symbol: string): string {
+  const normWallet = String(wallet || '').trim().toLowerCase() || 'unknown';
+  const cleanSym = String(symbol || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '') || 'SYM';
+  return `agent:autopilot:peak:${normWallet}:${cleanSym}`;
+}
+
+export function computeUpdatedPeakPrice(params: {
+  entryPrice: number;
+  currentPrice: number;
+  storedPeakPrice?: number | null;
+}): number {
+  const candidates = [
+    Number(params.entryPrice || 0),
+    Number(params.currentPrice || 0),
+    Number(params.storedPeakPrice || 0),
+  ].filter((v) => Number.isFinite(v) && v > 0);
+  if (candidates.length === 0) return 0;
+  return Math.max(...candidates);
+}
+
+/**
+ * Hydrates open Auto-Pilot positions with persistent High-Water Mark peak prices in Upstash Redis
+ * (with in-memory mirror for offline/unit-test environments) so TRAILING_STOP_SELL works 24/7 (Phase BZ1).
+ */
+export async function hydrateOpenPositionsWithPeakPrices(
+  wallet: string,
+  positions: AutoPilotOpenPosition[]
+): Promise<AutoPilotOpenPosition[]> {
+  if (!Array.isArray(positions) || positions.length === 0) return [];
+
+  return Promise.all(
+    positions.map(async (pos) => {
+      const key = buildAutoPilotPeakPriceKey(wallet, pos.symbol);
+      let storedPeak: number | null = inMemoryPeakPrices.get(key) ?? null;
+
+      if (upstashRedis.isConfigured()) {
+        const raw = await upstashRedis.get<string>(key).catch(() => null);
+        const parsed = raw !== null && raw !== undefined ? Number(raw) : NaN;
+        if (Number.isFinite(parsed) && parsed > 0) {
+          storedPeak = storedPeak !== null ? Math.max(storedPeak, parsed) : parsed;
+        }
+      }
+
+      const nextPeak = computeUpdatedPeakPrice({
+        entryPrice: pos.entryPrice,
+        currentPrice: pos.currentPrice,
+        storedPeakPrice: Math.max(storedPeak ?? 0, Number(pos.peakPrice || 0)),
+      });
+
+      if (nextPeak > 0 && (storedPeak === null || nextPeak > storedPeak)) {
+        inMemoryPeakPrices.set(key, nextPeak);
+        if (upstashRedis.isConfigured()) {
+          await upstashRedis.set(key, String(nextPeak), PEAK_PRICE_TTL_SECONDS).catch(() => false);
+        }
+      }
+
+      return {
+        ...pos,
+        peakPrice: nextPeak > 0 ? nextPeak : pos.peakPrice,
+      };
+    })
+  );
+}

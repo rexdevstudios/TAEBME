@@ -10,9 +10,16 @@ interface TokenSafetyBadgeCardProps {
   /** Or pass address + chainId to auto-fetch from public cached GET /api/trading/token-safety */
   address?: string | null;
   chainId?: number;
+  /** Optional callback notifying parent of the resolved safety report (e.g. for pre-trade hard-block guard) */
+  onReportChange?: (report: OnChainTokenSecurityReport | null) => void;
 }
 
-export function TokenSafetyBadgeCard({ report: propReport, address, chainId = 8453 }: TokenSafetyBadgeCardProps) {
+export function TokenSafetyBadgeCard({
+  report: propReport,
+  address,
+  chainId = 8453,
+  onReportChange,
+}: TokenSafetyBadgeCardProps) {
   const [fetched, setFetched] = useState<OnChainTokenSecurityReport | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -47,6 +54,12 @@ export function TokenSafetyBadgeCard({ report: propReport, address, chainId = 84
   }, [propReport, validAddr, chainId]);
 
   const data = propReport !== undefined ? propReport : fetched;
+
+  useEffect(() => {
+    if (onReportChange) {
+      onReportChange(data ?? null);
+    }
+  }, [data, onReportChange]);
 
   if (loading) {
     return (
