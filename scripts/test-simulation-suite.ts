@@ -30,6 +30,7 @@ import {
   evaluateAutoPilotPositionExit,
   validateAndClampAutoPilotConfig,
 } from '../packages/agent/autopilot-policy';
+import { runAutonomousCycleEvaluation } from '../packages/agent/autopilot-cycle-runner';
 import { TradingRiskGate, compute24hRiskExposure } from '../packages/trading/risk-gate';
 import { notifyUserWebhookBestEffort } from '../packages/notifications/webhook-dispatcher';
 import { signBybitV5Post, submitBybitSpotOrder } from '../packages/trading/bybit-vault';
@@ -797,6 +798,37 @@ async function runSimulationSuite() {
       bkEntry.approved === true &&
       bkTp.action === 'TAKE_PROFIT_SELL',
     'Auto-Pilot blocks FREE tier, clamps AGENT cap ($2,500), approves high-confidence entry & triggers TP sell'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 30: Autonomous Signal-to-Intent Cycle Runner (Phase BL)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 30: Autonomous Cycle Runner & Strategy Cap] ---');
+  const blReport = runAutonomousCycleEvaluation({
+    planId: 'TRADER',
+    config: {
+      enabled: true,
+      rail: 'CEX_AUTO',
+      maxOrderUsd: 250,
+      takeProfitPct: 10,
+      stopLossPct: 5,
+      minConfidenceScore: 75,
+      allowedSymbols: ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'],
+      updatedAt: new Date().toISOString(),
+    },
+    killSwitchActive: false,
+    openPositions: [{ symbol: 'BTCUSDT', entryPrice: 100, currentPrice: 112, quantity: 1 }],
+    marketSignals: [
+      { symbol: 'ETHUSDT', confidenceScore: 85, suggestedOrderUsd: 200, source: '5_AGENT' },
+      { symbol: 'SOLUSDT', confidenceScore: 90, suggestedOrderUsd: 200, source: 'SCOUT' },
+    ],
+  });
+  assert(
+    blReport.eligible &&
+      blReport.summary.tpSellCount === 1 &&
+      blReport.summary.buyReadyCount === 1 &&
+      blReport.entryActions[1]?.decision === 'STRATEGY_CAP_REACHED',
+    'Autonomous cycle runner triggers TP sell, approves 1 new entry, and enforces TRADER 2-strategy cap'
   );
 
   console.log('\n================================================================');

@@ -361,6 +361,19 @@ async function runSiweE2eSmoke() {
         String(apPutJson?.error || '').includes('PLAN_AUTOPILOT_REQUIRED'),
       `GET/PUT /api/agent/autopilot enforces TRADER/AGENT tier gate on FREE burner (GET eligible=false, PUT HTTP ${apPutRes.status})`
     );
+
+    // 20. Verify POST /api/agent/autopilot/simulate enforces HTTP 403 PLAN_AUTOPILOT_REQUIRED on FREE burner (Phase BL)
+    const apSimRes = await fetch(`${BASE_URL}/api/agent/autopilot/simulate`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({}),
+    });
+    const apSimJson: any = await apSimRes.json();
+    assert(
+      apSimRes.status === 403 &&
+        String(apSimJson?.error || '').includes('PLAN_AUTOPILOT_REQUIRED'),
+      `POST /api/agent/autopilot/simulate enforces TRADER/AGENT tier gate on FREE burner (Got HTTP ${apSimRes.status})`
+    );
   } finally {
     // 9. Auto-Cleanup: Revoke test key & verify count returns to 0 + logout
     if (sessionToken && createdBybitKeyId) {

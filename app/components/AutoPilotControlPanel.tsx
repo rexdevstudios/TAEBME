@@ -33,6 +33,8 @@ export function AutoPilotControlPanel({ isConnected }: AutoPilotControlPanelProp
   const [data, setData] = useState<AutoPilotApiPayload | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [simulating, setSimulating] = useState(false);
+  const [simReport, setSimReport] = useState<any>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const [enabled, setEnabled] = useState(false);
@@ -101,6 +103,29 @@ export function AutoPilotControlPanel({ isConnected }: AutoPilotControlPanelProp
       setFeedback(`⚠️ ${err?.message || 'Gagal menyimpan konfigurasi Auto-Pilot.'}`);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSimulateCycle = async () => {
+    setSimulating(true);
+    setFeedback(null);
+    try {
+      const res = await fetch('/api/agent/autopilot/simulate', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const json = await res.json();
+      if (!res.ok || !json?.success) {
+        setFeedback(`⚠️ ${json?.error || `HTTP ${res.status}`}`);
+        return;
+      }
+      setSimReport(json.data);
+    } catch (err: any) {
+      setFeedback(`⚠️ ${err?.message || 'Gagal menjalankan simulasi siklus Auto-Pilot.'}`);
+    } finally {
+      setSimulating(false);
     }
   };
 
@@ -269,16 +294,53 @@ export function AutoPilotControlPanel({ isConnected }: AutoPilotControlPanelProp
             <span className="text-muted" style={{ fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
               <ShieldCheck size={12} style={{ color: '#10B981' }} /> 100% Non-Custodial · Tunduk pada Risk Gate &amp; Global Kill-Switch
             </span>
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving}
-              className="btn-primary"
-              style={{ padding: '8px 14px', fontSize: '12px', fontWeight: 800 }}
-            >
-              {saving ? 'Menyimpan...' : 'Simpan Konfigurasi Auto-Pilot'}
-            </button>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={handleSimulateCycle}
+                disabled={simulating}
+                className="btn-secondary"
+                style={{ padding: '8px 12px', fontSize: '12px', fontWeight: 700 }}
+              >
+                {simulating ? 'Mensimulasi...' : 'Simulasi Siklus Auto-Pilot'}
+              </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving}
+                className="btn-primary"
+                style={{ padding: '8px 14px', fontSize: '12px', fontWeight: 800 }}
+              >
+                {saving ? 'Menyimpan...' : 'Simpan Konfigurasi Auto-Pilot'}
+              </button>
+            </div>
           </div>
+
+          {simReport && (
+            <div
+              style={{
+                padding: '10px 12px',
+                borderRadius: '8px',
+                border: '1px solid var(--color-border)',
+                background: 'rgba(56, 189, 248, 0.06)',
+                fontSize: '11px',
+                fontFamily: 'var(--font-mono)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '4px',
+              }}
+            >
+              <div style={{ fontWeight: 800, color: '#38BDF8' }}>
+                Dry-Run Cycle ({simReport.rail} · Kill-Switch: {simReport.killSwitchActive ? 'ACTIVE' : 'CLEAR'})
+              </div>
+              <div>
+                BUY Ready: <strong>{simReport.summary?.buyReadyCount ?? 0}</strong> · TP Sell:{' '}
+                <strong style={{ color: '#34D399' }}>{simReport.summary?.tpSellCount ?? 0}</strong> · SL Sell:{' '}
+                <strong style={{ color: '#F28B82' }}>{simReport.summary?.slSellCount ?? 0}</strong> · Skipped:{' '}
+                <strong>{simReport.summary?.skippedCount ?? 0}</strong>
+              </div>
+            </div>
+          )}
 
           {feedback && (
             <div style={{ fontSize: '11px', fontWeight: 700, color: feedback.startsWith('✅') ? '#34D399' : '#FBBF24' }}>

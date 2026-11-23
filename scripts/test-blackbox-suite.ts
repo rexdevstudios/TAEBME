@@ -318,6 +318,13 @@ async function runBlackboxSuite() {
   });
   assert(unauthAutoPilotPut.status === 401, 'Unauthenticated PUT /api/agent/autopilot strictly rejected with HTTP 401');
 
+  const unauthAutoPilotSim = await fetch(`${BASE_URL}/api/agent/autopilot/simulate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
+  });
+  assert(unauthAutoPilotSim.status === 401, 'Unauthenticated POST /api/agent/autopilot/simulate strictly rejected with HTTP 401');
+
   // -------------------------------------------------------------------------
   // TEST 12: Canonical Frontend Route Integrity & Live Billing Capacity Contract
   // -------------------------------------------------------------------------
