@@ -23,6 +23,7 @@ import {
 import { buildTradeIntentsFromAutoPilotReport } from './autopilot-intent-bridge';
 import type { AutoPilotConfig } from './autopilot-policy';
 import {
+  clearAutoPilotPeakPrice,
   computeDynamicSignalConfidence,
   deriveOpenPositionsFromTradeIntents,
   fetchAutoPilot24hTickers,
@@ -87,6 +88,9 @@ export async function runAutoPilotWorkerTick(opts: AutoPilotWorkerTickOptions): 
     intentKeys.push(intent.idempotencyKey);
     if (!opts.dryRun) {
       await saveTradeIntent(intent);
+      if (intent.side === 'SELL') {
+        await clearAutoPilotPeakPrice(opts.walletAddress, intent.symbol).catch(() => {});
+      }
 
       let cexOrderId: string | undefined;
       if (canAutoExecuteCex) {

@@ -33,6 +33,7 @@ import {
 import { runAutonomousCycleEvaluation } from '../packages/agent/autopilot-cycle-runner';
 import { buildTradeIntentsFromAutoPilotReport } from '../packages/agent/autopilot-intent-bridge';
 import {
+  clearAutoPilotPeakPrice,
   computeDynamicSignalConfidence,
   computeUpdatedPeakPrice,
   deriveOpenPositionsFromTradeIntents,
@@ -1041,6 +1042,19 @@ async function runSimulationSuite() {
   assert(
     bzPulse1[0]?.peakPrice === 115 && bzPulse2[0]?.peakPrice === 115 && bzUpdatedPeak === 115,
     'High-water mark peak-price tracker retains 115 peak on pullback to 109 for live 24/7 TRAILING_STOP_SELL'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 41: Peak-Price Reset on Exit SELL & Fresh Re-Entry (Phase CA)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 41: Peak-Price Reset on SELL Exit & Fresh Re-Entry] ---');
+  await clearAutoPilotPeakPrice(bzWallet, 'SOLUSDT');
+  const caFreshReentry = await hydrateOpenPositionsWithPeakPrices(bzWallet, [
+    { symbol: 'SOLUSDT', entryPrice: 95, currentPrice: 95, quantity: 2 },
+  ]);
+  assert(
+    caFreshReentry[0]?.peakPrice === 95,
+    'Clearing peak price on SELL exit resets high-water mark so fresh re-entry starts at 95 instead of stale 115'
   );
 
   console.log('\n================================================================');

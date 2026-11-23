@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { PageWorkflowBanner } from '../components/PageWorkflowBanner';
+import { WalletRiskBadgeCard } from '../components/WalletRiskBadgeCard';
 import {
   Award,
   ShieldCheck,
@@ -557,8 +558,13 @@ export default function KolHubPage() {
               <span style={{ fontSize: '18px', fontWeight: 900, color: 'var(--color-accent, #00E676)' }}>𝕏</span> Tautkan Akun Twitter / X
             </h3>
             <p className="text-muted" style={{ fontSize: '13px' }}>
-              Daftarkan handle media sosial Anda untuk mengevaluasi Arkham On-Chain Trust Score dan memenuhi syarat bounty.
+              Daftarkan handle media sosial Anda untuk mengevaluasi On-Chain Wallet Guard Trust Score (GoPlus + RPC) dan memenuhi syarat bounty.
             </p>
+            {walletAddress && (
+              <div style={{ marginTop: '12px' }}>
+                <WalletRiskBadgeCard address={walletAddress} title="KOL Wallet Reputation (GoPlus + RPC · $0)" />
+              </div>
+            )}
 
             <form onSubmit={handleRegisterProfile} className="flex-col gap-md" style={{ marginTop: '16px' }}>
               <div>
@@ -591,7 +597,7 @@ export default function KolHubPage() {
 
               <button type="submit" disabled={isRegistering} className="btn-primary" style={{ justifyContent: 'center' }}>
                 <ShieldCheck size={16} />
-                <span>{isRegistering ? 'Menghitung Arkham Score...' : 'Simpan & Verifikasi Identitas'}</span>
+                <span>{isRegistering ? 'Menghitung On-Chain Trust Score...' : 'Simpan & Verifikasi Identitas'}</span>
               </button>
             </form>
 

@@ -313,3 +313,15 @@ export async function hydrateOpenPositionsWithPeakPrices(
     })
   );
 }
+
+/**
+ * Resets the stored High-Water Mark peak price when a position is exited (SELL),
+ * so any subsequent re-entry starts tracking a fresh peak from the new entry price (Phase CA1).
+ */
+export async function clearAutoPilotPeakPrice(wallet: string, symbol: string): Promise<void> {
+  const key = buildAutoPilotPeakPriceKey(wallet, symbol);
+  inMemoryPeakPrices.delete(key);
+  if (upstashRedis.isConfigured()) {
+    await upstashRedis.getdel(key).catch(() => null);
+  }
+}

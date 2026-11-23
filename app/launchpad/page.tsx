@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Rocket, ShieldAlert, FileText, CheckCircle2, AlertTriangle, TrendingUp, Scale, Wallet, Users, Tag, Sparkles, Coins, Zap, Search, Copy, Check } from 'lucide-react';
 import { NutritionLabelCard } from '../components/NutritionLabelCard';
+import { WalletRiskBadgeCard } from '../components/WalletRiskBadgeCard';
 import { AngelDealRoomModal } from '../components/AngelDealRoomModal';
 import { AdminMerkleSnapshotPanel } from '../components/AdminMerkleSnapshotPanel';
 import { CreatorStudioPanel } from '../components/CreatorStudioPanel';
@@ -1149,6 +1150,15 @@ export default function LaunchpadPage() {
                   </div>
                 )}
               </div>
+
+              {(creatorWallet || walletAddress) && (
+                <div style={{ marginBottom: '12px' }}>
+                  <WalletRiskBadgeCard
+                    address={creatorWallet || walletAddress}
+                    title="Creator Wallet Guard (GoPlus + RPC · $0)"
+                  />
+                </div>
+              )}
 
               {/* Investor Nutrition Label Preview */}
               <NutritionLabelCard
