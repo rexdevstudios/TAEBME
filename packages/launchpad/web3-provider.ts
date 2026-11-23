@@ -325,6 +325,62 @@ export function getEvmExplorerTxUrl(chainId: number, txHash: string): string {
   return `${cfg.explorerUrl.replace(/\/+$/, '')}/tx/${txHash}`;
 }
 
+export interface DexTokenPreset {
+  symbol: string;
+  name: string;
+  address: string;
+  chainId: number;
+}
+
+/**
+ * Authoritative 6-Chain Blue-Chip DEX Token Presets (Phase BA).
+ * Every address is a verified 42-char checksummed EVM contract on its canonical network.
+ */
+export const EVM_DEX_TOKEN_PRESETS: Record<number, DexTokenPreset[]> = {
+  8453: [
+    { symbol: 'USDC', name: 'USD Coin (Base)', address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', chainId: 8453 },
+    { symbol: 'AERO', name: 'Aerodrome Finance', address: '0x940181a94A35A4569E4529A3CDfB74e38FD98631', chainId: 8453 },
+    { symbol: 'DEGEN', name: 'Degen (Base)', address: '0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed', chainId: 8453 },
+    { symbol: 'cbBTC', name: 'Coinbase Wrapped BTC', address: '0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf', chainId: 8453 },
+  ],
+  42161: [
+    { symbol: 'USDC', name: 'USD Coin (Arbitrum)', address: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831', chainId: 42161 },
+    { symbol: 'ARB', name: 'Arbitrum', address: '0x912CE59144191C1204E64559FE8253a0e49E6548', chainId: 42161 },
+    { symbol: 'USDT', name: 'Tether USD (Arbitrum)', address: '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9', chainId: 42161 },
+    { symbol: 'GMX', name: 'GMX', address: '0xfc5A1A6EB076a2C7aD06eD22C90d7E710E35ad0a', chainId: 42161 },
+  ],
+  1: [
+    { symbol: 'USDC', name: 'USD Coin (Ethereum)', address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', chainId: 1 },
+    { symbol: 'USDT', name: 'Tether USD (Ethereum)', address: '0xdAC17F958D2ee523a2206206994597C13D831ec7', chainId: 1 },
+    { symbol: 'UNI', name: 'Uniswap', address: '0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984', chainId: 1 },
+    { symbol: 'LINK', name: 'Chainlink', address: '0x514910771AF9Ca656af840dff83E8264EcF986CA', chainId: 1 },
+  ],
+  10: [
+    { symbol: 'USDC', name: 'USD Coin (Optimism)', address: '0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85', chainId: 10 },
+    { symbol: 'OP', name: 'Optimism', address: '0x4200000000000000000000000000000000000042', chainId: 10 },
+    { symbol: 'USDT', name: 'Tether USD (Optimism)', address: '0x94b008aA00579c1307B0EF2c499aD98a8ce58e58', chainId: 10 },
+  ],
+  137: [
+    { symbol: 'USDC', name: 'USD Coin (Polygon)', address: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359', chainId: 137 },
+    { symbol: 'USDT', name: 'Tether USD (Polygon)', address: '0xc2132D05D31c914a87C6611C10748AEb04B58e8F', chainId: 137 },
+    { symbol: 'AAVE', name: 'Aave (Polygon)', address: '0xD6DF932A45C0f255f85145f286eA0b292B21C90B', chainId: 137 },
+  ],
+  56: [
+    { symbol: 'USDT', name: 'Tether USD (BSC)', address: '0x55d398326f99059fF775485246999027B3197955', chainId: 56 },
+    { symbol: 'USDC', name: 'USD Coin (BSC)', address: '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d', chainId: 56 },
+    { symbol: 'CAKE', name: 'PancakeSwap Token', address: '0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82', chainId: 56 },
+  ],
+};
+
+export function getDexTokenPresetsForChain(chainId: number): DexTokenPreset[] {
+  return EVM_DEX_TOKEN_PRESETS[chainId] || EVM_DEX_TOKEN_PRESETS[8453];
+}
+
+export function getDefaultDexTokenForChain(chainId: number): DexTokenPreset {
+  const list = getDexTokenPresetsForChain(chainId);
+  return list[0];
+}
+
 /**
  * Multi-Chain MetaMask Network Switcher for any supported 0x EVM DEX chain (Phase AT).
  * Leaves `ensureBaseNetwork()` untouched for Billing & Launchpad contracts.

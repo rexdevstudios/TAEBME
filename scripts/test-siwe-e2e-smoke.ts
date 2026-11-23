@@ -143,8 +143,8 @@ async function runSiweE2eSmoke() {
       `GET /api/trade-intents?limit=5 returns persisted BTCUSDT order (Got HTTP ${histRes.status}, count=${intentsList.length})`
     );
 
-    // 10. Autonomous 4-Sub-Agent Dual-Rail Telemetry (Phase AR + AS)
-    const termRes = await fetch(`${BASE_URL}/api/agent/terminal-telemetry`, { headers: authHeaders });
+    // 10. Autonomous 4-Sub-Agent Dual-Rail Telemetry + On-Demand Scout Refresh (Phase AR + AS + AZ)
+    const termRes = await fetch(`${BASE_URL}/api/agent/terminal-telemetry?refreshScout=1`, { headers: authHeaders });
     const termJson: any = await termRes.json();
     assert(
       termRes.status === 200 &&
@@ -152,7 +152,14 @@ async function runSiweE2eSmoke() {
         Array.isArray(termJson?.data?.agentBreakdown) &&
         termJson.data.agentBreakdown.length === 4 &&
         termJson?.data?.dualRailReadiness?.externalDexZeroXReady === true,
-      `GET /api/agent/terminal-telemetry returns 4 sub-agents & externalDexZeroXReady=true (Got HTTP ${termRes.status})`
+      `GET /api/agent/terminal-telemetry?refreshScout=1 returns 4 sub-agents & externalDexZeroXReady=true (Got HTTP ${termRes.status})`
+    );
+    assert(
+      Array.isArray(termJson?.data?.liveFeed) &&
+        termJson.data.liveFeed.length >= 2 &&
+        typeof termJson.data.liveFeed[0]?.href === 'string' &&
+        termJson.data.liveFeed[0].href.startsWith('/trading?'),
+      `On-demand Scout telemetry populates liveFeed (${termJson?.data?.liveFeed?.length} items) with 1-click /trading handoff URLs`
     );
 
     // 11. Multi-Chain ERC-7715 Session Allowance on Arbitrum 42161 with FREE-tier cap clamping (Phase AS + AT)

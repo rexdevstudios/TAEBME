@@ -31,7 +31,12 @@ import { signBybitV5Post, submitBybitSpotOrder } from '../packages/trading/bybit
 import { resolveCexExecutionVenue } from '../packages/trading/venue-router';
 import { buildDexPartnerFeePayload, formatBrokerOrderId } from '../packages/trading/fee-monetization';
 import { buildZeroXQuoteUrl, ZEROX_NATIVE_ETH } from '../packages/trading/zerox-swap-client';
-import { EVM_DEX_CHAINS, getEvmExplorerTxUrl } from '../packages/launchpad/web3-provider';
+import {
+  EVM_DEX_CHAINS,
+  getDefaultDexTokenForChain,
+  getDexTokenPresetsForChain,
+  getEvmExplorerTxUrl,
+} from '../packages/launchpad/web3-provider';
 import {
   buildAutonomousTerminalSnapshot,
   buildTerminalTradeHandoffUrl,
@@ -538,6 +543,17 @@ async function runSimulationSuite() {
       arbOnlyFeed.length === 1 &&
       arbOnlyFeed[0].chainId === 42161,
     'On-demand Scout 60s cooldown guard and Arbitrum (42161) feed filter operate deterministically'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 20: 6-Chain Blue-Chip DEX Token Preset Registry (Phase BA)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 20: 6-Chain Blue-Chip DEX Token Preset Registry] ---');
+  assert(
+    getDefaultDexTokenForChain(42161).address === '0xaf88d065e77c8cC2239327C5EDb3A432268e5831' &&
+      getDefaultDexTokenForChain(56).address === '0x55d398326f99059fF775485246999027B3197955' &&
+      getDexTokenPresetsForChain(8453).length >= 4,
+    'All 6 EVM DEX chains resolve canonical checksummed blue-chip token presets cleanly'
   );
 
   console.log('\n================================================================');

@@ -13,6 +13,8 @@ import {
   EVM_DEX_CHAINS,
   ensureEvmNetwork,
   getBrowserSigner,
+  getDefaultDexTokenForChain,
+  getDexTokenPresetsForChain,
   getEvmExplorerTxUrl,
   normalizeWeb3Error,
 } from '@packages/launchpad/web3-provider';
@@ -397,7 +399,7 @@ export default function TradingPage() {
           type: orderType,
           quantity: orderQty > 0 ? orderQty : 0.1,
           maxSlippagePct: orderSlippagePct > 0 ? orderSlippagePct : 1.5,
-          tokenAddress: linkedTokenAddress || '0x4200000000000000000000000000000000000006',
+          tokenAddress: linkedTokenAddress || getDefaultDexTokenForChain(dexChainId).address,
           chainId: executionMode === 'DEX_NON_CUSTODIAL' ? dexChainId : parsedChainId,
           ...(executionMode === 'CEX_SINGLE_SHOT'
             ? {
@@ -808,7 +810,12 @@ export default function TradingPage() {
                 <select
                   aria-label="DEX EVM Network"
                   value={dexChainId}
-                  onChange={(e) => setDexChainId(Number(e.target.value) || 8453)}
+                  onChange={(e) => {
+                    const nextChain = Number(e.target.value) || 8453;
+                    setDexChainId(nextChain);
+                    const defPreset = getDefaultDexTokenForChain(nextChain);
+                    setLinkedTokenAddress(defPreset.address);
+                  }}
                   className="input"
                   style={{ width: '100%', padding: '6px 8px', fontSize: '11px', fontWeight: 700 }}
                 >
@@ -818,12 +825,45 @@ export default function TradingPage() {
                     </option>
                   ))}
                 </select>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                  <span className="text-muted" style={{ fontSize: '10px', fontWeight: 700 }}>
+                    Presets:
+                  </span>
+                  {getDexTokenPresetsForChain(dexChainId).map((preset) => {
+                    const isSelected =
+                      (linkedTokenAddress || getDefaultDexTokenForChain(dexChainId).address).toLowerCase() ===
+                      preset.address.toLowerCase();
+                    return (
+                      <button
+                        key={`${preset.chainId}-${preset.symbol}`}
+                        type="button"
+                        onClick={() => {
+                          setLinkedTokenAddress(preset.address);
+                        }}
+                        style={{
+                          padding: '2px 7px',
+                          fontSize: '10px',
+                          fontWeight: 800,
+                          borderRadius: '999px',
+                          cursor: 'pointer',
+                          fontFamily: 'var(--font-mono)',
+                          border: isSelected ? '1px solid #34D399' : '1px solid rgba(148, 163, 184, 0.25)',
+                          backgroundColor: isSelected ? 'rgba(16, 185, 129, 0.2)' : 'rgba(15, 23, 42, 0.6)',
+                          color: isSelected ? '#6EE7B7' : '#CBD5E1',
+                        }}
+                        title={`${preset.name} (${preset.address})`}
+                      >
+                        {preset.symbol}
+                      </button>
+                    );
+                  })}
+                </div>
                 <input
                   type="text"
                   aria-label="DEX Target Token Contract Address"
                   value={linkedTokenAddress || ''}
                   onChange={(e) => setLinkedTokenAddress(e.target.value.trim() || null)}
-                  placeholder="Target Token Contract 0x... (default Base WETH/USDC)"
+                  placeholder={`Target Token 0x... (default ${getDefaultDexTokenForChain(dexChainId).symbol}: ${getDefaultDexTokenForChain(dexChainId).address.slice(0, 10)}...)`}
                   className="input"
                   style={{ width: '100%', padding: '6px 8px', fontSize: '11px', fontFamily: 'var(--font-mono)' }}
                 />
