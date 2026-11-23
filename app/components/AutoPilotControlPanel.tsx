@@ -16,6 +16,7 @@ interface AutoPilotApiPayload {
   config: {
     enabled: boolean;
     rail: 'CEX_AUTO' | 'DEX_SESSION';
+    autoExecuteCex?: boolean;
     maxOrderUsd: number;
     takeProfitPct: number;
     stopLossPct: number;
@@ -47,6 +48,7 @@ export function AutoPilotControlPanel({ isConnected }: AutoPilotControlPanelProp
 
   const [enabled, setEnabled] = useState(false);
   const [rail, setRail] = useState<'CEX_AUTO' | 'DEX_SESSION'>('CEX_AUTO');
+  const [autoExecuteCex, setAutoExecuteCex] = useState(false);
   const [maxOrderUsd, setMaxOrderUsd] = useState(100);
   const [takeProfitPct, setTakeProfitPct] = useState(12);
   const [stopLossPct, setStopLossPct] = useState(5);
@@ -67,6 +69,7 @@ export function AutoPilotControlPanel({ isConnected }: AutoPilotControlPanelProp
           setData(payload);
           setEnabled(Boolean(payload.config?.enabled));
           setRail(payload.config?.rail === 'DEX_SESSION' ? 'DEX_SESSION' : 'CEX_AUTO');
+          setAutoExecuteCex(Boolean(payload.config?.autoExecuteCex));
           setMaxOrderUsd(Number(payload.config?.maxOrderUsd || 100));
           setTakeProfitPct(Number(payload.config?.takeProfitPct || 12));
           setStopLossPct(Number(payload.config?.stopLossPct || 5));
@@ -91,6 +94,7 @@ export function AutoPilotControlPanel({ isConnected }: AutoPilotControlPanelProp
         body: JSON.stringify({
           enabled,
           rail,
+          autoExecuteCex: rail === 'CEX_AUTO' ? autoExecuteCex : false,
           maxOrderUsd,
           takeProfitPct,
           stopLossPct,
@@ -313,6 +317,32 @@ export function AutoPilotControlPanel({ isConnected }: AutoPilotControlPanelProp
               />
             </label>
           </div>
+
+          {rail === 'CEX_AUTO' && (
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '11px',
+                fontWeight: 700,
+                padding: '8px 10px',
+                borderRadius: '6px',
+                border: '1px solid var(--color-border)',
+                background: 'rgba(16, 185, 129, 0.06)',
+                cursor: 'pointer',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={autoExecuteCex}
+                onChange={(e) => setAutoExecuteCex(e.target.checked)}
+              />
+              <span>
+                Opt-In: Auto-Execute CEX Spot Order (Bybit V5 Single-Shot) saat pulse 5 menit Cloudflare mendeteksi sinyal BUY / TP / SL. (Default OFF = Queue-Only)
+              </span>
+            </label>
+          )}
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
             <span className="text-muted" style={{ fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>

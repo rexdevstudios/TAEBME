@@ -28,6 +28,7 @@ import {
   syncActiveAutoPilotRegistry,
 } from './autopilot-market-feed';
 import { SubscriptionsEngine, type PlanId } from '../billing/subscriptions-engine';
+import { parseBybitKeyPair, submitBybitSpotOrder } from '../trading/bybit-vault';
 
 export interface AutoPilotWorkerTickOptions {
   userId: string;
@@ -39,10 +40,13 @@ export interface AutoPilotWorkerTickOptions {
   openPositions: AutoPilotOpenPosition[];
   dryRun?: boolean;
   nowMs?: number;
+  fetchImpl?: typeof fetch;
+  bybitCredentialOverride?: { apiKey: string; secretKey: string; environment: 'TESTNET' | 'MAINNET' } | null;
 }
 
 export async function runAutoPilotWorkerTick(opts: AutoPilotWorkerTickOptions): Promise<{
   queuedCount: number;
+  cexExecutedCount: number;
   dryRun: boolean;
   killSwitchActive: boolean;
   intentKeys: string[];
@@ -66,10 +70,64 @@ export async function runAutoPilotWorkerTick(opts: AutoPilotWorkerTickOptions): 
   });
 
   const intentKeys: string[] = [];
+  let cexExecutedCount = 0;
+  const planCap = SubscriptionsEngine.getPlanCapacities(opts.planId);
+  const canAutoExecuteCex =
+    !opts.dryRun &&
+    Boolean(opts.config.autoExecuteCex) &&
+    opts.config.rail === 'CEX_AUTO' &&
+    planCap.autoPilotEnabled;
+
   for (const intent of intents) {
     intentKeys.push(intent.idempotencyKey);
     if (!opts.dryRun) {
       await saveTradeIntent(intent);
+
+      let cexOrderId: string | undefined;
+      if (canAutoExecuteCex) {
+        try {
+          let cred = opts.bybitCredentialOverride || null;
+          if (!cred) {
+            const preferMainnet = opts.stage === 'LIVE' && planCap.allowMainnetBinance;
+            const resolved = await defaultProviderKeyVaultAdapter
+              .resolveDecryptedKeyForDeploy({
+                userIdentifier: opts.walletAddress,
+                targetChain: preferMainnet ? 'mainnet' : 'testnet',
+                provider: 'BYBIT',
+              })
+              .catch(() => null);
+            if (resolved?.apiKey) {
+              const pair = parseBybitKeyPair(resolved.apiKey);
+              cred = {
+                apiKey: pair.apiKey,
+                secretKey: pair.secretKey,
+                environment: preferMainnet ? 'MAINNET' : 'TESTNET',
+              };
+            }
+          }
+
+          if (cred) {
+            const execRes = await submitBybitSpotOrder({
+              apiKey: cred.apiKey,
+              secretKey: cred.secretKey,
+              environment: cred.environment,
+              symbol: intent.symbol,
+              side: intent.side,
+              orderType: 'MARKET',
+              qty: intent.quantity,
+              orderLinkId: intent.idempotencyKey.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 36),
+              fetchImpl: opts.fetchImpl,
+            });
+            if (execRes.submitted) {
+              cexExecutedCount += 1;
+              cexOrderId = execRes.orderId;
+            }
+          }
+        } catch {
+          // Non-blocking: intent remains safely persisted in PostgreSQL SSOT
+        }
+      }
+
       await notifyUserWebhookBestEffort({
         resolveWebhookUrl: async () => {
           const hook = await defaultProviderKeyVaultAdapter
@@ -83,13 +141,16 @@ export async function runAutoPilotWorkerTick(opts: AutoPilotWorkerTickOptions): 
         },
         payload: {
           event: 'AUTOPILOT_ORDER_QUEUED',
-          title: `Auto-Pilot Queued ${intent.side} ${intent.symbol}`,
-          message: `${intent.riskDecisionReason || 'Auto-Pilot Signal'} · Stage: ${intent.stage} · Qty: ${intent.quantity}`,
+          title: cexOrderId
+            ? `Auto-Pilot Executed ${intent.side} ${intent.symbol} (Bybit)`
+            : `Auto-Pilot Queued ${intent.side} ${intent.symbol}`,
+          message: `${intent.riskDecisionReason || 'Auto-Pilot Signal'} · Stage: ${intent.stage} · Qty: ${intent.quantity}${cexOrderId ? ` · OrderId: ${cexOrderId}` : ''}`,
           metadata: {
             symbol: intent.symbol,
             side: intent.side,
             stage: intent.stage,
             idempotencyKey: intent.idempotencyKey,
+            ...(cexOrderId ? { cexOrderId } : {}),
           },
         },
       });
@@ -98,6 +159,7 @@ export async function runAutoPilotWorkerTick(opts: AutoPilotWorkerTickOptions): 
 
   return {
     queuedCount: intents.length,
+    cexExecutedCount,
     dryRun: Boolean(opts.dryRun),
     killSwitchActive,
     intentKeys,

@@ -16,6 +16,7 @@ import {
 export interface AutoPilotConfig {
   enabled: boolean;
   rail: AutoPilotRail;
+  autoExecuteCex?: boolean;
   maxOrderUsd: number;
   takeProfitPct: number;
   stopLossPct: number;
@@ -27,6 +28,7 @@ export interface AutoPilotConfig {
 export interface AutoPilotConfigInput {
   enabled?: boolean;
   rail?: string;
+  autoExecuteCex?: boolean;
   maxOrderUsd?: number;
   takeProfitPct?: number;
   stopLossPct?: number;
@@ -39,6 +41,7 @@ export function getDefaultAutoPilotConfig(planId?: string | null): AutoPilotConf
   return {
     enabled: false,
     rail: 'CEX_AUTO',
+    autoExecuteCex: false,
     maxOrderUsd: cap.autoPilotEnabled ? Math.min(100, cap.maxAutoPilotOrderUsd) : 0,
     takeProfitPct: 12,
     stopLossPct: 5,
@@ -112,6 +115,7 @@ export function validateAndClampAutoPilotConfig(
     config: {
       enabled: Boolean(input.enabled),
       rail: rawRail,
+      autoExecuteCex: rawRail === 'CEX_AUTO' ? Boolean(input.autoExecuteCex) : false,
       maxOrderUsd,
       takeProfitPct: Math.round(rawTp * 100) / 100,
       stopLossPct: Math.round(rawSl * 100) / 100,

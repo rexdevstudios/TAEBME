@@ -911,6 +911,23 @@ async function runSimulationSuite() {
     'Automated data retention prunes expired residue while strictly preserving EXECUTED & financial audit logs'
   );
 
+  // -------------------------------------------------------------------------
+  // SCENARIO 35: Opt-In CEX Auto-Execute Guard (Phase BS)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 35: Opt-In CEX Auto-Execute Policy Guard] ---');
+  const bsCexOptIn = validateAndClampAutoPilotConfig(
+    { enabled: true, rail: 'CEX_AUTO', autoExecuteCex: true, maxOrderUsd: 250 },
+    'TRADER'
+  );
+  const bsDexGuard = validateAndClampAutoPilotConfig(
+    { enabled: true, rail: 'DEX_SESSION', autoExecuteCex: true, maxOrderUsd: 500 },
+    'AGENT'
+  );
+  assert(
+    bsCexOptIn.config.autoExecuteCex === true && bsDexGuard.config.autoExecuteCex === false,
+    'Auto-Pilot opt-in autoExecuteCex activates on CEX_AUTO and strictly stays false on DEX_SESSION'
+  );
+
   console.log('\n================================================================');
   console.log(`  🎉 SIMULATION SUITE COMPLETED: ${passed} PASSED, ${failed} FAILED`);
   console.log('================================================================\n');
