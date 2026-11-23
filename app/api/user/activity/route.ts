@@ -29,7 +29,10 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const limit = Number(searchParams.get('limit') || 10);
-    const rawActivities = await defaultBillingDbAdapter.getUserSecurityActivity(auth.walletAddress, limit);
+    const rawActivities = await defaultBillingDbAdapter.getUserSecurityActivity(
+      auth.user?.userId || auth.walletAddress,
+      limit
+    );
     const activities = rawActivities.map((item) => {
       const settlement = parseDexSettlementFromAuditReason(item.reason);
       return settlement
