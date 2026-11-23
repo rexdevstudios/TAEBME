@@ -429,6 +429,58 @@ export function resolveDexSellAmountAtomic(params: {
   }
 }
 
+export function formatDexQuoteOutputSummary(params: {
+  side: 'BUY' | 'SELL';
+  chainId: number;
+  tokenAddress?: string | null;
+  buyAmountAtomic?: string | null;
+  minBuyAmountAtomic?: string | null;
+}): {
+  buyTokenSymbol: string;
+  buyTokenDecimals: number;
+  estimatedOutFormatted: string;
+  minOutFormatted: string;
+} {
+  let buyTokenSymbol = 'TOKEN';
+  let buyTokenDecimals = 18;
+
+  if (params.side === 'SELL') {
+    const chainCfg = EVM_DEX_CHAINS[params.chainId] || SUPPORTED_BASE_CHAINS.BASE_MAINNET;
+    buyTokenSymbol = chainCfg.nativeCurrency.symbol || 'ETH';
+    buyTokenDecimals = chainCfg.nativeCurrency.decimals || 18;
+  } else {
+    const preset = findDexTokenPresetByAddress(params.chainId, params.tokenAddress);
+    buyTokenSymbol = preset?.symbol || 'TOKEN';
+    buyTokenDecimals = preset?.decimals ?? 18;
+  }
+
+  const formatAtomic = (raw?: string | null): string => {
+    if (!raw || typeof raw !== 'string') return '0';
+    try {
+      const bi = BigInt(raw);
+      if (bi <= 0n) return '0';
+      const formatted = ethers.formatUnits(bi, buyTokenDecimals);
+      const num = Number(formatted);
+      if (!Number.isFinite(num) || num <= 0) return formatted;
+      if (num >= 100) return num.toFixed(2);
+      if (num >= 1) return num.toFixed(4).replace(/\.?0+$/, '');
+      return num.toFixed(6).replace(/\.?0+$/, '');
+    } catch {
+      return '0';
+    }
+  };
+
+  const estimatedOutFormatted = formatAtomic(params.buyAmountAtomic);
+  const minOutFormatted = formatAtomic(params.minBuyAmountAtomic || params.buyAmountAtomic);
+
+  return {
+    buyTokenSymbol,
+    buyTokenDecimals,
+    estimatedOutFormatted,
+    minOutFormatted,
+  };
+}
+
 /**
  * Multi-Chain MetaMask Network Switcher for any supported 0x EVM DEX chain (Phase AT).
  * Leaves `ensureBaseNetwork()` untouched for Billing & Launchpad contracts.

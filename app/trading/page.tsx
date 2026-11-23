@@ -13,6 +13,7 @@ import {
   EVM_DEX_CHAINS,
   ensureEvmNetwork,
   findDexTokenPresetByAddress,
+  formatDexQuoteOutputSummary,
   getBrowserSigner,
   getDefaultDexTokenForChain,
   getDexTokenPresetsForChain,
@@ -285,9 +286,11 @@ export default function TradingPage() {
     sellToken?: string;
     sellAmount?: string;
     buyAmount?: string;
+    minBuyAmount?: string;
     allowanceTarget?: string | null;
     feeBps?: number;
     feeRecipient?: string;
+    routeSources?: string[];
     transaction?: { to: string; data: string; value: string; gas?: string };
     reason?: string;
   } | null>(null);
@@ -1078,6 +1081,28 @@ export default function TradingPage() {
                 <div style={{ fontSize: '11px', fontWeight: 800, color: '#34D399' }}>
                   ⚡ 0x Swap API v2 {dexSwapPayload?.available ? 'Calldata Ready' : 'ERC-20 Allowance Required'} (Chain {dexSwapPayload?.chainId || dexChainId})
                 </div>
+                {dexSwapPayload?.available && dexSwapPayload.buyAmount && (() => {
+                  const outSummary = formatDexQuoteOutputSummary({
+                    side: orderSide,
+                    chainId: dexSwapPayload.chainId || dexChainId,
+                    tokenAddress: linkedTokenAddress || getDefaultDexTokenForChain(dexChainId).address,
+                    buyAmountAtomic: dexSwapPayload.buyAmount,
+                    minBuyAmountAtomic: dexSwapPayload.minBuyAmount,
+                  });
+                  return (
+                    <div style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: '#E2E8F0', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <div>
+                        Est. Receive: <strong style={{ color: '#6EE7B7' }}>~{outSummary.estimatedOutFormatted} {outSummary.buyTokenSymbol}</strong>
+                        {' '}· Min: {outSummary.minOutFormatted} {outSummary.buyTokenSymbol}
+                      </div>
+                      {Array.isArray(dexSwapPayload.routeSources) && dexSwapPayload.routeSources.length > 0 && (
+                        <div className="text-muted" style={{ fontSize: '10px' }}>
+                          Routed via: {dexSwapPayload.routeSources.join(' + ')}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
                 <div className="text-muted" style={{ fontSize: '10px', fontFamily: 'var(--font-mono)' }}>
                   Protocol Fee: {((dexSwapPayload?.feeBps ?? 25) / 100).toFixed(2)}% (Auto-ETH → Treasury)
                 </div>

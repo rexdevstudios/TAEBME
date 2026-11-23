@@ -79,8 +79,26 @@ export interface ZeroXSwapQuoteResult {
   feeBps?: number;
   feeRecipient?: string;
   feeToken?: string;
+  routeSources?: string[];
   latencyMs: number;
   reason?: string;
+}
+
+export function extractZeroXRouteSources(data: unknown): string[] {
+  const fills = (data as any)?.route?.fills;
+  if (!Array.isArray(fills) || fills.length === 0) {
+    return ['0x_Settler_v2'];
+  }
+  const seen = new Set<string>();
+  const sources: string[] = [];
+  for (const f of fills) {
+    const src = typeof f?.source === 'string' ? f.source.trim() : '';
+    if (src && !seen.has(src)) {
+      seen.add(src);
+      sources.push(src);
+    }
+  }
+  return sources.length > 0 ? sources : ['0x_Settler_v2'];
 }
 
 export function buildZeroXQuoteUrl(params: {
@@ -235,6 +253,7 @@ export async function fetchZeroXSwapQuote(params: ZeroXQuoteParams): Promise<Zer
       feeBps: params.partnerFee.feeBps,
       feeRecipient: params.partnerFee.feeRecipient,
       feeToken: ZEROX_NATIVE_ETH,
+      routeSources: extractZeroXRouteSources(data),
       latencyMs,
     };
   } catch (err: any) {

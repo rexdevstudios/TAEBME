@@ -35,10 +35,12 @@ import {
   ZEROX_NATIVE_ETH,
   buildErc20ApproveTransaction,
   buildZeroXQuoteUrl,
+  extractZeroXRouteSources,
 } from '../packages/trading/zerox-swap-client';
 import {
   EVM_DEX_CHAINS,
   findDexTokenPresetByAddress,
+  formatDexQuoteOutputSummary,
   getDefaultDexTokenForChain,
   getDexTokenPresetsForChain,
   getEvmExplorerTxUrl,
@@ -603,6 +605,27 @@ async function runSimulationSuite() {
       cbBtcSellAtomic.sellTokenDecimals === 8 &&
       cbBtcSellAtomic.sellAmountAtomic === '1000000',
     'Token decimals-aware SELL amount resolves 6 decimals (USDC) and 8 decimals (cbBTC) accurately'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 23: Human-Readable 0x Quote Output Summary & DEX Route Fills (Phase BE)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 23: 0x Quote Output Summary & DEX Route Fills] ---');
+  const routeFills = extractZeroXRouteSources({
+    route: { fills: [{ source: 'Uniswap_V4' }, { source: 'Aerodrome' }] },
+  });
+  const quoteSummary = formatDexQuoteOutputSummary({
+    side: 'BUY',
+    chainId: 8453,
+    tokenAddress: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+    buyAmountAtomic: '32450000',
+    minBuyAmountAtomic: '32125500',
+  });
+  assert(
+    routeFills.includes('Uniswap_V4') &&
+      quoteSummary.buyTokenSymbol === 'USDC' &&
+      quoteSummary.estimatedOutFormatted === '32.45',
+    'Human-readable 0x quote output summary and DEX route sources format cleanly'
   );
 
   console.log('\n================================================================');

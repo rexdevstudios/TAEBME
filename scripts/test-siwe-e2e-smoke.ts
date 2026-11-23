@@ -251,6 +251,12 @@ async function runSiweE2eSmoke() {
         Boolean(arbDexJson?.data?.zeroXSwap && arbDexJson.data.zeroXSwap.chainId === 42161),
       `Arbitrum 42161 DEX payload includes partnerFee (${arbDexJson?.data?.partnerFee?.feeBps} bps) & zeroXSwap (available=${arbDexJson?.data?.zeroXSwap?.available}, chainId=${arbDexJson?.data?.zeroXSwap?.chainId})`
     );
+    assert(
+      Array.isArray(arbDexJson?.data?.zeroXSwap?.routeSources) &&
+        arbDexJson.data.zeroXSwap.routeSources.length >= 1 &&
+        BigInt(arbDexJson?.data?.zeroXSwap?.buyAmount || '0') > 0n,
+      `Live 0x v2 quote includes positive buyAmount (${arbDexJson?.data?.zeroXSwap?.buyAmount}) & routeSources (${arbDexJson?.data?.zeroXSwap?.routeSources?.join('+')})`
+    );
 
     // 15. Non-Custodial DEX SELL Quote includes ERC-20 AllowanceHolder target (Phase BC)
     const sellDexRes = await fetch(`${BASE_URL}/api/trading/execute`, {
