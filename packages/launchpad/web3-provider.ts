@@ -392,13 +392,14 @@ export interface TradeIntentSummaryCounts {
 }
 
 /**
- * Pure summary & filter helper for `RecentTradeHistoryPanel` (Phase BH1).
+ * Pure summary & filter helper for `RecentTradeHistoryPanel` (Phase BH1 + BJ1).
  */
 export function summarizeAndFilterTradeIntents<
   T extends { status: string; idempotencyKey?: string }
 >(
   intents: T[],
-  filter: TradeIntentHistoryFilter = 'ALL'
+  filter: TradeIntentHistoryFilter = 'ALL',
+  chainIdFilter: number | null = null
 ): { counts: TradeIntentSummaryCounts; filtered: T[] } {
   const list = Array.isArray(intents) ? intents : [];
   let dexSettled = 0;
@@ -417,13 +418,22 @@ export function summarizeAndFilterTradeIntents<
     if (isRej) rejected += 1;
   }
 
+  const normalizedChainId =
+    chainIdFilter !== null && Number.isInteger(Number(chainIdFilter)) && Number(chainIdFilter) > 0
+      ? Number(chainIdFilter)
+      : null;
+
   const filtered = list.filter((item) => {
-    const isDex = Boolean(parseDexSettlementFromIdempotencyKey(item.idempotencyKey));
+    const settlement = parseDexSettlementFromIdempotencyKey(item.idempotencyKey);
+    const isDex = Boolean(settlement);
     const st = String(item.status || '').toUpperCase();
     const isRej = st === 'REJECTED' || st === 'BLOCKED' || st === 'CANCELLED';
-    if (filter === 'DEX_SETTLED') return isDex;
-    if (filter === 'CEX_OR_PAPER') return !isDex && !isRej;
-    if (filter === 'REJECTED') return isRej;
+    if (filter === 'DEX_SETTLED' && !isDex) return false;
+    if (filter === 'CEX_OR_PAPER' && (isDex || isRej)) return false;
+    if (filter === 'REJECTED' && !isRej) return false;
+    if (normalizedChainId !== null) {
+      if (!settlement || settlement.chainId !== normalizedChainId) return false;
+    }
     return true;
   });
 
@@ -437,6 +447,49 @@ export function summarizeAndFilterTradeIntents<
     },
     filtered,
   };
+}
+
+function escapeCsvCell(value: unknown): string {
+  const raw = value === null || value === undefined ? '' : String(value);
+  const formulaSafe = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
+  if (/[",\r\n]/.test(formulaSafe)) {
+    return `"${formulaSafe.replace(/"/g, '""')}"`;
+  }
+  return formulaSafe;
+}
+
+/**
+ * Serializes trade intents into RFC-4180 CSV with spreadsheet formula-injection protection (Phase BJ1).
+ */
+export function serializeTradeIntentsToCsv(
+  intents: Array<{
+    id: string;
+    createdAt?: string;
+    stage: string;
+    side: string;
+    symbol: string;
+    quantity: number;
+    status: string;
+    idempotencyKey?: string;
+  }>
+): string {
+  const header = 'id,createdAt,stage,side,symbol,quantity,status,chainId,txHash,explorerUrl';
+  const rows = (Array.isArray(intents) ? intents : []).map((item) => {
+    const settlement = parseDexSettlementFromIdempotencyKey(item.idempotencyKey);
+    return [
+      escapeCsvCell(item.id),
+      escapeCsvCell(item.createdAt || ''),
+      escapeCsvCell(item.stage),
+      escapeCsvCell(item.side),
+      escapeCsvCell(item.symbol),
+      escapeCsvCell(item.quantity),
+      escapeCsvCell(item.status),
+      escapeCsvCell(settlement?.chainId ?? ''),
+      escapeCsvCell(settlement?.txHash ?? ''),
+      escapeCsvCell(settlement?.explorerUrl ?? ''),
+    ].join(',');
+  });
+  return [header, ...rows].join('\n');
 }
 
 export interface DexTokenPreset {

@@ -20,6 +20,10 @@ interface UserSecurityActivityPanelProps {
 export function UserSecurityActivityPanel({ isConnected }: UserSecurityActivityPanelProps) {
   const [rows, setRows] = useState<ActivityRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [onlyDexOnChain, setOnlyDexOnChain] = useState(false);
+
+  const visibleRows = onlyDexOnChain ? rows.filter((r) => Boolean(r.explorerUrl)) : rows;
+  const dexCount = rows.filter((r) => Boolean(r.explorerUrl)).length;
 
   const load = async () => {
     if (!isConnected) return;
@@ -60,24 +64,64 @@ export function UserSecurityActivityPanel({ isConnected }: UserSecurityActivityP
         <h3 style={{ fontSize: '15px', fontWeight: 800, color: 'var(--color-foreground)', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
           <ShieldCheck size={16} style={{ color: '#10B981' }} /> Riwayat Keamanan Akun (10 Terakhir)
         </h3>
-        <button
-          type="button"
-          onClick={load}
-          disabled={loading}
-          className="btn-secondary"
-          style={{ padding: '4px 8px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-        >
-          <RefreshCw size={11} /> {loading ? 'Memuat...' : 'Refresh'}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {rows.length > 0 && (
+            <>
+              <button
+                type="button"
+                onClick={() => setOnlyDexOnChain(false)}
+                style={{
+                  fontSize: '10px',
+                  fontWeight: 700,
+                  padding: '3px 7px',
+                  borderRadius: '999px',
+                  cursor: 'pointer',
+                  border: !onlyDexOnChain ? '1px solid #38BDF8' : '1px solid var(--color-border)',
+                  background: !onlyDexOnChain ? 'rgba(56, 189, 248, 0.14)' : 'transparent',
+                  color: !onlyDexOnChain ? '#38BDF8' : 'var(--color-muted)',
+                }}
+              >
+                All ({rows.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setOnlyDexOnChain(true)}
+                style={{
+                  fontSize: '10px',
+                  fontWeight: 700,
+                  padding: '3px 7px',
+                  borderRadius: '999px',
+                  cursor: 'pointer',
+                  border: onlyDexOnChain ? '1px solid #38BDF8' : '1px solid var(--color-border)',
+                  background: onlyDexOnChain ? 'rgba(56, 189, 248, 0.14)' : 'transparent',
+                  color: onlyDexOnChain ? '#38BDF8' : 'var(--color-muted)',
+                }}
+              >
+                DEX On-Chain ({dexCount})
+              </button>
+            </>
+          )}
+          <button
+            type="button"
+            onClick={load}
+            disabled={loading}
+            className="btn-secondary"
+            style={{ padding: '4px 8px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+          >
+            <RefreshCw size={11} /> {loading ? 'Memuat...' : 'Refresh'}
+          </button>
+        </div>
       </div>
 
-      {rows.length === 0 ? (
+      {visibleRows.length === 0 ? (
         <div className="text-muted" style={{ fontSize: '12px' }}>
-          Belum ada catatan aktivitas keamanan (tambah API Key, verifikasi Binance / BYOK LLM / Webhook, pembelian Add-On, atau update Risk Policy akan muncul otomatis di sini).
+          {rows.length === 0
+            ? 'Belum ada catatan aktivitas keamanan (tambah API Key, verifikasi Binance / BYOK LLM / Webhook, pembelian Add-On, atau update Risk Policy akan muncul otomatis di sini).'
+            : 'Belum ada aktivitas DEX On-Chain pada 10 log terakhir.'}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          {rows.map((r) => (
+          {visibleRows.map((r) => (
             <div
               key={r.id}
               style={{

@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { ExternalLink, History, RefreshCw } from 'lucide-react';
+import { Download, ExternalLink, History, RefreshCw } from 'lucide-react';
 import {
+  EVM_DEX_CHAINS,
   parseDexSettlementFromIdempotencyKey,
+  serializeTradeIntentsToCsv,
   summarizeAndFilterTradeIntents,
   type TradeIntentHistoryFilter,
 } from '@packages/launchpad/web3-provider';
@@ -34,11 +36,24 @@ export function RecentTradeHistoryPanel({
   const [intents, setIntents] = useState<TradeIntentItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeFilter, setActiveFilter] = useState<TradeIntentHistoryFilter>('ALL');
+  const [selectedChainId, setSelectedChainId] = useState<number | null>(null);
 
   const { counts, filtered } = useMemo(
-    () => summarizeAndFilterTradeIntents(intents, activeFilter),
-    [intents, activeFilter]
+    () => summarizeAndFilterTradeIntents(intents, activeFilter, selectedChainId),
+    [intents, activeFilter, selectedChainId]
   );
+
+  const handleExportCsv = () => {
+    if (filtered.length === 0) return;
+    const csv = serializeTradeIntentsToCsv(filtered);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `rtrader-trade-history-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const loadHistory = async () => {
     if (!isConnected) {
@@ -92,19 +107,32 @@ export function RecentTradeHistoryPanel({
         >
           <History size={14} className="text-accent" /> Riwayat Trade Intent ({intents.length})
         </h3>
-        <button
-          type="button"
-          onClick={loadHistory}
-          disabled={loading}
-          className="btn-secondary"
-          style={{ padding: '3px 7px', fontSize: '10px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-        >
-          <RefreshCw size={10} /> {loading ? '...' : 'Refresh'}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {filtered.length > 0 && (
+            <button
+              type="button"
+              onClick={handleExportCsv}
+              className="btn-secondary"
+              style={{ padding: '3px 7px', fontSize: '10px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+              title="Export riwayat order terfilter ke CSV (formula-safe)"
+            >
+              <Download size={10} /> CSV
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={loadHistory}
+            disabled={loading}
+            className="btn-secondary"
+            style={{ padding: '3px 7px', fontSize: '10px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+          >
+            <RefreshCw size={10} /> {loading ? '...' : 'Refresh'}
+          </button>
+        </div>
       </div>
 
       {intents.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
           {(
             [
               { key: 'ALL', label: `All (${counts.total})` },
@@ -118,7 +146,12 @@ export function RecentTradeHistoryPanel({
               <button
                 key={tab.key}
                 type="button"
-                onClick={() => setActiveFilter(tab.key)}
+                onClick={() => {
+                  setActiveFilter(tab.key);
+                  if (tab.key === 'CEX_OR_PAPER' || tab.key === 'REJECTED') {
+                    setSelectedChainId(null);
+                  }
+                }}
                 style={{
                   fontSize: '10px',
                   fontWeight: 700,
@@ -134,6 +167,29 @@ export function RecentTradeHistoryPanel({
               </button>
             );
           })}
+          {counts.dexSettled > 0 && (activeFilter === 'ALL' || activeFilter === 'DEX_SETTLED') && (
+            <select
+              aria-label="Filter EVM Chain"
+              value={selectedChainId ?? ''}
+              onChange={(e) => setSelectedChainId(e.target.value ? Number(e.target.value) : null)}
+              style={{
+                fontSize: '10px',
+                fontWeight: 700,
+                padding: '2px 6px',
+                borderRadius: '999px',
+                border: '1px solid var(--color-border)',
+                background: 'var(--color-surface)',
+                color: 'var(--color-foreground)',
+              }}
+            >
+              <option value="">All Chains</option>
+              {Object.values(EVM_DEX_CHAINS).map((c) => (
+                <option key={c.chainId} value={c.chainId}>
+                  #{c.chainId} {c.name}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       )}
 

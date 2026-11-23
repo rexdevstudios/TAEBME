@@ -44,6 +44,7 @@ import {
   formatDexQuoteOutputSummary,
   getDefaultDexTokenForChain,
   parseDexSettlementFromAuditReason,
+  serializeTradeIntentsToCsv,
   summarizeAndFilterTradeIntents,
   getDexTokenPresetsForChain,
   getEvmExplorerTxUrl,
@@ -725,6 +726,37 @@ async function runSimulationSuite() {
       biParsed.side === 'SELL' &&
       biParsed.qty === 0.05,
     'Trade history 1-click Re-Trade URL preserves Arbitrum chainId, DEX mode, side, and quantity cleanly'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 28: Multi-Chain History Filter & Formula-Safe CSV Export (Phase BJ)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 28: Multi-Chain History Filter & CSV Export] ---');
+  const bjFiltered = summarizeAndFilterTradeIntents(
+    [
+      { id: '1', status: 'EXECUTED', idempotencyKey: encodedDexKey },
+      { id: '2', status: 'APPROVED', idempotencyKey: 'paper-2' },
+    ],
+    'DEX_SETTLED',
+    42161
+  );
+  const bjCsv = serializeTradeIntentsToCsv([
+    {
+      id: '1',
+      createdAt: '2026-11-23T09:00:00.000Z',
+      stage: 'LIVE',
+      side: 'BUY',
+      symbol: '=EVIL',
+      quantity: 0.02,
+      status: 'EXECUTED',
+      idempotencyKey: encodedDexKey,
+    },
+  ]);
+  assert(
+    bjFiltered.filtered.length === 1 &&
+      bjCsv.includes("'=EVIL") &&
+      bjCsv.includes(`https://arbiscan.io/tx/${dummyTxHash}`),
+    'Multi-chain history filter & formula-safe CSV audit export work deterministically'
   );
 
   console.log('\n================================================================');
