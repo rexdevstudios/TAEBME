@@ -20,6 +20,7 @@ export interface AutoPilotConfig {
   maxOrderUsd: number;
   takeProfitPct: number;
   stopLossPct: number;
+  trailingStopPct?: number;
   minConfidenceScore: number;
   allowedSymbols: string[];
   updatedAt: string;
@@ -32,6 +33,7 @@ export interface AutoPilotConfigInput {
   maxOrderUsd?: number;
   takeProfitPct?: number;
   stopLossPct?: number;
+  trailingStopPct?: number;
   minConfidenceScore?: number;
   allowedSymbols?: string[] | string;
 }
@@ -43,6 +45,7 @@ export interface AutoPilotStrategyPreset {
   maxOrderUsd: number;
   takeProfitPct: number;
   stopLossPct: number;
+  trailingStopPct: number;
   minConfidenceScore: number;
   allowedSymbols: string[];
 }
@@ -51,30 +54,33 @@ export const AUTOPILOT_STRATEGY_PRESETS: AutoPilotStrategyPreset[] = [
   {
     id: 'CONSERVATIVE',
     label: 'Konservatif (Pemula)',
-    description: 'Blue-chip BTC & ETH · TP 8% / SL 3% · Filter AI ketat (82+)',
+    description: 'Blue-chip BTC & ETH · TP 8% / SL 3% / Trail 2.5% · Filter AI ketat (82+)',
     maxOrderUsd: 50,
     takeProfitPct: 8,
     stopLossPct: 3,
+    trailingStopPct: 2.5,
     minConfidenceScore: 82,
     allowedSymbols: ['BTCUSDT', 'ETHUSDT'],
   },
   {
     id: 'BALANCED',
     label: 'Seimbang (Swing)',
-    description: 'BTC, ETH, SOL · TP 15% / SL 5% · Filter AI seimbang (75+)',
+    description: 'BTC, ETH, SOL · TP 15% / SL 5% / Trail 4% · Filter AI seimbang (75+)',
     maxOrderUsd: 150,
     takeProfitPct: 15,
     stopLossPct: 5,
+    trailingStopPct: 4,
     minConfidenceScore: 75,
     allowedSymbols: ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'],
   },
   {
     id: 'AGGRESSIVE',
     label: 'Agresif (Momentum)',
-    description: 'Multi-pair momentum · TP 25% / SL 8% · Filter AI responsif (68+)',
+    description: 'Multi-pair momentum · TP 25% / SL 8% / Trail 6% · Filter AI responsif (68+)',
     maxOrderUsd: 250,
     takeProfitPct: 25,
     stopLossPct: 8,
+    trailingStopPct: 6,
     minConfidenceScore: 68,
     allowedSymbols: ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT'],
   },
@@ -89,6 +95,7 @@ export function getDefaultAutoPilotConfig(planId?: string | null): AutoPilotConf
     maxOrderUsd: cap.autoPilotEnabled ? Math.min(100, cap.maxAutoPilotOrderUsd) : 0,
     takeProfitPct: 12,
     stopLossPct: 5,
+    trailingStopPct: 0,
     minConfidenceScore: 75,
     allowedSymbols: ['BTCUSDT', 'ETHUSDT'],
     updatedAt: new Date().toISOString(),
@@ -124,11 +131,15 @@ export function validateAndClampAutoPilotConfig(
 
   const rawTp = Number(input.takeProfitPct ?? 12);
   const rawSl = Number(input.stopLossPct ?? 5);
+  const rawTrailing = input.trailingStopPct === undefined || input.trailingStopPct === null ? 0 : Number(input.trailingStopPct);
   if (!Number.isFinite(rawTp) || rawTp < 1 || rawTp > 200) {
     throw new Error('INVALID_TAKE_PROFIT_PCT: takeProfitPct must be between 1% and 200%.');
   }
   if (!Number.isFinite(rawSl) || rawSl < 0.5 || rawSl > 50) {
     throw new Error('INVALID_STOP_LOSS_PCT: stopLossPct must be between 0.5% and 50%.');
+  }
+  if (!Number.isFinite(rawTrailing) || rawTrailing < 0 || (rawTrailing > 0 && rawTrailing < 0.5) || rawTrailing > 30) {
+    throw new Error('INVALID_TRAILING_STOP_PCT: trailingStopPct must be 0 (OFF) or between 0.5% and 30%.');
   }
 
   const rawConf = Number(input.minConfidenceScore ?? 75);
@@ -163,6 +174,7 @@ export function validateAndClampAutoPilotConfig(
       maxOrderUsd,
       takeProfitPct: Math.round(rawTp * 100) / 100,
       stopLossPct: Math.round(rawSl * 100) / 100,
+      trailingStopPct: rawTrailing > 0 ? Math.round(rawTrailing * 100) / 100 : 0,
       minConfidenceScore,
       allowedSymbols,
       updatedAt: new Date().toISOString(),
@@ -170,13 +182,15 @@ export function validateAndClampAutoPilotConfig(
   };
 }
 
-export type AutoPilotExitAction = 'TAKE_PROFIT_SELL' | 'STOP_LOSS_SELL' | 'HOLD';
+export type AutoPilotExitAction = 'TAKE_PROFIT_SELL' | 'STOP_LOSS_SELL' | 'TRAILING_STOP_SELL' | 'HOLD';
 
 export function evaluateAutoPilotPositionExit(params: {
   entryPrice: number;
   currentPrice: number;
   takeProfitPct: number;
   stopLossPct: number;
+  peakPrice?: number;
+  trailingStopPct?: number;
 }): { action: AutoPilotExitAction; pnlPct: number } {
   const entry = Number(params.entryPrice);
   const current = Number(params.currentPrice);
@@ -187,10 +201,62 @@ export function evaluateAutoPilotPositionExit(params: {
   if (pnlPct >= Number(params.takeProfitPct)) {
     return { action: 'TAKE_PROFIT_SELL', pnlPct };
   }
+
+  const trailing = Number(params.trailingStopPct ?? 0);
+  const peak = Number(params.peakPrice ?? 0);
+  if (Number.isFinite(trailing) && trailing > 0 && Number.isFinite(peak) && peak > entry) {
+    const drawdownFromPeakPct = Math.round(((peak - current) / peak) * 10000) / 100;
+    if (drawdownFromPeakPct >= trailing) {
+      return { action: 'TRAILING_STOP_SELL', pnlPct };
+    }
+  }
+
   if (pnlPct <= -Math.abs(Number(params.stopLossPct))) {
     return { action: 'STOP_LOSS_SELL', pnlPct };
   }
   return { action: 'HOLD', pnlPct };
+}
+
+export function explainAutoPilotDecision(
+  code: AutoPilotEntryDecision | AutoPilotExitAction | 'STRATEGY_CAP_REACHED',
+  ctx?: {
+    symbol?: string;
+    confidenceScore?: number;
+    minConfidenceScore?: number;
+    orderUsd?: number;
+    maxOrderUsd?: number;
+    pnlPct?: number;
+    takeProfitPct?: number;
+    stopLossPct?: number;
+    trailingStopPct?: number;
+  }
+): string {
+  const sym = ctx?.symbol || 'Token';
+  switch (code) {
+    case 'AUTO_BUY_READY':
+      return `${sym} lolos filter AI (skor ${ctx?.confidenceScore ?? '-'} ≥ ${ctx?.minConfidenceScore ?? '-'}) & modal $${ctx?.orderUsd ?? '-'} dalam batas — siap beli.`;
+    case 'BLOCKED_KILL_SWITCH':
+      return `${sym} ditahan: Global Kill-Switch sedang AKTIF untuk keamanan darurat.`;
+    case 'AUTOPILOT_DISABLED':
+      return `${sym} dilewati: Status Auto-Pilot masih PAUSED (Advisory Only).`;
+    case 'SYMBOL_NOT_ALLOWED':
+      return `${sym} dilewati: Aset tidak termasuk dalam daftar Allowed Symbols Anda.`;
+    case 'CONFIDENCE_BELOW_THRESHOLD':
+      return `${sym} dilewati: Skor AI (${ctx?.confidenceScore ?? '-'}) masih di bawah ambang minimum (${ctx?.minConfidenceScore ?? '-'}).`;
+    case 'ORDER_EXCEEDS_CAP':
+      return `${sym} dilewati: Ukuran order ($${ctx?.orderUsd ?? '-'}) melebihi batas modal per order ($${ctx?.maxOrderUsd ?? '-'}).`;
+    case 'STRATEGY_CAP_REACHED':
+      return `${sym} dilewati: Kuota strategi aktif paket Anda sudah penuh.`;
+    case 'TAKE_PROFIT_SELL':
+      return `${sym} jual Take Profit: PnL ${ctx?.pnlPct ?? 0}% mencapai target TP ${ctx?.takeProfitPct ?? '-'}%.`;
+    case 'TRAILING_STOP_SELL':
+      return `${sym} jual Trailing Stop: Harga turun dari puncak melebihi batas ${ctx?.trailingStopPct ?? '-'}% (PnL ${ctx?.pnlPct ?? 0}%) — amankan profit.`;
+    case 'STOP_LOSS_SELL':
+      return `${sym} jual Stop Loss: PnL ${ctx?.pnlPct ?? 0}% menyentuh batas rugi -${ctx?.stopLossPct ?? '-'}%.`;
+    case 'HOLD':
+    default:
+      return `${sym} tetap HOLD: PnL ${ctx?.pnlPct ?? 0}% masih di dalam rentang aman TP/SL.`;
+  }
 }
 
 export type AutoPilotEntryDecision =

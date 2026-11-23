@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Activity, ShieldAlert, BarChart3, Clock, AlertTriangle, Lightbulb, Wallet, BrainCircuit, ActivitySquare, Lock } from 'lucide-react';
 import { NutritionLabelCard } from '../components/NutritionLabelCard';
+import { TokenSafetyBadgeCard } from '../components/TokenSafetyBadgeCard';
 import { PageWorkflowBanner } from '../components/PageWorkflowBanner';
 import { BinanceKeyVaultPanel } from '../components/BinanceKeyVaultPanel';
 import { BybitKeyVaultPanel } from '../components/BybitKeyVaultPanel';
@@ -1035,6 +1036,10 @@ export default function TradingPage() {
                   placeholder={`Target Token 0x... (default ${getDefaultDexTokenForChain(dexChainId).symbol}: ${getDefaultDexTokenForChain(dexChainId).address.slice(0, 10)}...)`}
                   className="input"
                   style={{ width: '100%', padding: '6px 8px', fontSize: '11px', fontFamily: 'var(--font-mono)' }}
+                />
+                <TokenSafetyBadgeCard
+                  address={linkedTokenAddress || getDefaultDexTokenForChain(dexChainId).address}
+                  chainId={dexChainId}
                 />
               </div>
             )}

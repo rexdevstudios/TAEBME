@@ -12,6 +12,7 @@ import { SubscriptionsEngine, type PlanId } from '../billing/subscriptions-engin
 import {
   evaluateAutoPilotEntrySignal,
   evaluateAutoPilotPositionExit,
+  explainAutoPilotDecision,
   type AutoPilotConfig,
   type AutoPilotEntryDecision,
   type AutoPilotExitAction,
@@ -28,6 +29,7 @@ export interface AutoPilotOpenPosition {
   symbol: string;
   entryPrice: number;
   currentPrice: number;
+  peakPrice?: number;
   quantity: number;
 }
 
@@ -38,6 +40,7 @@ export interface AutoPilotExitEvaluation {
   currentPrice: number;
   pnlPct: number;
   action: AutoPilotExitAction;
+  reason: string;
 }
 
 export interface AutoPilotEntryEvaluation {
@@ -47,6 +50,7 @@ export interface AutoPilotEntryEvaluation {
   source: string;
   decision: AutoPilotEntryDecision | 'STRATEGY_CAP_REACHED';
   approved: boolean;
+  reason: string;
 }
 
 export interface AutoPilotCycleReport {
@@ -61,6 +65,7 @@ export interface AutoPilotCycleReport {
     buyReadyCount: number;
     tpSellCount: number;
     slSellCount: number;
+    trailingStopSellCount?: number;
     holdCount: number;
     skippedCount: number;
   };
@@ -99,26 +104,38 @@ export function runAutonomousCycleEvaluation(params: {
 
   let tpSellCount = 0;
   let slSellCount = 0;
+  let trailingStopSellCount = 0;
   let holdCount = 0;
 
   const exitActions: AutoPilotExitEvaluation[] = (params.openPositions || []).map((pos) => {
+    const symbol = String(pos.symbol || '').trim().toUpperCase();
     const res = evaluateAutoPilotPositionExit({
       entryPrice: pos.entryPrice,
       currentPrice: pos.currentPrice,
+      peakPrice: pos.peakPrice,
       takeProfitPct: params.config.takeProfitPct,
       stopLossPct: params.config.stopLossPct,
+      trailingStopPct: params.config.trailingStopPct,
     });
     if (res.action === 'TAKE_PROFIT_SELL') tpSellCount += 1;
+    else if (res.action === 'TRAILING_STOP_SELL') trailingStopSellCount += 1;
     else if (res.action === 'STOP_LOSS_SELL') slSellCount += 1;
     else holdCount += 1;
 
     return {
-      symbol: String(pos.symbol || '').trim().toUpperCase(),
+      symbol,
       quantity: Number(pos.quantity || 0),
       entryPrice: Number(pos.entryPrice || 0),
       currentPrice: Number(pos.currentPrice || 0),
       pnlPct: res.pnlPct,
       action: res.action,
+      reason: explainAutoPilotDecision(res.action, {
+        symbol,
+        pnlPct: res.pnlPct,
+        takeProfitPct: params.config.takeProfitPct,
+        stopLossPct: params.config.stopLossPct,
+        trailingStopPct: params.config.trailingStopPct,
+      }),
     };
   });
 
@@ -142,6 +159,7 @@ export function runAutonomousCycleEvaluation(params: {
         source,
         decision: 'STRATEGY_CAP_REACHED',
         approved: false,
+        reason: explainAutoPilotDecision('STRATEGY_CAP_REACHED', { symbol }),
       };
     }
 
@@ -166,6 +184,13 @@ export function runAutonomousCycleEvaluation(params: {
       source,
       decision: res.decision,
       approved: res.approved,
+      reason: explainAutoPilotDecision(res.decision, {
+        symbol,
+        confidenceScore,
+        minConfidenceScore: params.config.minConfidenceScore,
+        orderUsd,
+        maxOrderUsd: params.config.maxOrderUsd,
+      }),
     };
   });
 
@@ -181,6 +206,7 @@ export function runAutonomousCycleEvaluation(params: {
       buyReadyCount,
       tpSellCount,
       slSellCount,
+      trailingStopSellCount,
       holdCount,
       skippedCount,
     },

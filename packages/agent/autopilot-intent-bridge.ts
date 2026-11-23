@@ -47,9 +47,15 @@ export function buildTradeIntentsFromAutoPilotReport(params: {
 
   const intents: SaveTradeIntentParams[] = [];
 
-  // 1. Capital-protective TP/SL SELL exits (allowed even if Kill-Switch blocks new entries)
+  // 1. Capital-protective TP/SL/Trailing-Stop SELL exits (allowed even if Kill-Switch blocks new entries)
   for (const exit of params.report.exitActions || []) {
-    if (exit.action !== 'TAKE_PROFIT_SELL' && exit.action !== 'STOP_LOSS_SELL') continue;
+    if (
+      exit.action !== 'TAKE_PROFIT_SELL' &&
+      exit.action !== 'STOP_LOSS_SELL' &&
+      exit.action !== 'TRAILING_STOP_SELL'
+    ) {
+      continue;
+    }
     if (!Number.isFinite(exit.quantity) || exit.quantity <= 0) continue;
 
     intents.push({

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Radar, Microscope, BrainCircuit, ShieldCheck, Zap, AlertTriangle, ArrowRight, CheckCircle2, ExternalLink } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { STRATEGY_PROFILES, type StrategyProfileId } from '@packages/intelligence/dex-market-scanner';
+import { TokenSafetyBadgeCard } from './TokenSafetyBadgeCard';
 
 interface FiveAgentDeskPanelProps {
   isConnected: boolean;
@@ -361,6 +362,8 @@ export function FiveAgentDeskPanel({
               <div className="text-muted">Jalankan 1 siklus 5-Agent Desk untuk melihat log READ-BACK real-time tanpa kolisi.</div>
             )}
           </div>
+
+          {report?.tokenSecurity && <TokenSafetyBadgeCard report={report.tokenSecurity} />}
 
           {report?.dexSnapshot && (
             <div

@@ -21,6 +21,7 @@ interface AutoPilotApiPayload {
     maxOrderUsd: number;
     takeProfitPct: number;
     stopLossPct: number;
+    trailingStopPct?: number;
     minConfidenceScore: number;
     allowedSymbols: string[];
     updatedAt?: string;
@@ -53,6 +54,7 @@ export function AutoPilotControlPanel({ isConnected }: AutoPilotControlPanelProp
   const [maxOrderUsd, setMaxOrderUsd] = useState(100);
   const [takeProfitPct, setTakeProfitPct] = useState(12);
   const [stopLossPct, setStopLossPct] = useState(5);
+  const [trailingStopPct, setTrailingStopPct] = useState(0);
   const [minConfidenceScore, setMinConfidenceScore] = useState(75);
   const [symbolsText, setSymbolsText] = useState('BTCUSDT, ETHUSDT');
 
@@ -74,6 +76,7 @@ export function AutoPilotControlPanel({ isConnected }: AutoPilotControlPanelProp
           setMaxOrderUsd(Number(payload.config?.maxOrderUsd || 100));
           setTakeProfitPct(Number(payload.config?.takeProfitPct || 12));
           setStopLossPct(Number(payload.config?.stopLossPct || 5));
+          setTrailingStopPct(Number(payload.config?.trailingStopPct || 0));
           setMinConfidenceScore(Number(payload.config?.minConfidenceScore || 75));
           setSymbolsText((payload.config?.allowedSymbols || ['BTCUSDT', 'ETHUSDT']).join(', '));
         }
@@ -99,6 +102,7 @@ export function AutoPilotControlPanel({ isConnected }: AutoPilotControlPanelProp
           maxOrderUsd,
           takeProfitPct,
           stopLossPct,
+          trailingStopPct,
           minConfidenceScore,
           allowedSymbols: symbolsText,
         }),
@@ -237,6 +241,7 @@ export function AutoPilotControlPanel({ isConnected }: AutoPilotControlPanelProp
                     setMaxOrderUsd(clampedOrder);
                     setTakeProfitPct(preset.takeProfitPct);
                     setStopLossPct(preset.stopLossPct);
+                    setTrailingStopPct(preset.trailingStopPct);
                     setMinConfidenceScore(preset.minConfidenceScore);
                     setSymbolsText(preset.allowedSymbols.join(', '));
                     setFeedback(`ℹ️ Preset "${preset.label}" diterapkan. Klik "Simpan Konfigurasi Auto-Pilot" untuk mengaktifkan.`);
@@ -318,7 +323,7 @@ export function AutoPilotControlPanel({ isConnected }: AutoPilotControlPanelProp
             </label>
           </div>
 
-          <div className="grid-3" style={{ gap: '10px' }}>
+          <div className="grid-4" style={{ gap: '10px' }}>
             <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '11px', fontWeight: 700 }}>
               Take Profit (%)
               <input
@@ -342,6 +347,20 @@ export function AutoPilotControlPanel({ isConnected }: AutoPilotControlPanelProp
                 max={50}
                 value={stopLossPct}
                 onChange={(e) => setStopLossPct(Number(e.target.value))}
+                className="input"
+                style={{ padding: '8px', fontSize: '12px' }}
+              />
+            </label>
+
+            <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '11px', fontWeight: 700 }}>
+              Trailing Stop (% · 0=OFF)
+              <input
+                type="number"
+                step="0.5"
+                min={0}
+                max={30}
+                value={trailingStopPct}
+                onChange={(e) => setTrailingStopPct(Number(e.target.value))}
                 className="input"
                 style={{ padding: '8px', fontSize: '12px' }}
               />
@@ -430,10 +449,27 @@ export function AutoPilotControlPanel({ isConnected }: AutoPilotControlPanelProp
               </div>
               <div>
                 BUY Ready: <strong>{simReport.summary?.buyReadyCount ?? 0}</strong> · TP Sell:{' '}
-                <strong style={{ color: '#34D399' }}>{simReport.summary?.tpSellCount ?? 0}</strong> · SL Sell:{' '}
+                <strong style={{ color: '#34D399' }}>{simReport.summary?.tpSellCount ?? 0}</strong> · Trail Stop:{' '}
+                <strong style={{ color: '#FBBF24' }}>{simReport.summary?.trailingStopSellCount ?? 0}</strong> · SL Sell:{' '}
                 <strong style={{ color: '#F28B82' }}>{simReport.summary?.slSellCount ?? 0}</strong> · Skipped:{' '}
                 <strong>{simReport.summary?.skippedCount ?? 0}</strong>
               </div>
+              {((Array.isArray(simReport.exitActions) && simReport.exitActions.length > 0) ||
+                (Array.isArray(simReport.entryActions) && simReport.entryActions.length > 0)) && (
+                <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px solid rgba(148, 163, 184, 0.2)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div style={{ fontSize: '10px', fontWeight: 800, color: '#94A3B8' }}>AI DECISION LOG (RAMAH PEMULA):</div>
+                  {(simReport.exitActions || []).slice(0, 4).map((ex: any, idx: number) => (
+                    <div key={`ex-${idx}`} style={{ fontSize: '11px', color: ex.action === 'HOLD' ? '#CBD5E1' : '#FDE047' }}>
+                      • [{ex.action}] {ex.reason || `${ex.symbol} (PnL ${ex.pnlPct}%)`}
+                    </div>
+                  ))}
+                  {(simReport.entryActions || []).slice(0, 5).map((en: any, idx: number) => (
+                    <div key={`en-${idx}`} style={{ fontSize: '11px', color: en.approved ? '#6EE7B7' : '#CBD5E1' }}>
+                      • [{en.decision}] {en.reason || `${en.symbol} (Skor ${en.confidenceScore})`}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

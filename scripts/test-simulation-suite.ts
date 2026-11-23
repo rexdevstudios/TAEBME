@@ -970,6 +970,37 @@ async function runSimulationSuite() {
     'On-chain Anti-Insider Guard hard-blocks honeypot tokens & flags suspected 3+ same-entity wallet clusters'
   );
 
+  // -------------------------------------------------------------------------
+  // SCENARIO 38: Trailing Stop-Loss & Human-Readable AI Decision Log (Phase BX)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 38: Trailing Stop-Loss & Beginner AI Decision Log] ---');
+  const bxExit = evaluateAutoPilotPositionExit({
+    entryPrice: 100,
+    peakPrice: 112,
+    currentPrice: 107,
+    takeProfitPct: 15,
+    stopLossPct: 5,
+    trailingStopPct: 4,
+  });
+  const bxCfg = validateAndClampAutoPilotConfig(
+    { enabled: true, rail: 'CEX_AUTO', maxOrderUsd: 100, takeProfitPct: 15, stopLossPct: 5, trailingStopPct: 4 },
+    'TRADER'
+  ).config;
+  const bxReport = runAutonomousCycleEvaluation({
+    planId: 'TRADER',
+    config: bxCfg,
+    killSwitchActive: false,
+    openPositions: [{ symbol: 'ETHUSDT', entryPrice: 100, peakPrice: 112, currentPrice: 107, quantity: 1 }],
+    marketSignals: [{ symbol: 'BTCUSDT', confidenceScore: 84, suggestedOrderUsd: 100 }],
+  });
+  assert(
+    bxExit.action === 'TRAILING_STOP_SELL' &&
+      bxReport.summary.trailingStopSellCount === 1 &&
+      Boolean(bxReport.exitActions[0]?.reason) &&
+      Boolean(bxReport.entryActions[0]?.reason),
+    'Trailing Stop-Loss locks profit on peak pullback & attaches beginner-friendly Indonesian AI decision reasons'
+  );
+
   console.log('\n================================================================');
   console.log(`  🎉 SIMULATION SUITE COMPLETED: ${passed} PASSED, ${failed} FAILED`);
   console.log('================================================================\n');
