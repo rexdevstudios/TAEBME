@@ -42,6 +42,7 @@ import {
   getDefaultDexTokenForChain,
   getDexTokenPresetsForChain,
   getEvmExplorerTxUrl,
+  resolveDexSellAmountAtomic,
 } from '../packages/launchpad/web3-provider';
 import {
   buildAutonomousTerminalSnapshot,
@@ -578,6 +579,30 @@ async function runSimulationSuite() {
       approveSpec.data.startsWith('0x095ea7b3') &&
       approveSpec.value === '0',
     'Non-custodial ERC-20 approve() calldata encodes 0x AllowanceHolder spender cleanly'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 22: Token Decimals-Aware sellAmount Conversion (Phase BD)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 22: Token Decimals-Aware 0x SELL Amount Conversion] ---');
+  const usdcSellAtomic = resolveDexSellAmountAtomic({
+    side: 'SELL',
+    quantity: 0.01,
+    chainId: 8453,
+    tokenAddress: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+  });
+  const cbBtcSellAtomic = resolveDexSellAmountAtomic({
+    side: 'SELL',
+    quantity: 0.01,
+    chainId: 8453,
+    tokenAddress: '0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf',
+  });
+  assert(
+    usdcSellAtomic.sellTokenDecimals === 6 &&
+      usdcSellAtomic.sellAmountAtomic === '10000' &&
+      cbBtcSellAtomic.sellTokenDecimals === 8 &&
+      cbBtcSellAtomic.sellAmountAtomic === '1000000',
+    'Token decimals-aware SELL amount resolves 6 decimals (USDC) and 8 decimals (cbBTC) accurately'
   );
 
   console.log('\n================================================================');

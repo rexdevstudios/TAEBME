@@ -277,6 +277,10 @@ async function runSiweE2eSmoke() {
         sellDexJson?.data?.zeroXSwap?.sellToken === '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
       `POST /api/trading/execute (DEX_NON_CUSTODIAL SELL Base USDC) returns valid ERC-20 allowanceTarget (${sellDexJson?.data?.zeroXSwap?.allowanceTarget})`
     );
+    assert(
+      sellDexJson?.data?.zeroXSwap?.sellAmount === '10000',
+      `SELL 0.01 Base USDC resolves 6-decimal atomic sellAmount === "10000" (Got ${sellDexJson?.data?.zeroXSwap?.sellAmount})`
+    );
   } finally {
     // 9. Auto-Cleanup: Revoke test key & verify count returns to 0 + logout
     if (sessionToken && createdBybitKeyId) {

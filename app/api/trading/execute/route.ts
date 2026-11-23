@@ -14,6 +14,7 @@ import { requireCapability } from '@packages/auth/session';
 import { rateLimiter } from '@packages/auth/rate-limiter';
 import { TradingRiskGate } from '@packages/trading/risk-gate';
 import { MevProtectionService } from '@packages/trading/mev-protection';
+import { resolveDexSellAmountAtomic } from '@packages/launchpad/web3-provider';
 import { validateBinancePermissions } from '@packages/shared/types/domain';
 import {
   annotateKeysWithQuotaStatus,
@@ -247,13 +248,13 @@ export async function POST(req: NextRequest) {
         chainId,
       });
 
-      const sellAmountWei = (() => {
-        try {
-          return ethers.parseEther(String(Math.max(0.000001, quantity))).toString();
-        } catch {
-          return ethers.parseEther('0.01').toString();
-        }
-      })();
+      const { sellAmountAtomic: sellAmountWei } = resolveDexSellAmountAtomic({
+        side,
+        quantity,
+        chainId,
+        tokenAddress,
+        tokenDecimals: typeof body?.tokenDecimals === 'number' ? body.tokenDecimals : null,
+      });
       const slippageBps = Math.min(Math.round(maxSlippagePct * 100), quote.maxSlippageBps);
       const zeroXSwap = await fetchZeroXSwapQuote({
         chainId,
