@@ -51,17 +51,19 @@ Responsibilities:
 ## External API Map
 
 ### Authentication
-- Wallet login
-- password/email login
-- session management
-- role resolution
+- Non-Custodial SIWE (EIP-4361) Wallet Login (`/api/auth/challenge`, `/api/auth/verify`)
+- HttpOnly HMAC-SHA256 Session Management (`/api/auth/session`, `/api/auth/logout`)
+- Authoritative RBAC Role Resolution (`ADMIN_WALLET_PUBLIC_ADDRESS` + PostgreSQL `user_roles`)
 
 ### Billing
-- Stripe subscriptions
-- usage events
-- invoice status
-- credit balance
-- plan upgrades
+- Plan Entitlements & Capacity Quotas (`FREE`, `CREATOR`, `TRADER`, `AGENT` via `/api/billing/plans`)
+- Crypto Payment Intents & Subscription Activation (`/api/billing/subscribe`)
+- Double-Entry Metered Credits Ledger (`/api/billing/ledger`)
+- Permanent Vault Capacity Add-Ons (`/api/billing/addons`)
+
+### On-Chain Intelligence ($0 Free Guard)
+- GoPlus Token Security & Anti-Insider Cluster Guard (`/api/trading/token-safety`)
+- GoPlus + Public EVM RPC Wallet Risk Guard (`/api/trading/wallet-risk`)
 
 ### Launchpad
 - create draft

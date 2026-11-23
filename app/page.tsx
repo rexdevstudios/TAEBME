@@ -549,7 +549,7 @@ export default function OverviewPage() {
             <Activity className="text-accent" /> System Overview & Telemetry Matrix
           </h1>
           <p className="text-muted" style={{ margin: 0, fontSize: '12px' }}>
-            Operational SSOT: PostgreSQL (28 Tables) • Ephemeral Tier: Upstash Redis REST Sidecar • Native dRPC Engine
+            Operational SSOT: PostgreSQL (48 Tables) • Ephemeral Tier: Upstash Redis REST Sidecar • GoPlus + Public RPC Guard
           </p>
         </div>
         <div className="flex-row items-center gap-md">

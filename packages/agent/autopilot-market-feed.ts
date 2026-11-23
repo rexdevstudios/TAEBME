@@ -85,21 +85,25 @@ export async function fetchAutoPilotSpotPrices(
   ).slice(0, 20);
 
   const prices: Record<string, number> = {};
+  const hosts = ['https://data-api.binance.vision', 'https://api.binance.com'];
   await Promise.all(
     uniqueSymbols.map(async (sym) => {
-      try {
-        const res = await fetchImpl(
-          `https://api.binance.com/api/v3/ticker/price?symbol=${encodeURIComponent(sym)}`,
-          { signal: AbortSignal.timeout(3500) }
-        );
-        if (!res.ok) return;
-        const json = (await res.json()) as { price?: string };
-        const parsed = Number(json?.price);
-        if (Number.isFinite(parsed) && parsed > 0) {
-          prices[sym] = parsed;
+      for (const host of hosts) {
+        try {
+          const res = await fetchImpl(
+            `${host}/api/v3/ticker/price?symbol=${encodeURIComponent(sym)}`,
+            { signal: AbortSignal.timeout(3500) }
+          );
+          if (!res.ok) continue;
+          const json = (await res.json()) as { price?: string };
+          const parsed = Number(json?.price);
+          if (Number.isFinite(parsed) && parsed > 0) {
+            prices[sym] = parsed;
+            return;
+          }
+        } catch {
+          // Try next mirror host
         }
-      } catch {
-        // Non-fatal per-symbol price fetch fallback
       }
     })
   );
@@ -171,30 +175,34 @@ export async function fetchAutoPilot24hTickers(
   ).slice(0, 20);
 
   const tickers: Record<string, AutoPilot24hTicker> = {};
+  const hosts = ['https://data-api.binance.vision', 'https://api.binance.com'];
   await Promise.all(
     uniqueSymbols.map(async (sym) => {
-      try {
-        const res = await fetchImpl(
-          `https://api.binance.com/api/v3/ticker/24hr?symbol=${encodeURIComponent(sym)}`,
-          { signal: AbortSignal.timeout(3500) }
-        );
-        if (!res.ok) return;
-        const json = (await res.json()) as {
-          lastPrice?: string;
-          priceChangePercent?: string;
-          quoteVolume?: string;
-        };
-        const lastPrice = Number(json?.lastPrice);
-        if (Number.isFinite(lastPrice) && lastPrice > 0) {
-          tickers[sym] = {
-            symbol: sym,
-            lastPrice,
-            priceChangePct24h: Number(json?.priceChangePercent || 0),
-            quoteVolumeUsd: Number(json?.quoteVolume || 0),
+      for (const host of hosts) {
+        try {
+          const res = await fetchImpl(
+            `${host}/api/v3/ticker/24hr?symbol=${encodeURIComponent(sym)}`,
+            { signal: AbortSignal.timeout(3500) }
+          );
+          if (!res.ok) continue;
+          const json = (await res.json()) as {
+            lastPrice?: string;
+            priceChangePercent?: string;
+            quoteVolume?: string;
           };
+          const lastPrice = Number(json?.lastPrice);
+          if (Number.isFinite(lastPrice) && lastPrice > 0) {
+            tickers[sym] = {
+              symbol: sym,
+              lastPrice,
+              priceChangePct24h: Number(json?.priceChangePercent || 0),
+              quoteVolumeUsd: Number(json?.quoteVolume || 0),
+            };
+            return;
+          }
+        } catch {
+          // Try next mirror host
         }
-      } catch {
-        // Non-fatal per-symbol ticker fallback
       }
     })
   );

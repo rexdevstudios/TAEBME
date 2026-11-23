@@ -30,18 +30,39 @@ export async function GET(req: NextRequest) {
     const pool = getDbPool();
     if (pool) {
       try {
-        const res = await pool.query(
-          `SELECT ld.social_links->>'whitelist_wallets' AS whitelist_wallets
-           FROM token_launches tl
-           JOIN launch_drafts ld ON ld.id = tl.draft_id
-           WHERE LOWER(tl.contract_address) = LOWER($1)
-           LIMIT 1`,
-          [tokenAddress]
-        );
-        const storedRaw = res.rows[0]?.whitelist_wallets;
+        // Unified read: combine relational launch_whitelists rows + legacy launch_drafts.social_links JSONB (Phase CC2)
+        const [jsonRes, relRes] = await Promise.all([
+          pool.query(
+            `SELECT ld.social_links->>'whitelist_wallets' AS whitelist_wallets
+             FROM token_launches tl
+             JOIN launch_drafts ld ON ld.id = tl.draft_id
+             WHERE LOWER(tl.contract_address) = LOWER($1)
+             LIMIT 1`,
+            [tokenAddress]
+          ),
+          pool
+            .query(
+              `SELECT lw.wallet_address
+               FROM launch_whitelists lw
+               JOIN token_launches tl ON tl.draft_id = lw.draft_id
+               WHERE LOWER(tl.contract_address) = LOWER($1)`,
+              [tokenAddress]
+            )
+            .catch(() => ({ rows: [] })),
+        ]);
+
+        const combined = new Set<string>();
+        const storedRaw = jsonRes.rows[0]?.whitelist_wallets;
         if (typeof storedRaw === 'string' && storedRaw.trim().length > 0) {
-          wallets = storedRaw.split(',').map((w: string) => w.trim()).filter((w: string) => ethers.isAddress(w));
+          for (const w of storedRaw.split(',').map((item: string) => item.trim())) {
+            if (ethers.isAddress(w)) combined.add(ethers.getAddress(w));
+          }
         }
+        for (const row of relRes.rows || []) {
+          const w = String((row as any)?.wallet_address || '').trim();
+          if (ethers.isAddress(w)) combined.add(ethers.getAddress(w));
+        }
+        wallets = Array.from(combined);
       } catch {
         // Fail closed — treat as empty whitelist
       }

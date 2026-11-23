@@ -69,35 +69,45 @@ export class StrategyBacktester {
     symbol: string,
     interval: BinanceKlineInterval = '1h',
     limit: number = 200,
-    isTestnet: boolean = false
+    isTestnet: boolean = false,
+    fetchImpl: typeof fetch = fetch
   ): Promise<PriceCandle[]> {
-    const baseUrl = isTestnet
-      ? 'https://testnet.binance.vision'
-      : 'https://api.binance.com';
+    const candidateHosts = isTestnet
+      ? ['https://testnet.binance.vision']
+      : ['https://data-api.binance.vision', 'https://api.binance.com'];
 
-    const url = `${baseUrl}/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${Math.min(limit, 1000)}`;
+    const clampedLimit = Math.min(limit, 1000);
+    let lastStatus = 0;
 
-    try {
-      const res = await fetch(url);
-      if (!res.ok) {
-        console.warn(`[Backtester] Binance klines API returned ${res.status} for ${symbol} — returning empty array`);
-        return [];
+    for (const baseUrl of candidateHosts) {
+      const url = `${baseUrl}/api/v3/klines?symbol=${encodeURIComponent(symbol)}&interval=${encodeURIComponent(interval)}&limit=${clampedLimit}`;
+      try {
+        const res = await fetchImpl(url, { signal: AbortSignal.timeout(4000) });
+        if (!res.ok) {
+          lastStatus = res.status;
+          continue;
+        }
+
+        const rows = (await res.json()) as BinanceKlineRow[];
+        if (!Array.isArray(rows) || rows.length === 0) continue;
+
+        return rows.map((row): PriceCandle => ({
+          timestamp: row[0],
+          open: parseFloat(row[1] as string),
+          high: parseFloat(row[2] as string),
+          low: parseFloat(row[3] as string),
+          close: parseFloat(row[4] as string),
+          volume: parseFloat(row[5] as string),
+        }));
+      } catch {
+        // Try next mirror host
       }
-
-      const rows = (await res.json()) as BinanceKlineRow[];
-
-      return rows.map((row): PriceCandle => ({
-        timestamp: row[0],
-        open: parseFloat(row[1] as string),
-        high: parseFloat(row[2] as string),
-        low: parseFloat(row[3] as string),
-        close: parseFloat(row[4] as string),
-        volume: parseFloat(row[5] as string),
-      }));
-    } catch (err) {
-      console.warn(`[Backtester] Failed to fetch historical candles for ${symbol}:`, (err as Error).message);
-      return [];
     }
+
+    if (lastStatus > 0) {
+      console.warn(`[Backtester] Binance klines API returned ${lastStatus} for ${symbol} — returning empty array`);
+    }
+    return [];
   }
 
   // -------------------------------------------------------------------------
