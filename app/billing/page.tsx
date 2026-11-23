@@ -84,6 +84,7 @@ export default function BillingPage() {
   const [ledgerEntries, setLedgerEntries] = useState<LedgerEntry[]>([]);
   const [ledgerLoading, setLedgerLoading] = useState(false);
   const [vaultSummary, setVaultSummary] = useState<UserVaultSummaryData | null>(null);
+  const [activeBillingTab, setActiveBillingTab] = useState<'plans' | 'vaults' | 'history' | 'admin'>('plans');
 
   // Admin Discount Management State
   const [discountPlanId, setDiscountPlanId] = useState<string>('CREATOR');
@@ -428,6 +429,66 @@ export default function BillingPage() {
         </div>
       </div>
 
+      {/* Accessible Tabbed Navigation for /billing (Beginner-Friendly Progressive Disclosure) */}
+      <div
+        role="tablist"
+        aria-label="Navigasi Halaman Billing dan Vault"
+        className="bg-panel"
+        style={{
+          display: 'flex',
+          gap: '8px',
+          flexWrap: 'wrap',
+          padding: '8px',
+          borderRadius: '10px',
+          border: '1px solid var(--color-border)',
+        }}
+      >
+        {(
+          [
+            { id: 'plans', label: '1. Paket & Harga', hint: 'Bandingkan FREE · CREATOR · TRADER · AGENT' },
+            { id: 'vaults', label: '2. Akun API, Bankr & Webhook', hint: 'Binance · Bybit · Bankr · BYOK LLM' },
+            { id: 'history', label: '3. Mutasi Kredit & Keamanan', hint: 'Ledger & Explorer Log' },
+            ...((hasCapability('MANAGE_BILLING_PLANS') || userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN' || userRole === 'BILLING_ADMIN')
+              ? [{ id: 'admin' as const, label: '4. Admin Ops Console', hint: 'Promo · Risk · Kill-Switch' }]
+              : []),
+          ] as const
+        ).map((tab) => {
+          const active = activeBillingTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setActiveBillingTab(tab.id)}
+              style={{
+                flex: '1 1 170px',
+                minHeight: '44px',
+                padding: '8px 14px',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'flex-start',
+                justifyContent: 'center',
+                gap: '2px',
+                border: active ? '1px solid #38BDF8' : '1px solid transparent',
+                background: active ? 'rgba(56, 189, 248, 0.14)' : 'transparent',
+                color: active ? '#F8FAFC' : 'var(--color-muted)',
+              }}
+            >
+              <span style={{ fontSize: '13px', fontWeight: 800, color: active ? '#38BDF8' : 'var(--color-foreground)' }}>
+                {tab.label}
+              </span>
+              <span style={{ fontSize: '11px', color: 'var(--color-muted)' }}>{tab.hint}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* TAB 1: Paket & Harga */}
+      {activeBillingTab === 'plans' && (
+        <div className="flex-col gap-lg">
       {/* Workflow & Plan Entitlement Guide */}
       <PageWorkflowBanner
         title="Cara Berlangganan & Menggunakan Kredit"
@@ -659,8 +720,28 @@ export default function BillingPage() {
       {/* Platform Business Fee & Credit Burn Transparency Matrix */}
       <div className="bg-panel" style={{ border: '1px solid rgba(56, 189, 248, 0.35)', borderRadius: '8px', padding: '20px' }}>
         <h3 style={{ fontSize: '15px', fontWeight: 900, color: '#38BDF8', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Scale size={17} /> Platform Business Fee Split &amp; Metered Credit Schedule
+          <Scale size={17} /> Kenapa RTrader AI vs Bot Bursa Biasa &amp; Transparansi Biaya
         </h3>
+        <div className="grid-3" style={{ gap: '12px', marginBottom: '12px' }}>
+          <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '12px', borderRadius: '6px' }}>
+            <div style={{ color: '#34D399', fontWeight: 800, fontSize: '12px' }}>Multi-Signal AI vs Grid Kaku</div>
+            <div className="text-muted" style={{ fontSize: '11px', marginTop: '4px' }}>
+              Bot bawaan bursa hanya memakai grid/DCA kaku. RTrader menggabungkan Scout 6-Chain, sentimen, on-chain risk, dan BYOK LLM.
+            </div>
+          </div>
+          <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '12px', borderRadius: '6px' }}>
+            <div style={{ color: '#38BDF8', fontWeight: 800, fontSize: '12px' }}>Omnichain CEX + DEX 0x v2</div>
+            <div className="text-muted" style={{ fontSize: '11px', marginTop: '4px' }}>
+              1 dashboard untuk Binance, Bybit V5, 6 jaringan DEX EVM (0x v2), Launchpad Bankr, dan proteksi Kill-Switch lintas akun.
+            </div>
+          </div>
+          <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '12px', borderRadius: '6px' }}>
+            <div style={{ color: '#C084FC', fontWeight: 800, fontSize: '12px' }}>100% Non-Custodial &amp; Soft-Freeze</div>
+            <div className="text-muted" style={{ fontSize: '11px', marginTop: '4px' }}>
+              Zero private key di server; API key dienkripsi AES-256-GCM dan tidak pernah terhapus saat downgrade paket.
+            </div>
+          </div>
+        </div>
         <div className="grid-3" style={{ gap: '12px' }}>
           <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '14px', borderRadius: '6px' }}>
             <div style={{ color: 'var(--color-accent)', fontWeight: 800, fontSize: '12px' }}>Bonding Curve Swap Fee (1.00%)</div>
@@ -685,7 +766,12 @@ export default function BillingPage() {
           </div>
         </div>
       </div>
+        </div>
+      )}
 
+      {/* TAB 3: Mutasi Kredit & Keamanan */}
+      {activeBillingTab === 'history' && (
+        <div className="flex-col gap-lg">
       {/* Live Double-Entry Credit Ledger Statement */}
       {isConnected && (
         <div className="bg-panel" style={{ border: '1px solid var(--color-border)', borderRadius: '8px', padding: '20px' }}>
@@ -761,7 +847,13 @@ export default function BillingPage() {
           )}
         </div>
       )}
+          <UserSecurityActivityPanel isConnected={isConnected} />
+        </div>
+      )}
 
+      {/* TAB 2: Akun API, Bankr & Webhook */}
+      {activeBillingTab === 'vaults' && (
+        <div className="flex-col gap-lg">
       {/* Permanent Capacity Add-On Store (Reuses ledger_entries, Zero Data Loss) */}
       <BillingAddonStorePanel
         isConnected={isConnected}
@@ -897,12 +989,12 @@ export default function BillingPage() {
 
       {/* Outbound Alert Webhooks (SSRF-Safe HTTPS · Discord / Custom Endpoint + Test Ping) */}
       <UserWebhookVaultPanel isConnected={isConnected} />
+        </div>
+      )}
 
-      {/* User-Scoped Security Activity Feed (10 Latest Audit Events) */}
-      <UserSecurityActivityPanel isConnected={isConnected} />
-
+      {/* TAB 4: Admin Ops Console */}
       {/* Admin Billing Rail Diagnostics Console (SYSTEM_ADMIN / SUPER_ADMIN / BILLING_ADMIN Exclusive) */}
-      {(hasCapability('MANAGE_BILLING_PLANS') || userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN' || userRole === 'BILLING_ADMIN') && (
+      {activeBillingTab === 'admin' && (hasCapability('MANAGE_BILLING_PLANS') || userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN' || userRole === 'BILLING_ADMIN') && (
         <div className="bg-panel" style={{ border: '1px solid #FF9100', borderRadius: '8px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div>
             <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#FFD600', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>

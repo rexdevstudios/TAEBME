@@ -22,6 +22,7 @@ export default function AgentPage() {
   const [selectedCustomAgent, setSelectedCustomAgent] = useState<CustomAgentProfile | null>(null);
   const [selectedLlmProvider, setSelectedLlmProvider] = useState<SelectedLlmProvider>('PLATFORM');
   const [selectedLlmModel, setSelectedLlmModel] = useState<string>('');
+  const [activeAgentTab, setActiveAgentTab] = useState<'autopilot' | 'analyst' | 'pro'>('autopilot');
   const [proposal, setProposal] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -159,68 +160,101 @@ export default function AgentPage() {
       <div className="advisory-banner" role="note" aria-label="AI advisory notice">
         <ShieldAlert size={16} style={{ flexShrink: 0 }} />
         <span>
-          <strong>Advisory Only — No Auto-Execution.</strong> AI proposals are recommendations only and require explicit human approval via the Trading Terminal. No trade is submitted or executed from this page.
+          <strong>100% Non-Custodial Guard.</strong> Mulai mudah dari tab <strong>Auto-Pilot &amp; Sinyal</strong>, atau buka tab <strong>Pro Settings</strong> untuk BYOK LLM, Risk Cap, dan ERC-7715 Session Allowance.
         </span>
       </div>
 
-      {/* Dual-Rail Autonomous 4-Sub-Agent Terminal (Scout / Sniper / Curve / Graduate) */}
-      <AutonomousAgentTerminalCard isConnected={isConnected} />
-
-      {/* Non-Custodial ERC-7715 Session Allowance Spec Builder */}
-      <SessionAllowancePanel isConnected={isConnected} />
-
-      {/* Workflow & Plan Entitlement Guide */}
-      <PageWorkflowBanner
-        title="Alur AI Autonomous Desk (Proposal-Only)"
-        isUnlocked={Boolean(entitlements.aiProposals)}
-        requiredPlanLabel="AGENT"
-        creditSummary="5-Agent Desk: -5 cr · Single Proposal: -1 cr"
-        steps={[
-          { step: '1', label: 'Jalankan 5-Agent Trading Desk', cost: '-5 cr' },
-          { step: '2', label: 'Tinjau Skor Risiko & Rasional AI' },
-          { step: '3', label: 'Klik Review in Trading Terminal →' },
-          { step: '4', label: 'Persetujuan Manual di /trading' },
-        ]}
-      />
-
-      {/* Custom AI Agent Builder & Modular Skill Registry */}
-      <CustomAgentBuilderPanel
-        isConnected={isConnected}
-        selectedAgentId={selectedCustomAgent?.id || null}
-        onSelectAgent={(ag) => {
-          setSelectedCustomAgent(ag);
-          if (ag?.targetSymbols?.[0]) setSymbol(ag.targetSymbols[0]);
+      {/* Accessible Tabbed Workspace Navigation (Progressive Disclosure — Beginner vs Pro) */}
+      <div
+        role="tablist"
+        aria-label="Navigasi Ruang Kerja AI Agent"
+        className="bg-panel"
+        style={{
+          display: 'flex',
+          gap: '8px',
+          flexWrap: 'wrap',
+          padding: '8px',
+          borderRadius: '10px',
+          border: '1px solid var(--color-border)',
         }}
-      />
+      >
+        {(
+          [
+            { id: 'autopilot', label: '1. Auto-Pilot & Sinyal', hint: 'Mudah · Pemula' },
+            { id: 'analyst', label: '2. AI Analyst Desk', hint: '5-Agent & Proposal' },
+            { id: 'pro', label: '3. Pro Vault & Risk', hint: 'BYOK LLM · Session · Admin' },
+          ] as const
+        ).map((tab) => {
+          const active = activeAgentTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setActiveAgentTab(tab.id)}
+              style={{
+                flex: '1 1 180px',
+                minHeight: '44px',
+                padding: '8px 14px',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'flex-start',
+                justifyContent: 'center',
+                gap: '2px',
+                border: active ? '1px solid #38BDF8' : '1px solid transparent',
+                background: active ? 'rgba(56, 189, 248, 0.14)' : 'transparent',
+                color: active ? '#F8FAFC' : 'var(--color-muted)',
+                transition: 'background 150ms ease, border-color 150ms ease',
+              }}
+            >
+              <span style={{ fontSize: '13px', fontWeight: 800, color: active ? '#38BDF8' : 'var(--color-foreground)' }}>
+                {tab.label}
+              </span>
+              <span style={{ fontSize: '11px', color: 'var(--color-muted)' }}>{tab.hint}</span>
+            </button>
+          );
+        })}
+      </div>
 
-      {/* BYOK LLM Provider Vault (GEMINI / OPENAI / ANTHROPIC — TRADER & AGENT Exclusive) */}
-      <ByokLlmVaultPanel
-        isConnected={isConnected}
-        selectedLlmProvider={selectedLlmProvider}
-        onSelectLlmProvider={setSelectedLlmProvider}
-        selectedLlmModel={selectedLlmModel}
-        onSelectLlmModel={setSelectedLlmModel}
-      />
+      {/* TAB 1: Auto-Pilot & Sinyal (Beginner-Friendly Default) */}
+      {activeAgentTab === 'autopilot' && (
+        <div className="flex-col gap-lg">
+          <AutoPilotControlPanel isConnected={isConnected} />
+          <AutonomousAgentTerminalCard isConnected={isConnected} />
+        </div>
+      )}
 
-      {/* Non-Custodial Personal Risk Guard (Reused from /trading, Clamped to Billing Tier) */}
-      <UserRiskPolicyPanel isConnected={isConnected} />
+      {/* TAB 2: AI Analyst Desk (5-Agent + Proposal Generator) */}
+      {activeAgentTab === 'analyst' && (
+        <div className="flex-col gap-lg">
+          <PageWorkflowBanner
+            title="Alur AI Autonomous Desk (Proposal-Only)"
+            isUnlocked={Boolean(entitlements.aiProposals)}
+            requiredPlanLabel="AGENT"
+            creditSummary="5-Agent Desk: -5 cr · Single Proposal: -1 cr"
+            steps={[
+              { step: '1', label: 'Jalankan 5-Agent Trading Desk', cost: '-5 cr' },
+              { step: '2', label: 'Tinjau Skor Risiko & Rasional AI' },
+              { step: '3', label: 'Klik Review in Trading Terminal →' },
+              { step: '4', label: 'Persetujuan Manual di /trading' },
+            ]}
+          />
 
-      {/* Autonomous AI Trading Auto-Pilot (TRADER & AGENT Exclusive) */}
-      <AutoPilotControlPanel isConnected={isConnected} />
+          <FiveAgentDeskPanel
+            isConnected={isConnected}
+            defaultSymbol={symbol}
+            defaultAction={action}
+            defaultQty={qty}
+            selectedAgentId={selectedCustomAgent?.id || null}
+            selectedAgentName={selectedCustomAgent?.name || null}
+            selectedLlmProvider={selectedLlmProvider}
+            selectedLlmModel={selectedLlmModel}
+          />
 
-      {/* 5-Agent Autonomous Trading Desk (100% Vercel-Native) */}
-      <FiveAgentDeskPanel
-        isConnected={isConnected}
-        defaultSymbol={symbol}
-        defaultAction={action}
-        defaultQty={qty}
-        selectedAgentId={selectedCustomAgent?.id || null}
-        selectedAgentName={selectedCustomAgent?.name || null}
-        selectedLlmProvider={selectedLlmProvider}
-        selectedLlmModel={selectedLlmModel}
-      />
-
-      <div className="grid-2">
+          <div className="grid-2">
         {/* Left Card: Interactive Proposal Generator */}
         <div className="bg-panel" style={{ borderRadius: '8px', padding: '24px' }}>
           <h2 style={{ color: 'var(--color-foreground)', marginTop: 0, fontSize: '16px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
@@ -370,6 +404,32 @@ export default function AgentPage() {
           )}
         </div>
       </div>
+        </div>
+      )}
+
+      {/* TAB 3: Pro Vault, Risk & Custom Agent */}
+      {activeAgentTab === 'pro' && (
+        <div className="flex-col gap-lg">
+          <CustomAgentBuilderPanel
+            isConnected={isConnected}
+            selectedAgentId={selectedCustomAgent?.id || null}
+            onSelectAgent={(ag) => {
+              setSelectedCustomAgent(ag);
+              if (ag?.targetSymbols?.[0]) setSymbol(ag.targetSymbols[0]);
+            }}
+          />
+
+          <ByokLlmVaultPanel
+            isConnected={isConnected}
+            selectedLlmProvider={selectedLlmProvider}
+            onSelectLlmProvider={setSelectedLlmProvider}
+            selectedLlmModel={selectedLlmModel}
+            onSelectLlmModel={setSelectedLlmModel}
+          />
+
+          <UserRiskPolicyPanel isConnected={isConnected} />
+
+          <SessionAllowancePanel isConnected={isConnected} />
 
       {/* Admin Feature Weight Configurator (Exclusive to SUPER_ADMIN / SYSTEM_ADMIN / MANAGE_BILLING_PLANS) */}
       {(hasCapability('MANAGE_BILLING_PLANS') || userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN') && (
@@ -470,6 +530,8 @@ export default function AgentPage() {
               {weightsFeedback}
             </div>
           )}
+        </div>
+      )}
         </div>
       )}
     </div>
