@@ -10,6 +10,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { upstashRedis } from '@packages/shared/redis-client';
+import { mapDexScreenerBoostRowsToScoutHints } from '@packages/agent/autonomous-terminal-engine';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,6 +18,7 @@ export interface ScoutDatasetHint {
   symbol: string;
   note: string;
   tokenAddress?: string;
+  chainId?: number;
   updatedAt: string;
 }
 
@@ -50,34 +52,9 @@ export async function GET(req: NextRequest) {
         signal: AbortSignal.timeout(6000),
       });
       if (res.ok) {
-        const rows = (await res.json()) as any[];
-        if (Array.isArray(rows)) {
-          const baseTokens = rows
-            .filter(
-              (r) =>
-                String(r?.chainId || '').toLowerCase() === 'base' &&
-                typeof r?.tokenAddress === 'string' &&
-                /^0x[a-fA-F0-9]{40}$/.test(r.tokenAddress)
-            )
-            .slice(0, 5);
-
-          for (const item of baseTokens) {
-            const addr = String(item.tokenAddress);
-            const desc = typeof item?.description === 'string' ? item.description.trim().slice(0, 80) : '';
-            const sym =
-              typeof item?.symbol === 'string' && item.symbol.trim()
-                ? item.symbol.trim().toUpperCase().slice(0, 12)
-                : `BASE_${addr.slice(2, 6).toUpperCase()}`;
-            hints.push({
-              symbol: sym,
-              tokenAddress: addr,
-              note: desc
-                ? `Scout boosted on Base: ${desc} → 0x Swap v2 ready`
-                : `Scout trending Base token ($${sym}) → MEV-guarded 0x Swap v2 ready`,
-              updatedAt: nowIso,
-            });
-          }
-        }
+        const rows = (await res.json()) as unknown[];
+        const mapped = mapDexScreenerBoostRowsToScoutHints(rows, nowIso, 6);
+        hints.push(...mapped);
       }
     } catch {
       // Non-fatal external discovery fallback
@@ -87,6 +64,7 @@ export async function GET(req: NextRequest) {
       hints.push({
         symbol: 'USDC',
         tokenAddress: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+        chainId: 8453,
         note: 'Scout Base liquidity baseline active → 0x Swap v2 ready',
         updatedAt: nowIso,
       });

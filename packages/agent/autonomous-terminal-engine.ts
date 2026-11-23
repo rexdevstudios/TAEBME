@@ -239,6 +239,68 @@ export function formatScoutCacheAgeLabel(
   return `Synced ${diffDays}d ago`;
 }
 
+export const DEXSCREENER_EVM_CHAIN_MAP: Record<
+  string,
+  { chainId: number; label: string; prefix: string }
+> = {
+  base: { chainId: 8453, label: 'Base', prefix: 'BASE' },
+  arbitrum: { chainId: 42161, label: 'Arbitrum', prefix: 'ARB' },
+  ethereum: { chainId: 1, label: 'Ethereum', prefix: 'ETH' },
+  optimism: { chainId: 10, label: 'Optimism', prefix: 'OP' },
+  polygon: { chainId: 137, label: 'Polygon', prefix: 'POLY' },
+  bsc: { chainId: 56, label: 'BNB Chain', prefix: 'BSC' },
+};
+
+export interface MappedScoutDatasetHint {
+  symbol: string;
+  note: string;
+  tokenAddress: string;
+  chainId: number;
+  updatedAt: string;
+}
+
+export function mapDexScreenerBoostRowsToScoutHints(
+  rows: unknown[],
+  nowIso: string = new Date().toISOString(),
+  maxHints: number = 6
+): MappedScoutDatasetHint[] {
+  if (!Array.isArray(rows)) return [];
+  const cap = Math.max(1, Math.min(20, Math.floor(Number(maxHints) || 6)));
+  const results: MappedScoutDatasetHint[] = [];
+
+  for (const raw of rows) {
+    if (results.length >= cap) break;
+    const item = raw as Record<string, unknown> | null;
+    if (!item || typeof item !== 'object') continue;
+
+    const rawChainKey = String(item.chainId || '').trim().toLowerCase();
+    const chainMeta = DEXSCREENER_EVM_CHAIN_MAP[rawChainKey];
+    if (!chainMeta) continue;
+
+    const addr = typeof item.tokenAddress === 'string' ? item.tokenAddress.trim() : '';
+    if (!/^0x[a-fA-F0-9]{40}$/.test(addr)) continue;
+
+    const desc =
+      typeof item.description === 'string' ? item.description.trim().slice(0, 80) : '';
+    const rawSym = typeof item.symbol === 'string' ? item.symbol.trim() : '';
+    const sym = rawSym
+      ? rawSym.toUpperCase().slice(0, 12)
+      : `${chainMeta.prefix}_${addr.slice(2, 6).toUpperCase()}`;
+
+    results.push({
+      symbol: sym,
+      tokenAddress: addr,
+      chainId: chainMeta.chainId,
+      note: desc
+        ? `Scout boosted on ${chainMeta.label}: ${desc} → 0x Swap v2 ready`
+        : `Scout trending ${chainMeta.label} token ($${sym}) → MEV-guarded 0x Swap v2 ready`,
+      updatedAt: nowIso,
+    });
+  }
+
+  return results;
+}
+
 export function buildAutonomousTerminalSnapshot(params: {
   planId?: string;
   intents: MinimalTradeIntent[];
@@ -246,7 +308,12 @@ export function buildAutonomousTerminalSnapshot(params: {
   hasActiveCexKey: boolean;
   hasZeroXApiKey: boolean;
   hasFirecrawlApiKey: boolean;
-  firecrawlHints?: Array<{ symbol: string; note: string; tokenAddress?: string }>;
+  firecrawlHints?: Array<{
+    symbol: string;
+    note: string;
+    tokenAddress?: string;
+    chainId?: number;
+  }>;
   scoutDatasetSyncedAt?: string | null;
   goalTradesTarget?: number;
 }): AutonomousTerminalSnapshot {
@@ -348,8 +415,12 @@ export function buildAutonomousTerminalSnapshot(params: {
 
   for (const hint of hints.slice(0, 2)) {
     counts.SCOUT += 1;
+    const resolvedChainId =
+      hint.chainId && SUPPORTED_HANDOFF_CHAIN_IDS.has(Number(hint.chainId))
+        ? Number(hint.chainId)
+        : 8453;
     liveFeed.push({
-      id: `scout-${hint.symbol}`,
+      id: `scout-${hint.symbol}-${resolvedChainId}`,
       agent: 'SCOUT',
       color: AGENT_COLORS.SCOUT,
       rail: 'EXTERNAL_DEX_0X',
@@ -363,7 +434,7 @@ export function buildAutonomousTerminalSnapshot(params: {
         rail: 'EXTERNAL_DEX_0X',
         agent: 'SCOUT',
         tokenAddress: hint.tokenAddress || null,
-        chainId: 8453,
+        chainId: resolvedChainId,
       }),
       symbol: hint.symbol,
       side: 'BUY',

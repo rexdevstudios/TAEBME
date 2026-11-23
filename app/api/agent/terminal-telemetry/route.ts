@@ -53,7 +53,9 @@ export async function GET(req: NextRequest) {
       upstashRedis.isConfigured() ? upstashRedis.get<string>('agent:scout:dataset').catch(() => null) : Promise.resolve(null),
     ]);
 
-    let firecrawlHints: Array<{ symbol: string; note: string; tokenAddress?: string }> | undefined;
+    let firecrawlHints:
+      | Array<{ symbol: string; note: string; tokenAddress?: string; chainId?: number }>
+      | undefined;
     let scoutDatasetSyncedAt: string | null = null;
     if (cachedScoutRaw) {
       try {

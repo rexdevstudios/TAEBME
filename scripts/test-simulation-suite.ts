@@ -36,6 +36,7 @@ import {
   buildAutonomousTerminalSnapshot,
   buildTerminalTradeHandoffUrl,
   formatScoutCacheAgeLabel,
+  mapDexScreenerBoostRowsToScoutHints,
   parseTradingHandoffSearchParams,
 } from '../packages/agent/autonomous-terminal-engine';
 import { validateChainScope } from '../packages/shared/credential-vault';
@@ -485,6 +486,30 @@ async function runSimulationSuite() {
       parsedHandoff.mode === 'DEX_NON_CUSTODIAL' &&
       parsedHandoff.tokenAddress === '0x912CE59144191C1204E64559FE8253a0e49E6548',
     '1-Click Agent-to-Trading handoff URL round-trips Arbitrum 42161 DEX parameters cleanly'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 18: Multi-Chain 6-EVM Scout Discovery Mapper (Phase AY)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 18: Multi-Chain 6-EVM Scout Discovery Mapper] ---');
+  const multiScoutHints = mapDexScreenerBoostRowsToScoutHints([
+    { chainId: 'arbitrum', tokenAddress: '0x912CE59144191C1204E64559FE8253a0e49E6548', symbol: 'ARB' },
+    { chainId: 'bsc', tokenAddress: '0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82', symbol: 'CAKE' },
+  ]);
+  const multiScoutSnap = buildAutonomousTerminalSnapshot({
+    planId: 'AGENT',
+    intents: [],
+    activeLaunches: [],
+    hasActiveCexKey: true,
+    hasZeroXApiKey: true,
+    hasFirecrawlApiKey: true,
+    firecrawlHints: multiScoutHints,
+  });
+  assert(
+    multiScoutHints.length === 2 &&
+      multiScoutSnap.liveFeed.some((f) => f.href.includes('chainId=42161')) &&
+      multiScoutSnap.liveFeed.some((f) => f.href.includes('chainId=56')),
+    'Multi-chain Scout discovery maps Arbitrum (42161) and BSC (56) hints into 1-click DEX handoff URLs'
   );
 
   console.log('\n================================================================');
