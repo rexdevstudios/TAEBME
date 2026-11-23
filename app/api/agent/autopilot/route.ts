@@ -65,10 +65,39 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const planId = await defaultBillingDbAdapter.getUserPlan(auth.walletAddress).catch(() => 'FREE' as const);
+    const [planId, lastTickRaw] = await Promise.all([
+      defaultBillingDbAdapter.getUserPlan(auth.walletAddress).catch(() => 'FREE' as const),
+      upstashRedis.isConfigured()
+        ? upstashRedis.get<string>('agent:autopilot:last_tick').catch(() => null)
+        : Promise.resolve(null),
+    ]);
     const capacities = SubscriptionsEngine.getPlanCapacities(planId);
     const stored = capacities.autoPilotEnabled ? await readUserAutoPilotConfig(auth.walletAddress) : null;
     const config = stored || getDefaultAutoPilotConfig(planId);
+
+    let lastPulse: {
+      updatedAt: string;
+      scannedWallets: number;
+      executedWallets: number;
+      totalQueued: number;
+      scoutSignalsLoaded: number;
+    } | null = null;
+    if (lastTickRaw) {
+      try {
+        const parsed = typeof lastTickRaw === 'string' ? JSON.parse(lastTickRaw) : lastTickRaw;
+        if (parsed?.updatedAt) {
+          lastPulse = {
+            updatedAt: String(parsed.updatedAt),
+            scannedWallets: Number(parsed.scannedWallets || 0),
+            executedWallets: Number(parsed.executedWallets || 0),
+            totalQueued: Number(parsed.totalQueued || 0),
+            scoutSignalsLoaded: Number(parsed.scoutSignalsLoaded || 0),
+          };
+        }
+      } catch {
+        // ignore malformed cache
+      }
+    }
 
     return NextResponse.json(
       {
@@ -83,6 +112,7 @@ export async function GET(req: NextRequest) {
             maxAutoPilotOrderUsd: capacities.maxAutoPilotOrderUsd,
           },
           config,
+          lastPulse,
           upgradeUrl: capacities.autoPilotEnabled ? null : '/billing',
         },
         timestamp: new Date().toISOString(),

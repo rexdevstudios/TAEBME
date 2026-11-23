@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Bot, Lock, ShieldCheck, Sparkles } from 'lucide-react';
+import { formatScoutCacheAgeLabel } from '@packages/agent/autonomous-terminal-engine';
 
 interface AutoPilotApiPayload {
   planId: 'FREE' | 'CREATOR' | 'TRADER' | 'AGENT';
@@ -22,6 +23,13 @@ interface AutoPilotApiPayload {
     allowedSymbols: string[];
     updatedAt?: string;
   };
+  lastPulse?: {
+    updatedAt: string;
+    scannedWallets: number;
+    executedWallets: number;
+    totalQueued: number;
+    scoutSignalsLoaded: number;
+  } | null;
   upgradeUrl?: string | null;
 }
 
@@ -145,19 +153,35 @@ export function AutoPilotControlPanel({ isConnected }: AutoPilotControlPanelProp
         <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: 'var(--color-foreground)', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Bot size={18} style={{ color: '#38BDF8' }} /> AI Autonomous Trading Auto-Pilot (Auto-Buy &amp; TP/SL)
         </h2>
-        <span
-          style={{
-            fontSize: '10px',
-            fontWeight: 800,
-            padding: '3px 8px',
-            borderRadius: '999px',
-            background: data?.eligible ? 'rgba(16, 185, 129, 0.14)' : 'rgba(245, 158, 11, 0.14)',
-            color: data?.eligible ? '#34D399' : '#FBBF24',
-            fontFamily: 'var(--font-mono)',
-          }}
-        >
-          {loading ? 'CHECKING TIER...' : data?.eligible ? `UNLOCKED · ${data.planId}` : `LOCKED · ${data?.planId || 'FREE'}`}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+          <span
+            style={{
+              fontSize: '10px',
+              fontWeight: 700,
+              padding: '3px 8px',
+              borderRadius: '999px',
+              background: 'rgba(56, 189, 248, 0.12)',
+              color: '#38BDF8',
+              fontFamily: 'var(--font-mono)',
+            }}
+            title="Cloudflare Workers 24/7 Cron Scheduler (*/5 * * * *)"
+          >
+            24/7 Pulse: {data?.lastPulse?.updatedAt ? formatScoutCacheAgeLabel(data.lastPulse.updatedAt) : 'Awaiting Cron Pulse'}
+          </span>
+          <span
+            style={{
+              fontSize: '10px',
+              fontWeight: 800,
+              padding: '3px 8px',
+              borderRadius: '999px',
+              background: data?.eligible ? 'rgba(16, 185, 129, 0.14)' : 'rgba(245, 158, 11, 0.14)',
+              color: data?.eligible ? '#34D399' : '#FBBF24',
+              fontFamily: 'var(--font-mono)',
+            }}
+          >
+            {loading ? 'CHECKING TIER...' : data?.eligible ? `UNLOCKED · ${data.planId}` : `LOCKED · ${data?.planId || 'FREE'}`}
+          </span>
+        </div>
       </div>
 
       {!loading && data && !data.eligible ? (

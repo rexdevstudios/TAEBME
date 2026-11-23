@@ -69,6 +69,26 @@ export async function GET(req: NextRequest) {
       marketSignals,
     });
 
+    const nowIso = new Date().toISOString();
+    const elapsedMs = Math.round(performance.now() - startMs);
+    if (upstashRedis.isConfigured()) {
+      await upstashRedis
+        .set(
+          'agent:autopilot:last_tick',
+          JSON.stringify({
+            updatedAt: nowIso,
+            scannedWallets: sweep.scannedWallets,
+            executedWallets: sweep.executedWallets,
+            totalQueued: sweep.totalQueued,
+            scoutSignalsLoaded: marketSignals.length,
+            dryRun,
+            elapsedMs,
+          }),
+          86400
+        )
+        .catch(() => false);
+    }
+
     return NextResponse.json(
       {
         success: true,
@@ -76,9 +96,9 @@ export async function GET(req: NextRequest) {
           ...sweep,
           dryRun,
           scoutSignalsLoaded: marketSignals.length,
-          elapsedMs: Math.round(performance.now() - startMs),
+          elapsedMs,
         },
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso,
       },
       { status: 200 }
     );
