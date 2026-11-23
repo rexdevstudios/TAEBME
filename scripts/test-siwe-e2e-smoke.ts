@@ -344,6 +344,23 @@ async function runSiweE2eSmoke() {
         matchedAct.explorerUrl.startsWith('https://arbiscan.io/tx/'),
       `GET /api/user/activity enriches DEX_SWAP_TX_CONFIRMED with chainId=42161 & explorerUrl (${matchedAct?.explorerUrl})`
     );
+
+    // 19. Verify Auto-Pilot tier gate: FREE burner gets eligible=false on GET and HTTP 403 on PUT (Phase BK)
+    const apGetRes = await fetch(`${BASE_URL}/api/agent/autopilot`, { headers: authHeaders });
+    const apGetJson: any = await apGetRes.json();
+    const apPutRes = await fetch(`${BASE_URL}/api/agent/autopilot`, {
+      method: 'PUT',
+      headers: authHeaders,
+      body: JSON.stringify({ enabled: true, rail: 'CEX_AUTO', maxOrderUsd: 100 }),
+    });
+    const apPutJson: any = await apPutRes.json();
+    assert(
+      apGetRes.status === 200 &&
+        apGetJson?.data?.eligible === false &&
+        apPutRes.status === 403 &&
+        String(apPutJson?.error || '').includes('PLAN_AUTOPILOT_REQUIRED'),
+      `GET/PUT /api/agent/autopilot enforces TRADER/AGENT tier gate on FREE burner (GET eligible=false, PUT HTTP ${apPutRes.status})`
+    );
   } finally {
     // 9. Auto-Cleanup: Revoke test key & verify count returns to 0 + logout
     if (sessionToken && createdBybitKeyId) {

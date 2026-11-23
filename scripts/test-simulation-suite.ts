@@ -25,6 +25,11 @@ import {
 } from '../packages/intelligence/llm-advisory-client';
 import { buildAgentActionCards } from '../packages/agent/skill-registry';
 import { validateSessionAllowanceSpec } from '../packages/agent/session-allowance';
+import {
+  evaluateAutoPilotEntrySignal,
+  evaluateAutoPilotPositionExit,
+  validateAndClampAutoPilotConfig,
+} from '../packages/agent/autopilot-policy';
 import { TradingRiskGate, compute24hRiskExposure } from '../packages/trading/risk-gate';
 import { notifyUserWebhookBestEffort } from '../packages/notifications/webhook-dispatcher';
 import { signBybitV5Post, submitBybitSpotOrder } from '../packages/trading/bybit-vault';
@@ -757,6 +762,41 @@ async function runSimulationSuite() {
       bjCsv.includes("'=EVIL") &&
       bjCsv.includes(`https://arbiscan.io/tx/${dummyTxHash}`),
     'Multi-chain history filter & formula-safe CSV audit export work deterministically'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 29: Autonomous AI Auto-Pilot Tier Gate & TP/SL Engine (Phase BK)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 29: Autonomous Auto-Pilot Tier Gate & TP/SL] ---');
+  let bkFreeBlocked = false;
+  try {
+    validateAndClampAutoPilotConfig({ enabled: true }, 'FREE');
+  } catch (e: any) {
+    bkFreeBlocked = String(e?.message || '').includes('PLAN_AUTOPILOT_REQUIRED');
+  }
+  const bkAgentCfg = validateAndClampAutoPilotConfig(
+    { enabled: true, rail: 'DEX_SESSION', maxOrderUsd: 5000, takeProfitPct: 12, stopLossPct: 5, allowedSymbols: ['BTCUSDT'] },
+    'AGENT'
+  );
+  const bkEntry = evaluateAutoPilotEntrySignal({
+    symbol: 'BTCUSDT',
+    confidenceScore: 84,
+    orderUsd: 500,
+    config: bkAgentCfg.config,
+    killSwitchActive: false,
+  });
+  const bkTp = evaluateAutoPilotPositionExit({
+    entryPrice: 100,
+    currentPrice: 113,
+    takeProfitPct: 12,
+    stopLossPct: 5,
+  });
+  assert(
+    bkFreeBlocked &&
+      bkAgentCfg.config.maxOrderUsd === 2500 &&
+      bkEntry.approved === true &&
+      bkTp.action === 'TAKE_PROFIT_SELL',
+    'Auto-Pilot blocks FREE tier, clamps AGENT cap ($2,500), approves high-confidence entry & triggers TP sell'
   );
 
   console.log('\n================================================================');

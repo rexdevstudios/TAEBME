@@ -308,6 +308,16 @@ async function runBlackboxSuite() {
   });
   assert(unauthDualCtrlPost.status === 401, 'Unauthenticated POST /api/admin/dual-control strictly rejected with HTTP 401');
 
+  const unauthAutoPilotGet = await fetch(`${BASE_URL}/api/agent/autopilot`);
+  assert(unauthAutoPilotGet.status === 401, 'Unauthenticated GET /api/agent/autopilot strictly rejected with HTTP 401');
+
+  const unauthAutoPilotPut = await fetch(`${BASE_URL}/api/agent/autopilot`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled: true }),
+  });
+  assert(unauthAutoPilotPut.status === 401, 'Unauthenticated PUT /api/agent/autopilot strictly rejected with HTTP 401');
+
   // -------------------------------------------------------------------------
   // TEST 12: Canonical Frontend Route Integrity & Live Billing Capacity Contract
   // -------------------------------------------------------------------------

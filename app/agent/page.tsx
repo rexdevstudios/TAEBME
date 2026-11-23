@@ -10,6 +10,7 @@ import { CustomAgentBuilderPanel } from '../components/CustomAgentBuilderPanel';
 import { ByokLlmVaultPanel, type SelectedLlmProvider } from '../components/ByokLlmVaultPanel';
 import { AutonomousAgentTerminalCard } from '../components/AutonomousAgentTerminalCard';
 import { SessionAllowancePanel } from '../components/SessionAllowancePanel';
+import { AutoPilotControlPanel } from '../components/AutoPilotControlPanel';
 import type { CustomAgentProfile } from '@packages/agent/skill-registry';
 
 export default function AgentPage() {
@@ -203,6 +204,9 @@ export default function AgentPage() {
 
       {/* Non-Custodial Personal Risk Guard (Reused from /trading, Clamped to Billing Tier) */}
       <UserRiskPolicyPanel isConnected={isConnected} />
+
+      {/* Autonomous AI Trading Auto-Pilot (TRADER & AGENT Exclusive) */}
+      <AutoPilotControlPanel isConnected={isConnected} />
 
       {/* 5-Agent Autonomous Trading Desk (100% Vercel-Native) */}
       <FiveAgentDeskPanel

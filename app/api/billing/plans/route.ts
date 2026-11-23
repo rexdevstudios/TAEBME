@@ -49,6 +49,7 @@ const CANONICAL_PLANS = [
     hasPriorityScrape: true,
     features: [
       'Live Trading Terminal (DEX & CEX Single-Shot)',
+      'Auto-Pilot CEX Bot (2 Strategi · Auto Buy & TP/SL)',
       'MEV Slippage Guard (<= 3.0% Cap)',
       'Deterministic Risk Gate & Kill-Switch Protection',
       'BYOK LLM Vault (3 Keys: Gemini / OpenAI / Claude · Hemat 60% Credits)',
@@ -67,6 +68,7 @@ const CANONICAL_PLANS = [
     hasPriorityScrape: true,
     features: [
       'Full Creator + Pro Trader Entitlements',
+      'Full Autonomous Auto-Pilot (5 Strategi · CEX & DEX Session + Auto TP/SL)',
       '5-Agent Autonomous Trading Desk (BytePlus / Gemini)',
       'BYOK LLM Vault (5 Keys: Gemini / OpenAI / Claude · Hemat 60% Credits)',
       'Arkham Wallet Profiling & Firecrawl Priority',

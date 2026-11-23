@@ -10,6 +10,8 @@ export interface PlanEntitlements {
   aiProposals: boolean;
 }
 
+export type AutoPilotRail = 'CEX_AUTO' | 'DEX_SESSION';
+
 export interface PlanCapacities {
   planId: PlanId;
   monthlyCredits: number;
@@ -20,6 +22,10 @@ export interface PlanCapacities {
   allowMainnetBinance: boolean;
   maxOrderValueUsd: number;
   maxDailyLossUsd: number;
+  autoPilotEnabled: boolean;
+  maxAutoPilotStrategies: number;
+  autoPilotRails: AutoPilotRail[];
+  maxAutoPilotOrderUsd: number;
 }
 
 export interface UserRiskPolicy {
@@ -229,6 +235,10 @@ export class SubscriptionsEngine {
       allowMainnetBinance: false,
       maxOrderValueUsd: 250,
       maxDailyLossUsd: 50,
+      autoPilotEnabled: false,
+      maxAutoPilotStrategies: 0,
+      autoPilotRails: [],
+      maxAutoPilotOrderUsd: 0,
     },
     CREATOR: {
       planId: 'CREATOR',
@@ -240,6 +250,10 @@ export class SubscriptionsEngine {
       allowMainnetBinance: false,
       maxOrderValueUsd: 1000,
       maxDailyLossUsd: 200,
+      autoPilotEnabled: false,
+      maxAutoPilotStrategies: 0,
+      autoPilotRails: [],
+      maxAutoPilotOrderUsd: 0,
     },
     TRADER: {
       planId: 'TRADER',
@@ -251,6 +265,10 @@ export class SubscriptionsEngine {
       allowMainnetBinance: true,
       maxOrderValueUsd: 10000,
       maxDailyLossUsd: 1000,
+      autoPilotEnabled: true,
+      maxAutoPilotStrategies: 2,
+      autoPilotRails: ['CEX_AUTO'],
+      maxAutoPilotOrderUsd: 500,
     },
     AGENT: {
       planId: 'AGENT',
@@ -262,6 +280,10 @@ export class SubscriptionsEngine {
       allowMainnetBinance: true,
       maxOrderValueUsd: 25000,
       maxDailyLossUsd: 2500,
+      autoPilotEnabled: true,
+      maxAutoPilotStrategies: 5,
+      autoPilotRails: ['CEX_AUTO', 'DEX_SESSION'],
+      maxAutoPilotOrderUsd: 2500,
     },
   };
 
