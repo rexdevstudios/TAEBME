@@ -8,10 +8,12 @@
  */
 
 import {
+  defaultBillingDbAdapter,
   defaultKillSwitchDbAdapter,
   defaultProviderKeyVaultAdapter,
   saveTradeIntent,
 } from '../../packages/shared/db-pool';
+import { upstashRedis } from '../../packages/shared/redis-client';
 import { notifyUserWebhookBestEffort } from '../../packages/notifications/webhook-dispatcher';
 import {
   runAutonomousCycleEvaluation,
@@ -20,7 +22,13 @@ import {
 } from '../../packages/agent/autopilot-cycle-runner';
 import { buildTradeIntentsFromAutoPilotReport } from '../../packages/agent/autopilot-intent-bridge';
 import type { AutoPilotConfig } from '../../packages/agent/autopilot-policy';
-import type { PlanId } from '../../packages/billing/subscriptions-engine';
+import {
+  fetchAutoPilotSpotPrices,
+  hydrateOpenPositionsWithLivePrices,
+  listActiveAutoPilotWallets,
+  syncActiveAutoPilotRegistry,
+} from '../../packages/agent/autopilot-market-feed';
+import { SubscriptionsEngine, type PlanId } from '../../packages/billing/subscriptions-engine';
 
 export interface AutoPilotWorkerTickOptions {
   userId: string;
@@ -94,6 +102,81 @@ export async function runAutoPilotWorkerTick(opts: AutoPilotWorkerTickOptions): 
     dryRun: Boolean(opts.dryRun),
     killSwitchActive,
     intentKeys,
+  };
+}
+
+/**
+ * Multi-Tenant 24/7 Sweep across all active `TRADER` / `AGENT` Auto-Pilot wallets (Phase BN).
+ * - Re-validates live billing tier before every tick; auto-deregisters downgraded `FREE`/`CREATOR` wallets.
+ * - Hydrates open positions with live Binance public spot prices before TP/SL evaluation.
+ */
+export async function runMultiTenantAutoPilotSweep(params?: {
+  dryRun?: boolean;
+  stage?: 'PAPER' | 'TESTNET' | 'LIVE';
+  fetchImpl?: typeof fetch;
+  openPositionsByWallet?: Record<string, AutoPilotOpenPosition[]>;
+  marketSignals?: AutoPilotMarketSignal[];
+}): Promise<{
+  scannedWallets: number;
+  executedWallets: number;
+  deregisteredDowngraded: number;
+  totalQueued: number;
+}> {
+  const wallets = await listActiveAutoPilotWallets();
+  let executedWallets = 0;
+  let deregisteredDowngraded = 0;
+  let totalQueued = 0;
+
+  for (const wallet of wallets) {
+    const planId = await defaultBillingDbAdapter.getUserPlan(wallet).catch(() => 'FREE' as PlanId);
+    const cap = SubscriptionsEngine.getPlanCapacities(planId);
+    if (!cap.autoPilotEnabled) {
+      await syncActiveAutoPilotRegistry(wallet, false).catch(() => {});
+      deregisteredDowngraded += 1;
+      continue;
+    }
+
+    const cfgKey = `agent:autopilot:cfg:${wallet.trim().toLowerCase()}`;
+    const rawCfg = upstashRedis.isConfigured()
+      ? await upstashRedis.get<string>(cfgKey).catch(() => null)
+      : null;
+    if (!rawCfg) continue;
+
+    let config: AutoPilotConfig;
+    try {
+      config = typeof rawCfg === 'string' ? JSON.parse(rawCfg) : rawCfg;
+    } catch {
+      continue;
+    }
+    if (!config.enabled) continue;
+
+    const rawPositions = params?.openPositionsByWallet?.[wallet] || [];
+    const symbolsToPrice = Array.from(
+      new Set([...config.allowedSymbols, ...rawPositions.map((p) => p.symbol)])
+    );
+    const livePrices = await fetchAutoPilotSpotPrices(symbolsToPrice, params?.fetchImpl);
+    const hydratedPositions = hydrateOpenPositionsWithLivePrices(rawPositions, livePrices);
+
+    const tick = await runAutoPilotWorkerTick({
+      userId: wallet,
+      walletAddress: wallet,
+      planId,
+      stage: params?.stage || (params?.dryRun ? 'PAPER' : 'TESTNET'),
+      config,
+      marketSignals: params?.marketSignals || [],
+      openPositions: hydratedPositions,
+      dryRun: params?.dryRun,
+    });
+
+    executedWallets += 1;
+    totalQueued += tick.queuedCount;
+  }
+
+  return {
+    scannedWallets: wallets.length,
+    executedWallets,
+    deregisteredDowngraded,
+    totalQueued,
   };
 }
 

@@ -18,6 +18,7 @@ import {
   validateAndClampAutoPilotConfig,
   type AutoPilotConfig,
 } from '@packages/agent/autopilot-policy';
+import { syncActiveAutoPilotRegistry } from '@packages/agent/autopilot-market-feed';
 
 export const dynamic = 'force-dynamic';
 
@@ -136,6 +137,7 @@ export async function PUT(req: NextRequest) {
     }
 
     await writeUserAutoPilotConfig(auth.walletAddress, validated.config);
+    await syncActiveAutoPilotRegistry(auth.walletAddress, validated.config.enabled).catch(() => {});
     await defaultBillingDbAdapter
       .createAuditLog(
         auth.user?.userId || auth.walletAddress,

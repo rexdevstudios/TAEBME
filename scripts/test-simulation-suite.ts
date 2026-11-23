@@ -32,6 +32,10 @@ import {
 } from '../packages/agent/autopilot-policy';
 import { runAutonomousCycleEvaluation } from '../packages/agent/autopilot-cycle-runner';
 import { buildTradeIntentsFromAutoPilotReport } from '../packages/agent/autopilot-intent-bridge';
+import {
+  hydrateOpenPositionsWithLivePrices,
+  updateActiveAutoPilotWalletList,
+} from '../packages/agent/autopilot-market-feed';
 import { TradingRiskGate, compute24hRiskExposure } from '../packages/trading/risk-gate';
 import { notifyUserWebhookBestEffort } from '../packages/notifications/webhook-dispatcher';
 import { signBybitV5Post, submitBybitSpotOrder } from '../packages/trading/bybit-vault';
@@ -849,6 +853,30 @@ async function runSimulationSuite() {
       bmIntents[1]?.side === 'BUY' &&
       bmIntents[1]?.idempotencyKey.startsWith('ap:simtrader1:ETHUSDT:BUY:'),
     'Auto-Pilot intent bridge converts TP sell & Auto-BUY signals into deterministic time-bucketed intents'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 32: Multi-Tenant Auto-Pilot Registry & Live Price Hydration (Phase BN)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 32: Multi-Tenant Auto-Pilot Registry & Price Feed] ---');
+  const bnList = updateActiveAutoPilotWalletList(
+    updateActiveAutoPilotWalletList([], '0xAAA0000000000000000000000000000000000001', true),
+    '0xBBB0000000000000000000000000000000000002',
+    true
+  );
+  const bnHydrated = hydrateOpenPositionsWithLivePrices(
+    [{ symbol: 'BTCUSDT', entryPrice: 100000, currentPrice: 100000, quantity: 0.01 }],
+    { BTCUSDT: 115000 }
+  );
+  const bnExit = evaluateAutoPilotPositionExit({
+    entryPrice: bnHydrated[0].entryPrice,
+    currentPrice: bnHydrated[0].currentPrice,
+    takeProfitPct: 12,
+    stopLossPct: 5,
+  });
+  assert(
+    bnList.length === 2 && bnHydrated[0].currentPrice === 115000 && bnExit.action === 'TAKE_PROFIT_SELL',
+    'Multi-tenant Auto-Pilot registry & live price hydration trigger deterministic TP sell cleanly'
   );
 
   console.log('\n================================================================');
