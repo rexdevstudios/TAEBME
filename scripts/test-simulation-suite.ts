@@ -33,6 +33,7 @@ import { buildDexPartnerFeePayload, formatBrokerOrderId } from '../packages/trad
 import { buildZeroXQuoteUrl, ZEROX_NATIVE_ETH } from '../packages/trading/zerox-swap-client';
 import {
   EVM_DEX_CHAINS,
+  findDexTokenPresetByAddress,
   getDefaultDexTokenForChain,
   getDexTokenPresetsForChain,
   getEvmExplorerTxUrl,
@@ -552,7 +553,8 @@ async function runSimulationSuite() {
   assert(
     getDefaultDexTokenForChain(42161).address === '0xaf88d065e77c8cC2239327C5EDb3A432268e5831' &&
       getDefaultDexTokenForChain(56).address === '0x55d398326f99059fF775485246999027B3197955' &&
-      getDexTokenPresetsForChain(8453).length >= 4,
+      getDexTokenPresetsForChain(8453).length >= 4 &&
+      findDexTokenPresetByAddress(42161, '0x912ce59144191c1204e64559fe8253a0e49e6548')?.symbol === 'ARB',
     'All 6 EVM DEX chains resolve canonical checksummed blue-chip token presets cleanly'
   );
 

@@ -224,6 +224,33 @@ async function runSiweE2eSmoke() {
         Boolean(dexJson?.data?.zeroXSwap && typeof dexJson.data.zeroXSwap.available === 'boolean' && dexJson.data.zeroXSwap.chainId === 8453),
       `DEX_NON_CUSTODIAL payload includes partnerFee (${dexJson?.data?.partnerFee?.feeBps} bps) & zeroXSwap (available=${dexJson?.data?.zeroXSwap?.available}, chainId=${dexJson?.data?.zeroXSwap?.chainId})`
     );
+
+    // 14. Multi-Chain Non-Custodial DEX Swap Quote on Arbitrum 42161 (Phase AT + BA + BB)
+    const arbDexRes = await fetch(`${BASE_URL}/api/trading/execute`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({
+        executionMode: 'DEX_NON_CUSTODIAL',
+        stage: 'PAPER',
+        symbol: 'USDC',
+        tokenAddress: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
+        chainId: 42161,
+        side: 'BUY',
+        type: 'MARKET',
+        quantity: 0.01,
+        maxSlippagePct: 1.0,
+      }),
+    });
+    const arbDexJson: any = await arbDexRes.json();
+    assert(
+      arbDexRes.status === 200 && arbDexJson?.success === true && arbDexJson?.data?.status === 'READY_FOR_WALLET_SIGN',
+      `POST /api/trading/execute (DEX_NON_CUSTODIAL Arbitrum 42161 USDC) returns READY_FOR_WALLET_SIGN (Got HTTP ${arbDexRes.status})`
+    );
+    assert(
+      Boolean(arbDexJson?.data?.partnerFee && arbDexJson.data.partnerFee.chainId === 42161) &&
+        Boolean(arbDexJson?.data?.zeroXSwap && arbDexJson.data.zeroXSwap.chainId === 42161),
+      `Arbitrum 42161 DEX payload includes partnerFee (${arbDexJson?.data?.partnerFee?.feeBps} bps) & zeroXSwap (available=${arbDexJson?.data?.zeroXSwap?.available}, chainId=${arbDexJson?.data?.zeroXSwap?.chainId})`
+    );
   } finally {
     // 9. Auto-Cleanup: Revoke test key & verify count returns to 0 + logout
     if (sessionToken && createdBybitKeyId) {

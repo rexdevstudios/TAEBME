@@ -381,6 +381,17 @@ export function getDefaultDexTokenForChain(chainId: number): DexTokenPreset {
   return list[0];
 }
 
+export function findDexTokenPresetByAddress(
+  chainId: number,
+  address: string | null | undefined
+): DexTokenPreset | null {
+  if (!address || typeof address !== 'string') return null;
+  const norm = address.trim().toLowerCase();
+  if (!norm) return null;
+  const list = getDexTokenPresetsForChain(chainId);
+  return list.find((p) => p.address.toLowerCase() === norm) || null;
+}
+
 /**
  * Multi-Chain MetaMask Network Switcher for any supported 0x EVM DEX chain (Phase AT).
  * Leaves `ensureBaseNetwork()` untouched for Billing & Launchpad contracts.

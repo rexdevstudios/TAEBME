@@ -3,6 +3,7 @@ import { ethers } from 'ethers';
 import {
   EVM_DEX_CHAINS,
   EVM_DEX_TOKEN_PRESETS,
+  findDexTokenPresetByAddress,
   getDefaultDexTokenForChain,
   getDexTokenPresetsForChain,
 } from '../packages/launchpad/web3-provider';
@@ -36,5 +37,17 @@ describe('Phase BA: Authoritative 6-Chain Blue-Chip DEX Token Preset Registry', 
     );
     expect(getDefaultDexTokenForChain(999999).chainId).toBe(8453);
     expect(Object.keys(EVM_DEX_TOKEN_PRESETS).length).toBe(6);
+  });
+
+  it('[BA1.3] findDexTokenPresetByAddress resolves presets case-insensitively and returns null for unknown addresses', () => {
+    const arbMatch = findDexTokenPresetByAddress(
+      42161,
+      '0x912ce59144191c1204e64559fe8253a0e49e6548'
+    );
+    expect(arbMatch?.symbol).toBe('ARB');
+    expect(arbMatch?.chainId).toBe(42161);
+
+    expect(findDexTokenPresetByAddress(42161, '0x1111111111111111111111111111111111111111')).toBeNull();
+    expect(findDexTokenPresetByAddress(8453, null)).toBeNull();
   });
 });

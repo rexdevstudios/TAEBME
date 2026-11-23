@@ -12,6 +12,7 @@ import { RecentTradeHistoryPanel } from '../components/RecentTradeHistoryPanel';
 import {
   EVM_DEX_CHAINS,
   ensureEvmNetwork,
+  findDexTokenPresetByAddress,
   getBrowserSigner,
   getDefaultDexTokenForChain,
   getDexTokenPresetsForChain,
@@ -289,6 +290,31 @@ export default function TradingPage() {
   const [dexSigning, setDexSigning] = useState(false);
   const [dexTxHash, setDexTxHash] = useState<string | null>(null);
 
+  const syncDexTokenSelection = (nextAddress: string | null, nextChainId: number) => {
+    setLinkedTokenAddress(nextAddress);
+    setDexSwapPayload(null);
+    setDexTxHash(null);
+    if (nextAddress && /^0x[a-fA-F0-9]{40}$/.test(nextAddress)) {
+      fetch(
+        `/api/trading/mev-quote?tokenAddress=${encodeURIComponent(nextAddress)}&chainId=${encodeURIComponent(String(nextChainId))}`
+      )
+        .then((r) => r.json())
+        .then((json) => {
+          if (json.success && json.data) {
+            setMevQuote({
+              isSafe: Boolean(json.data.isSafe),
+              maxSlippageBps: json.data.maxSlippageBps,
+            });
+          }
+        })
+        .catch(() => {
+          /* non-blocking MEV enrichment */
+        });
+    } else {
+      setMevQuote(null);
+    }
+  };
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const parsed = parseTradingHandoffSearchParams(window.location.search);
@@ -307,19 +333,9 @@ export default function TradingPage() {
       });
     }
     if (parsed.tokenAddress) {
-      setLinkedTokenAddress(parsed.tokenAddress);
-      fetch(`/api/trading/mev-quote?tokenAddress=${encodeURIComponent(parsed.tokenAddress)}`)
-        .then((r) => r.json())
-        .then((json) => {
-          if (json.success && json.data) {
-            setMevQuote({
-              isSafe: Boolean(json.data.isSafe),
-              maxSlippageBps: json.data.maxSlippageBps,
-            });
-          }
-        })
-        .catch(() => { /* non-blocking MEV enrichment */ });
+      syncDexTokenSelection(parsed.tokenAddress, parsed.chainId || 8453);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchMarketData = async () => {
@@ -781,7 +797,12 @@ export default function TradingPage() {
                 )}
                 {linkedTokenAddress && (
                   <div>
-                    Target Token: {linkedTokenAddress.slice(0, 10)}...{linkedTokenAddress.slice(-6)}
+                    Target Token:{' '}
+                    {findDexTokenPresetByAddress(dexChainId, linkedTokenAddress)
+                      ? `${findDexTokenPresetByAddress(dexChainId, linkedTokenAddress)?.symbol} (`
+                      : ''}
+                    {linkedTokenAddress.slice(0, 10)}...{linkedTokenAddress.slice(-6)}
+                    {findDexTokenPresetByAddress(dexChainId, linkedTokenAddress) ? ')' : ''}
                     {mevQuote && ` • MEV Shield: ${mevQuote.isSafe ? 'SAFE' : 'HIGH_RISK'}`}
                   </div>
                 )}
@@ -814,7 +835,7 @@ export default function TradingPage() {
                     const nextChain = Number(e.target.value) || 8453;
                     setDexChainId(nextChain);
                     const defPreset = getDefaultDexTokenForChain(nextChain);
-                    setLinkedTokenAddress(defPreset.address);
+                    syncDexTokenSelection(defPreset.address, nextChain);
                   }}
                   className="input"
                   style={{ width: '100%', padding: '6px 8px', fontSize: '11px', fontWeight: 700 }}
@@ -838,7 +859,7 @@ export default function TradingPage() {
                         key={`${preset.chainId}-${preset.symbol}`}
                         type="button"
                         onClick={() => {
-                          setLinkedTokenAddress(preset.address);
+                          syncDexTokenSelection(preset.address, dexChainId);
                         }}
                         style={{
                           padding: '2px 7px',
@@ -862,7 +883,7 @@ export default function TradingPage() {
                   type="text"
                   aria-label="DEX Target Token Contract Address"
                   value={linkedTokenAddress || ''}
-                  onChange={(e) => setLinkedTokenAddress(e.target.value.trim() || null)}
+                  onChange={(e) => syncDexTokenSelection(e.target.value.trim() || null, dexChainId)}
                   placeholder={`Target Token 0x... (default ${getDefaultDexTokenForChain(dexChainId).symbol}: ${getDefaultDexTokenForChain(dexChainId).address.slice(0, 10)}...)`}
                   className="input"
                   style={{ width: '100%', padding: '6px 8px', fontSize: '11px', fontFamily: 'var(--font-mono)' }}
