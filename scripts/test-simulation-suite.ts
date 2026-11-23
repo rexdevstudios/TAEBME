@@ -38,6 +38,7 @@ import {
   hydrateOpenPositionsWithLivePrices,
   updateActiveAutoPilotWalletList,
 } from '../packages/agent/autopilot-market-feed';
+import { analyzeGoPlusTokenSecurity } from '../packages/intelligence/onchain-insider-guard';
 import { runScheduledPulses } from '../workers/cloudflare-autopilot-cron/src/index';
 import { buildRetentionCleanupQueries } from '../packages/db/data-retention';
 import { TradingRiskGate, compute24hRiskExposure } from '../packages/trading/risk-gate';
@@ -941,6 +942,32 @@ async function runSimulationSuite() {
   assert(
     bvScore >= 82 && bvOpen.length === 1 && bvOpen[0]?.symbol === 'ETHUSDT',
     'Dynamic momentum scorer rewards healthy volume trend & derives open EXECUTED BUY positions cleanly'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 37: Free GoPlus On-Chain Anti-Insider & Honeypot Guard (Phase BW)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 37: On-Chain Anti-Insider & Honeypot Guard] ---');
+  const bwHoneypot = analyzeGoPlusTokenSecurity(
+    { is_honeypot: '1', sell_tax: '0.50' },
+    { address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', chainId: 8453 }
+  );
+  const bwCluster = analyzeGoPlusTokenSecurity(
+    {
+      is_honeypot: '0',
+      holders: [
+        { address: '0x1', percent: '0.0510', is_contract: 0, is_locked: 0 },
+        { address: '0x2', percent: '0.0505', is_contract: 0, is_locked: 0 },
+        { address: '0x3', percent: '0.0502', is_contract: 0, is_locked: 0 },
+      ],
+    },
+    { address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', chainId: 8453 }
+  );
+  assert(
+    bwHoneypot.hardBlocked === true &&
+      bwCluster.suspectedClusterCount === 3 &&
+      bwCluster.redFlags.includes('INSIDER_CLUSTER_SUSPECTED'),
+    'On-chain Anti-Insider Guard hard-blocks honeypot tokens & flags suspected 3+ same-entity wallet clusters'
   );
 
   console.log('\n================================================================');

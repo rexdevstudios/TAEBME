@@ -353,6 +353,19 @@ async function runBlackboxSuite() {
   assert(registryJson?.data?.defaultLlm?.primary === 'BYTEPLUS' || registryJson?.data?.defaultLlm?.primary === 'GEMINI', 'Provider registry exposes authoritative defaultLlm primary engine');
   assert(Array.isArray(registryJson?.data?.providers) && registryJson.data.providers.length >= 6, 'Provider registry exposes modular CEX, Launchpad, LLM & Webhook providers');
 
+  // -------------------------------------------------------------------------
+  // TEST 13: Public On-Chain Anti-Insider Token Safety Guard (Phase BW)
+  // -------------------------------------------------------------------------
+  const safetyBadRes = await fetch(`${BASE_URL}/api/trading/token-safety?address=invalid&chainId=8453`);
+  assert(safetyBadRes.status === 400, `GET /api/trading/token-safety rejects invalid EVM address with HTTP 400 (Got ${safetyBadRes.status})`);
+
+  const safetyOkRes = await fetch(
+    `${BASE_URL}/api/trading/token-safety?address=0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913&chainId=8453`
+  );
+  assert(safetyOkRes.status === 200, `GET /api/trading/token-safety returns HTTP 200 for Base USDC (Got ${safetyOkRes.status})`);
+  const safetyOkJson: any = await safetyOkRes.json();
+  assert(safetyOkJson?.success === true, 'GET /api/trading/token-safety responds with structured success=true envelope');
+
   console.log('\n================================================================');
   console.log(`  🎉 BLACKBOX SUITE COMPLETED: ${passedTests} PASSED, ${failedTests} FAILED`);
   console.log('================================================================\n');
