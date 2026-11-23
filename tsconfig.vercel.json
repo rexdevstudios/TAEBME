@@ -26,6 +26,7 @@
     "sites",
     "scripts",
     "tests",
-    "test"
+    "test",
+    "workers"
   ]
 }

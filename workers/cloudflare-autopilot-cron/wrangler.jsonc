@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "rtrader-autopilot-cron",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-23",
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  },
+  "vars": {
+    "TESTNET_ORIGIN": "https://testnet.pndigi.site",
+    "PROD_ORIGIN": "https://pndigi.site"
+  },
+  "observability": {
+    "enabled": true,
+    "traces": {
+      "enabled": true
+    }
+  }
+}

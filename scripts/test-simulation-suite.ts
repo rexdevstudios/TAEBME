@@ -36,6 +36,7 @@ import {
   hydrateOpenPositionsWithLivePrices,
   updateActiveAutoPilotWalletList,
 } from '../packages/agent/autopilot-market-feed';
+import { runScheduledPulses } from '../workers/cloudflare-autopilot-cron/src/index';
 import { TradingRiskGate, compute24hRiskExposure } from '../packages/trading/risk-gate';
 import { notifyUserWebhookBestEffort } from '../packages/notifications/webhook-dispatcher';
 import { signBybitV5Post, submitBybitSpotOrder } from '../packages/trading/bybit-vault';
@@ -877,6 +878,24 @@ async function runSimulationSuite() {
   assert(
     bnList.length === 2 && bnHydrated[0].currentPrice === 115000 && bnExit.action === 'TAKE_PROFIT_SELL',
     'Multi-tenant Auto-Pilot registry & live price hydration trigger deterministic TP sell cleanly'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 33: Cloudflare Worker Cron Scheduler Dual-Origin Pulses (Phase BO)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 33: Cloudflare Worker Cron Scheduler] ---');
+  const boResults = await runScheduledPulses(
+    {
+      TESTNET_ORIGIN: 'https://testnet.pndigi.site',
+      CRON_SECRET_TESTNET: 'sim_testnet_cron_secret_123456',
+      PROD_ORIGIN: 'https://pndigi.site',
+      CRON_SECRET_PROD: 'sim_prod_cron_secret_123456',
+    },
+    (async () => new Response(JSON.stringify({ success: true }), { status: 200 })) as typeof fetch
+  );
+  assert(
+    boResults.length === 4 && boResults.every((r) => r.ok && r.status === 200),
+    'Cloudflare Worker cron dispatches 4 authenticated pulses (Scout + Auto-Pilot) across Testnet & Production'
   );
 
   console.log('\n================================================================');

@@ -1,184 +1,20 @@
 /**
  * apps/execution-plane/autopilot-worker.ts
  *
- * Standalone 24/7 Execution-Plane Auto-Pilot Worker CLI (Phase BM).
+ * Standalone 24/7 Execution-Plane Auto-Pilot Worker CLI (Phase BM + BN + BO).
+ * - Thin CLI wrapper around `@packages/agent/autopilot-sweep` (zero duplication).
  * - Strictly runs outside Vercel/Next.js (`AGENTS.md` Rule 1: Control Plane Isolation).
  * - Zero Auto-Start on Import: safe to import in unit tests.
- * - Supports `--dry-run` and `--once` flags for safe preflight and VPS/Docker/Railway deployment.
  */
 
 import {
-  defaultBillingDbAdapter,
-  defaultKillSwitchDbAdapter,
-  defaultProviderKeyVaultAdapter,
-  saveTradeIntent,
-} from '../../packages/shared/db-pool';
-import { upstashRedis } from '../../packages/shared/redis-client';
-import { notifyUserWebhookBestEffort } from '../../packages/notifications/webhook-dispatcher';
-import {
-  runAutonomousCycleEvaluation,
-  type AutoPilotMarketSignal,
-  type AutoPilotOpenPosition,
-} from '../../packages/agent/autopilot-cycle-runner';
-import { buildTradeIntentsFromAutoPilotReport } from '../../packages/agent/autopilot-intent-bridge';
-import type { AutoPilotConfig } from '../../packages/agent/autopilot-policy';
-import {
-  fetchAutoPilotSpotPrices,
-  hydrateOpenPositionsWithLivePrices,
-  listActiveAutoPilotWallets,
-  syncActiveAutoPilotRegistry,
-} from '../../packages/agent/autopilot-market-feed';
-import { SubscriptionsEngine, type PlanId } from '../../packages/billing/subscriptions-engine';
+  runAutoPilotWorkerTick,
+  runMultiTenantAutoPilotSweep,
+  type AutoPilotWorkerTickOptions,
+} from '../../packages/agent/autopilot-sweep';
+import type { PlanId } from '../../packages/billing/subscriptions-engine';
 
-export interface AutoPilotWorkerTickOptions {
-  userId: string;
-  walletAddress: string;
-  planId: PlanId;
-  stage: 'PAPER' | 'TESTNET' | 'LIVE';
-  config: AutoPilotConfig;
-  marketSignals: AutoPilotMarketSignal[];
-  openPositions: AutoPilotOpenPosition[];
-  dryRun?: boolean;
-  nowMs?: number;
-}
-
-export async function runAutoPilotWorkerTick(opts: AutoPilotWorkerTickOptions): Promise<{
-  queuedCount: number;
-  dryRun: boolean;
-  killSwitchActive: boolean;
-  intentKeys: string[];
-}> {
-  const activeKillSwitches = await defaultKillSwitchDbAdapter.getActiveKillSwitches().catch(() => []);
-  const killSwitchActive = Array.isArray(activeKillSwitches) && activeKillSwitches.length > 0;
-
-  const report = runAutonomousCycleEvaluation({
-    planId: opts.planId,
-    config: opts.config,
-    killSwitchActive,
-    marketSignals: opts.marketSignals,
-    openPositions: opts.openPositions,
-  });
-
-  const intents = buildTradeIntentsFromAutoPilotReport({
-    userId: opts.userId,
-    stage: opts.stage,
-    report,
-    nowMs: opts.nowMs,
-  });
-
-  const intentKeys: string[] = [];
-  for (const intent of intents) {
-    intentKeys.push(intent.idempotencyKey);
-    if (!opts.dryRun) {
-      await saveTradeIntent(intent);
-      await notifyUserWebhookBestEffort({
-        resolveWebhookUrl: async () => {
-          const hook = await defaultProviderKeyVaultAdapter
-            .resolveDecryptedKeyForDeploy({
-              userIdentifier: opts.walletAddress,
-              targetChain: 'all',
-              provider: 'WEBHOOK',
-            })
-            .catch(() => null);
-          return hook?.apiKey || null;
-        },
-        payload: {
-          event: 'AUTOPILOT_ORDER_QUEUED',
-          title: `Auto-Pilot Queued ${intent.side} ${intent.symbol}`,
-          message: `${intent.riskDecisionReason || 'Auto-Pilot Signal'} · Stage: ${intent.stage} · Qty: ${intent.quantity}`,
-          metadata: {
-            symbol: intent.symbol,
-            side: intent.side,
-            stage: intent.stage,
-            idempotencyKey: intent.idempotencyKey,
-          },
-        },
-      });
-    }
-  }
-
-  return {
-    queuedCount: intents.length,
-    dryRun: Boolean(opts.dryRun),
-    killSwitchActive,
-    intentKeys,
-  };
-}
-
-/**
- * Multi-Tenant 24/7 Sweep across all active `TRADER` / `AGENT` Auto-Pilot wallets (Phase BN).
- * - Re-validates live billing tier before every tick; auto-deregisters downgraded `FREE`/`CREATOR` wallets.
- * - Hydrates open positions with live Binance public spot prices before TP/SL evaluation.
- */
-export async function runMultiTenantAutoPilotSweep(params?: {
-  dryRun?: boolean;
-  stage?: 'PAPER' | 'TESTNET' | 'LIVE';
-  fetchImpl?: typeof fetch;
-  openPositionsByWallet?: Record<string, AutoPilotOpenPosition[]>;
-  marketSignals?: AutoPilotMarketSignal[];
-}): Promise<{
-  scannedWallets: number;
-  executedWallets: number;
-  deregisteredDowngraded: number;
-  totalQueued: number;
-}> {
-  const wallets = await listActiveAutoPilotWallets();
-  let executedWallets = 0;
-  let deregisteredDowngraded = 0;
-  let totalQueued = 0;
-
-  for (const wallet of wallets) {
-    const planId = await defaultBillingDbAdapter.getUserPlan(wallet).catch(() => 'FREE' as PlanId);
-    const cap = SubscriptionsEngine.getPlanCapacities(planId);
-    if (!cap.autoPilotEnabled) {
-      await syncActiveAutoPilotRegistry(wallet, false).catch(() => {});
-      deregisteredDowngraded += 1;
-      continue;
-    }
-
-    const cfgKey = `agent:autopilot:cfg:${wallet.trim().toLowerCase()}`;
-    const rawCfg = upstashRedis.isConfigured()
-      ? await upstashRedis.get<string>(cfgKey).catch(() => null)
-      : null;
-    if (!rawCfg) continue;
-
-    let config: AutoPilotConfig;
-    try {
-      config = typeof rawCfg === 'string' ? JSON.parse(rawCfg) : rawCfg;
-    } catch {
-      continue;
-    }
-    if (!config.enabled) continue;
-
-    const rawPositions = params?.openPositionsByWallet?.[wallet] || [];
-    const symbolsToPrice = Array.from(
-      new Set([...config.allowedSymbols, ...rawPositions.map((p) => p.symbol)])
-    );
-    const livePrices = await fetchAutoPilotSpotPrices(symbolsToPrice, params?.fetchImpl);
-    const hydratedPositions = hydrateOpenPositionsWithLivePrices(rawPositions, livePrices);
-
-    const tick = await runAutoPilotWorkerTick({
-      userId: wallet,
-      walletAddress: wallet,
-      planId,
-      stage: params?.stage || (params?.dryRun ? 'PAPER' : 'TESTNET'),
-      config,
-      marketSignals: params?.marketSignals || [],
-      openPositions: hydratedPositions,
-      dryRun: params?.dryRun,
-    });
-
-    executedWallets += 1;
-    totalQueued += tick.queuedCount;
-  }
-
-  return {
-    scannedWallets: wallets.length,
-    executedWallets,
-    deregisteredDowngraded,
-    totalQueued,
-  };
-}
+export { runAutoPilotWorkerTick, runMultiTenantAutoPilotSweep, type AutoPilotWorkerTickOptions };
 
 // CLI Entrypoint (only executes when invoked directly)
 const isMainModule =
