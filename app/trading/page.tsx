@@ -259,6 +259,7 @@ export default function TradingPage() {
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [historyRefreshTick, setHistoryRefreshTick] = useState(0);
+  const [activeTradingTab, setActiveTradingTab] = useState<'trade' | 'history' | 'vault'>('trade');
 
   // Controlled order parameters & deep-link context (Launchpad ?token= & Agent ?proposalId=)
   const [executionMode, setExecutionMode] = useState<'PAPER' | 'DEX_NON_CUSTODIAL' | 'CEX_SINGLE_SHOT'>('PAPER');
@@ -604,6 +605,89 @@ export default function TradingPage() {
         </div>
       </div>
 
+      {/* Accessible Tabbed Navigation for /trading (Consistent with /agent & /billing) */}
+      <div
+        role="tablist"
+        aria-label="Navigasi Halaman Trading"
+        className="bg-panel"
+        style={{
+          display: 'flex',
+          gap: '8px',
+          flexWrap: 'wrap',
+          padding: '8px',
+          borderRadius: '10px',
+          border: '1px solid var(--color-border)',
+        }}
+      >
+        {(
+          [
+            { id: 'trade', label: '1. Quick Swap & Order', hint: 'Chart · DEX 0x v2 · CEX Single-Shot' },
+            { id: 'history', label: '2. Riwayat Order & CSV Audit', hint: 'Filter Chain · Explorer · Re-Trade' },
+            { id: 'vault', label: '3. Pro CEX Vault & Risk Guard', hint: 'Binance · Bybit · Personal Risk Cap' },
+          ] as const
+        ).map((tab) => {
+          const active = activeTradingTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setActiveTradingTab(tab.id)}
+              style={{
+                flex: '1 1 180px',
+                minHeight: '44px',
+                padding: '8px 14px',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'flex-start',
+                justifyContent: 'center',
+                gap: '2px',
+                border: active ? '1px solid #38BDF8' : '1px solid transparent',
+                background: active ? 'rgba(56, 189, 248, 0.14)' : 'transparent',
+                color: active ? '#F8FAFC' : 'var(--color-muted)',
+              }}
+            >
+              <span style={{ fontSize: '13px', fontWeight: 800, color: active ? '#38BDF8' : 'var(--color-foreground)' }}>
+                {tab.label}
+              </span>
+              <span style={{ fontSize: '11px', color: 'var(--color-muted)' }}>{tab.hint}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* TAB 2: Riwayat Order & CSV Audit */}
+      {activeTradingTab === 'history' && (
+        <div className="flex-col gap-lg">
+          <RecentTradeHistoryPanel isConnected={isConnected} refreshSignal={historyRefreshTick} />
+        </div>
+      )}
+
+      {/* TAB 3: Pro CEX Vault & Risk Guard */}
+      {activeTradingTab === 'vault' && (
+        <div className="flex-col gap-lg">
+          <UserRiskPolicyPanel isConnected={isConnected} />
+          <div className="grid-2" style={{ gap: '16px' }}>
+            <BinanceKeyVaultPanel
+              isConnected={isConnected}
+              selectedCredentialId={selectedBinanceCredentialId}
+              onSelectCredentialId={setSelectedBinanceCredentialId}
+            />
+            <BybitKeyVaultPanel
+              isConnected={isConnected}
+              selectedKeyId={selectedBybitKeyId}
+              onSelectKeyId={setSelectedBybitKeyId}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* TAB 1: Quick Swap & Order (Default Beginner-Friendly View) */}
+      {activeTradingTab === 'trade' && (
+      <>
       {/* Workflow & Plan Entitlement Guide */}
       <PageWorkflowBanner
         title="Alur Trading Terminal & Risk Gate"
@@ -1203,9 +1287,6 @@ export default function TradingPage() {
             )}
           </div>
 
-          {/* User-Scoped Recent Trade Intent History (GET /api/trade-intents) */}
-          <RecentTradeHistoryPanel isConnected={isConnected} refreshSignal={historyRefreshTick} />
-
           {/* Investor Safety Nutrition Label (for SocialFi / Bonding Curve tokens) */}
           {symbol.includes('/') && (
             <div style={{ marginTop: '8px' }}>
@@ -1228,6 +1309,8 @@ export default function TradingPage() {
           )}
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }
