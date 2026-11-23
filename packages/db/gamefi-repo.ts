@@ -348,10 +348,10 @@ export class PostgresGameFiDbAdapter {
 
         const profileRes = await client.query(
           `INSERT INTO user_gamefi_profiles (user_id, xp, level, quests_completed, updated_at)
-           VALUES ($1, $2, 1 + FLOOR($2 / 500), 1, NOW())
+           VALUES ($1, $2::bigint, (1 + FLOOR($2::bigint / 500))::integer, 1, NOW())
            ON CONFLICT (user_id) DO UPDATE SET
              xp = user_gamefi_profiles.xp + EXCLUDED.xp,
-             level = 1 + FLOOR((user_gamefi_profiles.xp + EXCLUDED.xp) / 500),
+             level = (1 + FLOOR((user_gamefi_profiles.xp + EXCLUDED.xp) / 500))::integer,
              quests_completed = user_gamefi_profiles.quests_completed + 1,
              updated_at = NOW()
            RETURNING user_id as "userId", xp, level, quests_completed as "questsCompleted", updated_at as "updatedAt"`,

@@ -387,7 +387,7 @@ async function runSiweE2eSmoke() {
         gfJson?.success === true &&
         Number(gfJson?.profile?.xp || 0) >= 25 &&
         Number(gfJson?.creditsGranted || 0) === 5,
-      `POST /api/gamefi/quests/complete (daily_checkin) succeeds live with +25 XP & +5 Credits (Got HTTP ${gfRes.status}, xp=${gfJson?.profile?.xp})`
+      `POST /api/gamefi/quests/complete (daily_checkin) succeeds live with +25 XP & +5 Credits (Got HTTP ${gfRes.status}, xp=${gfJson?.profile?.xp}, err=${gfJson?.error || 'none'})`
     );
   } finally {
     // 9. Auto-Cleanup: Revoke test key & verify count returns to 0 + logout
