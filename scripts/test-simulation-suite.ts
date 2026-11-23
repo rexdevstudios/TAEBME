@@ -31,6 +31,7 @@ import {
   validateAndClampAutoPilotConfig,
 } from '../packages/agent/autopilot-policy';
 import { runAutonomousCycleEvaluation } from '../packages/agent/autopilot-cycle-runner';
+import { buildTradeIntentsFromAutoPilotReport } from '../packages/agent/autopilot-intent-bridge';
 import { TradingRiskGate, compute24hRiskExposure } from '../packages/trading/risk-gate';
 import { notifyUserWebhookBestEffort } from '../packages/notifications/webhook-dispatcher';
 import { signBybitV5Post, submitBybitSpotOrder } from '../packages/trading/bybit-vault';
@@ -829,6 +830,25 @@ async function runSimulationSuite() {
       blReport.summary.buyReadyCount === 1 &&
       blReport.entryActions[1]?.decision === 'STRATEGY_CAP_REACHED',
     'Autonomous cycle runner triggers TP sell, approves 1 new entry, and enforces TRADER 2-strategy cap'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 31: Auto-Pilot Intent Bridge & Idempotent Deduplication (Phase BM)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 31: Auto-Pilot Intent Bridge & Deduplication] ---');
+  const bmIntents = buildTradeIntentsFromAutoPilotReport({
+    userId: 'sim-trader-1',
+    stage: 'TESTNET',
+    report: blReport,
+    nowMs: 1_700_000_000_000,
+  });
+  assert(
+    bmIntents.length === 2 &&
+      bmIntents[0]?.side === 'SELL' &&
+      bmIntents[0]?.idempotencyKey.startsWith('ap:simtrader1:BTCUSDT:SELL:') &&
+      bmIntents[1]?.side === 'BUY' &&
+      bmIntents[1]?.idempotencyKey.startsWith('ap:simtrader1:ETHUSDT:BUY:'),
+    'Auto-Pilot intent bridge converts TP sell & Auto-BUY signals into deterministic time-bucketed intents'
   );
 
   console.log('\n================================================================');
