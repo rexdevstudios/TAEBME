@@ -71,7 +71,7 @@ const CANONICAL_PLANS = [
       'Full Autonomous Auto-Pilot (5 Strategi · CEX & DEX Session + Auto TP/SL)',
       '5-Agent Autonomous Trading Desk (BytePlus / Gemini)',
       'BYOK LLM Vault (5 Keys: Gemini / OpenAI / Claude · Hemat 60% Credits)',
-      'Arkham Wallet Profiling & Firecrawl Priority',
+      'On-Chain Wallet Guard (GoPlus + RPC) & Firecrawl Priority',
       'Daytona Strategy Sandbox & Backtester',
     ],
   },

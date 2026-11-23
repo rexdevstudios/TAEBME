@@ -39,6 +39,7 @@ import {
   updateActiveAutoPilotWalletList,
 } from '../packages/agent/autopilot-market-feed';
 import { analyzeGoPlusTokenSecurity } from '../packages/intelligence/onchain-insider-guard';
+import { analyzeFreeWalletIntelligence } from '../packages/intelligence/free-wallet-intelligence';
 import { runScheduledPulses } from '../workers/cloudflare-autopilot-cron/src/index';
 import { buildRetentionCleanupQueries } from '../packages/db/data-retention';
 import { TradingRiskGate, compute24hRiskExposure } from '../packages/trading/risk-gate';
@@ -999,6 +1000,28 @@ async function runSimulationSuite() {
       Boolean(bxReport.exitActions[0]?.reason) &&
       Boolean(bxReport.entryActions[0]?.reason),
     'Trailing Stop-Loss locks profit on peak pullback & attaches beginner-friendly Indonesian AI decision reasons'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 39: Free Multi-Source On-Chain Wallet Intelligence ($0 Replacing Arkham — Phase BY)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 39: Free On-Chain Wallet Intelligence ($0 Replacing Arkham)] ---');
+  const bySanctioned = analyzeFreeWalletIntelligence({
+    address: '0x1111111111111111111111111111111111111111',
+    chainId: 8453,
+    goPlus: { sanctioned: '1' },
+  });
+  const byKnownRouter = analyzeFreeWalletIntelligence({
+    address: '0x0000000000001ff3684f28c67538d4d072c22734',
+    chainId: 8453,
+    goPlus: { sanctioned: '0' },
+  });
+  assert(
+    bySanctioned.isCounterpartyBlocked === true &&
+      bySanctioned.riskPassportScore === 0 &&
+      byKnownRouter.riskPassportScore === 95 &&
+      byKnownRouter.arkhamEntityName === '0x Protocol AllowanceHolder',
+    'Free GoPlus+RPC Wallet Intelligence hard-blocks sanctioned addresses & recognizes verified DeFi routers at $0 cost'
   );
 
   console.log('\n================================================================');

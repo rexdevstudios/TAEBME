@@ -366,6 +366,22 @@ async function runBlackboxSuite() {
   const safetyOkJson: any = await safetyOkRes.json();
   assert(safetyOkJson?.success === true, 'GET /api/trading/token-safety responds with structured success=true envelope');
 
+  // -------------------------------------------------------------------------
+  // TEST 14: Public Free On-Chain Wallet Risk Profiling ($0 Replacing Arkham — Phase BY)
+  // -------------------------------------------------------------------------
+  const walletBadRes = await fetch(`${BASE_URL}/api/trading/wallet-risk?address=invalid&chainId=8453`);
+  assert(walletBadRes.status === 400, `GET /api/trading/wallet-risk rejects invalid EVM address with HTTP 400 (Got ${walletBadRes.status})`);
+
+  const walletOkRes = await fetch(
+    `${BASE_URL}/api/trading/wallet-risk?address=0x0000000000001ff3684f28c67538d4d072c22734&chainId=8453`
+  );
+  assert(walletOkRes.status === 200, `GET /api/trading/wallet-risk returns HTTP 200 for 0x AllowanceHolder (Got ${walletOkRes.status})`);
+  const walletOkJson: any = await walletOkRes.json();
+  assert(
+    walletOkJson?.success === true && walletOkJson?.data?.riskPassportScore >= 90,
+    'GET /api/trading/wallet-risk resolves known verified protocol router with high trust score at $0 cost'
+  );
+
   console.log('\n================================================================');
   console.log(`  🎉 BLACKBOX SUITE COMPLETED: ${passedTests} PASSED, ${failedTests} FAILED`);
   console.log('================================================================\n');

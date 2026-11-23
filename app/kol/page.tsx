@@ -493,7 +493,7 @@ export default function KolHubPage() {
                 SocialFi Bounty Portal
               </span>
               <span className="badge" style={{ backgroundColor: 'var(--color-badge-neutral-bg)', border: '1px solid var(--color-badge-neutral-border)', color: 'var(--color-badge-neutral-text)', fontSize: '11px', padding: '2px 8px' }}>
-                Arkham & Merkle Verified
+                On-Chain Wallet Guard (GoPlus + RPC) &amp; Merkle Verified
               </span>
             </div>
             <h1 style={{ fontSize: '24px', fontWeight: 800, margin: 0, letterSpacing: '-0.3px' }}>

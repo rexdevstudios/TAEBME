@@ -469,7 +469,7 @@ export default function AgentPage() {
           </div>
           <div className="grid-4">
             <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '16px', borderRadius: '6px' }}>
-              <div style={{ color: '#00E5FF', fontWeight: 800, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}><ShieldAlert size={14} /> Arkham Intelligence</div>
+              <div style={{ color: '#00E5FF', fontWeight: 800, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}><ShieldAlert size={14} /> On-Chain Wallet Guard</div>
               <div style={{ fontSize: '18px', fontWeight: 900, color: 'var(--color-foreground)', margin: '8px 0', fontFamily: 'var(--font-mono)' }}>{Math.round(arkhamWeight * 100)}%</div>
               <input
                 type="range"
@@ -477,10 +477,10 @@ export default function AgentPage() {
                 max={100}
                 value={Math.round(arkhamWeight * 100)}
                 onChange={(e) => setArkhamWeight(Number(e.target.value) / 100)}
-                aria-label="Arkham Intelligence Weight"
+                aria-label="On-Chain Wallet Guard Weight"
                 style={{ width: '100%', marginBottom: '6px' }}
               />
-              <div className="text-muted" style={{ fontSize: '11px' }}>Counterparty &amp; Sanctions Risk</div>
+              <div className="text-muted" style={{ fontSize: '11px' }}>GoPlus + RPC Counterparty &amp; Sanctions Risk ($0)</div>
             </div>
             <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '16px', borderRadius: '6px' }}>
               <div style={{ color: '#D500F9', fontWeight: 800, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}><Activity size={14} /> Firecrawl Sentiment</div>

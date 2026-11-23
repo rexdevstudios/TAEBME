@@ -50,6 +50,7 @@ const PUBLIC_GET_ONLY_PATHS = new Set([
   '/api/launchpad/graduate', // GET (graduation status read) is public; POST is protected
   '/api/launchpad/bounty/claim', // GET (Merkle proof eligibility lookup) is public; POST (claim submission) requires SIWE session
   '/api/trading/token-safety', // GET (GoPlus on-chain anti-insider & honeypot report) is public read-only
+  '/api/trading/wallet-risk', // GET (Free GoPlus+RPC wallet risk profiling) is public read-only
 ]);
 
 // Security headers applied to ALL responses

@@ -827,12 +827,12 @@ export default function TradingPage() {
             </div>
 
             <div style={{ fontSize: '12px', color: 'var(--color-foreground)', lineHeight: '1.5', marginBottom: '12px' }}>
-              <strong className="text-muted">Rationale:</strong> {signal?.rationale || 'Counterparty cleared by Arkham | Volatility LOW | Spread normal'}
+              <strong className="text-muted">Rationale:</strong> {signal?.rationale || 'Counterparty cleared by On-Chain Guard (GoPlus + RPC) | Volatility LOW | Spread normal'}
             </div>
 
             <div className="flex-row gap-xs" style={{ flexWrap: 'wrap' }}>
               <span className="badge badge-trader">
-                ✓ Arkham {signal?.inputs.counterpartyRisk || 'CLEAR'}
+                ✓ On-Chain Guard {signal?.inputs.counterpartyRisk || 'CLEAR'}
               </span>
               <span className="badge badge-trader" style={{ border: '1px solid var(--color-badge-info-border)', color: 'var(--color-badge-info-text)', backgroundColor: 'var(--color-badge-info-bg)' }}>
                 ✓ Sentiment {signal?.inputs.webSentiment || 'NEUTRAL'}

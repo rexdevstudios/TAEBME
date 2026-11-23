@@ -1,4 +1,5 @@
 // Uses native global fetch (Node 18+ & Next.js native)
+import { fetchFreeWalletProfile } from './free-wallet-intelligence';
 
 export interface ArkhamEntityProfile {
   walletAddress: string;
@@ -38,15 +39,34 @@ export class ArkhamIntelligenceService {
   }
 
   /**
-   * Fetch Wallet Risk Profiling & Entity Intelligence from Arkham API (Out-of-Band Async Enrichment)
+   * Fetch Wallet Risk Profiling & Entity Intelligence (Free-First Cascade — Phase BY).
+   * - Default ($0): GoPlus Address Security + Public EVM RPC Maturity + Curated Public Registry + Redis 24h cache.
+   * - Optional Paid Override: Only calls Arkham Enterprise API if a real (non-mock) ARKHAM_API_KEY is explicitly configured.
    */
-  async profileWallet(walletAddress: string, requesterUserId: string): Promise<ArkhamEntityProfile> {
+  async profileWallet(walletAddress: string, requesterUserId: string, chainId: number = 8453): Promise<ArkhamEntityProfile> {
     const cached = await this.db.getArkhamProfile(walletAddress);
     if (cached) {
       return cached;
     }
 
-    console.log(`[Arkham Intelligence] Fetching out-of-band profile for wallet ${walletAddress}...`);
+    const hasPaidArkhamKey =
+      Boolean(this.apiKey) &&
+      this.apiKey !== 'mock_arkham_api_key' &&
+      !this.apiKey.startsWith('mock_');
+
+    if (!hasPaidArkhamKey) {
+      const freeProfile = await fetchFreeWalletProfile({ address: walletAddress, chainId });
+      await this.db.upsertArkhamProfile(freeProfile);
+      await this.db.createAuditLog(
+        requesterUserId,
+        'FREE_WALLET_INTELLIGENCE_PROFILED',
+        undefined,
+        `Profiled wallet ${walletAddress} (Free GoPlus+RPC): Score=${freeProfile.riskPassportScore}, Entity=${freeProfile.arkhamEntityName}`
+      );
+      return freeProfile;
+    }
+
+    console.log(`[OnChain Wallet Intel] Fetching optional Arkham Enterprise override for wallet ${walletAddress}...`);
 
     try {
       const res = await fetch(`${this.apiBaseUrl}/intelligence/address/${walletAddress}`, {
