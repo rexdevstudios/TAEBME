@@ -35,9 +35,11 @@ import { EVM_DEX_CHAINS, getEvmExplorerTxUrl } from '../packages/launchpad/web3-
 import {
   buildAutonomousTerminalSnapshot,
   buildTerminalTradeHandoffUrl,
+  filterTerminalLiveFeed,
   formatScoutCacheAgeLabel,
   mapDexScreenerBoostRowsToScoutHints,
   parseTradingHandoffSearchParams,
+  shouldTriggerOnDemandScoutSync,
 } from '../packages/agent/autonomous-terminal-engine';
 import { validateChainScope } from '../packages/shared/credential-vault';
 import { ProviderRegistry } from '../packages/providers/registry';
@@ -510,6 +512,32 @@ async function runSimulationSuite() {
       multiScoutSnap.liveFeed.some((f) => f.href.includes('chainId=42161')) &&
       multiScoutSnap.liveFeed.some((f) => f.href.includes('chainId=56')),
     'Multi-chain Scout discovery maps Arbitrum (42161) and BSC (56) hints into 1-click DEX handoff URLs'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 19: On-Demand Scout Cooldown Guard & Multi-Chain Feed Filter (Phase AZ)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 19: On-Demand Scout Cooldown & Multi-Chain Feed Filter] ---');
+  const cooldownRefNow = Date.parse('2026-11-23T05:00:00.000Z');
+  const blockedWithin60s = shouldTriggerOnDemandScoutSync({
+    refreshRequested: true,
+    lastSyncedAtIso: '2026-11-23T04:59:20.000Z',
+    nowMs: cooldownRefNow,
+    cooldownSec: 60,
+  });
+  const allowedAfter60s = shouldTriggerOnDemandScoutSync({
+    refreshRequested: true,
+    lastSyncedAtIso: '2026-11-23T04:58:30.000Z',
+    nowMs: cooldownRefNow,
+    cooldownSec: 60,
+  });
+  const arbOnlyFeed = filterTerminalLiveFeed(multiScoutSnap.liveFeed, 42161);
+  assert(
+    blockedWithin60s === false &&
+      allowedAfter60s === true &&
+      arbOnlyFeed.length === 1 &&
+      arbOnlyFeed[0].chainId === 42161,
+    'On-demand Scout 60s cooldown guard and Arbitrum (42161) feed filter operate deterministically'
   );
 
   console.log('\n================================================================');

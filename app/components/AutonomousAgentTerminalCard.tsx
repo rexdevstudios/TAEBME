@@ -2,7 +2,12 @@
 
 import React, { useEffect, useState } from 'react';
 import { Bot, ArrowUpRight, RefreshCw, ShieldCheck, Globe2, Layers, Cpu } from 'lucide-react';
-import { formatScoutCacheAgeLabel, type AutonomousTerminalSnapshot } from '@packages/agent/autonomous-terminal-engine';
+import {
+  filterTerminalLiveFeed,
+  formatScoutCacheAgeLabel,
+  type AutonomousTerminalSnapshot,
+  type TerminalFeedFilter,
+} from '@packages/agent/autonomous-terminal-engine';
 
 interface AutonomousAgentTerminalCardProps {
   isConnected: boolean;
@@ -11,15 +16,19 @@ interface AutonomousAgentTerminalCardProps {
 export function AutonomousAgentTerminalCard({ isConnected }: AutonomousAgentTerminalCardProps) {
   const [snapshot, setSnapshot] = useState<AutonomousTerminalSnapshot | null>(null);
   const [loading, setLoading] = useState(false);
+  const [feedFilter, setFeedFilter] = useState<TerminalFeedFilter>('ALL');
 
-  const loadTelemetry = async () => {
+  const loadTelemetry = async (refreshScout: boolean = false) => {
     if (!isConnected) {
       setSnapshot(null);
       return;
     }
     setLoading(true);
     try {
-      const res = await fetch('/api/agent/terminal-telemetry', { credentials: 'same-origin' });
+      const url = refreshScout
+        ? '/api/agent/terminal-telemetry?refreshScout=1'
+        : '/api/agent/terminal-telemetry';
+      const res = await fetch(url, { credentials: 'same-origin' });
       const json = await res.json();
       if (res.ok && json?.success && json.data) {
         setSnapshot(json.data);
@@ -88,15 +97,35 @@ export function AutonomousAgentTerminalCard({ isConnected }: AutonomousAgentTerm
         </div>
 
         {isConnected && (
-          <button
-            type="button"
-            onClick={loadTelemetry}
-            disabled={loading}
-            className="btn-secondary"
-            style={{ padding: '5px 10px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
-          >
-            <RefreshCw size={11} /> {loading ? 'Syncing...' : 'Refresh'}
-          </button>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => void loadTelemetry(true)}
+              disabled={loading}
+              className="btn-secondary"
+              style={{
+                padding: '5px 10px',
+                fontSize: '11px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                borderColor: 'rgba(249, 115, 22, 0.45)',
+                color: '#FDBA74',
+              }}
+              title="Sinkronkan dataset trending 6-chain EVM dari DexScreener ke Redis cache (cooldown 60 detik)"
+            >
+              <Globe2 size={11} /> {loading ? 'Syncing...' : 'Sync Scout'}
+            </button>
+            <button
+              type="button"
+              onClick={() => void loadTelemetry(false)}
+              disabled={loading}
+              className="btn-secondary"
+              style={{ padding: '5px 10px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+            >
+              <RefreshCw size={11} /> {loading ? 'Syncing...' : 'Refresh'}
+            </button>
+          </div>
         )}
       </div>
 
@@ -255,56 +284,99 @@ export function AutonomousAgentTerminalCard({ isConnected }: AutonomousAgentTerm
 
           {/* Live Color-Coded Agent Action Feed with 1-Click Dual-Rail Handoff */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <div style={{ fontSize: '11px', fontWeight: 700, color: '#E2E8F0' }}>
-              Live Agent Feed (1-Klik Handoff → Internal Launchpad / External DEX 0x / External CEX)
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: '#E2E8F0' }}>
+                Live Agent Feed (1-Klik Handoff → Internal Launchpad / External DEX 0x / External CEX)
+              </div>
+              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                {(
+                  [
+                    { label: 'ALL', value: 'ALL' as TerminalFeedFilter },
+                    { label: 'INTERNAL', value: 'INTERNAL_LAUNCHPAD' as TerminalFeedFilter },
+                    { label: 'DEX 0x', value: 'EXTERNAL_DEX_0X' as TerminalFeedFilter },
+                    { label: 'CEX AUTO', value: 'EXTERNAL_CEX_AUTO' as TerminalFeedFilter },
+                    { label: 'Base', value: 8453 as TerminalFeedFilter },
+                    { label: 'Arbitrum', value: 42161 as TerminalFeedFilter },
+                    { label: 'BSC', value: 56 as TerminalFeedFilter },
+                  ] as const
+                ).map((pill) => {
+                  const active = feedFilter === pill.value;
+                  return (
+                    <button
+                      key={String(pill.value)}
+                      type="button"
+                      onClick={() => setFeedFilter(pill.value)}
+                      style={{
+                        padding: '2px 7px',
+                        fontSize: '10px',
+                        fontWeight: 800,
+                        borderRadius: '999px',
+                        cursor: 'pointer',
+                        border: active ? '1px solid #34D399' : '1px solid rgba(148, 163, 184, 0.25)',
+                        backgroundColor: active ? 'rgba(16, 185, 129, 0.2)' : 'rgba(15, 23, 42, 0.6)',
+                        color: active ? '#6EE7B7' : '#94A3B8',
+                      }}
+                    >
+                      {pill.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-            {snapshot.liveFeed.map((item) => (
-              <div
-                key={item.id}
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  gap: '10px',
-                  flexWrap: 'wrap',
-                  padding: '8px 10px',
-                  borderRadius: '8px',
-                  background: 'rgba(15, 23, 42, 0.75)',
-                  borderLeft: `3px solid ${item.color}`,
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', fontSize: '11px' }}>
-                  <span
-                    style={{
-                      fontSize: '9px',
-                      fontWeight: 800,
-                      padding: '2px 5px',
-                      borderRadius: '4px',
-                      background: 'rgba(255,255,255,0.08)',
-                      color: item.color,
-                      fontFamily: 'var(--font-mono)',
-                    }}
-                  >
-                    {item.railLabel}
-                  </span>
-                  <span style={{ color: '#E2E8F0' }}>{item.headline}</span>
-                </div>
-                <a
-                  href={item.href}
-                  className="btn-secondary"
+            {filterTerminalLiveFeed(snapshot.liveFeed, feedFilter).length === 0 ? (
+              <div className="text-muted" style={{ fontSize: '11px', padding: '8px 10px', borderRadius: '6px', backgroundColor: 'rgba(15, 23, 42, 0.5)' }}>
+                Belum ada sinyal pada filter ini. Klik <strong>ALL</strong> atau <strong>Sync Scout</strong> untuk memuat sinyal multi-chain.
+              </div>
+            ) : (
+              filterTerminalLiveFeed(snapshot.liveFeed, feedFilter).map((item) => (
+                <div
+                  key={item.id}
                   style={{
-                    padding: '3px 8px',
-                    fontSize: '10px',
-                    display: 'inline-flex',
+                    display: 'flex',
+                    justifyContent: 'space-between',
                     alignItems: 'center',
-                    gap: '4px',
-                    whiteSpace: 'nowrap',
+                    gap: '10px',
+                    flexWrap: 'wrap',
+                    padding: '8px 10px',
+                    borderRadius: '8px',
+                    background: 'rgba(15, 23, 42, 0.75)',
+                    borderLeft: `3px solid ${item.color}`,
                   }}
                 >
-                  Execute <ArrowUpRight size={11} />
-                </a>
-              </div>
-            ))}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', fontSize: '11px' }}>
+                    <span
+                      style={{
+                        fontSize: '9px',
+                        fontWeight: 800,
+                        padding: '2px 5px',
+                        borderRadius: '4px',
+                        background: 'rgba(255,255,255,0.08)',
+                        color: item.color,
+                        fontFamily: 'var(--font-mono)',
+                      }}
+                    >
+                      {item.railLabel}
+                      {item.chainId ? ` · #${item.chainId}` : ''}
+                    </span>
+                    <span style={{ color: '#E2E8F0' }}>{item.headline}</span>
+                  </div>
+                  <a
+                    href={item.href}
+                    className="btn-secondary"
+                    style={{
+                      padding: '3px 8px',
+                      fontSize: '10px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    Execute <ArrowUpRight size={11} />
+                  </a>
+                </div>
+              ))
+            )}
           </div>
         </>
       ) : null}

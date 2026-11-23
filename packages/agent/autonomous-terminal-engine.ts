@@ -163,6 +163,36 @@ export interface TerminalAgentFeedItem {
   href: string;
   symbol: string;
   side: 'BUY' | 'SELL';
+  chainId?: number;
+}
+
+export type TerminalFeedFilter = 'ALL' | ExecutionRailId | number;
+
+export function shouldTriggerOnDemandScoutSync(params: {
+  refreshRequested: boolean;
+  lastSyncedAtIso: string | null | undefined;
+  nowMs?: number;
+  cooldownSec?: number;
+}): boolean {
+  if (!params.refreshRequested) return false;
+  const nowMs = Number.isFinite(params.nowMs) ? Number(params.nowMs) : Date.now();
+  const cooldownMs = Math.max(5, Math.floor(Number(params.cooldownSec ?? 60))) * 1000;
+  if (!params.lastSyncedAtIso || typeof params.lastSyncedAtIso !== 'string') return true;
+  const lastMs = Date.parse(params.lastSyncedAtIso);
+  if (!Number.isFinite(lastMs)) return true;
+  return nowMs - lastMs >= cooldownMs;
+}
+
+export function filterTerminalLiveFeed(
+  feed: TerminalAgentFeedItem[],
+  filter: TerminalFeedFilter
+): TerminalAgentFeedItem[] {
+  const list = Array.isArray(feed) ? feed : [];
+  if (filter === 'ALL') return list;
+  if (typeof filter === 'number') {
+    return list.filter((item) => item.chainId === filter);
+  }
+  return list.filter((item) => item.rail === filter);
 }
 
 export interface AutonomousTerminalSnapshot {
@@ -396,6 +426,7 @@ export function buildAutonomousTerminalSnapshot(params: {
       }),
       symbol: `${ticker}/WETH`,
       side: 'BUY',
+      chainId: 8453,
     });
   }
 
@@ -413,7 +444,7 @@ export function buildAutonomousTerminalSnapshot(params: {
           },
         ];
 
-  for (const hint of hints.slice(0, 2)) {
+  for (const hint of hints.slice(0, 4)) {
     counts.SCOUT += 1;
     const resolvedChainId =
       hint.chainId && SUPPORTED_HANDOFF_CHAIN_IDS.has(Number(hint.chainId))
@@ -438,6 +469,7 @@ export function buildAutonomousTerminalSnapshot(params: {
       }),
       symbol: hint.symbol,
       side: 'BUY',
+      chainId: resolvedChainId,
     });
   }
 
@@ -529,6 +561,6 @@ export function buildAutonomousTerminalSnapshot(params: {
     },
     agentBreakdown,
     recentTradeCards,
-    liveFeed: liveFeed.slice(0, 6),
+    liveFeed: liveFeed.slice(0, 8),
   };
 }

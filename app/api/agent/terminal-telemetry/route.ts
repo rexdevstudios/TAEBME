@@ -18,7 +18,11 @@ import {
   defaultProviderKeyVaultAdapter,
   PostgresBinanceExecutionDbAdapter,
 } from '@packages/shared/db-pool';
-import { buildAutonomousTerminalSnapshot } from '@packages/agent/autonomous-terminal-engine';
+import {
+  buildAutonomousTerminalSnapshot,
+  mapDexScreenerBoostRowsToScoutHints,
+  shouldTriggerOnDemandScoutSync,
+} from '@packages/agent/autonomous-terminal-engine';
 import { upstashRedis } from '@packages/shared/redis-client';
 
 export const dynamic = 'force-dynamic';
@@ -68,6 +72,36 @@ export async function GET(req: NextRequest) {
         }
       } catch {
         // Ignore malformed cache
+      }
+    }
+
+    const refreshRequested = req.nextUrl.searchParams.get('refreshScout') === '1';
+    if (
+      shouldTriggerOnDemandScoutSync({
+        refreshRequested,
+        lastSyncedAtIso: scoutDatasetSyncedAt,
+      })
+    ) {
+      try {
+        const nowIso = new Date().toISOString();
+        const res = await fetch('https://api.dexscreener.com/token-boosts/top/v1', {
+          signal: AbortSignal.timeout(4500),
+        });
+        if (res.ok) {
+          const rows = (await res.json()) as unknown[];
+          const freshHints = mapDexScreenerBoostRowsToScoutHints(rows, nowIso, 6);
+          if (freshHints.length > 0) {
+            firecrawlHints = freshHints;
+            scoutDatasetSyncedAt = nowIso;
+            if (upstashRedis.isConfigured()) {
+              await upstashRedis
+                .set('agent:scout:dataset', JSON.stringify({ updatedAt: nowIso, hints: freshHints }), 86400)
+                .catch(() => false);
+            }
+          }
+        }
+      } catch {
+        // Non-blocking on-demand Scout refresh
       }
     }
 
