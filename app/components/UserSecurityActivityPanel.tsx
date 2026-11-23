@@ -1,13 +1,16 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { ShieldCheck, RefreshCw } from 'lucide-react';
+import { ExternalLink, ShieldCheck, RefreshCw } from 'lucide-react';
 
 interface ActivityRow {
   id: string;
   action: string;
   reason: string | null;
   createdAt: string;
+  chainId?: number;
+  txHash?: string;
+  explorerUrl?: string;
 }
 
 interface UserSecurityActivityPanelProps {
@@ -93,9 +96,31 @@ export function UserSecurityActivityPanel({ isConnected }: UserSecurityActivityP
                 <strong style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-accent)' }}>{r.action}</strong>
                 {r.reason && <span className="text-muted">{r.reason}</span>}
               </div>
-              <span className="text-muted" style={{ fontFamily: 'var(--font-mono)', fontSize: '10px' }}>
-                {new Date(r.createdAt).toLocaleString()}
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {r.explorerUrl && (
+                  <a
+                    href={r.explorerUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: '10px',
+                      fontWeight: 800,
+                      color: '#38BDF8',
+                      textDecoration: 'none',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '3px',
+                    }}
+                    title={r.txHash ? `Tx: ${r.txHash}` : 'Open Block Explorer'}
+                  >
+                    {r.chainId ? `#${r.chainId} ` : ''}Explorer <ExternalLink size={10} />
+                  </a>
+                )}
+                <span className="text-muted" style={{ fontFamily: 'var(--font-mono)', fontSize: '10px' }}>
+                  {new Date(r.createdAt).toLocaleString()}
+                </span>
+              </div>
             </div>
           ))}
         </div>

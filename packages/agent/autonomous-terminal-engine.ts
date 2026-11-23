@@ -109,6 +109,44 @@ export function buildTerminalTradeHandoffUrl(params: {
   return `/trading?${qs.toString()}`;
 }
 
+/**
+ * Builds a 1-click Re-Trade handoff URL for any row in `RecentTradeHistoryPanel` (Phase BI2).
+ * Reuses `parseDexSettlementFromIdempotencyKey` and `buildTerminalTradeHandoffUrl` with zero duplication.
+ */
+export function buildTradeHistoryReTradeUrl(item: {
+  symbol: string;
+  side: string;
+  quantity: number;
+  stage?: string;
+  idempotencyKey?: string;
+}): string {
+  const settlement = parseDexSettlementFromIdempotencyKey(item.idempotencyKey);
+  const side: 'BUY' | 'SELL' = String(item.side || '').toUpperCase() === 'SELL' ? 'SELL' : 'BUY';
+  const qty = Number(item.quantity || 0) > 0 ? Number(item.quantity) : 0.02;
+  const stage = String(item.stage || '').toUpperCase();
+
+  if (settlement) {
+    return buildTerminalTradeHandoffUrl({
+      symbol: item.symbol,
+      side,
+      qty,
+      mode: 'DEX_NON_CUSTODIAL',
+      rail: 'EXTERNAL_DEX_0X',
+      agent: 'SNIPER',
+      chainId: settlement.chainId,
+    });
+  }
+
+  return buildTerminalTradeHandoffUrl({
+    symbol: item.symbol,
+    side,
+    qty,
+    mode: stage === 'LIVE' || stage === 'TESTNET' ? 'CEX_SINGLE_SHOT' : 'PAPER',
+    rail: 'EXTERNAL_CEX_AUTO',
+    agent: stage === 'LIVE' || stage === 'TESTNET' ? 'SNIPER' : 'SCOUT',
+  });
+}
+
 export function parseTradingHandoffSearchParams(
   search: string | URLSearchParams
 ): ParsedTradingHandoffParams {

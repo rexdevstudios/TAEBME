@@ -7,6 +7,7 @@ import {
   summarizeAndFilterTradeIntents,
   type TradeIntentHistoryFilter,
 } from '@packages/launchpad/web3-provider';
+import { buildTradeHistoryReTradeUrl } from '@packages/agent/autonomous-terminal-engine';
 
 interface TradeIntentItem {
   id: string;
@@ -204,6 +205,21 @@ export function RecentTradeHistoryPanel({
                       </a>
                     );
                   })()}
+                  <a
+                    href={buildTradeHistoryReTradeUrl(item)}
+                    style={{
+                      fontSize: '9px',
+                      fontWeight: 800,
+                      color: '#A78BFA',
+                      textDecoration: 'none',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '2px',
+                    }}
+                    title="Muat ulang parameter order ini ke form trading"
+                  >
+                    Re-Trade ↗
+                  </a>
                   {item.createdAt && (
                     <span className="text-muted" style={{ fontSize: '10px' }}>
                       {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

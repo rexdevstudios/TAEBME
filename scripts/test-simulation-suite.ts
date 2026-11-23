@@ -53,6 +53,7 @@ import {
 import {
   buildAutonomousTerminalSnapshot,
   buildTerminalTradeHandoffUrl,
+  buildTradeHistoryReTradeUrl,
   filterTerminalLiveFeed,
   formatScoutCacheAgeLabel,
   mapDexScreenerBoostRowsToScoutHints,
@@ -704,6 +705,26 @@ async function runSimulationSuite() {
       bhAuditParsed?.chainId === 42161 &&
       bhAuditParsed?.explorerUrl === `https://arbiscan.io/tx/${dummyTxHash}`,
     'Trade history filter counts & activity audit reason parser resolve Arbitrum explorer link cleanly'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 27: 1-Click Re-Trade Handoff from Trade History Row (Phase BI)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 27: Trade History 1-Click Re-Trade Handoff] ---');
+  const biHref = buildTradeHistoryReTradeUrl({
+    symbol: 'USDC/WETH',
+    side: 'SELL',
+    quantity: 0.05,
+    stage: 'LIVE',
+    idempotencyKey: encodedDexKey,
+  });
+  const biParsed = parseTradingHandoffSearchParams(biHref.slice('/trading?'.length));
+  assert(
+    biParsed.mode === 'DEX_NON_CUSTODIAL' &&
+      biParsed.chainId === 42161 &&
+      biParsed.side === 'SELL' &&
+      biParsed.qty === 0.05,
+    'Trade history 1-click Re-Trade URL preserves Arbitrum chainId, DEX mode, side, and quantity cleanly'
   );
 
   console.log('\n================================================================');
