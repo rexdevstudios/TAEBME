@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { getConfiguredAdminWallet } from '../packages/auth/session';
-import { PostgresGameFiDbAdapter } from '../packages/db/gamefi-repo';
+import { PostgresGameFiDbAdapter, resolveQuestDefinitionMetadata } from '../packages/db/gamefi-repo';
 
 describe('Phase CB: Admin Checksum Normalization & Authoritative GameFi Quest Eligibility', () => {
   test('CB1.1 getConfiguredAdminWallet accepts mixed-case non-EIP55 valid 40-hex address and rejects 64-hex private keys', () => {
@@ -57,5 +57,48 @@ describe('Phase CB: Admin Checksum Normalization & Authoritative GameFi Quest El
     const eligible = await adapter.hasSybilEvidence('11111111-1111-1111-1111-111111111111', '0x1111111111111111111111111111111111111111');
     expect(eligible).toBe(true);
     expect(queriedSql.some((q) => q.includes('FROM kol_profiles'))).toBe(true);
+  });
+
+  test('CB2.3 recordQuestCompletion atomically ensures parent quest_definitions row before inserting quest_completions', async () => {
+    const executedSql: string[] = [];
+    const mockClient = {
+      query: async (sql: string) => {
+        executedSql.push(sql);
+        if (sql.includes('INSERT INTO quest_completions')) {
+          return { rows: [{ id: 'c1', completed_at: new Date() }] };
+        }
+        if (sql.includes('INSERT INTO user_gamefi_profiles')) {
+          return {
+            rows: [
+              {
+                userId: '11111111-1111-1111-1111-111111111111',
+                xp: 25,
+                level: 1,
+                questsCompleted: 1,
+                updatedAt: new Date(),
+              },
+            ],
+          };
+        }
+        return { rows: [] };
+      },
+      release: () => {},
+    };
+    const mockPool = { connect: async () => mockClient } as any;
+    const adapter = new PostgresGameFiDbAdapter(mockPool, false);
+
+    const meta = resolveQuestDefinitionMetadata('daily_checkin:2026-11-23', 25);
+    expect(meta.title).toContain('2026-11-23');
+
+    const res = await adapter.recordQuestCompletion({
+      userId: '11111111-1111-1111-1111-111111111111',
+      questId: 'daily_checkin:2026-11-23',
+      xpGranted: 25,
+    });
+    expect(res.profile.xp).toBe(25);
+    const parentIdx = executedSql.findIndex((s) => s.includes('INSERT INTO quest_definitions'));
+    const childIdx = executedSql.findIndex((s) => s.includes('INSERT INTO quest_completions'));
+    expect(parentIdx).toBeGreaterThan(-1);
+    expect(childIdx).toBeGreaterThan(parentIdx);
   });
 });

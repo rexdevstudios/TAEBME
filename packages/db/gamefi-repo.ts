@@ -33,6 +33,46 @@ export function registerGameFiRepoDeps(deps: GameFiRepoDeps): void {
   registeredDeps = deps;
 }
 
+export function resolveQuestDefinitionMetadata(
+  questId: string,
+  xpGranted: number
+): { title: string; description: string; badgeTier: 'BRONZE' | 'SILVER' | 'GOLD' } {
+  if (questId.startsWith('daily_checkin:')) {
+    const day = questId.slice('daily_checkin:'.length);
+    return {
+      title: `Daily Check-In (${day} UTC)`,
+      description: 'Daily UTC-scoped check-in reward for active RTrader traders.',
+      badgeTier: 'BRONZE',
+    };
+  }
+  if (questId === 'connect_siwe') {
+    return {
+      title: 'Connect SIWE Wallet',
+      description: 'Verify non-custodial EIP-4361 Sign-In With Ethereum session.',
+      badgeTier: 'BRONZE',
+    };
+  }
+  if (questId === 'verify_sybil') {
+    return {
+      title: 'Verify Anti-Sybil Identity',
+      description: 'Verify KOL profile, World ID, or Web3 Social Passport.',
+      badgeTier: 'SILVER',
+    };
+  }
+  if (questId === 'first_trade_or_launch') {
+    return {
+      title: 'Execute Trade or Token Launch',
+      description: 'Execute first trade intent or publish a Bonding Curve token launch.',
+      badgeTier: 'GOLD',
+    };
+  }
+  return {
+    title: `Quest ${questId}`,
+    description: `RTrader GameFi progression quest (${xpGranted} XP).`,
+    badgeTier: xpGranted >= 500 ? 'GOLD' : xpGranted >= 250 ? 'SILVER' : 'BRONZE',
+  };
+}
+
 export class PostgresGameFiDbAdapter {
   private poolOverride?: Pool | null;
   private isExplicitInMemory: boolean = false;
@@ -280,6 +320,15 @@ export class PostgresGameFiDbAdapter {
       const client = await pool.connect();
       try {
         await client.query('BEGIN');
+
+        // Ensure parent quest_definitions row exists (self-healing for dynamic UTC daily_checkin:YYYY-MM-DD & fresh DBs)
+        const questMeta = resolveQuestDefinitionMetadata(questId, xpGranted);
+        await client.query(
+          `INSERT INTO quest_definitions (id, title, description, xp_reward, badge_tier, is_active)
+           VALUES ($1, $2, $3, $4, $5, true)
+           ON CONFLICT (id) DO NOTHING`,
+          [questId, questMeta.title, questMeta.description, xpGranted, questMeta.badgeTier]
+        );
 
         const completionUuid = crypto.randomUUID();
         const insertRes = await client.query(

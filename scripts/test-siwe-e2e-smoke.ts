@@ -374,6 +374,21 @@ async function runSiweE2eSmoke() {
         String(apSimJson?.error || '').includes('PLAN_AUTOPILOT_REQUIRED'),
       `POST /api/agent/autopilot/simulate enforces TRADER/AGENT tier gate on FREE burner (Got HTTP ${apSimRes.status})`
     );
+
+    // 21. Verify POST /api/gamefi/quests/complete (daily_checkin) succeeds live without FK violation (Phase CB)
+    const gfRes = await fetch(`${BASE_URL}/api/gamefi/quests/complete`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({ questId: 'daily_checkin' }),
+    });
+    const gfJson: any = await gfRes.json();
+    assert(
+      gfRes.status === 200 &&
+        gfJson?.success === true &&
+        Number(gfJson?.profile?.xp || 0) >= 25 &&
+        Number(gfJson?.creditsGranted || 0) === 5,
+      `POST /api/gamefi/quests/complete (daily_checkin) succeeds live with +25 XP & +5 Credits (Got HTTP ${gfRes.status}, xp=${gfJson?.profile?.xp})`
+    );
   } finally {
     // 9. Auto-Cleanup: Revoke test key & verify count returns to 0 + logout
     if (sessionToken && createdBybitKeyId) {
