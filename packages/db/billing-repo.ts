@@ -1559,6 +1559,69 @@ export class PostgresBillingDbAdapter implements BillingDbAdapter {
     return deleted;
   }
 
+  private inMemoryGlobalRedeemedTxHashes: Set<string> = new Set();
+
+  /**
+   * Global cross-endpoint anti-replay registry for on-chain payment txHashes (Phase DR).
+   * Prevents reusing a single ETH payment across multiple endpoints (subscribe, genesis-sbt,
+   * featured-boost, boosted check-in, prop challenge). Zero DB migration.
+   */
+  async redeemGlobalPaymentTxHash(params: {
+    txHash: string;
+    purpose: string;
+    walletAddress: string;
+  }): Promise<{ ok: boolean; code?: 'GLOBAL_REPLAY_TX_HASH'; error?: string }> {
+    const normTx = String(params.txHash || '').trim().toLowerCase();
+    if (!normTx) return { ok: true };
+
+    const pool = this.resolveDeps()?.getDbPool() || null;
+    let existing: string[] = Array.from(this.inMemoryGlobalRedeemedTxHashes);
+
+    if (pool) {
+      try {
+        const res = await pool.query(`SELECT features FROM plans WHERE id = 'FREE' LIMIT 1`);
+        if (res.rows.length > 0) {
+          const feat =
+            typeof res.rows[0].features === 'string'
+              ? JSON.parse(res.rows[0].features)
+              : res.rows[0].features || {};
+          if (Array.isArray(feat.globalRedeemedTxHashes)) {
+            existing = feat.globalRedeemedTxHashes as string[];
+          }
+        }
+      } catch (err: any) {
+        console.warn('[PostgresBillingDbAdapter] redeemGlobalPaymentTxHash load warning:', err?.message);
+      }
+    }
+
+    if (existing.some((h) => String(h).toLowerCase() === normTx) || this.inMemoryGlobalRedeemedTxHashes.has(normTx)) {
+      return {
+        ok: false,
+        code: 'GLOBAL_REPLAY_TX_HASH',
+        error: `GLOBAL_REPLAY_TX_HASH: This transaction hash has already been redeemed (${params.purpose}).`,
+      };
+    }
+
+    const next = [normTx, ...existing].slice(0, 20000);
+    if (pool) {
+      try {
+        const patch = JSON.stringify({ globalRedeemedTxHashes: next });
+        await pool.query(
+          `INSERT INTO plans (id, name, base_price_cents, monthly_credits, features)
+           VALUES ('FREE', 'FREE Tier', 0, 100, $1::jsonb)
+           ON CONFLICT (id) DO UPDATE SET
+             features = COALESCE(plans.features, '{}'::jsonb) || $1::jsonb`,
+          [patch]
+        );
+      } catch (err: any) {
+        console.warn('[PostgresBillingDbAdapter] redeemGlobalPaymentTxHash save warning:', err?.message);
+      }
+    }
+
+    this.inMemoryGlobalRedeemedTxHashes.add(normTx);
+    return { ok: true };
+  }
+
   async createAuditLog(_actorId: string, _action: string, _entityId?: string, _reason?: string): Promise<void> {
     // Audit log
   }

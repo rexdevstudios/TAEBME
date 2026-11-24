@@ -9,6 +9,7 @@ import {
   createPublicClient,
   http,
   defineChain,
+  parseEther,
   type PublicClient,
   type Transport,
   type Chain,
@@ -296,4 +297,183 @@ export async function verifyEvmDeploymentAttribution(
     reason: `Transaction succeeded on-chain, but no logs or event references match expected token address '${expectedTokenAddress}'`,
     receipt,
   };
+}
+
+// ============================================================================
+// STRICT NATIVE PAYMENT VERIFIER (Phase DR — Anti-Spoofing Hardening)
+// ============================================================================
+
+export interface EvmNativePaymentCheckInput {
+  from?: string | null;
+  to?: string | null;
+  valueWei: bigint;
+  expectedFrom: string;
+  expectedTo: string;
+  minValueWei: bigint;
+}
+
+export interface EvmNativePaymentCheckResult {
+  ok: boolean;
+  code?: 'RECIPIENT_MISMATCH' | 'SENDER_MISMATCH' | 'INSUFFICIENT_PAYMENT_VALUE';
+  reason?: string;
+}
+
+export interface EvmNativePaymentVerification {
+  status: 'confirmed' | 'pending' | 'failed' | 'mismatch' | 'unknown' | 'error';
+  code?: 'RECIPIENT_MISMATCH' | 'SENDER_MISMATCH' | 'INSUFFICIENT_PAYMENT_VALUE';
+  from?: string;
+  to?: string;
+  valueWei?: bigint;
+  blockNumber?: bigint;
+  reason?: string;
+}
+
+export function ethStringToWei(ethAmount: string): bigint {
+  try {
+    return parseEther(String(ethAmount || '0').trim());
+  } catch {
+    return BigInt(0);
+  }
+}
+
+/**
+ * Pure deterministic invariant check for native ETH payments (Phase DR).
+ * Strictly enforces: to === treasuryWallet, from === session.walletAddress, value >= minValueWei.
+ */
+export function validateEvmNativePaymentFields(
+  input: EvmNativePaymentCheckInput
+): EvmNativePaymentCheckResult {
+  const actualTo = String(input.to || '').trim().toLowerCase();
+  const expectedTo = String(input.expectedTo || '').trim().toLowerCase();
+  if (!actualTo || actualTo !== expectedTo) {
+    return {
+      ok: false,
+      code: 'RECIPIENT_MISMATCH',
+      reason: `RECIPIENT_MISMATCH: Payment transaction recipient (${actualTo || 'none'}) does not match platform treasury (${expectedTo}).`,
+    };
+  }
+
+  const actualFrom = String(input.from || '').trim().toLowerCase();
+  const expectedFrom = String(input.expectedFrom || '').trim().toLowerCase();
+  if (!actualFrom || actualFrom !== expectedFrom) {
+    return {
+      ok: false,
+      code: 'SENDER_MISMATCH',
+      reason: `SENDER_MISMATCH: Payment transaction sender (${actualFrom || 'none'}) does not match authenticated wallet (${expectedFrom}).`,
+    };
+  }
+
+  if (input.valueWei < input.minValueWei) {
+    return {
+      ok: false,
+      code: 'INSUFFICIENT_PAYMENT_VALUE',
+      reason: `INSUFFICIENT_PAYMENT_VALUE: Sent ${input.valueWei.toString()} wei, but at least ${input.minValueWei.toString()} wei is required.`,
+    };
+  }
+
+  return { ok: true };
+}
+
+/**
+ * Strictly verifies an on-chain native ETH payment transaction on Base/EVM:
+ *  1. Receipt exists and status === 'success'
+ *  2. tx.to === expectedTo (Platform Treasury)
+ *  3. tx.from === expectedFrom (Authenticated SIWE Wallet)
+ *  4. tx.value >= minValueWei
+ */
+export async function verifyEvmNativePayment(params: {
+  txHash: string;
+  chain?: string;
+  expectedFrom: string;
+  expectedTo: string;
+  minValueWei: bigint;
+  customClient?: PublicClient;
+}): Promise<EvmNativePaymentVerification> {
+  const chain = params.chain || 'base-mainnet';
+  if (!params.txHash || !/^0x[a-fA-F0-9]{64}$/.test(params.txHash)) {
+    return {
+      status: 'error',
+      reason: `Malformed EVM transaction hash: '${sanitizeRpcText(params.txHash || '')}'`,
+    };
+  }
+
+  try {
+    const client = params.customClient ?? getEvmPublicClient(chain);
+    if (!client) {
+      return {
+        status: 'error',
+        reason: `UNSUPPORTED_EVM_CHAIN: Chain '${chain}' is not supported by EVM verifier`,
+      };
+    }
+
+    const [receipt, tx] = await Promise.all([
+      client.getTransactionReceipt({ hash: params.txHash as `0x${string}` }),
+      client.getTransaction({ hash: params.txHash as `0x${string}` }),
+    ]);
+
+    if (!receipt || !tx) {
+      return {
+        status: 'pending',
+        reason: 'Transaction receipt or payload not yet found on-chain',
+      };
+    }
+
+    if (receipt.status === 'reverted') {
+      return {
+        status: 'failed',
+        blockNumber: receipt.blockNumber,
+        reason: 'Transaction reverted on-chain (execution failure)',
+      };
+    }
+
+    if (receipt.status !== 'success') {
+      return {
+        status: 'unknown',
+        blockNumber: receipt.blockNumber,
+        reason: `Unexpected receipt status: ${String(receipt.status)}`,
+      };
+    }
+
+    const fieldCheck = validateEvmNativePaymentFields({
+      from: tx.from,
+      to: tx.to,
+      valueWei: tx.value,
+      expectedFrom: params.expectedFrom,
+      expectedTo: params.expectedTo,
+      minValueWei: params.minValueWei,
+    });
+
+    if (!fieldCheck.ok) {
+      return {
+        status: 'mismatch',
+        code: fieldCheck.code,
+        from: tx.from,
+        to: tx.to ?? undefined,
+        valueWei: tx.value,
+        blockNumber: receipt.blockNumber,
+        reason: fieldCheck.reason,
+      };
+    }
+
+    return {
+      status: 'confirmed',
+      from: tx.from,
+      to: tx.to ?? undefined,
+      valueWei: tx.value,
+      blockNumber: receipt.blockNumber,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const lower = msg.toLowerCase();
+    if (lower.includes('not found') || lower.includes('could not be found')) {
+      return {
+        status: 'pending',
+        reason: 'Transaction not yet indexed or not found on target chain',
+      };
+    }
+    return {
+      status: 'unknown',
+      reason: `EVM RPC error: ${sanitizeRpcText(msg)}`,
+    };
+  }
 }

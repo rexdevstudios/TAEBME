@@ -12,7 +12,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireActiveSession } from '@packages/auth/session';
 import { defaultBillingDbAdapter } from '@packages/shared/db-pool';
 import { getAppEnvironment } from '@packages/shared/env-config';
-import { verifyEvmTransactionReceipt } from '@packages/launchpad/evm-verifier';
+import { ethStringToWei, verifyEvmNativePayment } from '@packages/launchpad/evm-verifier';
 import {
   FEATURED_BOOST_TIERS,
   computeFeaturedBoostWindow,
@@ -96,11 +96,29 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
       }
-      const receipt = await verifyEvmTransactionReceipt(txHashInput, chain);
-      if (receipt.status !== 'confirmed') {
+      const platformCfg = await defaultBillingDbAdapter.getPlatformFeeAndRiskConfig();
+      const paymentCheck = await verifyEvmNativePayment({
+        txHash: txHashInput,
+        chain,
+        expectedFrom: session.walletAddress,
+        expectedTo: platformCfg.treasuryWallet,
+        minValueWei: ethStringToWei(tier.feeEth),
+      });
+      if (paymentCheck.status !== 'confirmed') {
         return NextResponse.json(
-          { success: false, error: `BOOST_TX_NOT_CONFIRMED: ${receipt.reason || receipt.status}`, timestamp: new Date().toISOString() },
+          { success: false, error: `BOOST_TX_NOT_CONFIRMED: ${paymentCheck.reason || paymentCheck.status}`, timestamp: new Date().toISOString() },
           { status: 422 }
+        );
+      }
+      const globalRedeem = await defaultBillingDbAdapter.redeemGlobalPaymentTxHash({
+        txHash: txHashInput,
+        purpose: 'FEATURED_BOOST',
+        walletAddress: session.walletAddress,
+      });
+      if (!globalRedeem.ok) {
+        return NextResponse.json(
+          { success: false, error: globalRedeem.error || 'GLOBAL_REPLAY_TX_HASH', timestamp: new Date().toISOString() },
+          { status: 409 }
         );
       }
     } else if (appEnv === 'testnet' || process.env.NODE_ENV !== 'production') {
