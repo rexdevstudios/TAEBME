@@ -20,6 +20,8 @@ import {
   Moon,
   BarChart3,
   Globe,
+  PanelLeft,
+  PanelLeftClose,
 } from 'lucide-react';
 import { getNetworkLabel } from '../lib/classifyHostname';
 
@@ -40,7 +42,8 @@ export default function HeaderNav() {
 
   const [isSwitchingChain, setIsSwitchingChain] = React.useState(false);
   const [theme, setTheme] = React.useState<'dark' | 'light'>('dark');
-  const { locale, toggleLocale, t } = useLocale();
+  const [sidebarPinned, setSidebarPinned] = React.useState<boolean>(false);
+  const { locale, toggleLocale, t, tr } = useLocale();
 
   React.useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -48,7 +51,20 @@ export default function HeaderNav() {
     const initial: 'dark' | 'light' = saved === 'light' ? 'light' : 'dark';
     setTheme(initial);
     document.documentElement.setAttribute('data-theme', initial);
+
+    const savedPin = window.localStorage.getItem('poolnet_sidebar_pinned') === '1';
+    setSidebarPinned(savedPin);
+    document.documentElement.setAttribute('data-sidebar', savedPin ? 'pinned' : 'collapsed');
   }, []);
+
+  const toggleSidebarPin = () => {
+    const next = !sidebarPinned;
+    setSidebarPinned(next);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('poolnet_sidebar_pinned', next ? '1' : '0');
+      document.documentElement.setAttribute('data-sidebar', next ? 'pinned' : 'collapsed');
+    }
+  };
 
   const toggleTheme = () => {
     const next: 'dark' | 'light' = theme === 'dark' ? 'light' : 'dark';
@@ -104,125 +120,172 @@ export default function HeaderNav() {
     setNetworkLabel(getNetworkLabel());
   }, []);
 
-  return (
-    <header className="header-nav">
-      {/* Brand & Network Indicator */}
-      <div className="flex-row items-center" style={{ gap: '8px', flexShrink: 0 }}>
-        <Link href="/" className="poolnet-brand" style={{ fontSize: '16px', fontWeight: 900, letterSpacing: '-0.5px', whiteSpace: 'nowrap' }}>
-          POOLNET
-        </Link>
-        <div
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '5px',
-            padding: '3px 7px',
-            borderRadius: '9999px',
-            backgroundColor: selectedChainHex === '0x14a34'
-              ? 'var(--color-badge-info-bg)'
-              : selectedChainHex === '0x2105'
-                ? 'var(--color-badge-success-bg)'
-                : 'var(--color-badge-warning-bg)',
-            border: `1px solid ${
-              selectedChainHex === '0x14a34'
-                ? 'var(--color-badge-info-border)'
-                : selectedChainHex === '0x2105'
-                  ? 'var(--color-badge-success-border)'
-                  : 'var(--color-badge-warning-border)'
-            }`,
-          }}
-          title={`Environment: ${networkLabel} · Active Wallet Chain: ${normChainHex || 'Not detected'}`}
-          aria-label={`Deployment environment: ${networkLabel}`}
-        >
-          <span
-            style={{
-              width: '6px',
-              height: '6px',
-              borderRadius: '50%',
-              flexShrink: 0,
-              backgroundColor: selectedChainHex === '0x14a34'
-                ? 'var(--color-badge-info-text)'
-                : selectedChainHex === '0x2105'
-                  ? 'var(--color-badge-success-text)'
-                  : 'var(--color-badge-warning-text)',
-            }}
-          />
-          <select
-            aria-label="Universal Network Switcher"
-            value={selectedChainHex}
-            disabled={isSwitchingChain}
-            onChange={async (e) => {
-              const targetHex = e.target.value;
-              if (!targetHex || targetHex === normChainHex) return;
-              setIsSwitchingChain(true);
-              try {
-                const res = await switchNetwork(targetHex);
-                if (!res.success && res.error) {
-                  alert(`MetaMask Network Switch: ${res.error}`);
-                }
-              } finally {
-                setIsSwitchingChain(false);
-              }
-            }}
-            style={{
-              backgroundColor: 'transparent',
-              border: 'none',
-              outline: 'none',
-              color: selectedChainHex === '0x14a34'
-                ? 'var(--color-badge-info-text)'
-                : selectedChainHex === '0x2105'
-                  ? 'var(--color-badge-success-text)'
-                  : 'var(--color-badge-warning-text)',
-              fontSize: '11px',
-              fontWeight: 700,
-              fontFamily: 'var(--font-mono)',
-              cursor: 'pointer',
-              paddingRight: '4px',
-            }}
-          >
-            {normChainHex && !isKnownChain && (
-              <option value={normChainHex} style={{ backgroundColor: 'var(--color-surface-elevated)', color: 'var(--color-badge-warning-text)' }}>
-                Other ({parseInt(normChainHex, 16) || normChainHex})
-              </option>
-            )}
-            {CHAIN_OPTIONS.map((c) => (
-              <option key={c.hex} value={c.hex} style={{ backgroundColor: 'var(--color-surface-elevated)', color: 'var(--color-foreground)' }}>
-                {c.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
+  const activeNavItem = navItems.find((item) => isActive(item.href)) || navItems[0];
 
-      {/* Dynamic Navigation Links */}
-      <nav className="nav-links" style={{ gap: '2px' }}>
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const active = isActive(item.href);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`nav-link ${active ? 'nav-link-active nav-link-cex-active' : ''}`}
+  return (
+    <>
+      {/* Pons-v2 Desktop Left Icon Rail Sidebar (56px collapsed -> 196px expanded on hover or pin) */}
+      <aside
+        className={`pons-sidebar ${sidebarPinned ? 'pinned' : ''}`}
+        aria-label="Primary Sidebar Navigation"
+      >
+        <div className="pons-sidebar-header">
+          <Link href="/" className="pons-sidebar-brand" title="POOLNET">
+            <span className="pons-brand-mark">P</span>
+            <span className="pons-sidebar-label pons-brand-text">POOLNET</span>
+          </Link>
+          <button
+            type="button"
+            onClick={toggleSidebarPin}
+            className="pons-sidebar-pin-btn"
+            title={sidebarPinned ? tr('Collapse sidebar', 'Kecilkan sidebar') : tr('Pin sidebar open', 'Sematkan sidebar')}
+            aria-label={sidebarPinned ? tr('Collapse sidebar', 'Kecilkan sidebar') : tr('Pin sidebar open', 'Sematkan sidebar')}
+          >
+            {sidebarPinned ? <PanelLeftClose size={15} /> : <PanelLeft size={15} />}
+          </button>
+        </div>
+
+        <nav className="pons-sidebar-nav">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const active = isActive(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                title={item.label}
+                className={`pons-sidebar-link ${active ? 'active' : ''}`}
+              >
+                <Icon size={17} style={{ flexShrink: 0 }} />
+                <span className="pons-sidebar-label">{item.label}</span>
+              </Link>
+            );
+          })}
+        </nav>
+      </aside>
+
+      {/* Slim Single-Row Top Utility Bar (Desktop: offset by sidebar; Mobile: full-width + scrollable nav strip) */}
+      <header className="header-nav">
+        {/* Brand (mobile) + Active Section Breadcrumb (desktop) + Network Indicator */}
+        <div className="flex-row items-center" style={{ gap: '10px', flexShrink: 0 }}>
+          <Link href="/" className="poolnet-brand pons-mobile-brand" style={{ fontSize: '16px', fontWeight: 900, letterSpacing: '-0.5px', whiteSpace: 'nowrap' }}>
+            POOLNET
+          </Link>
+          <span className="pons-desktop-section-title">
+            {activeNavItem.label}
+          </span>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              padding: '3px 7px',
+              borderRadius: '9999px',
+              backgroundColor: selectedChainHex === '0x14a34'
+                ? 'var(--color-badge-info-bg)'
+                : selectedChainHex === '0x2105'
+                  ? 'var(--color-badge-success-bg)'
+                  : 'var(--color-badge-warning-bg)',
+              border: `1px solid ${
+                selectedChainHex === '0x14a34'
+                  ? 'var(--color-badge-info-border)'
+                  : selectedChainHex === '0x2105'
+                    ? 'var(--color-badge-success-border)'
+                    : 'var(--color-badge-warning-border)'
+              }`,
+            }}
+            title={`Environment: ${networkLabel} · Active Wallet Chain: ${normChainHex || 'Not detected'}`}
+            aria-label={`Deployment environment: ${networkLabel}`}
+          >
+            <span
               style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '5px',
-                padding: '6px 8px',
-                borderRadius: '8px',
-                fontSize: '11.5px',
-                fontWeight: active ? 800 : 600,
-                whiteSpace: 'nowrap',
-                border: '1px solid transparent',
-                transition: 'all 150ms ease',
+                width: '6px',
+                height: '6px',
+                borderRadius: '50%',
+                flexShrink: 0,
+                backgroundColor: selectedChainHex === '0x14a34'
+                  ? 'var(--color-badge-info-text)'
+                  : selectedChainHex === '0x2105'
+                    ? 'var(--color-badge-success-text)'
+                    : 'var(--color-badge-warning-text)',
+              }}
+            />
+            <select
+              aria-label="Universal Network Switcher"
+              value={selectedChainHex}
+              disabled={isSwitchingChain}
+              onChange={async (e) => {
+                const targetHex = e.target.value;
+                if (!targetHex || targetHex === normChainHex) return;
+                setIsSwitchingChain(true);
+                try {
+                  const res = await switchNetwork(targetHex);
+                  if (!res.success && res.error) {
+                    alert(`MetaMask Network Switch: ${res.error}`);
+                  }
+                } finally {
+                  setIsSwitchingChain(false);
+                }
+              }}
+              style={{
+                backgroundColor: 'transparent',
+                border: 'none',
+                outline: 'none',
+                color: selectedChainHex === '0x14a34'
+                  ? 'var(--color-badge-info-text)'
+                  : selectedChainHex === '0x2105'
+                    ? 'var(--color-badge-success-text)'
+                    : 'var(--color-badge-warning-text)',
+                fontSize: '11px',
+                fontWeight: 700,
+                fontFamily: 'var(--font-mono)',
+                cursor: 'pointer',
+                paddingRight: '4px',
               }}
             >
-              <Icon size={13} style={{ verticalAlign: 'middle', flexShrink: 0 }} />
-              <span>{item.label}</span>
-            </Link>
-          );
-        })}
-      </nav>
+              {normChainHex && !isKnownChain && (
+                <option value={normChainHex} style={{ backgroundColor: 'var(--color-surface-elevated)', color: 'var(--color-badge-warning-text)' }}>
+                  Other ({parseInt(normChainHex, 16) || normChainHex})
+                </option>
+              )}
+              {CHAIN_OPTIONS.map((c) => (
+                <option key={c.hex} value={c.hex} style={{ backgroundColor: 'var(--color-surface-elevated)', color: 'var(--color-foreground)' }}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Mobile-Only Scrollable Navigation Links (Hidden on Desktop where Left Rail Sidebar is active) */}
+        <nav className="nav-links pons-mobile-nav" style={{ gap: '2px' }}>
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const active = isActive(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`nav-link ${active ? 'nav-link-active nav-link-cex-active' : ''}`}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '6px 8px',
+                  borderRadius: '8px',
+                  fontSize: '11.5px',
+                  fontWeight: active ? 800 : 600,
+                  whiteSpace: 'nowrap',
+                  border: '1px solid transparent',
+                  transition: 'all 150ms ease',
+                }}
+              >
+                <Icon size={13} style={{ verticalAlign: 'middle', flexShrink: 0 }} />
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+        </nav>
 
       {/* Account & Session Controls */}
       <div className="flex-row items-center" style={{ gap: '6px', flexShrink: 0 }}>
@@ -350,6 +413,7 @@ export default function HeaderNav() {
           </button>
         )}
       </div>
-    </header>
+      </header>
+    </>
   );
 }

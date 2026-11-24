@@ -1225,8 +1225,237 @@ a {
   .cex-tab-btn,
   .cex-btn-gold,
   .cex-role-card,
-  .cex-progress-fill {
+  .cex-progress-fill,
+  .pons-sidebar,
+  .header-nav,
+  main {
     transition: none;
     transform: none;
+  }
+}
+
+/* ============================================================================
+   Phase CT: Pons-v2 Left Icon Rail Sidebar (56px collapsed -> 196px expanded)
+   ============================================================================ */
+.pons-sidebar {
+  display: none;
+}
+
+.pons-desktop-section-title {
+  display: none;
+}
+
+.pons-mobile-brand {
+  display: inline-flex;
+}
+
+.pons-mobile-nav {
+  display: flex;
+}
+
+@media (min-width: 960px) {
+  .pons-sidebar {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 56px;
+    z-index: 60;
+    background-color: var(--color-surface-elevated);
+    border-right: 1px solid var(--color-border);
+    overflow: hidden;
+    transition: width 180ms cubic-bezier(0.2, 0, 0, 1), box-shadow 180ms ease;
+  }
+
+  .pons-sidebar:hover,
+  .pons-sidebar.pinned {
+    width: 196px;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.16);
+  }
+
+  [data-theme="light"] .pons-sidebar {
+    background-color: #FFFFFF;
+    border-right: 1px solid rgba(12, 21, 0, 0.12);
+  }
+
+  [data-theme="light"] .pons-sidebar:hover,
+  [data-theme="light"] .pons-sidebar.pinned {
+    box-shadow: 4px 0 24px rgba(12, 21, 0, 0.08);
+  }
+
+  .pons-sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 52px;
+    padding: 0 11px;
+    border-bottom: 1px solid var(--color-border);
+    flex-shrink: 0;
+  }
+
+  .pons-sidebar-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    min-width: 0;
+  }
+
+  .pons-brand-mark {
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+    font-size: 15px;
+    flex-shrink: 0;
+    background: var(--color-accent);
+    color: #09090B;
+    letter-spacing: -0.5px;
+  }
+
+  [data-theme="light"] .pons-brand-mark {
+    background: #00C805;
+    color: #0C1500;
+  }
+
+  .pons-brand-text {
+    font-size: 15px;
+    font-weight: 900;
+    letter-spacing: -0.4px;
+    color: var(--color-foreground);
+  }
+
+  .pons-sidebar-pin-btn {
+    opacity: 0;
+    pointer-events: none;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--color-muted);
+    border-radius: 6px;
+    padding: 5px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 150ms ease, color 150ms ease, background-color 150ms ease;
+    flex-shrink: 0;
+  }
+
+  .pons-sidebar:hover .pons-sidebar-pin-btn,
+  .pons-sidebar.pinned .pons-sidebar-pin-btn {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .pons-sidebar-pin-btn:hover {
+    color: var(--color-foreground);
+    background-color: var(--color-surface-inset);
+  }
+
+  .pons-sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px 8px;
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  .pons-sidebar-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: 38px;
+    padding: 0 11px;
+    border-radius: 10px;
+    color: var(--color-muted);
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    position: relative;
+    transition: background-color 150ms ease, color 150ms ease;
+  }
+
+  .pons-sidebar-link:hover {
+    background-color: var(--color-surface-inset);
+    color: var(--color-foreground);
+  }
+
+  .pons-sidebar-link.active {
+    background-color: var(--color-badge-success-bg);
+    color: var(--color-foreground);
+    font-weight: 800;
+    box-shadow: inset 3px 0 0 var(--color-accent);
+  }
+
+  [data-theme="light"] .pons-sidebar-link {
+    color: rgba(12, 21, 0, 0.72);
+  }
+
+  [data-theme="light"] .pons-sidebar-link:hover {
+    background-color: rgba(12, 21, 0, 0.06);
+    color: #0C1500;
+  }
+
+  [data-theme="light"] .pons-sidebar-link.active {
+    background-color: rgba(0, 200, 5, 0.14);
+    color: #0C1500;
+    box-shadow: inset 3px 0 0 #00C805;
+  }
+
+  .pons-sidebar-label {
+    opacity: 0;
+    transition: opacity 140ms ease;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .pons-sidebar:hover .pons-sidebar-label,
+  .pons-sidebar.pinned .pons-sidebar-label {
+    opacity: 1;
+  }
+
+  .pons-mobile-brand,
+  .pons-mobile-nav {
+    display: none !important;
+  }
+
+  .pons-desktop-section-title {
+    display: inline-flex;
+    align-items: center;
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--color-foreground);
+    letter-spacing: -0.2px;
+    white-space: nowrap;
+  }
+
+  .header-nav {
+    margin-left: 56px;
+    min-height: 52px;
+    padding: 8px 20px;
+    transition: margin-left 180ms cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  main {
+    margin-left: 56px;
+    transition: margin-left 180ms cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  [data-sidebar="pinned"] .header-nav,
+  [data-sidebar="pinned"] main {
+    margin-left: 196px;
+  }
+}
+
+@media (max-width: 959px) {
+  .header-nav {
+    flex-wrap: wrap;
   }
 }

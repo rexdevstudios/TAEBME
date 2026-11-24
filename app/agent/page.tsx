@@ -16,7 +16,7 @@ import type { CustomAgentProfile } from '@packages/agent/skill-registry';
 
 export default function AgentPage() {
   const { isConnected, userRole, hasCapability, entitlements, connectMetaMask, isConnecting, refreshSession } = useAuth();
-  const { t } = useLocale();
+  const { t, tr } = useLocale();
   const [connectError, setConnectError] = useState<string | null>(null);
   const [symbol, setSymbol] = useState('BTCUSDT');
   const [action, setAction] = useState<'BUY' | 'SELL'>('BUY');
@@ -203,15 +203,15 @@ export default function AgentPage() {
       {activeAgentTab === 'analyst' && (
         <div className="flex-col gap-lg">
           <PageWorkflowBanner
-            title="Alur AI Autonomous Desk (Proposal-Only)"
+            title={tr('AI Autonomous Desk Flow (Proposal-Only)', 'Alur AI Autonomous Desk (Proposal-Only)')}
             isUnlocked={Boolean(entitlements.aiProposals)}
             requiredPlanLabel="AGENT"
             creditSummary="5-Agent Desk: -5 cr · Single Proposal: -1 cr"
             steps={[
-              { step: '1', label: 'Jalankan 5-Agent Trading Desk', cost: '-5 cr' },
-              { step: '2', label: 'Tinjau Skor Risiko & Rasional AI' },
-              { step: '3', label: 'Klik Review in Trading Terminal →' },
-              { step: '4', label: 'Persetujuan Manual di /trading' },
+              { step: '1', label: tr('Run 5-Agent Trading Desk', 'Jalankan 5-Agent Trading Desk'), cost: '-5 cr' },
+              { step: '2', label: tr('Review Risk Score & AI Rationale', 'Tinjau Skor Risiko & Rasional AI') },
+              { step: '3', label: tr('Click Review in Trading Terminal →', 'Klik Review in Trading Terminal →') },
+              { step: '4', label: tr('Manual Approval in /trading', 'Persetujuan Manual di /trading') },
             ]}
           />
 

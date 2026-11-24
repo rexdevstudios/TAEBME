@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Radar, Microscope, BrainCircuit, ShieldCheck, Zap, AlertTriangle, ArrowRight, CheckCircle2, ExternalLink } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useLocale } from '../context/LocaleContext';
 import { STRATEGY_PROFILES, type StrategyProfileId } from '@packages/intelligence/dex-market-scanner';
 import { TokenSafetyBadgeCard } from './TokenSafetyBadgeCard';
 
@@ -35,6 +36,7 @@ export function FiveAgentDeskPanel({
   selectedLlmProvider = 'PLATFORM',
   selectedLlmModel,
 }: FiveAgentDeskPanelProps) {
+  const { tr } = useLocale();
   const { refreshSession } = useAuth();
   const [targetSource, setTargetSource] = useState<'CEX' | 'LAUNCHPAD' | 'EXTERNAL_DEX'>('CEX');
   const [launchpadTokens, setLaunchpadTokens] = useState<any[]>([]);
@@ -133,22 +135,25 @@ export function FiveAgentDeskPanel({
       {/* Top Telemetry Bar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '16px' }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 900, color: '#E2E8F0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <BrainCircuit size={18} color="#A855F7" /> AI Trading Desk (5 Agen Modular)
+          <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 900, color: 'var(--color-foreground)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <BrainCircuit size={18} style={{ color: 'var(--color-accent-purple)' }} /> {tr('AI Trading Desk (5 Modular Agents)', 'AI Trading Desk (5 Agen Modular)')}
           </h2>
           <p className="text-muted" style={{ margin: '2px 0 0 0', fontSize: '11px' }}>
-            Analisa token Launchpad kita, token eksternal GeckoTerminal / DexScreener (paste CA), maupun pair CEX — dilindungi Risk Gate permanen.
+            {tr(
+              'Analyze Launchpad tokens, external GeckoTerminal / DexScreener contracts (paste CA), or major CEX pairs — protected by an immutable Risk Gate.',
+              'Analisa token Launchpad kita, token eksternal GeckoTerminal / DexScreener (paste CA), maupun pair CEX — dilindungi Risk Gate permanen.'
+            )}
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
-          <span style={{ padding: '4px 8px', borderRadius: '4px', backgroundColor: 'rgba(16, 185, 129, 0.14)', color: 'var(--color-text-positive)', border: '1px solid rgba(16, 185, 129, 0.35)' }}>
+          <span style={{ padding: '4px 8px', borderRadius: '4px', backgroundColor: 'var(--color-badge-success-bg)', color: 'var(--color-badge-success-text)', border: '1px solid var(--color-badge-success-border)' }}>
             COLLISIONS: {report ? report.collisions : 0}
           </span>
-          <span style={{ padding: '4px 8px', borderRadius: '4px', backgroundColor: 'rgba(244, 63, 94, 0.14)', color: '#FDA4AF', border: '1px solid rgba(244, 63, 94, 0.35)' }}>
+          <span style={{ padding: '4px 8px', borderRadius: '4px', backgroundColor: 'rgba(217, 45, 32, 0.1)', color: 'var(--color-destructive)', border: '1px solid rgba(217, 45, 32, 0.3)' }}>
             RULES: IMMUTABLE
           </span>
           {report?.llmAdvisory?.provider && (
-            <span style={{ padding: '4px 8px', borderRadius: '4px', backgroundColor: 'rgba(56, 189, 248, 0.14)', color: 'var(--color-accent-info)', border: '1px solid rgba(56, 189, 248, 0.35)' }}>
+            <span style={{ padding: '4px 8px', borderRadius: '4px', backgroundColor: 'var(--color-badge-info-bg)', color: 'var(--color-badge-info-text)', border: '1px solid var(--color-badge-info-border)' }}>
               LLM: {report.llmAdvisory.provider}
             </span>
           )}
@@ -158,8 +163,8 @@ export function FiveAgentDeskPanel({
       {/* Universal Target Source Tabs (Launchpad Kita / External DEX CA / Major CEX) */}
       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
         {[
-          { id: 'LAUNCHPAD' as const, label: `Token Launchpad Kita (${launchpadTokens.length})` },
-          { id: 'EXTERNAL_DEX' as const, label: 'Paste CA Eksternal (GeckoTerminal / DexScreener)' },
+          { id: 'LAUNCHPAD' as const, label: tr(`Our Launchpad Tokens (${launchpadTokens.length})`, `Token Launchpad Kita (${launchpadTokens.length})`) },
+          { id: 'EXTERNAL_DEX' as const, label: tr('Paste External CA (GeckoTerminal / DexScreener)', 'Paste CA Eksternal (GeckoTerminal / DexScreener)') },
           { id: 'CEX' as const, label: 'Major CEX Pair' },
         ].map((t) => (
           <button

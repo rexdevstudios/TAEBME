@@ -249,7 +249,7 @@ function CandlestickChart({ candles }: { candles: Candle[] }) {
 
 export default function TradingPage() {
   const { isConnected, userRole, planId, entitlements, chainId, connectMetaMask, isConnecting } = useAuth();
-  const { t } = useLocale();
+  const { t, tr } = useLocale();
   const [connectError, setConnectError] = useState<string | null>(null);
   const [symbol, setSymbol] = useState('BTCUSDT');
   const [interval, setInterval] = useState('1h');
@@ -671,15 +671,15 @@ export default function TradingPage() {
       <>
       {/* Workflow & Plan Entitlement Guide */}
       <PageWorkflowBanner
-        title="Alur Trading Terminal & Risk Gate"
+        title={tr('Trading Terminal & Risk Gate Flow', 'Alur Trading Terminal & Risk Gate')}
         isUnlocked={executionMode === 'PAPER' ? true : Boolean(entitlements.liveTrading)}
         requiredPlanLabel="TRADER / AGENT"
-        creditSummary="Paper Trading: Gratis · Live DEX/CEX: Paket TRADER/AGENT"
+        creditSummary={tr('Paper Trading: Free · Live DEX/CEX: TRADER/AGENT Plan', 'Paper Trading: Gratis · Live DEX/CEX: Paket TRADER/AGENT')}
         steps={[
-          { step: '1', label: 'Pilih Pair & Analisa Chart/RSI' },
-          { step: '2', label: 'Pilih Mode (Paper / DEX / CEX)' },
-          { step: '3', label: 'Validasi TradingRiskGate & MEV Cap' },
-          { step: '4', label: 'Approve Intent / Sign di MetaMask' },
+          { step: '1', label: tr('Select Pair & Inspect Chart/RSI', 'Pilih Pair & Analisa Chart/RSI') },
+          { step: '2', label: tr('Choose Mode (Paper / DEX / CEX)', 'Pilih Mode (Paper / DEX / CEX)') },
+          { step: '3', label: tr('Validate TradingRiskGate & MEV Cap', 'Validasi TradingRiskGate & MEV Cap') },
+          { step: '4', label: tr('Approve Intent / Sign in MetaMask', 'Approve Intent / Sign di MetaMask') },
         ]}
       />
 

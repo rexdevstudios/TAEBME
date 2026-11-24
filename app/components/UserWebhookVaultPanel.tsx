@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Bell, Plus, Trash2, Send, Lock, ShieldCheck } from 'lucide-react';
+import { useLocale } from '../context/LocaleContext';
 
 interface WebhookItem {
   id: string;
@@ -16,6 +17,7 @@ interface UserWebhookVaultPanelProps {
 }
 
 export function UserWebhookVaultPanel({ isConnected }: UserWebhookVaultPanelProps) {
+  const { tr } = useLocale();
   const [hooks, setHooks] = useState<WebhookItem[]>([]);
   const [maxKeys, setMaxKeys] = useState<number>(2);
   const [showAdd, setShowAdd] = useState<boolean>(false);
@@ -139,7 +141,10 @@ export function UserWebhookVaultPanel({ isConnected }: UserWebhookVaultPanelProp
             </span>
           </h3>
           <p className="text-muted" style={{ margin: 0, fontSize: '12px' }}>
-            Terima notifikasi real-time untuk <strong>Auto-Pilot TP/SL &amp; Trailing Stop</strong>, <strong>Honeypot Hard-Block</strong>, dan <strong>Token Launch</strong> langsung ke <strong>Telegram Bot</strong>, <strong>Discord</strong>, atau endpoint HTTPS Anda.
+            {tr(
+              'Receive real-time alerts for Auto-Pilot TP/SL & Trailing Stop, Honeypot Hard-Blocks, and Token Launches directly to your Telegram Bot, Discord, or HTTPS endpoint.',
+              'Terima notifikasi real-time untuk Auto-Pilot TP/SL & Trailing Stop, Honeypot Hard-Block, dan Token Launch langsung ke Telegram Bot, Discord, atau endpoint HTTPS Anda.'
+            )}
           </p>
         </div>
 
@@ -150,7 +155,7 @@ export function UserWebhookVaultPanel({ isConnected }: UserWebhookVaultPanelProp
             className="btn-secondary"
             style={{ padding: '6px 10px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
           >
-            <Plus size={12} /> {showAdd ? 'Tutup' : 'Tambah Webhook'}
+            <Plus size={12} /> {showAdd ? tr('Close', 'Tutup') : tr('Add Webhook', 'Tambah Webhook')}
           </button>
         )}
       </div>

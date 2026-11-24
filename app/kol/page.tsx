@@ -49,7 +49,7 @@ interface BountyCampaignView {
 
 export default function KolHubPage() {
   const { walletAddress, isConnected, entitlements } = useAuth();
-  const { t } = useLocale();
+  const { t, tr } = useLocale();
 
   const [activeTab, setActiveTab] = useState<'PASSPORT' | 'MARKET' | 'CLAIM' | 'CREATOR'>('PASSPORT');
   const [twitterHandle, setTwitterHandle] = useState('');
@@ -563,15 +563,15 @@ export default function KolHubPage() {
       {/* Workflow & Plan Entitlement Guide */}
       <div style={{ marginTop: '16px' }}>
         <PageWorkflowBanner
-          title="Alur KOL & SocialFi Bounty"
+          title={tr('KOL & SocialFi Bounty Flow', 'Alur KOL & SocialFi Bounty')}
           isUnlocked={activeTab === 'CREATOR' ? Boolean(entitlements.createLaunch) : true}
           requiredPlanLabel="CREATOR / AGENT"
-          creditSummary="KOL Passport & Klaim: Gratis · Buat Kampanye: Paket CREATOR/AGENT"
+          creditSummary={tr('KOL Passport & Claim: Free · Create Campaign: CREATOR/AGENT Plan', 'KOL Passport & Klaim: Gratis · Buat Kampanye: Paket CREATOR/AGENT')}
           steps={[
-            { step: '1', label: 'Verifikasi KOL Passport', cost: 'Gratis' },
-            { step: '2', label: 'Pilih Bounty (Share/Hold/Stake)' },
-            { step: '3', label: 'Submit Bukti & Audit AI' },
-            { step: '4', label: 'Klaim Merkle Proof On-Chain' },
+            { step: '1', label: tr('Verify KOL Passport', 'Verifikasi KOL Passport'), cost: tr('Free', 'Gratis') },
+            { step: '2', label: tr('Select Bounty (Share/Hold/Stake)', 'Pilih Bounty (Share/Hold/Stake)') },
+            { step: '3', label: tr('Submit Proof & AI Audit', 'Submit Bukti & Audit AI') },
+            { step: '4', label: tr('Claim Merkle Proof On-Chain', 'Klaim Merkle Proof On-Chain') },
           ]}
         />
       </div>
@@ -581,7 +581,7 @@ export default function KolHubPage() {
         <div className="grid-3" style={{ gridTemplateColumns: '1fr 1fr', marginTop: '24px', gap: '24px' }}>
           <div className="bg-panel" style={{ padding: '24px', borderRadius: '12px' }}>
             <h3 style={{ fontSize: '18px', fontWeight: 800, marginTop: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '18px', fontWeight: 900, color: 'var(--color-accent, var(--color-text-positive))' }}>𝕏</span> Tautkan Akun Twitter / X
+              <span style={{ fontSize: '18px', fontWeight: 900, color: 'var(--color-accent, var(--color-text-positive))' }}>𝕏</span> {tr('Link Twitter / X Account', 'Tautkan Akun Twitter / X')}
             </h3>
             <p className="text-muted" style={{ fontSize: '13px' }}>
               Daftarkan handle media sosial Anda untuk mengevaluasi On-Chain Wallet Guard Trust Score (GoPlus + RPC) dan memenuhi syarat bounty.
