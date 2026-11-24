@@ -371,6 +371,9 @@ async function runFullTestnetUsecase() {
     const lbPageRes = await fetch(`${BASE_URL}/leaderboard`);
     assert(lbPageRes.status === 200, `GET /leaderboard public Global Leaderboard UI rendered cleanly (HTTP ${lbPageRes.status})`);
 
+    const termsPageRes = await fetch(`${BASE_URL}/terms`);
+    assert(termsPageRes.status === 200, `GET /terms public Terms & Risk Disclosure UI rendered cleanly (HTTP ${termsPageRes.status})`);
+
     // =========================================================================
     // STAGE 8: RBAC Admin Fail-Closed + Cleanup + Logout Invalidation
     // =========================================================================

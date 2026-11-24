@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import HeaderNav from './components/HeaderNav';
+import { SiteFooter } from './components/SiteFooter';
 import { AuthProvider } from './context/AuthContext';
 import { LocaleProvider } from './context/LocaleContext';
 
@@ -39,6 +40,7 @@ export default function RootLayout({
             <main>
               {children}
             </main>
+            <SiteFooter />
           </AuthProvider>
         </LocaleProvider>
       </body>
