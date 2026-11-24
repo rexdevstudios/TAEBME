@@ -13,6 +13,11 @@ import { BybitKeyVaultPanel } from '../components/BybitKeyVaultPanel';
 import { UserRiskPolicyPanel } from '../components/UserRiskPolicyPanel';
 import { RecentTradeHistoryPanel } from '../components/RecentTradeHistoryPanel';
 import {
+  PinWatchlistButton,
+  TokenWatchlistBar,
+  useTokenWatchlist,
+} from '../components/TokenWatchlistBar';
+import {
   EVM_DEX_CHAINS,
   ensureEvmNetwork,
   findDexTokenPresetByAddress,
@@ -250,6 +255,7 @@ function CandlestickChart({ candles }: { candles: Candle[] }) {
 export default function TradingPage() {
   const { isConnected, userRole, planId, entitlements, chainId, connectMetaMask, isConnecting } = useAuth();
   const { t, tr } = useLocale();
+  const { items: watchlistItems, togglePin: toggleWatchlistPin, isPinned: isWatchlistItemPinned } = useTokenWatchlist();
   const [connectError, setConnectError] = useState<string | null>(null);
   const [symbol, setSymbol] = useState('BTCUSDT');
   const [interval, setInterval] = useState('1h');
@@ -683,17 +689,54 @@ export default function TradingPage() {
         ]}
       />
 
+      {/* Pinned Token Watchlist Strip (Phase CZ) */}
+      <TokenWatchlistBar
+        items={watchlistItems}
+        onUnpin={(item) => toggleWatchlistPin({ symbol: item.symbol, name: item.name, chainId: item.chainId, address: item.address })}
+        onSelect={(item) => {
+          if (item.address) {
+            setExecutionMode('DEX_NON_CUSTODIAL');
+            setDexChainId(item.chainId);
+            setLinkedTokenAddress(item.address);
+          } else {
+            setSymbol(item.symbol);
+          }
+        }}
+      />
+
       {/* Main Grid Layout */}
       <div className="grid-3" style={{ gridTemplateColumns: '2fr 1fr' }}>
         {/* Left Column: Candlestick Chart & Derived Indicators */}
         <div className="flex-col gap-md">
           <div className="bg-panel" style={{ padding: '16px', borderRadius: '8px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                 <span style={{ fontSize: '18px', fontWeight: 900, color: 'var(--color-foreground)', fontFamily: 'var(--font-mono)' }}>
                   {symbol} <span className="text-muted">({interval.toUpperCase()})</span>
                 </span>
-                <span className="text-muted" style={{ fontSize: '12px', marginLeft: '12px' }}>
+                <PinWatchlistButton
+                  pinned={isWatchlistItemPinned(
+                    dexChainId,
+                    executionMode === 'DEX_NON_CUSTODIAL' && linkedTokenAddress.trim() ? linkedTokenAddress.trim() : symbol
+                  )}
+                  onClick={() =>
+                    toggleWatchlistPin({
+                      symbol,
+                      name: symbol,
+                      chainId: dexChainId,
+                      address: executionMode === 'DEX_NON_CUSTODIAL' && linkedTokenAddress.trim() ? linkedTokenAddress.trim() : undefined,
+                    })
+                  }
+                  label={
+                    isWatchlistItemPinned(
+                      dexChainId,
+                      executionMode === 'DEX_NON_CUSTODIAL' && linkedTokenAddress.trim() ? linkedTokenAddress.trim() : symbol
+                    )
+                      ? tr('Pinned', 'Disematkan')
+                      : tr('Pin', 'Sematkan')
+                  }
+                />
+                <span className="text-muted" style={{ fontSize: '12px' }}>
                   {loading ? 'Updating live candles...' : 'Binance REST + WebSocket Stream'}
                 </span>
               </div>

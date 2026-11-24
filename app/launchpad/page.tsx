@@ -12,6 +12,11 @@ import { CreatorStudioPanel } from '../components/CreatorStudioPanel';
 import { PageWorkflowBanner } from '../components/PageWorkflowBanner';
 import { TokenAvatar } from '../components/TokenAvatar';
 import { BankrKeyVaultPanel } from '../components/BankrKeyVaultPanel';
+import {
+  PinWatchlistButton,
+  TokenWatchlistBar,
+  useTokenWatchlist,
+} from '../components/TokenWatchlistBar';
 import { buildSocialShareUrl } from '@packages/notifications/webhook-dispatcher';
 import { ethers } from 'ethers';
 import {
@@ -35,6 +40,7 @@ export type LaunchModeType = 'BONDING_CURVE' | 'FAIR_LAUNCH' | 'WHITELIST_PRIVAT
 export default function LaunchpadPage() {
   const { isConnected, userRole, entitlements, walletAddress, connectMetaMask, isConnecting, refreshSession, switchNetwork, hasCapability, planId, credits } = useAuth();
   const { t, tr } = useLocale();
+  const { items: watchlistItems, togglePin: toggleWatchlistPin, isPinned: isWatchlistItemPinned } = useTokenWatchlist();
   const [connectError, setConnectError] = useState<string | null>(null);
   const [selectedBankrKeyId, setSelectedBankrKeyId] = useState<string>('PLATFORM_DEFAULT');
   const [selectedBatchBankrKeyIds, setSelectedBatchBankrKeyIds] = useState<string[]>([]);
@@ -1419,6 +1425,12 @@ export default function LaunchpadPage() {
             </div>
           </div>
 
+          {/* Pinned Token Watchlist Strip (Phase CZ) */}
+          <TokenWatchlistBar
+            items={watchlistItems}
+            onUnpin={(item) => toggleWatchlistPin({ symbol: item.symbol, name: item.name, chainId: item.chainId, address: item.address })}
+          />
+
           {/* Chain Filter Pills */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '11px', color: 'var(--color-muted)', fontWeight: 700, marginRight: '4px' }}>
@@ -1565,6 +1577,17 @@ export default function LaunchpadPage() {
                         </div>
                       </div>
                     </a>
+                    <PinWatchlistButton
+                      pinned={isWatchlistItemPinned(8453, token.contractAddress || token.ticker)}
+                      onClick={() =>
+                        toggleWatchlistPin({
+                          symbol: token.ticker,
+                          name: token.name,
+                          chainId: 8453,
+                          address: token.contractAddress,
+                        })
+                      }
+                    />
                     <span
                       style={{
                         padding: '2px 8px',
