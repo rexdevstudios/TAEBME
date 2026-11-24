@@ -63,6 +63,15 @@ interface TransparencyPayload {
     dexAggregator: string;
     cronScheduler: string;
   };
+  recentProofs?: Array<{
+    name: string;
+    ticker: string;
+    contractAddress: string;
+    chain: string;
+    isGraduated: boolean;
+    publishedAt: string | null;
+    explorerUrl: string;
+  }>;
   updatedAt: string;
 }
 
@@ -496,6 +505,71 @@ export default function TransparencyPage() {
           </div>
         </div>
       </div>
+
+      {/* CARD 4: Recent On-Chain Launches & Verifiable Contracts */}
+      {data?.recentProofs && data.recentProofs.length > 0 && (
+        <div className="card" style={{ padding: '20px 24px' }}>
+          <h3 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: 800, color: 'var(--color-foreground)' }}>
+            Recent On-Chain Launches &amp; Verifiable Contracts
+          </h3>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="data-table tabular-nums" style={{ width: '100%', fontSize: '12px' }}>
+              <thead>
+                <tr>
+                  <th>Token</th>
+                  <th>Network</th>
+                  <th>Contract Address</th>
+                  <th>Status</th>
+                  <th style={{ textAlign: 'right' }}>Proof</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.recentProofs.map((item) => (
+                  <tr key={item.contractAddress}>
+                    <td style={{ fontWeight: 700 }}>
+                      ${item.ticker} <span className="text-muted" style={{ fontWeight: 500 }}>({item.name})</span>
+                    </td>
+                    <td>{item.chain}</td>
+                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
+                      {item.contractAddress.slice(0, 10)}...{item.contractAddress.slice(-6)}
+                    </td>
+                    <td>
+                      <span
+                        className="badge"
+                        style={{
+                          backgroundColor: item.isGraduated ? 'var(--color-badge-success-bg)' : 'var(--color-badge-neutral-bg)',
+                          color: item.isGraduated ? 'var(--color-badge-success-text)' : 'var(--color-badge-neutral-text)',
+                          border: `1px solid ${item.isGraduated ? 'var(--color-badge-success-border)' : 'var(--color-badge-neutral-border)'}`,
+                          fontSize: '10px',
+                        }}
+                      >
+                        {item.isGraduated ? 'Graduated DEX' : 'Active Curve'}
+                      </span>
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <a
+                        href={item.explorerUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          color: 'var(--color-foreground)',
+                          textDecoration: 'none',
+                          fontWeight: 700,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}
+                      >
+                        Explorer <ExternalLink size={11} />
+                      </a>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

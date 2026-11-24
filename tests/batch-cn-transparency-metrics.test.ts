@@ -5,6 +5,7 @@ import {
   formatMonthKeyLabel,
   normalizeWeiOrHumanTokens,
   formatCompactNumber,
+  resolveChainAddressExplorerUrl,
 } from '../packages/shared/transparency-metrics';
 
 describe('Phase CN/CP: Public Platform Transparency & Fee Split Analytics', () => {
@@ -54,5 +55,12 @@ describe('Phase CN/CP: Public Platform Transparency & Fee Split Analytics', () =
     expect(split.totalEstimatedFeesUsd).toBe(0);
     expect(split.creatorShareUsd).toBe(0);
     expect(split.protocolShareUsd).toBe(0);
+  });
+
+  it('CN1.5 resolves public block explorer address URLs across Base, Robinhood, Arbitrum & Solana', () => {
+    expect(resolveChainAddressExplorerUrl('base-mainnet', '0x123')).toBe('https://basescan.org/address/0x123');
+    expect(resolveChainAddressExplorerUrl('base-sepolia', '0x123')).toBe('https://sepolia.basescan.org/address/0x123');
+    expect(resolveChainAddressExplorerUrl('robinhood-mainnet', '0x123')).toBe('https://robinhoodchain.blockscout.com/address/0x123');
+    expect(resolveChainAddressExplorerUrl('arbitrum', '0x123')).toBe('https://arbiscan.io/address/0x123');
   });
 });

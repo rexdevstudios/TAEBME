@@ -16,12 +16,13 @@ import {
   buildMonthlyTransparencyRows,
   computeFeeSplitBreakdown,
   normalizeWeiOrHumanTokens,
+  resolveChainAddressExplorerUrl,
   type MonthlyTransparencyInputRow,
 } from '@packages/shared/transparency-metrics';
 
 export const dynamic = 'force-dynamic';
 
-const CACHE_KEY = 'system:transparency:v2';
+const CACHE_KEY = 'system:transparency:v3';
 const CACHE_TTL_SEC = 60;
 
 async function fetchPublicEthBalance(address: string, isTestnet: boolean): Promise<number> {
@@ -90,6 +91,15 @@ export async function GET() {
     let totalCreditsGranted = 0;
     let activePaidSubscriptions = 0;
     let monthlyBuckets: MonthlyTransparencyInputRow[] = [];
+    let recentProofs: Array<{
+      name: string;
+      ticker: string;
+      contractAddress: string;
+      chain: string;
+      isGraduated: boolean;
+      publishedAt: string | null;
+      explorerUrl: string;
+    }> = [];
 
     if (pool) {
       const [
@@ -102,6 +112,7 @@ export async function GET() {
         monthlyTradesRes,
         monthlyLaunchesRes,
         monthlyLedgerRes,
+        recentLaunchesRes,
       ] = await Promise.all([
         pool
           .query(
@@ -176,6 +187,17 @@ export async function GET() {
              GROUP BY 1`
           )
           .catch(() => ({ rows: [] })),
+        pool
+          .query(
+            `SELECT tl.contract_address, tl.chain, tl.is_graduated, tl.published_at,
+                    ld.name, ld.ticker
+             FROM token_launches tl
+             LEFT JOIN launch_drafts ld ON ld.id = tl.draft_id
+             WHERE tl.contract_address IS NOT NULL
+             ORDER BY tl.published_at DESC NULLS LAST
+             LIMIT 6`
+          )
+          .catch(() => ({ rows: [] })),
       ]);
 
       const lRow = launchesRes.rows[0];
@@ -243,6 +265,20 @@ export async function GET() {
         if (r.month_key) ensureMonth(String(r.month_key)).creditsBurned = Number(r.burned) || 0;
       }
       monthlyBuckets = Array.from(monthMap.values());
+
+      recentProofs = (recentLaunchesRes.rows || []).map((r: any) => {
+        const addr = String(r.contract_address || '').trim();
+        const ch = String(r.chain || 'base-mainnet').trim();
+        return {
+          name: String(r.name || 'POOLNET Token'),
+          ticker: String(r.ticker || 'TOKEN'),
+          contractAddress: addr,
+          chain: ch,
+          isGraduated: Boolean(r.is_graduated),
+          publishedAt: r.published_at ? new Date(r.published_at).toISOString() : null,
+          explorerUrl: resolveChainAddressExplorerUrl(ch, addr),
+        };
+      });
     }
 
     const treasuryEthBalance = await fetchPublicEthBalance(treasuryWallet, isTestnet);
@@ -292,6 +328,7 @@ export async function GET() {
         dexAggregator: '0x v2 AllowanceHolder (6 EVM Chains)',
         cronScheduler: 'Cloudflare Worker (24/7 Free Tier)',
       },
+      recentProofs,
       updatedAt: new Date().toISOString(),
     };
 

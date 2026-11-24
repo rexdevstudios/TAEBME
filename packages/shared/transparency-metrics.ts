@@ -146,3 +146,17 @@ export function buildMonthlyTransparencyRows(
       };
     });
 }
+
+/**
+ * Resolves the canonical public block explorer address URL for any supported launch chain (Phase CQ).
+ */
+export function resolveChainAddressExplorerUrl(chain: string, address: string): string {
+  const cleanAddr = (address || '').trim();
+  const c = (chain || 'base-mainnet').trim().toLowerCase();
+  if (c.includes('sepolia')) return `https://sepolia.basescan.org/address/${cleanAddr}`;
+  if (c.includes('robinhood')) return `https://robinhoodchain.blockscout.com/address/${cleanAddr}`;
+  if (c.includes('arbitrum')) return `https://arbiscan.io/address/${cleanAddr}`;
+  if (c.includes('arc')) return `https://arcscan.io/address/${cleanAddr}`;
+  if (c.includes('solana')) return `https://solscan.io/token/${cleanAddr}`;
+  return `https://basescan.org/address/${cleanAddr}`;
+}
