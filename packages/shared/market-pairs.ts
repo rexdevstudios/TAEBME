@@ -34,7 +34,7 @@ export const LAUNCHPAD_CURVE_PAIRS: readonly MarketPairOption[] = [
   { symbol: 'CDAO/ETH', label: 'CDAO / ETH (Community Prelaunch)', venue: 'LAUNCHPAD' },
 ] as const;
 
-export const VALID_CHART_INTERVALS = new Set(['5m', '15m', '1h', '4h', '1d']);
+export const VALID_CHART_INTERVALS = new Set(['1m', '5m', '15m', '1h', '4h', '1d']);
 
 /**
  * Strict allowlist for CEX symbols (e.g. BTCUSDT, 1000PEPEUSDT) and Launchpad slash pairs (e.g. MOON/ETH).

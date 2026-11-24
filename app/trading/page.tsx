@@ -22,6 +22,10 @@ import {
   TOP_LIQUID_CEX_PAIRS,
   isValidMarketSymbol,
 } from '@packages/shared/market-pairs';
+import type {
+  ChartCandleMarker,
+  KolConsensusReport,
+} from '@packages/intelligence/kol-chart-overlay';
 import {
   EVM_DEX_CHAINS,
   ensureEvmNetwork,
@@ -107,13 +111,30 @@ interface TradingAnalysis {
   tradingPaused: boolean;
 }
 
-// Interactive Gemini-Styled Candlestick & Volume Chart with Hover Crosshair, OHLCV Tooltip & Price Scale
-function CandlestickChart({ candles }: { candles: Candle[] }) {
+// Interactive Gemini-Styled Candlestick & Volume Chart with Hover Crosshair, OHLCV Tooltip, Price Scale & GMGN-Style KOL/AI Markers
+function CandlestickChart({
+  candles,
+  markers = [],
+  kolConsensus = null,
+  onSelectMarkerSide,
+}: {
+  candles: Candle[];
+  markers?: ChartCandleMarker[];
+  kolConsensus?: KolConsensusReport | null;
+  onSelectMarkerSide?: (side: 'BUY' | 'SELL') => void;
+}) {
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+  const [showKolMarkers, setShowKolMarkers] = useState(true);
+  const [showAiMarkers, setShowAiMarkers] = useState(true);
 
   if (!candles || candles.length === 0) {
     return <div className="text-muted" style={{ padding: '3rem', textAlign: 'center', fontSize: '13px' }}>Memuat data grafik pasar...</div>;
   }
+
+  const visibleMarkers = markers.filter((m) => {
+    if (m.kind === 'KOL_BUY' || m.kind === 'KOL_SELL') return showKolMarkers;
+    return showAiMarkers;
+  });
 
   const width = 640;
   const height = 268;
@@ -144,6 +165,46 @@ function CandlestickChart({ candles }: { candles: Candle[] }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      {/* GMGN-Style Verified KOL & AI Signal Overlay Filter Bar (Phase DU) */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', fontSize: '11px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => setShowKolMarkers((v) => !v)}
+            className={showKolMarkers ? 'btn-primary' : 'btn-secondary'}
+            style={{ fontSize: '10px', padding: '3px 8px', fontFamily: 'var(--font-mono)' }}
+          >
+            {showKolMarkers ? 'ON' : 'OFF'} · KOL Verified (KB/KS)
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowAiMarkers((v) => !v)}
+            className={showAiMarkers ? 'btn-primary' : 'btn-secondary'}
+            style={{ fontSize: '10px', padding: '3px 8px', fontFamily: 'var(--font-mono)' }}
+          >
+            {showAiMarkers ? 'ON' : 'OFF'} · AI Entry (AI)
+          </button>
+        </div>
+        {kolConsensus && (
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--color-muted)' }}>
+            KOL Consensus:{' '}
+            <strong
+              style={{
+                color:
+                  kolConsensus.score >= 60
+                    ? 'var(--color-text-positive)'
+                    : kolConsensus.score <= 35
+                      ? 'var(--color-destructive)'
+                      : 'var(--color-accent-info)',
+              }}
+            >
+              {kolConsensus.score}/100 ({kolConsensus.verdict})
+            </strong>
+            {' · '}Verified KOLs: {kolConsensus.uniqueVerifiedKols}
+          </div>
+        )}
+      </div>
+
       {/* Floating OHLCV Telemetry Bar */}
       <div
         style={{
@@ -252,6 +313,41 @@ function CandlestickChart({ candles }: { candles: Candle[] }) {
             </g>
           );
         })}
+
+        {/* GMGN-Style Verified KOL (KB/KS) & AI Signal (AI) Candle Markers */}
+        {visibleMarkers.map((m, idx) => {
+          const c = candles[m.candleIndex];
+          if (!c) return null;
+          const mx = padLeft + m.candleIndex * candleWidth + candleWidth / 2;
+          const my = m.side === 'BUY' ? Math.min(height - padBottom - 8, toY(c.low) + 12) : Math.max(padTop + 10, toY(c.high) - 12);
+          const fill =
+            m.kind === 'KOL_BUY'
+              ? '#10B981'
+              : m.kind === 'KOL_SELL'
+                ? '#EF4444'
+                : '#8B5CF6';
+          return (
+            <g
+              key={`${m.kind}-${m.candleIndex}-${idx}`}
+              style={{ cursor: onSelectMarkerSide ? 'pointer' : 'default' }}
+              onClick={() => onSelectMarkerSide?.(m.side)}
+            >
+              <title>{`${m.label} · ${m.side} @ ${formatPx(m.price)}`}</title>
+              <circle cx={mx} cy={my} r={9} fill={fill} stroke="#0B1220" strokeWidth="1.5" />
+              <text
+                x={mx}
+                y={my + 3}
+                textAnchor="middle"
+                fill="#FFFFFF"
+                fontSize="7.5"
+                fontWeight="900"
+                fontFamily="monospace"
+              >
+                {m.badge}
+              </text>
+            </g>
+          );
+        })}
       </svg>
     </div>
   );
@@ -265,6 +361,8 @@ export default function TradingPage() {
   const [symbol, setSymbol] = useState('BTCUSDT');
   const [interval, setInterval] = useState('1h');
   const [candles, setCandles] = useState<Candle[]>([]);
+  const [chartMarkers, setChartMarkers] = useState<ChartCandleMarker[]>([]);
+  const [kolConsensus, setKolConsensus] = useState<KolConsensusReport | null>(null);
   const [orderbook, setOrderbook] = useState<Orderbook | null>(null);
   const [signal, setSignal] = useState<IntelligenceSignal | null>(null);
   const [tradingAnalysis, setTradingAnalysis] = useState<TradingAnalysis | null>(null);
@@ -372,6 +470,8 @@ export default function TradingPage() {
 
       if (json.success && json.data) {
         setCandles(json.data.candles || []);
+        setChartMarkers(Array.isArray(json.data.chartMarkers) ? json.data.chartMarkers : []);
+        setKolConsensus(json.data.kolConsensus || null);
         setOrderbook(json.data.orderbook || null);
         setSignal(json.data.signal || null);
         setTradingAnalysis(json.data.tradingAnalysis || null);
@@ -783,7 +883,12 @@ export default function TradingPage() {
 
             {/* SVG Candlestick Chart Container */}
             <div style={{ backgroundColor: 'var(--color-background)', padding: '16px', borderRadius: '6px', border: '1px solid var(--color-border)' }}>
-              <CandlestickChart candles={candles} />
+              <CandlestickChart
+                candles={candles}
+                markers={chartMarkers}
+                kolConsensus={kolConsensus}
+                onSelectMarkerSide={(s) => setOrderSide(s)}
+              />
             </div>
 
             {/* Data-Dense Derived Metrics Bar */}
