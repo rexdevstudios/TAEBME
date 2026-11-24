@@ -543,25 +543,25 @@ export default function TransparencyPage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '10px', fontSize: '12px' }}>
           <div style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--color-border)', background: 'var(--color-surface-subtle)' }}>
             <div className="text-muted" style={{ fontSize: '11px', marginBottom: '3px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <Layers size={12} /> Database SSOT Parity
+              <Layers size={12} /> 100% Non-Custodial Architecture
             </div>
             <div style={{ fontWeight: 800 }}>
-              {data?.infrastructure.databaseTables ?? 48} Tables · {data?.infrastructure.databaseIndexes ?? 120} Indexes (0 Drift)
+              Zero Private Keys Stored · User Signs Every Tx
             </div>
           </div>
           <div style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--color-border)', background: 'var(--color-surface-subtle)' }}>
             <div className="text-muted" style={{ fontSize: '11px', marginBottom: '3px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <CheckCircle2 size={12} style={{ color: '#16A34A' }} /> Anti-Insider &amp; Honeypot
+              <CheckCircle2 size={12} style={{ color: '#16A34A' }} /> Real-Time Honeypot Shield
             </div>
-            <div style={{ fontWeight: 800 }}>{data?.infrastructure.antiInsiderGuard || 'GoPlus Public API + EVM RPC ($0)'}</div>
+            <div style={{ fontWeight: 800 }}>{data?.infrastructure.antiInsiderGuard || 'Automated Contract & Insider Risk Guard'}</div>
           </div>
           <div style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--color-border)', background: 'var(--color-surface-subtle)' }}>
-            <div className="text-muted" style={{ fontSize: '11px', marginBottom: '3px' }}>DEX Execution Rail</div>
-            <div style={{ fontWeight: 800 }}>{data?.infrastructure.dexAggregator || '0x v2 AllowanceHolder (6 EVM Chains)'}</div>
+            <div className="text-muted" style={{ fontSize: '11px', marginBottom: '3px' }}>Multi-Rail Execution Engine</div>
+            <div style={{ fontWeight: 800 }}>{data?.infrastructure.dexAggregator || '0x v2 DEX (6 Chains) · Bankr · Binance · Bybit'}</div>
           </div>
           <div style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--color-border)', background: 'var(--color-surface-subtle)' }}>
-            <div className="text-muted" style={{ fontSize: '11px', marginBottom: '3px' }}>24/7 Autonomous Scheduler</div>
-            <div style={{ fontWeight: 800 }}>{data?.infrastructure.cronScheduler || 'Cloudflare Worker (24/7 Free Tier)'}</div>
+            <div className="text-muted" style={{ fontSize: '11px', marginBottom: '3px' }}>24/7 Autonomous Protection</div>
+            <div style={{ fontWeight: 800 }}>{data?.infrastructure.cronScheduler || 'Always-On Trailing SL & Deterministic Risk Gate'}</div>
           </div>
         </div>
       </div>
