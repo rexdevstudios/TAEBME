@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { BarChart3, ExternalLink, RefreshCw, ShieldCheck, CheckCircle2, Layers } from 'lucide-react';
+import { formatCompactNumber } from '@packages/shared/transparency-metrics';
+import { useLocale } from '../context/LocaleContext';
 
 interface TransparencyPayload {
   environment: string;
@@ -72,6 +74,7 @@ function formatCompactUsd(n: number): string {
 }
 
 export default function TransparencyPage() {
+  const { t } = useLocale();
   const [data, setData] = useState<TransparencyPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState<string>('ALL');
@@ -132,10 +135,10 @@ export default function TransparencyPage() {
               gap: '8px',
             }}
           >
-            <BarChart3 size={20} style={{ color: 'var(--color-accent-emerald)' }} /> Platform Transparency &amp; Revenue
+            <BarChart3 size={20} style={{ color: 'var(--color-accent-emerald)' }} /> {t('transparency.title')}
           </h1>
           <p className="text-muted" style={{ margin: 0, fontSize: '12px' }}>
-            Audit terbuka alur fee protokol, saldo Treasury on-chain, Bounty Escrow, dan kesehatan infrastruktur POOLNET secara real-time.
+            {t('transparency.subtitle')}
           </p>
         </div>
         <div className="flex-row gap-sm items-center">
@@ -408,7 +411,7 @@ export default function TransparencyPage() {
               KOL Bounty Escrow Pool
             </div>
             <div style={{ fontSize: '30px', fontWeight: 900, letterSpacing: '-0.03em', color: 'var(--color-foreground)', lineHeight: 1.1 }}>
-              {(data?.escrowAndBounties.totalAllocatedTokens ?? 0).toLocaleString()}
+              {formatCompactNumber(data?.escrowAndBounties.totalAllocatedTokens ?? 0)}
             </div>
             <div className="text-muted" style={{ fontSize: '12px', marginTop: '6px', paddingBottom: '14px', borderBottom: '1px solid var(--color-border)' }}>
               Token reward allocated across {data?.escrowAndBounties.activeCampaigns ?? 0} active campaigns

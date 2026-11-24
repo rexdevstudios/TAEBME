@@ -44,6 +44,7 @@ import {
 import {
   computeFeeSplitBreakdown,
   buildMonthlyTransparencyRows,
+  normalizeWeiOrHumanTokens,
 } from '../packages/shared/transparency-metrics';
 import {
   clearAutoPilotPeakPrice,
@@ -1148,20 +1149,21 @@ async function runSimulationSuite() {
   console.log('\n--- [SCENARIO 45: Public Platform Transparency Fee Split & Monthly Analytics] ---');
   const cnSplit = computeFeeSplitBreakdown({
     totalTradeVolumeUsd: 100_000,
-    totalCurveRaisedEth: 10,
-    ethPriceUsd: 3000,
+    totalCurveRaisedUsd: 30_000,
     dexSwapFeeBps: 25,
   });
   const cnMonthly = buildMonthlyTransparencyRows([
-    { monthKey: '2026-10', tradeVolumeUsd: 20_000, curveRaisedEth: 2, launchesCount: 2, creditsBurned: 100 },
-    { monthKey: '2026-11', tradeVolumeUsd: 80_000, curveRaisedEth: 8, launchesCount: 5, creditsBurned: 400 },
+    { monthKey: '2026-10', tradeVolumeUsd: 20_000, curveRaisedUsd: 6_000, launchesCount: 2, creditsBurned: 100 },
+    { monthKey: '2026-11', tradeVolumeUsd: 80_000, curveRaisedUsd: 24_000, launchesCount: 5, creditsBurned: 400 },
   ]);
+  const cnWeiNorm = normalizeWeiOrHumanTokens(4.46e24);
   assert(
     cnSplit.totalEstimatedFeesUsd === 550 &&
       cnSplit.creatorShareUsd === 150 &&
       cnSplit.protocolShareUsd === 400 &&
+      cnWeiNorm === 4_460_000 &&
       cnMonthly[0]?.monthLabel === 'Nov 2026',
-    'Public transparency engine computes exact 1% curve split + 25bps DEX partner fee & monthly rows'
+    'Public transparency engine computes exact 1% curve USD split + 25bps DEX fee & 18-dec wei normalization'
   );
 
   console.log('\n================================================================');

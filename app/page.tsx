@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from './context/AuthContext';
+import { useLocale } from './context/LocaleContext';
 import { Activity, ShieldAlert, Zap, Rocket, Award, Server, Cpu, Lock, Network, Wallet, BrainCircuit } from 'lucide-react';
 import { executeKillSwitchToggle } from './lib/kill-switch-admin-client';
 import { LandingHeroMotion } from './components/LandingHeroMotion';
@@ -21,6 +22,7 @@ interface OverviewData {
 
 export default function OverviewPage() {
   const { isConnected, userRole, planId, credits, walletAddress, connectMetaMask, isConnecting, refreshSession } = useAuth();
+  const { t } = useLocale();
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [activeLaunches, setActiveLaunches] = useState<any[]>([]);
   const [gameFiProfile, setGameFiProfile] = useState<{
@@ -331,18 +333,18 @@ export default function OverviewPage() {
               Non-Custodial CEX-Grade Launchpad &amp; AI Trading Hub
             </div>
             <h1 style={{ margin: '0 0 6px 0', fontSize: '22px', fontWeight: 900, color: 'var(--color-foreground)' }}>
-              Selamat datang, {walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : 'Trader'}
+              {t('home.welcome')}, {walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : 'Trader'}
             </h1>
             <p className="text-muted" style={{ margin: 0, fontSize: '13px' }}>
-              Pilih tujuan Anda di bawah — semua fitur sudah dikelompokkan rapi berdasarkan kategori agar mudah digunakan.
+              {t('home.subtitle')}
             </p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
             <a href="/launchpad" className="cex-btn-gold">
-              <Rocket size={15} /> Launch / Explore Pools
+              <Rocket size={15} /> {t('home.ctaLaunch')}
             </a>
             <a href="/trading" className="btn-secondary" style={{ textDecoration: 'none', padding: '10px 16px', fontSize: '13px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-              <Network size={15} /> Buka Terminal Trade
+              <Network size={15} /> {t('home.ctaTrade')}
             </a>
           </div>
         </div>
@@ -478,8 +480,8 @@ export default function OverviewPage() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: completedSteps === 3 ? 0 : '10px' }}>
                 <div style={{ fontSize: '13px', fontWeight: 800, color: completedSteps === 3 ? '#34D399' : '#38BDF8' }}>
                   {completedSteps === 3
-                    ? '✅ Onboarding Pemula Selesai (3/3) — Akun Anda siap untuk Trading, AI Desk & Launchpad!'
-                    : `🚀 Panduan Cepat 3 Menit untuk Pemula (${completedSteps}/3 Selesai)`}
+                    ? 'Onboarding Pemula Selesai (3/3) — Akun Anda siap untuk Trading, AI Desk & Launchpad.'
+                    : `Panduan Cepat 3 Menit untuk Pemula (${completedSteps}/3 Selesai)`}
                 </div>
                 <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--color-muted)' }}>
                   100% Non-Custodial · GoPlus Anti-Insider Aktif

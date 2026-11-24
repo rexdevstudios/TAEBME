@@ -1,15 +1,15 @@
 /**
  * packages/shared/transparency-metrics.ts
  *
- * Pure, deterministic fee-split & monthly transparency analytics calculator (Phase CN).
+ * Pure, deterministic fee-split & monthly transparency analytics calculator (Phase CN/CP).
  * Computes real platform accounting splits (Creators 50%, Protocol Treasury 50%,
- * DEX Partner Fee 0.25% / configurable bps, and metered credits economy) with zero fabrication.
+ * DEX Partner Fee 0.25% / configurable bps, and 18-decimal wei token normalization) with zero fabrication.
  */
 
 export interface MonthlyTransparencyInputRow {
   monthKey: string; // e.g. '2026-11'
   tradeVolumeUsd: number;
-  curveRaisedEth: number;
+  curveRaisedUsd: number;
   launchesCount: number;
   creditsBurned: number;
 }
@@ -59,20 +59,41 @@ function round2(n: number): number {
 }
 
 /**
+ * Normalizes on-chain 18-decimal wei token amounts (e.g. 4.46e24 wei -> 4,460,000 tokens)
+ * while preserving already human-denominated values (< 1e15).
+ */
+export function normalizeWeiOrHumanTokens(raw: unknown): number {
+  const v = safeNonNegative(raw);
+  if (v >= 1e15) {
+    return round2(v / 1e18);
+  }
+  return round2(v);
+}
+
+/**
+ * Formats large token counts compactly (e.g. 4,460,000 -> "4.46M", 12,500 -> "12.50K").
+ */
+export function formatCompactNumber(raw: unknown): string {
+  const v = safeNonNegative(raw);
+  if (v >= 1_000_000_000) return `${(v / 1_000_000_000).toFixed(2)}B`;
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(2)}M`;
+  if (v >= 1_000) return `${(v / 1_000).toFixed(2)}K`;
+  return v.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
+/**
  * Computes transparent fee flow totals matching POOLNET's documented fee model:
- * - Bonding Curve Fee: 1.00% of curve raised volume (0.50% Creator / 0.50% Protocol Treasury)
+ * - Bonding Curve Fee: 1.00% of curve raised volume in USD (0.50% Creator / 0.50% Protocol Treasury)
  * - 0x v2 DEX Partner Fee: configurable bps (default 25 bps = 0.25% Protocol Treasury)
  */
 export function computeFeeSplitBreakdown(params: {
   totalTradeVolumeUsd: number;
-  totalCurveRaisedEth: number;
-  ethPriceUsd?: number;
+  totalCurveRaisedUsd: number;
   dexSwapFeeBps?: number;
 }): TransparencyFeeSplitSummary {
-  const ethPx = safeNonNegative(params.ethPriceUsd) || 3000;
   const dexBps = safeNonNegative(params.dexSwapFeeBps) || 25;
   const tradeVol = safeNonNegative(params.totalTradeVolumeUsd);
-  const curveVolUsd = safeNonNegative(params.totalCurveRaisedEth) * ethPx;
+  const curveVolUsd = safeNonNegative(params.totalCurveRaisedUsd);
 
   const curveFeeUsd = curveVolUsd * 0.01; // 1.00% bonding curve fee
   const dexPartnerFeeUsd = tradeVol * (dexBps / 10_000);
@@ -101,7 +122,6 @@ export function computeFeeSplitBreakdown(params: {
  */
 export function buildMonthlyTransparencyRows(
   rows: MonthlyTransparencyInputRow[],
-  ethPriceUsd: number = 3000,
   dexSwapFeeBps: number = 25
 ): MonthlyTransparencyRow[] {
   const list = Array.isArray(rows) ? rows : [];
@@ -111,8 +131,7 @@ export function buildMonthlyTransparencyRows(
     .map((r) => {
       const split = computeFeeSplitBreakdown({
         totalTradeVolumeUsd: r.tradeVolumeUsd,
-        totalCurveRaisedEth: r.curveRaisedEth,
-        ethPriceUsd,
+        totalCurveRaisedUsd: r.curveRaisedUsd,
         dexSwapFeeBps,
       });
       return {

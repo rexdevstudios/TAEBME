@@ -15,12 +15,13 @@ import { getAppEnvironment } from '@packages/shared/env-config';
 import {
   buildMonthlyTransparencyRows,
   computeFeeSplitBreakdown,
+  normalizeWeiOrHumanTokens,
   type MonthlyTransparencyInputRow,
 } from '@packages/shared/transparency-metrics';
 
 export const dynamic = 'force-dynamic';
 
-const CACHE_KEY = 'system:transparency:v1';
+const CACHE_KEY = 'system:transparency:v2';
 const CACHE_TTL_SEC = 60;
 
 async function fetchPublicEthBalance(address: string, isTestnet: boolean): Promise<number> {
@@ -76,7 +77,7 @@ export async function GET() {
     const pool = getDbPool();
     let totalLaunches = 0;
     let graduatedLaunches = 0;
-    let totalCurveRaisedEth = 0;
+    let totalCurveRaisedUsd = 0;
     let totalTradeIntents = 0;
     let executedTrades = 0;
     let blockedTrades = 0;
@@ -181,7 +182,7 @@ export async function GET() {
       if (lRow) {
         totalLaunches = Number(lRow.total) || 0;
         graduatedLaunches = Number(lRow.graduated) || 0;
-        totalCurveRaisedEth = Number(lRow.raised_eth) || 0;
+        totalCurveRaisedUsd = Number(lRow.raised_eth) || 0;
       }
 
       const tRow = tradesRes.rows[0];
@@ -221,7 +222,7 @@ export async function GET() {
           monthMap.set(k, {
             monthKey: k,
             tradeVolumeUsd: 0,
-            curveRaisedEth: 0,
+            curveRaisedUsd: 0,
             launchesCount: 0,
             creditsBurned: 0,
           });
@@ -235,7 +236,7 @@ export async function GET() {
         if (r.month_key) {
           const b = ensureMonth(String(r.month_key));
           b.launchesCount = Number(r.launches) || 0;
-          b.curveRaisedEth = Number(r.raised_eth) || 0;
+          b.curveRaisedUsd = Number(r.raised_eth) || 0;
         }
       }
       for (const r of monthlyLedgerRes.rows) {
@@ -247,11 +248,11 @@ export async function GET() {
     const treasuryEthBalance = await fetchPublicEthBalance(treasuryWallet, isTestnet);
     const feeSplit = computeFeeSplitBreakdown({
       totalTradeVolumeUsd,
-      totalCurveRaisedEth,
-      ethPriceUsd,
+      totalCurveRaisedUsd,
       dexSwapFeeBps,
     });
-    const monthly = buildMonthlyTransparencyRows(monthlyBuckets, ethPriceUsd, dexSwapFeeBps);
+    const monthly = buildMonthlyTransparencyRows(monthlyBuckets, dexSwapFeeBps);
+    const normalizedBountyTokens = normalizeWeiOrHumanTokens(totalBountyAllocated);
 
     const payload = {
       environment: appEnv,
@@ -267,14 +268,14 @@ export async function GET() {
       monthly,
       escrowAndBounties: {
         activeCampaigns: activeBountyCampaigns,
-        totalAllocatedTokens: Math.round(totalBountyAllocated * 100) / 100,
+        totalAllocatedTokens: normalizedBountyTokens,
         totalClaims: totalBountyClaims,
         verifiedClaims: verifiedBountyClaims,
       },
       activity: {
         totalLaunches,
         graduatedLaunches,
-        totalCurveRaisedEth: Math.round(totalCurveRaisedEth * 1e4) / 1e4,
+        totalCurveRaisedUsd: Math.round(totalCurveRaisedUsd * 100) / 100,
         totalTradeIntents,
         executedTrades,
         blockedTrades,
