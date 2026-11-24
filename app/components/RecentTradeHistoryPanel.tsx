@@ -58,6 +58,37 @@ export function RecentTradeHistoryPanel({
     URL.revokeObjectURL(url);
   };
 
+  const handleExportJson = () => {
+    if (filtered.length === 0) return;
+    const enriched = filtered.map((item) => {
+      const settlement = parseDexSettlementFromIdempotencyKey(item.idempotencyKey);
+      return {
+        ...item,
+        settlementChainId: settlement?.chainId ?? null,
+        settlementTxHash: settlement?.txHash ?? null,
+        explorerUrl: settlement?.explorerUrl ?? null,
+      };
+    });
+    const payload = JSON.stringify(
+      {
+        schemaVersion: 'poolnet.audit.trades.v1',
+        exportedAt: new Date().toISOString(),
+        recap,
+        count: enriched.length,
+        trades: enriched,
+      },
+      null,
+      2
+    );
+    const blob = new Blob([payload], { type: 'application/json;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `rtrader-trade-audit-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const loadHistory = async () => {
     if (!isConnected) {
       setIntents([]);
@@ -112,15 +143,26 @@ export function RecentTradeHistoryPanel({
         </h3>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           {filtered.length > 0 && (
-            <button
-              type="button"
-              onClick={handleExportCsv}
-              className="btn-secondary"
-              style={{ padding: '3px 7px', fontSize: '10px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-              title="Export riwayat order terfilter ke CSV (formula-safe)"
-            >
-              <Download size={10} /> CSV
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={handleExportCsv}
+                className="btn-secondary"
+                style={{ padding: '3px 7px', fontSize: '10px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                title="Export riwayat order terfilter ke CSV (formula-safe)"
+              >
+                <Download size={10} /> CSV
+              </button>
+              <button
+                type="button"
+                onClick={handleExportJson}
+                className="btn-secondary"
+                style={{ padding: '3px 7px', fontSize: '10px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                title="Export audit PnL & Explorer proofs ke JSON"
+              >
+                <Download size={10} /> JSON
+              </button>
+            </>
           )}
           <button
             type="button"

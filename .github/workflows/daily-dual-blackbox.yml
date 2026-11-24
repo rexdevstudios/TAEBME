@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   dual-blackbox:
-    name: Live API Blackbox (168) + CEX UI Smoke (14)
+    name: Live API Blackbox (168) + CEX UI Smoke (16) + Testnet E2E (29)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -28,3 +28,6 @@ jobs:
 
       - name: Run dual-environment API blackbox & CEX UI smoke suite (verify:live:all)
         run: bun run verify:live:all
+
+      - name: Run 8-stage full-usecase Testnet E2E simulation (verify:testnet:e2e)
+        run: bun run verify:testnet:e2e

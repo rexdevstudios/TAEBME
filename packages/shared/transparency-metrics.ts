@@ -160,3 +160,94 @@ export function resolveChainAddressExplorerUrl(chain: string, address: string): 
   if (c.includes('solana')) return `https://solscan.io/token/${cleanAddr}`;
   return `https://basescan.org/address/${cleanAddr}`;
 }
+
+export interface TransparencyAuditExportPayload {
+  network: string;
+  generatedAt?: string;
+  fees: TransparencyFeeSplitSummary;
+  monthly: MonthlyTransparencyRow[];
+  recentLaunches?: Array<{
+    name: string;
+    ticker: string;
+    chain: string;
+    contractAddress: string;
+    raisedUsd: number;
+    status: string;
+    explorerUrl: string;
+  }>;
+}
+
+function escapeAuditCsvCell(raw: unknown): string {
+  const s = String(raw ?? '').replace(/\r?\n/g, ' ').trim();
+  const safe = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+  return `"${safe.replace(/"/g, '""')}"`;
+}
+
+/**
+ * Serializes Platform Transparency monthly fees & on-chain explorer proofs to formula-safe CSV (Phase CY).
+ */
+export function serializeTransparencyReportToCsv(report: TransparencyAuditExportPayload): string {
+  const lines: string[] = [];
+  lines.push(
+    ['Section', 'PeriodOrTicker', 'NetworkOrChain', 'VolumeOrRaisedUsd', 'EstimatedFeesUsd', 'CreatorShareUsd', 'ProtocolShareUsd', 'StatusOrLaunches', 'ExplorerUrl']
+      .map(escapeAuditCsvCell)
+      .join(',')
+  );
+
+  for (const m of report.monthly || []) {
+    lines.push(
+      [
+        'MONTHLY_FEES',
+        m.monthLabel,
+        report.network,
+        m.tradeVolumeUsd.toFixed(2),
+        m.estimatedFeesUsd.toFixed(2),
+        m.creatorShareUsd.toFixed(2),
+        m.protocolShareUsd.toFixed(2),
+        String(m.launchesCount),
+        '',
+      ]
+        .map(escapeAuditCsvCell)
+        .join(',')
+    );
+  }
+
+  for (const l of report.recentLaunches || []) {
+    lines.push(
+      [
+        'ONCHAIN_LAUNCH',
+        `${l.name} ($${l.ticker})`,
+        l.chain,
+        Number(l.raisedUsd || 0).toFixed(2),
+        '',
+        '',
+        '',
+        l.status,
+        l.explorerUrl || resolveChainAddressExplorerUrl(l.chain, l.contractAddress),
+      ]
+        .map(escapeAuditCsvCell)
+        .join(',')
+    );
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Serializes Platform Transparency data into a canonical JSON audit bundle (Phase CY).
+ */
+export function serializeTransparencyReportToJson(report: TransparencyAuditExportPayload): string {
+  return JSON.stringify(
+    {
+      schemaVersion: 'poolnet.audit.transparency.v1',
+      exportedAt: new Date().toISOString(),
+      network: report.network,
+      generatedAt: report.generatedAt || new Date().toISOString(),
+      fees: report.fees,
+      monthly: report.monthly,
+      recentLaunches: report.recentLaunches || [],
+    },
+    null,
+    2
+  );
+}

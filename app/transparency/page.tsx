@@ -1,8 +1,12 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { BarChart3, ExternalLink, RefreshCw, ShieldCheck, CheckCircle2, Layers } from 'lucide-react';
-import { formatCompactNumber } from '@packages/shared/transparency-metrics';
+import { BarChart3, Download, ExternalLink, RefreshCw, ShieldCheck, CheckCircle2, Layers } from 'lucide-react';
+import {
+  formatCompactNumber,
+  serializeTransparencyReportToCsv,
+  serializeTransparencyReportToJson,
+} from '@packages/shared/transparency-metrics';
 import { useLocale } from '../context/LocaleContext';
 
 interface TransparencyPayload {
@@ -125,6 +129,22 @@ export default function TransparencyPage() {
     ? activeMonthRow.tradeVolumeUsd
     : data?.fees.totalEstimatedVolumeUsd ?? 0;
 
+  const handleExportTransparency = (format: 'csv' | 'json') => {
+    if (!data) return;
+    const content =
+      format === 'csv'
+        ? serializeTransparencyReportToCsv(data)
+        : serializeTransparencyReportToJson(data);
+    const mime = format === 'csv' ? 'text/csv;charset=utf-8;' : 'application/json;charset=utf-8;';
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `poolnet-transparency-audit-${new Date().toISOString().slice(0, 10)}.${format}`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="flex-col gap-lg">
       {/* Header Banner */}
@@ -163,6 +183,28 @@ export default function TransparencyPage() {
             >
               {data.network} · 0 Drift
             </span>
+          )}
+          {data && (
+            <>
+              <button
+                type="button"
+                onClick={() => handleExportTransparency('csv')}
+                className="btn-secondary"
+                style={{ padding: '7px 10px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                title="Export Transparency Audit Report (CSV)"
+              >
+                <Download size={12} /> CSV
+              </button>
+              <button
+                type="button"
+                onClick={() => handleExportTransparency('json')}
+                className="btn-secondary"
+                style={{ padding: '7px 10px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                title="Export Transparency Audit Report (JSON)"
+              >
+                <Download size={12} /> JSON
+              </button>
+            </>
           )}
           <button
             type="button"
