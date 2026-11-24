@@ -23,6 +23,7 @@ import {
   PanelLeft,
   PanelLeftClose,
   Trophy,
+  Medal,
 } from 'lucide-react';
 import { getNetworkLabel } from '../lib/classifyHostname';
 
@@ -103,6 +104,7 @@ export default function HeaderNav() {
     { href: '/agent', label: t('nav.agent'), icon: BrainCircuit },
     { href: '/kol', label: t('nav.kol'), icon: Award },
     { href: '/prop', label: t('nav.prop'), icon: Trophy },
+    { href: '/leaderboard', label: t('nav.leaderboard'), icon: Medal },
     { href: '/transparency', label: t('nav.transparency'), icon: BarChart3 },
     { href: '/billing', label: t('nav.account'), icon: CreditCard },
   ];
