@@ -73,6 +73,9 @@ export default function LaunchpadPage() {
   const [activeTokens, setActiveTokens] = useState<any[]>([]);
   const [isLoadingTokens, setIsLoadingTokens] = useState(false);
 
+  // CEX Launchpad Tab Navigation State (Phase CJ)
+  const [launchpadTab, setLaunchpadTab] = useState<'POOLS' | 'CREATE' | 'STUDIO' | 'ADMIN'>('POOLS');
+
   // Discovery Filter & Sort State (Live Token Fleet)
   const [tokenSearch, setTokenSearch] = useState('');
   const [chainFilter, setChainFilter] = useState<string>('all');
@@ -417,51 +420,95 @@ export default function LaunchpadPage() {
     }
   };
 
+  const isLaunchpadAdmin =
+    userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN' || userRole === 'LAUNCH_ADMIN';
+
   return (
     <div className="flex-col gap-lg">
-      {/* Top Banner */}
-      <div className="bg-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderRadius: '8px' }}>
+      {/* CEX Launchpad Hero Spotlight Banner */}
+      <div
+        className="card"
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '16px',
+          background: 'linear-gradient(135deg, rgba(19, 24, 34, 0.98) 0%, rgba(26, 33, 48, 0.92) 65%, rgba(240, 185, 11, 0.08) 100%)',
+          border: '1px solid rgba(240, 185, 11, 0.25)',
+        }}
+      >
         <div>
-          <h1 style={{ fontSize: '20px', fontWeight: 900, margin: '0 0 4px 0', color: '#00E5FF', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Rocket size={20} /> Degen Token Launchpad & Wizard
+          <div style={{ fontSize: '11px', fontWeight: 800, color: '#F0B90B', letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: '4px' }}>
+            POOLNET CEX-Grade Token Launchpad · 0% Tax · Gas-Sponsored Base L2
+          </div>
+          <h1 style={{ fontSize: '22px', fontWeight: 900, margin: '0 0 4px 0', color: 'var(--color-foreground)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Rocket size={20} style={{ color: '#F0B90B' }} /> Token Launchpad &amp; Live Bonding Pools
           </h1>
           <p className="text-muted" style={{ margin: 0, fontSize: '12px' }}>
-            Create pump.fun style fair launches and bonding curve tokens backed by Arkham creator risk passports.
+            Jelajahi pool token aktif, luncurkan token baru dengan Bankr Fleet, atau bangun aset brand via AI Studio — semua terverifikasi GoPlus Anti-Insider ($0).
           </p>
         </div>
-        <div className="flex-row gap-sm items-center">
+        <div className="flex-row gap-sm items-center" style={{ flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => setLaunchpadTab('CREATE')}
+            className="cex-btn-gold"
+          >
+            <Rocket size={15} /> Launch Token Baru
+          </button>
           <button
             type="button"
             onClick={() => setIsAngelModalOpen(true)}
-            className="badge badge-admin"
-            style={{ cursor: 'pointer', border: '1px solid #D500F9', color: '#E040FB', backgroundColor: '#1A0826', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+            className="btn-secondary"
+            style={{ cursor: 'pointer', border: '1px solid rgba(168, 85, 247, 0.45)', color: '#D8B4FE', padding: '9px 13px', fontSize: '12px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '6px' }}
           >
-            <Users size={14} /> 👑 ANGEL DEAL ROOM
+            <Users size={14} /> Angel Deal Room
           </button>
-          {(userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN') && (
-            <span className="badge badge-admin">
-              👑 LAUNCHPAD CONTROLLER ACTIVE
-            </span>
-          )}
-          <span className="badge badge-trader" style={{ border: '1px solid #00E5FF', color: '#00E5FF', backgroundColor: '#071A2E' }}>
-            5 MODES ACTIVE
-          </span>
         </div>
       </div>
 
-      {/* Workflow & Plan Entitlement Guide */}
-      <PageWorkflowBanner
-        title="Alur Peluncuran Token"
-        isUnlocked={Boolean(entitlements.createLaunch)}
-        requiredPlanLabel="CREATOR / AGENT"
-        creditSummary="Studio: -1 cr · Draft: Gratis · Deploy: -50 cr"
-        steps={[
-          { step: '1', label: 'AI Creator Studio', cost: '-1 cr' },
-          { step: '2', label: 'Buat Draft & Risk Passport', cost: 'Gratis' },
-          { step: '3', label: 'Bankr Deploy / On-Chain Contract', cost: '-50 cr / Gas' },
-          { step: '4', label: 'Token Portal & KOL Bounty', cost: 'Live' },
-        ]}
-      />
+      {/* CEX Launchpad Category Tab Bar */}
+      <div className="cex-tab-bar" role="tablist" aria-label="Kategori Launchpad">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={launchpadTab === 'POOLS'}
+          onClick={() => setLaunchpadTab('POOLS')}
+          className={`cex-tab-btn ${launchpadTab === 'POOLS' ? 'active' : ''}`}
+        >
+          🔥 Live Pools <span className="cex-tab-count">{activeTokens.length}</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={launchpadTab === 'CREATE'}
+          onClick={() => setLaunchpadTab('CREATE')}
+          className={`cex-tab-btn ${launchpadTab === 'CREATE' ? 'active' : ''}`}
+        >
+          🚀 Launch Token &amp; Bankr Fleet
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={launchpadTab === 'STUDIO'}
+          onClick={() => setLaunchpadTab('STUDIO')}
+          className={`cex-tab-btn ${launchpadTab === 'STUDIO' ? 'active' : ''}`}
+        >
+          🎨 AI Brand Studio
+        </button>
+        {isLaunchpadAdmin && (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={launchpadTab === 'ADMIN'}
+            onClick={() => setLaunchpadTab('ADMIN')}
+            className={`cex-tab-btn ${launchpadTab === 'ADMIN' ? 'active' : ''}`}
+          >
+            🛡️ Admin Governance
+          </button>
+        )}
+      </div>
 
       {/* Angel Deal Room Modal */}
       <AngelDealRoomModal
@@ -470,24 +517,45 @@ export default function LaunchpadPage() {
         connectedWallet={walletAddress}
       />
 
-      {/* Vercel-Native Creator Asset Studio & Growth Launch Pack */}
-      <CreatorStudioPanel
-        tokenName={tokenName}
-        tokenSymbol={tokenSymbol}
-        selectedChain={selectedChain}
-        onApplyIdentity={(name, ticker) => {
-          setTokenName(name);
-          setTokenSymbol(ticker);
-        }}
-        onApplyAssets={({ name, ticker, description, imageUrl }) => {
-          if (name) setTokenName(name);
-          if (ticker) setTokenSymbol(ticker);
-          if (description) setTokenDescription(description);
-          if (imageUrl) setTokenImageUrl(imageUrl);
-        }}
-      />
+      {/* TAB 3: AI Brand Studio */}
+      {launchpadTab === 'STUDIO' && (
+        <div className="flex-col gap-md">
+          <CreatorStudioPanel
+            tokenName={tokenName}
+            tokenSymbol={tokenSymbol}
+            selectedChain={selectedChain}
+            onApplyIdentity={(name, ticker) => {
+              setTokenName(name);
+              setTokenSymbol(ticker);
+              setLaunchpadTab('CREATE');
+            }}
+            onApplyAssets={({ name, ticker, description, imageUrl }) => {
+              if (name) setTokenName(name);
+              if (ticker) setTokenSymbol(ticker);
+              if (description) setTokenDescription(description);
+              if (imageUrl) setTokenImageUrl(imageUrl);
+              setLaunchpadTab('CREATE');
+            }}
+          />
+        </div>
+      )}
 
-      <div className="grid-2">
+      {/* TAB 2: Create Token Wizard + Live Preview + Bankr Fleet */}
+      {launchpadTab === 'CREATE' && (
+        <>
+          <PageWorkflowBanner
+            title="Alur Peluncuran Token"
+            isUnlocked={Boolean(entitlements.createLaunch)}
+            requiredPlanLabel="CREATOR / AGENT"
+            creditSummary="Studio: -1 cr · Draft: Gratis · Deploy: -50 cr"
+            steps={[
+              { step: '1', label: 'AI Creator Studio', cost: '-1 cr' },
+              { step: '2', label: 'Buat Draft & Risk Passport', cost: 'Gratis' },
+              { step: '3', label: 'Bankr Deploy / On-Chain Contract', cost: '-50 cr / Gas' },
+              { step: '4', label: 'Token Portal & KOL Bounty', cost: 'Live' },
+            ]}
+          />
+          <div className="grid-2">
         {/* Left Column: Interactive Token Launch Form */}
         <div className="bg-panel" style={{ borderRadius: '8px', padding: '24px' }}>
           <h2 style={{ color: 'var(--color-foreground)', marginTop: 0, fontSize: '16px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
@@ -1251,8 +1319,11 @@ export default function LaunchpadPage() {
           )}
         </div>
       </div>
+        </>
+      )}
 
-      {/* Live Deployed Tokens & Active Bonding Curves */}
+      {/* TAB 1 (Default): Live Deployed Tokens & Active Bonding Curves */}
+      {launchpadTab === 'POOLS' && (
       <div className="bg-panel" style={{ borderRadius: '14px', padding: '24px', border: '1px solid var(--color-border)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
           <h2 style={{ color: 'var(--color-foreground)', margin: 0, fontSize: '16px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1672,9 +1743,10 @@ export default function LaunchpadPage() {
           </div>
         )}
       </div>
+      )}
 
-      {/* Admin Launchpad Governance Console (SYSTEM_ADMIN Exclusive) */}
-      {(userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN') && (
+      {/* TAB 4 (Admin Only): Launchpad Governance & Merkle Snapshot Console */}
+      {launchpadTab === 'ADMIN' && (userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN') && (
         <div className="bg-panel" style={{ border: '1px solid #FF9100', borderRadius: '8px', padding: '24px' }}>
           <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#FFD600', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <ShieldAlert size={18} /> System Admin: Launchpad Bonding Curve & Liquidity Governance
@@ -1693,14 +1765,14 @@ export default function LaunchpadPage() {
             <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '16px', borderRadius: '6px' }}>
               <div style={{ color: 'var(--color-destructive)', fontWeight: 800, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}><AlertTriangle size={14} /> Emergency Blacklist</div>
               <div style={{ fontSize: '18px', fontWeight: 900, color: 'var(--color-accent)', margin: '8px 0', fontFamily: 'var(--font-mono)' }}>0 Blacklisted Contracts</div>
-              <div className="text-muted" style={{ fontSize: '11px' }}>Arkham OFAC Scanned Hourly</div>
+              <div className="text-muted" style={{ fontSize: '11px' }}>GoPlus &amp; On-Chain OFAC Guard Active</div>
             </div>
           </div>
         </div>
       )}
 
       {/* Admin Bounty Merkle Snapshot Console (RBAC: MANAGE_SNAPSHOTS — SUPER_ADMIN / LAUNCH_ADMIN) */}
-      {(userRole === 'SUPER_ADMIN' || userRole === 'LAUNCH_ADMIN') && (
+      {launchpadTab === 'ADMIN' && (userRole === 'SUPER_ADMIN' || userRole === 'LAUNCH_ADMIN') && (
         <AdminMerkleSnapshotPanel
           activeTokens={activeTokens}
           walletAddress={walletAddress}

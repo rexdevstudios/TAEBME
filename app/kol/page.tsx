@@ -485,53 +485,85 @@ export default function KolHubPage() {
 
   return (
     <div className="container" style={{ paddingBottom: '60px' }}>
-      {/* Hero Header */}
-      <div className="bg-panel" style={{ padding: '24px', borderRadius: '12px' }}>
+      {/* CEX Earn & KOL Hub Hero Banner */}
+      <div
+        className="card"
+        style={{
+          padding: '20px 22px',
+          background: 'linear-gradient(135deg, rgba(19, 24, 34, 0.98) 0%, rgba(26, 33, 48, 0.92) 65%, rgba(168, 85, 247, 0.1) 100%)',
+          border: '1px solid rgba(168, 85, 247, 0.25)',
+          marginBottom: '14px',
+        }}
+      >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-              <span className="badge" style={{ backgroundColor: 'rgba(34, 197, 94, 0.1)', color: '#86EFAC', border: '1px solid rgba(34, 197, 94, 0.25)', fontSize: '11px', padding: '2px 8px' }}>
-                SocialFi Bounty Portal
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
+              <span className="badge" style={{ backgroundColor: 'rgba(16, 185, 129, 0.14)', color: '#34D399', border: '1px solid rgba(16, 185, 129, 0.3)', fontSize: '11px', padding: '2px 8px' }}>
+                Earn &amp; SocialFi Bounty Portal
               </span>
               <span className="badge" style={{ backgroundColor: 'var(--color-badge-neutral-bg)', border: '1px solid var(--color-badge-neutral-border)', color: 'var(--color-badge-neutral-text)', fontSize: '11px', padding: '2px 8px' }}>
-                On-Chain Wallet Guard (GoPlus + RPC) &amp; Merkle Verified
+                GoPlus On-Chain Guard &amp; Merkle Verified
               </span>
             </div>
-            <h1 style={{ fontSize: '24px', fontWeight: 800, margin: 0, letterSpacing: '-0.3px' }}>
-              KOL Hub & Marketing Bounties
+            <h1 style={{ fontSize: '22px', fontWeight: 900, margin: 0, letterSpacing: '-0.3px' }}>
+              Earn, KOL Hub &amp; Marketing Bounties
             </h1>
-            <p className="text-muted" style={{ margin: '6px 0 0 0', fontSize: '14px' }}>
-              Bekerja sama dengan pembuat token, selesaikan misi kampanye sosial, dan klaim alokasi token secara instan & on-chain.
+            <p className="text-muted" style={{ margin: '4px 0 0 0', fontSize: '13px' }}>
+              Verifikasi Passport sosial Anda, selesaikan misi kampanye token, dan klaim alokasi reward secara instan &amp; on-chain.
             </p>
           </div>
-
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button
-              onClick={() => setActiveTab('PASSPORT')}
-              className={activeTab === 'PASSPORT' ? 'btn-primary' : 'btn-secondary'}
-            >
-              <Award size={16} /> KOL Passport
-            </button>
-            <button
-              onClick={() => setActiveTab('MARKET')}
-              className={activeTab === 'MARKET' ? 'btn-primary' : 'btn-secondary'}
-            >
-              <Coins size={16} /> Bounties
-            </button>
-            <button
-              onClick={() => { setActiveTab('CLAIM'); checkMerkleProof(); }}
-              className={activeTab === 'CLAIM' ? 'btn-primary' : 'btn-secondary'}
-            >
-              <Share2 size={16} /> Submit & Claim
-            </button>
-            <button
-              onClick={() => setActiveTab('CREATOR')}
-              className={activeTab === 'CREATOR' ? 'btn-primary' : 'btn-secondary'}
-            >
-              <Flame size={16} /> Creator Escrow
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setActiveTab('MARKET')}
+            className="cex-btn-gold"
+          >
+            <Coins size={15} /> Jelajahi Bounties
+          </button>
         </div>
+      </div>
+
+      {/* CEX Category Tab Bar for /kol */}
+      <div role="tablist" aria-label="Kategori KOL Hub" className="cex-tab-bar" style={{ marginBottom: '16px' }}>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'PASSPORT'}
+          onClick={() => setActiveTab('PASSPORT')}
+          className={`cex-tab-btn ${activeTab === 'PASSPORT' ? 'active' : ''}`}
+          style={{ flex: '1 1 150px' }}
+        >
+          <Award size={15} /> 🪪 KOL Passport
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'MARKET'}
+          onClick={() => setActiveTab('MARKET')}
+          className={`cex-tab-btn ${activeTab === 'MARKET' ? 'active' : ''}`}
+          style={{ flex: '1 1 150px' }}
+        >
+          <Coins size={15} /> 🏆 Active Bounties
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'CLAIM'}
+          onClick={() => { setActiveTab('CLAIM'); checkMerkleProof(); }}
+          className={`cex-tab-btn ${activeTab === 'CLAIM' ? 'active' : ''}`}
+          style={{ flex: '1 1 150px' }}
+        >
+          <Share2 size={15} /> ✅ Submit &amp; Claim
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'CREATOR'}
+          onClick={() => setActiveTab('CREATOR')}
+          className={`cex-tab-btn ${activeTab === 'CREATOR' ? 'active' : ''}`}
+          style={{ flex: '1 1 150px' }}
+        >
+          <Flame size={15} /> 🔥 Creator Escrow
+        </button>
       </div>
 
       {/* Workflow & Plan Entitlement Guide */}

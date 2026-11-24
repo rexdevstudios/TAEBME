@@ -134,14 +134,29 @@ export default function AgentPage() {
 
   return (
     <div className="flex-col gap-lg">
-      {/* Top Banner */}
-      <div className="bg-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderRadius: '8px' }}>
+      {/* CEX AI Auto-Pilot & 5-Agent Desk Hero Banner */}
+      <div
+        className="card"
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '14px',
+          padding: '18px 20px',
+          background: 'linear-gradient(135deg, rgba(19, 24, 34, 0.98) 0%, rgba(26, 33, 48, 0.92) 65%, rgba(56, 189, 248, 0.1) 100%)',
+          border: '1px solid rgba(56, 189, 248, 0.25)',
+        }}
+      >
         <div>
-          <h1 style={{ fontSize: '20px', fontWeight: 800, margin: '0 0 4px 0', color: 'var(--color-foreground)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Bot size={20} color="#8AB4F8" /> Asisten AI &amp; Strategi Trading
+          <div style={{ fontSize: '11px', fontWeight: 800, color: '#38BDF8', letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: '4px' }}>
+            24/7 Autonomous AI Trading · Trailing Stop-Loss · GoPlus Anti-Insider
+          </div>
+          <h1 style={{ fontSize: '20px', fontWeight: 900, margin: '0 0 4px 0', color: 'var(--color-foreground)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Bot size={20} style={{ color: '#38BDF8' }} /> AI Auto-Pilot &amp; 5-Agent Desk
           </h1>
-          <p className="text-muted" style={{ margin: 0, fontSize: '13px' }}>
-            Analisis peluang beli/jual berbasis data pasar live, likuiditas DEX, dan sentimen — seluruh eksekusi tetap memerlukan persetujuan Anda.
+          <p className="text-muted" style={{ margin: 0, fontSize: '12px' }}>
+            Analisis peluang beli/jual berbasis data pasar live, likuiditas DEX, dan sentimen — 100% Non-Custodial dengan Risk Gate deterministik.
           </p>
         </div>
         <div className="flex-row gap-sm items-center">
@@ -150,39 +165,19 @@ export default function AgentPage() {
               👑 Admin Aktif
             </span>
           )}
-          <span className="badge" style={{ backgroundColor: 'rgba(138, 180, 248, 0.12)', color: '#8AB4F8', border: '1px solid rgba(138, 180, 248, 0.3)' }}>
-            Mode Rekomendasi (Aman)
+          <span className="badge" style={{ backgroundColor: 'rgba(16, 185, 129, 0.12)', color: '#34D399', border: '1px solid rgba(16, 185, 129, 0.32)' }}>
+            Non-Custodial Guard
           </span>
         </div>
       </div>
 
-      {/* Persistent Advisory Banner */}
-      <div className="advisory-banner" role="note" aria-label="AI advisory notice">
-        <ShieldAlert size={16} style={{ flexShrink: 0 }} />
-        <span>
-          <strong>100% Non-Custodial Guard.</strong> Mulai mudah dari tab <strong>Auto-Pilot &amp; Sinyal</strong>, atau buka tab <strong>Pro Settings</strong> untuk BYOK LLM, Risk Cap, dan ERC-7715 Session Allowance.
-        </span>
-      </div>
-
-      {/* Accessible Tabbed Workspace Navigation (Progressive Disclosure — Beginner vs Pro) */}
-      <div
-        role="tablist"
-        aria-label="Navigasi Ruang Kerja AI Agent"
-        className="bg-panel"
-        style={{
-          display: 'flex',
-          gap: '8px',
-          flexWrap: 'wrap',
-          padding: '8px',
-          borderRadius: '10px',
-          border: '1px solid var(--color-border)',
-        }}
-      >
+      {/* CEX Category Tab Bar for /agent */}
+      <div role="tablist" aria-label="Navigasi Ruang Kerja AI Agent" className="cex-tab-bar">
         {(
           [
-            { id: 'autopilot', label: '1. Auto-Pilot & Sinyal', hint: 'Mudah · Pemula' },
-            { id: 'analyst', label: '2. AI Analyst Desk', hint: '5-Agent & Proposal' },
-            { id: 'pro', label: '3. Pro Vault & Risk', hint: 'BYOK LLM · Session · Admin' },
+            { id: 'autopilot', label: '🤖 Auto-Pilot 24/7 & Sinyal', hint: 'Mudah · Pemula' },
+            { id: 'analyst', label: '🧠 5-Agent Analyst Desk', hint: 'Scanner · Analyst · Risk' },
+            { id: 'pro', label: '⚙️ Pro Vault & Session', hint: 'BYOK LLM · ERC-7715' },
           ] as const
         ).map((tab) => {
           const active = activeAgentTab === tab.id;
@@ -193,27 +188,11 @@ export default function AgentPage() {
               role="tab"
               aria-selected={active}
               onClick={() => setActiveAgentTab(tab.id)}
-              style={{
-                flex: '1 1 180px',
-                minHeight: '44px',
-                padding: '8px 14px',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'flex-start',
-                justifyContent: 'center',
-                gap: '2px',
-                border: active ? '1px solid #38BDF8' : '1px solid transparent',
-                background: active ? 'rgba(56, 189, 248, 0.14)' : 'transparent',
-                color: active ? '#F8FAFC' : 'var(--color-muted)',
-                transition: 'background 150ms ease, border-color 150ms ease',
-              }}
+              className={`cex-tab-btn ${active ? 'active' : ''}`}
+              style={{ flex: '1 1 180px', justifyContent: 'space-between' }}
             >
-              <span style={{ fontSize: '13px', fontWeight: 800, color: active ? '#38BDF8' : 'var(--color-foreground)' }}>
-                {tab.label}
-              </span>
-              <span style={{ fontSize: '11px', color: 'var(--color-muted)' }}>{tab.hint}</span>
+              <span>{tab.label}</span>
+              <span style={{ fontSize: '10px', opacity: 0.72, fontWeight: 600 }}>{tab.hint}</span>
             </button>
           );
         })}

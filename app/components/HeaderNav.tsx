@@ -76,12 +76,12 @@ export default function HeaderNav() {
     : null;
 
   const navItems = [
-    { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/', label: 'Overview', icon: LayoutDashboard },
     { href: '/launchpad', label: 'Launchpad', icon: Rocket },
-    { href: '/kol', label: 'KOL Hub', icon: Award },
-    { href: '/trading', label: 'Trading', icon: Network },
-    { href: '/agent', label: 'AI Desk', icon: BrainCircuit },
-    { href: '/billing', label: 'Billing', icon: CreditCard },
+    { href: '/trading', label: 'Trade', icon: Network },
+    { href: '/agent', label: 'AI Auto-Pilot', icon: BrainCircuit },
+    { href: '/kol', label: 'Earn & KOL', icon: Award },
+    { href: '/billing', label: 'Account', icon: CreditCard },
   ];
 
   const isActive = (href: string) => {
@@ -205,11 +205,15 @@ export default function HeaderNav() {
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '5px',
-                padding: '6px 11px',
-                borderRadius: '9999px',
+                gap: '6px',
+                padding: '7px 12px',
+                borderRadius: '8px',
                 fontSize: '12px',
+                fontWeight: active ? 800 : 600,
                 whiteSpace: 'nowrap',
+                background: active ? 'rgba(240, 185, 11, 0.14)' : 'transparent',
+                color: active ? '#FCD34D' : undefined,
+                border: active ? '1px solid rgba(240, 185, 11, 0.35)' : '1px solid transparent',
                 transition: 'all 150ms ease',
               }}
             >

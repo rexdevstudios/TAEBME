@@ -424,56 +424,59 @@ export default function BillingPage() {
 
   return (
     <div className="flex-col gap-lg">
-      {/* Top Banner */}
-      <div className="bg-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', padding: '18px 20px', borderRadius: '16px' }}>
+      {/* CEX Account & Billing Hero Banner */}
+      <div
+        className="card"
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '14px',
+          padding: '18px 20px',
+          background: 'linear-gradient(135deg, rgba(19, 24, 34, 0.98) 0%, rgba(26, 33, 48, 0.92) 65%, rgba(240, 185, 11, 0.08) 100%)',
+          border: '1px solid rgba(240, 185, 11, 0.24)',
+        }}
+      >
         <div>
-          <h1 style={{ fontSize: '20px', fontWeight: 800, margin: '0 0 4px 0', color: 'var(--color-foreground)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <CreditCard size={20} color="#8AB4F8" /> Paket Layanan &amp; Kredit
+          <div style={{ fontSize: '11px', fontWeight: 800, color: '#F0B90B', letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: '4px' }}>
+            Account · Plans · API Vaults · Telegram Alerts
+          </div>
+          <h1 style={{ fontSize: '20px', fontWeight: 900, margin: '0 0 4px 0', color: 'var(--color-foreground)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <CreditCard size={20} style={{ color: '#F0B90B' }} /> Paket Layanan, Kredit &amp; Pengaturan Akun
           </h1>
-          <p className="text-muted" style={{ margin: 0, fontSize: '13px' }}>
-            Pilih paket sesuai kebutuhan Anda, kelola saldo kredit bulanan, dan pantau seluruh riwayat penggunaan akun.
+          <p className="text-muted" style={{ margin: 0, fontSize: '12px' }}>
+            Kelola paket langganan, Add-On kuota, Webhook Telegram/Discord, dan audit mutasi kredit dalam satu tempat yang rapi.
           </p>
         </div>
-        <div className="flex-row gap-sm items-center">
+        <div className="flex-row gap-sm items-center tabular-nums">
           {isConnected && (
             <>
-              <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '6px 12px', borderRadius: '999px', fontSize: '12px' }}>
+              <div className="bg-panel" style={{ border: '1px solid rgba(240, 185, 11, 0.3)', padding: '6px 12px', borderRadius: '8px', fontSize: '12px' }}>
                 <span className="text-muted">Paket: </span>
-                <span style={{ color: '#FFC400', fontWeight: 800 }}>{activePlanId}</span>
+                <span style={{ color: '#F0B90B', fontWeight: 800 }}>{activePlanId}</span>
               </div>
-              <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '6px 12px', borderRadius: '999px', fontSize: '12px' }}>
+              <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '6px 12px', borderRadius: '8px', fontSize: '12px' }}>
                 <span className="text-muted">Saldo: </span>
-                <span style={{ color: '#8AB4F8', fontWeight: 800 }}>{credits.toLocaleString()} Kredit</span>
+                <span style={{ color: '#38BDF8', fontWeight: 800 }}>{credits.toLocaleString()} Kredit</span>
               </div>
             </>
           )}
-          <span className="badge badge-trader" style={{ border: '1px solid rgba(52, 211, 153, 0.35)', color: '#6EE7B7', backgroundColor: 'rgba(52, 211, 153, 0.1)' }}>
-            {loading ? 'Memuat...' : 'Paket Aktif'}
+          <span className="badge badge-trader" style={{ border: '1px solid rgba(16, 185, 129, 0.35)', color: '#34D399', backgroundColor: 'rgba(16, 185, 129, 0.12)' }}>
+            {loading ? 'Memuat...' : 'Aktif'}
           </span>
         </div>
       </div>
 
-      {/* Accessible Tabbed Navigation for /billing (Beginner-Friendly Progressive Disclosure) */}
-      <div
-        role="tablist"
-        aria-label="Navigasi Halaman Billing dan Vault"
-        className="bg-panel"
-        style={{
-          display: 'flex',
-          gap: '8px',
-          flexWrap: 'wrap',
-          padding: '8px',
-          borderRadius: '10px',
-          border: '1px solid var(--color-border)',
-        }}
-      >
+      {/* CEX Category Tab Bar for /billing */}
+      <div role="tablist" aria-label="Navigasi Halaman Billing dan Vault" className="cex-tab-bar">
         {(
           [
-            { id: 'plans', label: '1. Paket & Harga', hint: 'Bandingkan FREE · CREATOR · TRADER · AGENT' },
-            { id: 'vaults', label: '2. Akun API, Bankr & Webhook', hint: 'Binance · Bybit · Bankr · BYOK LLM' },
-            { id: 'history', label: '3. Mutasi Kredit & Keamanan', hint: 'Ledger & Explorer Log' },
+            { id: 'plans', label: '💳 Paket & Harga', hint: 'FREE · CREATOR · TRADER · AGENT' },
+            { id: 'vaults', label: '🔔 Add-On, API & Telegram Alert', hint: 'Vault · Webhook · Provider' },
+            { id: 'history', label: '📜 Mutasi Kredit & Keamanan', hint: 'Ledger & Explorer Log' },
             ...((hasCapability('MANAGE_BILLING_PLANS') || userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN' || userRole === 'BILLING_ADMIN')
-              ? [{ id: 'admin' as const, label: '4. Admin Ops Console', hint: 'Promo · Risk · Kill-Switch' }]
+              ? [{ id: 'admin' as const, label: '⚙️ Admin Ops Console', hint: 'Promo · Risk · Kill-Switch' }]
               : []),
           ] as const
         ).map((tab) => {
@@ -485,26 +488,11 @@ export default function BillingPage() {
               role="tab"
               aria-selected={active}
               onClick={() => setActiveBillingTab(tab.id)}
-              style={{
-                flex: '1 1 170px',
-                minHeight: '44px',
-                padding: '8px 14px',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'flex-start',
-                justifyContent: 'center',
-                gap: '2px',
-                border: active ? '1px solid #38BDF8' : '1px solid transparent',
-                background: active ? 'rgba(56, 189, 248, 0.14)' : 'transparent',
-                color: active ? '#F8FAFC' : 'var(--color-muted)',
-              }}
+              className={`cex-tab-btn ${active ? 'active' : ''}`}
+              style={{ flex: '1 1 170px', justifyContent: 'space-between' }}
             >
-              <span style={{ fontSize: '13px', fontWeight: 800, color: active ? '#38BDF8' : 'var(--color-foreground)' }}>
-                {tab.label}
-              </span>
-              <span style={{ fontSize: '11px', color: 'var(--color-muted)' }}>{tab.hint}</span>
+              <span>{tab.label}</span>
+              <span style={{ fontSize: '10px', opacity: 0.72, fontWeight: 600 }}>{tab.hint}</span>
             </button>
           );
         })}
@@ -683,7 +671,7 @@ export default function BillingPage() {
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <CheckCircle2 size={14} style={{ color: hasPriority ? 'var(--color-accent)' : 'var(--color-muted)', opacity: hasPriority ? 1 : 0.3 }} />
-                    <span style={{ color: hasPriority ? 'var(--color-foreground)' : 'var(--color-muted)' }}>Arkham &amp; Firecrawl Scrape Priority</span>
+                    <span style={{ color: hasPriority ? 'var(--color-foreground)' : 'var(--color-muted)' }}>GoPlus On-Chain Intel ($0) &amp; Scrape Priority</span>
                   </div>
                 </div>
               </div>

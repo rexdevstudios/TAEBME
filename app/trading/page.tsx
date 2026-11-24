@@ -572,14 +572,26 @@ export default function TradingPage() {
 
   return (
     <div className="flex-col gap-lg">
-      {/* Top Banner Control Bar */}
-      <div className="bg-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderRadius: '8px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <h1 style={{ fontSize: '20px', fontWeight: 900, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <ActivitySquare className="text-accent" /> Trading Terminal & Orderbook Depth
+      {/* CEX Pro Trading Terminal Top Ticker Bar */}
+      <div
+        className="card"
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '12px',
+          padding: '14px 18px',
+          background: 'linear-gradient(135deg, rgba(19, 24, 34, 0.98) 0%, rgba(26, 33, 48, 0.92) 70%, rgba(16, 185, 129, 0.08) 100%)',
+          border: '1px solid rgba(16, 185, 129, 0.25)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <h1 style={{ fontSize: '19px', fontWeight: 900, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <ActivitySquare size={19} style={{ color: '#10B981' }} /> Spot &amp; DEX Trading Terminal
           </h1>
           <span className="text-muted" style={{ fontSize: '12px' }}>
-            Binance Orderbook Sync • Multi-Factor Trading Signal Engine Active
+            6-Chain 0x v2 DEX · Binance/Bybit Spot · GoPlus Anti-Honeypot Guard
           </span>
         </div>
         <div className="flex-row gap-sm items-center">
@@ -587,7 +599,7 @@ export default function TradingPage() {
             value={symbol}
             onChange={(e) => setSymbol(e.target.value)}
             className="input"
-            style={{ padding: '6px 12px', fontSize: '12px', width: 'auto', display: 'inline-block' }}
+            style={{ padding: '7px 12px', fontSize: '12px', fontWeight: 700, width: 'auto', display: 'inline-block' }}
           >
             <option value="BTCUSDT">BTC / USDT (Binance Live)</option>
             <option value="ETHUSDT">ETH / USDT (Binance Live)</option>
@@ -608,25 +620,13 @@ export default function TradingPage() {
         </div>
       </div>
 
-      {/* Accessible Tabbed Navigation for /trading (Consistent with /agent & /billing) */}
-      <div
-        role="tablist"
-        aria-label="Navigasi Halaman Trading"
-        className="bg-panel"
-        style={{
-          display: 'flex',
-          gap: '8px',
-          flexWrap: 'wrap',
-          padding: '8px',
-          borderRadius: '10px',
-          border: '1px solid var(--color-border)',
-        }}
-      >
+      {/* CEX Category Tab Bar for /trading */}
+      <div role="tablist" aria-label="Navigasi Halaman Trading" className="cex-tab-bar">
         {(
           [
-            { id: 'trade', label: '1. Quick Swap & Order', hint: 'Chart · DEX 0x v2 · CEX Single-Shot' },
-            { id: 'history', label: '2. Riwayat Order & CSV Audit', hint: 'Filter Chain · Explorer · Re-Trade' },
-            { id: 'vault', label: '3. Pro CEX Vault & Risk Guard', hint: 'Binance · Bybit · Personal Risk Cap' },
+            { id: 'trade', label: '📈 Trade Terminal', hint: 'Chart · DEX 0x v2 · CEX Order' },
+            { id: 'history', label: '📊 Riwayat & Portfolio Recap', hint: 'KPI · Explorer · CSV' },
+            { id: 'vault', label: '⚙️ API Vault & Risk Guard', hint: 'Binance · Bybit · Risk Cap' },
           ] as const
         ).map((tab) => {
           const active = activeTradingTab === tab.id;
@@ -637,26 +637,11 @@ export default function TradingPage() {
               role="tab"
               aria-selected={active}
               onClick={() => setActiveTradingTab(tab.id)}
-              style={{
-                flex: '1 1 180px',
-                minHeight: '44px',
-                padding: '8px 14px',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'flex-start',
-                justifyContent: 'center',
-                gap: '2px',
-                border: active ? '1px solid #38BDF8' : '1px solid transparent',
-                background: active ? 'rgba(56, 189, 248, 0.14)' : 'transparent',
-                color: active ? '#F8FAFC' : 'var(--color-muted)',
-              }}
+              className={`cex-tab-btn ${active ? 'active' : ''}`}
+              style={{ flex: '1 1 180px', justifyContent: 'space-between' }}
             >
-              <span style={{ fontSize: '13px', fontWeight: 800, color: active ? '#38BDF8' : 'var(--color-foreground)' }}>
-                {tab.label}
-              </span>
-              <span style={{ fontSize: '11px', color: 'var(--color-muted)' }}>{tab.hint}</span>
+              <span>{tab.label}</span>
+              <span style={{ fontSize: '10px', opacity: 0.72, fontWeight: 600 }}>{tab.hint}</span>
             </button>
           );
         })}
@@ -975,7 +960,16 @@ export default function TradingPage() {
               </select>
             </div>
 
-            <UserRiskPolicyPanel isConnected={isConnected} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', borderRadius: '6px', background: 'rgba(148, 163, 184, 0.06)', border: '1px solid var(--color-border)', marginBottom: '8px', fontSize: '11px' }}>
+              <span className="text-muted">🛡️ Personal Risk Guard Aktif</span>
+              <button
+                type="button"
+                onClick={() => setActiveTradingTab('vault')}
+                style={{ background: 'none', border: 'none', color: '#F0B90B', fontWeight: 700, cursor: 'pointer', fontSize: '11px', padding: 0 }}
+              >
+                Atur Risk &amp; API Key →
+              </button>
+            </div>
 
             {executionMode === 'DEX_NON_CUSTODIAL' && (
               <div style={{ marginTop: '8px', marginBottom: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>

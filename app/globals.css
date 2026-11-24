@@ -1,39 +1,41 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
-  /* Gemini Web Dark Mode Design System Colors */
-  --color-primary: #1E1F20;
-  --color-on-primary: #E3E3E3;
-  --color-secondary: #282A2C;
-  --color-accent: #8AB4F8; /* Gemini Soft Blue */
-  --color-accent-emerald: #34D399;
-  --color-background: #131314; /* Gemini Dark Canvas */
-  --color-foreground: #E3E3E3;
-  --color-muted: #9AA0A6; /* Soft high-contrast muted text */
-  --color-muted-bg: #282A2C;
-  --color-border: rgba(255, 255, 255, 0.09);
-  --color-destructive: #F28B82;
-  --color-ring: #8AB4F8;
+  /* POOLNET CEX Pro Launchpad — Deep Obsidian & Gold-Amber Design System */
+  --color-primary: #131822;
+  --color-on-primary: #F8FAFC;
+  --color-secondary: #1A2130;
+  --color-accent: #38BDF8; /* Electric Cyan */
+  --color-cex-gold: #F0B90B; /* Signature CEX Launchpad Gold */
+  --color-cex-gold-hover: #FACC15;
+  --color-accent-emerald: #10B981;
+  --color-background: #0B0E14; /* Deep OLED Obsidian */
+  --color-foreground: #F1F5F9;
+  --color-muted: #94A3B8;
+  --color-muted-bg: #18202F;
+  --color-border: rgba(148, 163, 184, 0.14);
+  --color-destructive: #EF4444;
+  --color-ring: #F0B90B;
 
-  /* Semantic Surface & Pill Tokens (Dark Default) */
-  --color-surface-elevated: #17191E;
-  --color-surface-subtle: #14171F;
-  --color-surface-inset: #1E2430;
-  --color-badge-info-bg: rgba(138, 180, 248, 0.14);
-  --color-badge-info-text: #8AB4F8;
-  --color-badge-info-border: rgba(138, 180, 248, 0.34);
-  --color-badge-success-bg: rgba(52, 211, 153, 0.14);
-  --color-badge-success-text: #6EE7B7;
-  --color-badge-success-border: rgba(52, 211, 153, 0.36);
-  --color-badge-warning-bg: rgba(250, 204, 21, 0.14);
-  --color-badge-warning-text: #FDE047;
-  --color-badge-warning-border: rgba(250, 204, 21, 0.38);
-  --color-badge-purple-bg: rgba(168, 85, 247, 0.16);
+  /* Semantic Surface & Pill Tokens (CEX Obsidian Dark Default) */
+  --color-surface-elevated: #131822;
+  --color-surface-subtle: #0F141D;
+  --color-surface-inset: #1A2232;
+  --color-badge-info-bg: rgba(56, 189, 248, 0.13);
+  --color-badge-info-text: #38BDF8;
+  --color-badge-info-border: rgba(56, 189, 248, 0.34);
+  --color-badge-success-bg: rgba(16, 185, 129, 0.14);
+  --color-badge-success-text: #34D399;
+  --color-badge-success-border: rgba(16, 185, 129, 0.36);
+  --color-badge-warning-bg: rgba(240, 185, 11, 0.14);
+  --color-badge-warning-text: #FCD34D;
+  --color-badge-warning-border: rgba(240, 185, 11, 0.38);
+  --color-badge-purple-bg: rgba(168, 85, 247, 0.15);
   --color-badge-purple-text: #D8B4FE;
   --color-badge-purple-border: rgba(168, 85, 247, 0.38);
-  --color-badge-neutral-bg: #222630;
+  --color-badge-neutral-bg: #1A2232;
   --color-badge-neutral-text: #CBD5E1;
-  --color-badge-neutral-border: #334155;
+  --color-badge-neutral-border: rgba(148, 163, 184, 0.22);
 
   /* Spacing Variables */
   --space-xs: 4px;
@@ -44,12 +46,12 @@
   --space-2xl: 48px;
   --space-3xl: 64px;
 
-  /* Soft Material-You Elevations */
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.25);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.35);
-  --shadow-lg: 0 10px 28px rgba(0, 0, 0, 0.45);
-  --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.55);
-  --shadow-neon: 0 4px 18px rgba(138, 180, 248, 0.22);
+  /* Layered CEX Elevations */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.55);
+  --shadow-xl: 0 20px 44px rgba(0, 0, 0, 0.65);
+  --shadow-neon: 0 4px 20px rgba(240, 185, 11, 0.18);
 }
 
 /* Gemini Web Light Mode Theme */
@@ -906,5 +908,189 @@ a {
   }
   .grid-4 {
     grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* ============================================================================
+   PHASE CJ: CEX PRO LAUNCHPAD UI/UX COMPONENT SYSTEM
+   ============================================================================ */
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+.cex-ticker-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, rgba(19, 24, 34, 0.96), rgba(26, 33, 48, 0.92));
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+}
+
+[data-theme="light"] .cex-ticker-strip {
+  background: #FFFFFF;
+}
+
+.cex-tab-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px;
+  border-radius: 12px;
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.cex-tab-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.cex-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 15px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-muted);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease, transform 150ms ease;
+}
+
+.cex-tab-btn:hover {
+  color: var(--color-foreground);
+  background: rgba(148, 163, 184, 0.08);
+}
+
+.cex-tab-btn.active {
+  background: linear-gradient(135deg, rgba(240, 185, 11, 0.18), rgba(245, 158, 11, 0.09));
+  border-color: rgba(240, 185, 11, 0.45);
+  color: #FCD34D;
+  box-shadow: 0 2px 10px rgba(240, 185, 11, 0.12);
+}
+
+[data-theme="light"] .cex-tab-btn.active {
+  background: #FEF7E0;
+  border-color: #F5C242;
+  color: #9A5B00;
+}
+
+.cex-tab-count {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.16);
+  color: var(--color-foreground);
+}
+
+.cex-tab-btn.active .cex-tab-count {
+  background: rgba(240, 185, 11, 0.28);
+  color: #FEF08A;
+}
+
+[data-theme="light"] .cex-tab-btn.active .cex-tab-count {
+  background: #F5C242;
+  color: #1F1F1F;
+}
+
+.cex-btn-gold {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 9px;
+  border: none;
+  background: linear-gradient(135deg, #F0B90B 0%, #F59E0B 100%);
+  color: #0B0E14;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.1px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: transform 160ms ease, box-shadow 180ms ease, filter 160ms ease;
+  box-shadow: 0 4px 16px rgba(240, 185, 11, 0.24);
+}
+
+.cex-btn-gold:hover {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 22px rgba(240, 185, 11, 0.34);
+}
+
+.cex-btn-gold:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.cex-role-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px;
+  border-radius: 12px;
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  text-decoration: none;
+  color: var(--color-foreground);
+  cursor: pointer;
+  transition: border-color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
+}
+
+.cex-role-card:hover {
+  border-color: rgba(240, 185, 11, 0.48);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.cex-progress-track {
+  width: 100%;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.14);
+  overflow: hidden;
+}
+
+.cex-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #F0B90B 0%, #10B981 100%);
+  transition: width 350ms ease;
+}
+
+.cex-exchange-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(320px, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 1024px) {
+  .cex-exchange-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cex-tab-btn,
+  .cex-btn-gold,
+  .cex-role-card,
+  .cex-progress-fill {
+    transition: none;
+    transform: none;
   }
 }

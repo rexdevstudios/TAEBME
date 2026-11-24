@@ -295,56 +295,114 @@ export default function OverviewPage() {
     const activeTier = (planId || 'FREE').toUpperCase();
     return (
       <div className="flex-col gap-lg">
-        {/* Top Welcome & Active Plan Banner */}
-        <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-          <div>
-            <h1 style={{ margin: '0 0 6px 0', fontSize: '22px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              Welcome back, {walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : 'User'}
-            </h1>
-            <p className="text-muted" style={{ margin: 0, fontSize: '13px' }}>
-              Terhubung sebagai <strong className="text-accent">{userRole}</strong> · Paket Aktif:{' '}
-              <strong style={{ color: '#FFC400' }}>{activeTier}</strong> · Saldo:{' '}
-              <strong style={{ color: 'var(--color-accent)' }}>{credits.toLocaleString()} Kredit</strong>
-            </p>
+        {/* CEX Launchpad Market Pulse Ticker Strip */}
+        <div className="cex-ticker-strip tabular-nums">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', fontSize: '12px' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 800, color: '#F0B90B' }}>
+              <Rocket size={14} /> POOLNET LAUNCHPAD
+            </span>
+            <span style={{ color: 'var(--color-muted)' }}>
+              Active Pools: <strong style={{ color: 'var(--color-foreground)' }}>{activeLaunches.length}</strong>
+            </span>
+            <span style={{ color: 'var(--color-muted)' }}>
+              Trading Tax: <strong style={{ color: '#10B981' }}>0% Buy/Sell</strong>
+            </span>
+            <span style={{ color: 'var(--color-muted)' }}>
+              Gas Relayer: <strong style={{ color: '#38BDF8' }}>Base L2 Sponsored</strong>
+            </span>
+            <span style={{ color: 'var(--color-muted)' }}>
+              Anti-Honeypot: <strong style={{ color: '#10B981' }}>GoPlus Live ($0)</strong>
+            </span>
           </div>
-          <a href="/trading" className="btn-primary" style={{ textDecoration: 'none', padding: '8px 14px', fontSize: '13px' }}>
-            <Network size={15} /> Open Trading Terminal →
-          </a>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px', fontFamily: 'var(--font-mono)' }}>
+            <span style={{ color: 'var(--color-muted)' }}>
+              Tier: <strong style={{ color: '#F0B90B' }}>{activeTier}</strong>
+            </span>
+            <span style={{ color: 'var(--color-muted)' }}>
+              Credits: <strong style={{ color: '#38BDF8' }}>{credits.toLocaleString()} cr</strong>
+            </span>
+          </div>
         </div>
 
-        {/* 4 Quick-Launch Command Cards (Single Non-Duplicated Navigation Hub) */}
+        {/* CEX Launchpad Spotlight Banner & Dual Primary CTAs */}
+        <div
+          className="card"
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '16px',
+            background: 'linear-gradient(135deg, rgba(19, 24, 34, 0.98) 0%, rgba(26, 33, 48, 0.92) 60%, rgba(240, 185, 11, 0.08) 100%)',
+            border: '1px solid rgba(240, 185, 11, 0.24)',
+          }}
+        >
+          <div>
+            <div style={{ fontSize: '11px', fontWeight: 800, color: '#F0B90B', letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: '4px' }}>
+              Non-Custodial CEX-Grade Launchpad &amp; AI Trading Hub
+            </div>
+            <h1 style={{ margin: '0 0 6px 0', fontSize: '22px', fontWeight: 900 }}>
+              Selamat datang, {walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : 'Trader'}
+            </h1>
+            <p className="text-muted" style={{ margin: 0, fontSize: '13px' }}>
+              Pilih tujuan Anda di bawah — semua fitur sudah dikelompokkan rapi berdasarkan kategori agar mudah digunakan.
+            </p>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <a href="/launchpad" className="cex-btn-gold">
+              <Rocket size={15} /> Launch / Explore Pools
+            </a>
+            <a href="/trading" className="btn-secondary" style={{ textDecoration: 'none', padding: '10px 16px', fontSize: '13px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <Network size={15} /> Buka Terminal Trade
+            </a>
+          </div>
+        </div>
+
+        {/* 4 Role-Based Quick-Start Action Cards */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
-          <a href="/agent" className="card" style={{ textDecoration: 'none', borderLeft: '3px solid #A855F7' }}>
-            <div style={{ fontWeight: 900, color: '#C084FC', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-              <BrainCircuit size={16} /> 5-Agent Autonomous Desk
+          <a href="/launchpad" className="cex-role-card" style={{ borderTop: '2px solid #F0B90B' }}>
+            <div>
+              <div style={{ fontWeight: 900, color: '#FCD34D', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '6px' }}>
+                <Rocket size={16} /> 1. Launchpad &amp; Pools
+              </div>
+              <div className="text-muted" style={{ fontSize: '12px', lineHeight: 1.5 }}>
+                Jelajahi token live, buat token baru 0% tax, AI Brand Studio, &amp; Bankr Multi-Account Fleet.
+              </div>
             </div>
-            <div className="text-muted" style={{ fontSize: '12px' }}>
-              Scanner → Analyst → Brain (BytePlus/Gemini) → Risk → Executor dengan 0 kolisi.
-            </div>
+            <span style={{ fontSize: '11px', fontWeight: 800, color: '#F0B90B' }}>Buka Launchpad →</span>
           </a>
-          <a href="/launchpad" className="card" style={{ textDecoration: 'none', borderLeft: '3px solid #38BDF8' }}>
-            <div style={{ fontWeight: 900, color: '#38BDF8', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-              <Rocket size={16} /> Launchpad &amp; AI Studio
+          <a href="/trading" className="cex-role-card" style={{ borderTop: '2px solid #10B981' }}>
+            <div>
+              <div style={{ fontWeight: 900, color: '#34D399', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '6px' }}>
+                <Network size={16} /> 2. Spot &amp; DEX Terminal
+              </div>
+              <div className="text-muted" style={{ fontSize: '12px', lineHeight: 1.5 }}>
+                Trade 6-chain DEX (0x v2) atau Binance/Bybit Spot dengan Chart &amp; GoPlus Anti-Honeypot Guard.
+              </div>
             </div>
-            <div className="text-muted" style={{ fontSize: '12px' }}>
-              5 mode peluncuran token, AI Identity, Logo IPFS, Growth Pack, &amp; Bonding Curve.
-            </div>
+            <span style={{ fontSize: '11px', fontWeight: 800, color: '#10B981' }}>Mulai Trading →</span>
           </a>
-          <a href="/kol" className="card" style={{ textDecoration: 'none', borderLeft: '3px solid #10B981' }}>
-            <div style={{ fontWeight: 900, color: '#6EE7B7', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-              <Award size={16} /> KOL &amp; Merkle Bounties
+          <a href="/agent" className="cex-role-card" style={{ borderTop: '2px solid #38BDF8' }}>
+            <div>
+              <div style={{ fontWeight: 900, color: '#38BDF8', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '6px' }}>
+                <BrainCircuit size={16} /> 3. AI Auto-Pilot 24/7
+              </div>
+              <div className="text-muted" style={{ fontSize: '12px', lineHeight: 1.5 }}>
+                Jalankan 5-Agent Desk &amp; Auto-Pilot TP/SL + Trailing Stop otomatis dengan alert Telegram.
+              </div>
             </div>
-            <div className="text-muted" style={{ fontSize: '12px' }}>
-              Kampanye SocialFi, verifikasi X/Farcaster/World ID, &amp; klaim Merkle on-chain.
-            </div>
+            <span style={{ fontSize: '11px', fontWeight: 800, color: '#38BDF8' }}>Atur AI Bot →</span>
           </a>
-          <a href="/billing" className="card" style={{ textDecoration: 'none', borderLeft: '3px solid #FFC400' }}>
-            <div style={{ fontWeight: 900, color: '#FFC400', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-              <Zap size={16} /> Tier &amp; Credit Ledger
+          <a href="/kol" className="cex-role-card" style={{ borderTop: '2px solid #A855F7' }}>
+            <div>
+              <div style={{ fontWeight: 900, color: '#D8B4FE', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '6px' }}>
+                <Award size={16} /> 4. Earn &amp; KOL Hub
+              </div>
+              <div className="text-muted" style={{ fontSize: '12px', lineHeight: 1.5 }}>
+                Verifikasi Passport X/Farcaster/World ID, ikuti kampanye bounty, &amp; raih 0.25% referral fee.
+              </div>
             </div>
-            <div className="text-muted" style={{ fontSize: '12px' }}>
-              Upgrade FREE → CREATOR / TRADER / AGENT &amp; kelola kuota kredit bulanan.
-            </div>
+            <span style={{ fontSize: '11px', fontWeight: 800, color: '#C084FC' }}>Lihat Campaign →</span>
           </a>
         </div>
 
