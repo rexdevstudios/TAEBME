@@ -218,3 +218,84 @@ export async function notifyUserWebhookBestEffort(params: {
     };
   }
 }
+
+/**
+ * Formats an OnChainTokenSecurityReport into a concise, mobile-friendly Telegram message (Phase CK).
+ */
+export function formatTelegramTokenSafetyReply(report: {
+  address: string;
+  chainId: number;
+  riskLevel: string;
+  hardBlocked: boolean;
+  isHoneypot?: boolean;
+  top10HolderPct: number;
+  suspectedClusterCount: number;
+  redFlags?: string[];
+  summary?: string;
+}): string {
+  const badge = report.hardBlocked ? '🚨 HARD-BLOCKED' : report.riskLevel === 'LOW' ? '✅ SAFE' : `⚠️ ${report.riskLevel}`;
+  const flags = (report.redFlags || []).slice(0, 4).join(', ') || 'None';
+  return [
+    `${badge} · Token Safety Scan (Chain ${report.chainId})`,
+    `Contract: ${report.address}`,
+    `Top-10 Holders: ${report.top10HolderPct}% | Insider Clusters: ${report.suspectedClusterCount}`,
+    `Flags: ${flags}`,
+    report.summary ? `Note: ${report.summary}` : '',
+    `Powered by POOLNET GoPlus Guard ($0) · https://pndigi.site/trading`,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+/**
+ * Formats a Free On-Chain Wallet Intelligence profile into a concise Telegram message (Phase CK).
+ */
+export function formatTelegramWalletRiskReply(profile: {
+  walletAddress: string;
+  arkhamEntityName?: string;
+  arkhamEntityType: string;
+  riskPassportScore: number;
+  isCounterpartyBlocked: boolean;
+  tags?: string[];
+}): string {
+  const badge = profile.isCounterpartyBlocked
+    ? '🚨 SANCTIONED / BLOCKED'
+    : profile.riskPassportScore >= 75
+      ? '✅ TRUSTED'
+      : '⚠️ CAUTION';
+  const tags = (profile.tags || []).slice(0, 4).join(', ') || 'Standard EOA';
+  return [
+    `${badge} · Wallet Risk Audit ($0 GoPlus + RPC)`,
+    `Wallet: ${profile.walletAddress}`,
+    `Entity: ${profile.arkhamEntityName || 'Unknown'} (${profile.arkhamEntityType})`,
+    `Trust Score: ${profile.riskPassportScore}/100`,
+    `Signals: ${tags}`,
+    `Inspect on POOLNET · https://pndigi.site/kol`,
+  ].join('\n');
+}
+
+/**
+ * Builds a safe, URL-encoded viral share intent URL for X (Twitter) or Farcaster (Warpcast) (Phase CK).
+ */
+export function buildSocialShareUrl(
+  platform: 'x' | 'farcaster',
+  params: {
+    text: string;
+    url: string;
+    refWallet?: string | null;
+  }
+): string {
+  const cleanUrl = (params.url || 'https://pndigi.site/launchpad').trim();
+  const ref = params.refWallet && /^0x[a-fA-F0-9]{40}$/.test(params.refWallet.trim())
+    ? params.refWallet.trim()
+    : null;
+  const finalUrl = ref
+    ? `${cleanUrl}${cleanUrl.includes('?') ? '&' : '?'}ref=${encodeURIComponent(ref)}`
+    : cleanUrl;
+  const text = (params.text || 'Check out this live token on POOLNET Launchpad!').trim();
+
+  if (platform === 'farcaster') {
+    return `https://warpcast.com/~/compose?text=${encodeURIComponent(text)}&embeds[]=${encodeURIComponent(finalUrl)}`;
+  }
+  return `https://x.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(finalUrl)}`;
+}

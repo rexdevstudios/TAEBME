@@ -11,6 +11,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { rateLimiter } from '@packages/auth/rate-limiter';
 import { defaultDraftDbAdapter } from '@packages/shared/db-pool';
+import { fetchOnChainTokenSecurity, isValidEvmAddress } from '@packages/intelligence/onchain-insider-guard';
+import { fetchFreeWalletProfile } from '@packages/intelligence/free-wallet-intelligence';
+import {
+  formatTelegramTokenSafetyReply,
+  formatTelegramWalletRiskReply,
+} from '@packages/notifications/webhook-dispatcher';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,11 +70,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, data: { handled: false }, timestamp: new Date().toISOString() });
     }
 
-    const cmd = text.split(/\s+/)[0].toLowerCase();
-    let reply = 'RTrader Launchpad Bot (Vercel Serverless). Commands: /start, /status, /tokens';
+    const parts = text.split(/\s+/);
+    const cmd = parts[0].toLowerCase();
+    let reply = 'POOLNET Launchpad & AI Scanner Bot.\nCommands:\n/start · /status · /tokens\n/safety <0xContract> [chainId]\n/wallet <0xAddress>';
 
     if (cmd === '/start' || cmd === '/status') {
-      reply = 'RTrader SocialFi & Launchpad is OPERATIONAL on Vercel + Neon PostgreSQL SSOT. Visit https://pndigi.site/launchpad';
+      reply =
+        'POOLNET SocialFi & Launchpad is OPERATIONAL on Vercel + Neon PostgreSQL SSOT.\n' +
+        'Commands:\n• /tokens — Live launches\n• /safety <0xContract> [8453] — Anti-Honeypot & Insider Scan ($0)\n• /wallet <0xAddress> — Wallet Risk Audit ($0)\n' +
+        'Visit https://pndigi.site/launchpad';
     } else if (cmd === '/tokens') {
       const launches = await defaultDraftDbAdapter.getActiveTokenLaunches().catch(() => []);
       if (launches.length === 0) {
@@ -76,6 +86,26 @@ export async function POST(req: NextRequest) {
       } else {
         const lines = launches.slice(0, 5).map((t: any) => `- $${t.ticker || 'TOKEN'} (${t.name || 'Launch'}) [${t.chain || 'base'}]`);
         reply = `Active RTrader Launches (${launches.length}):\n${lines.join('\n')}`;
+      }
+    } else if (cmd === '/safety') {
+      const targetAddr = (parts[1] || '').trim();
+      const targetChain = Number(parts[2] || 8453);
+      if (!isValidEvmAddress(targetAddr)) {
+        reply = 'Usage: /safety <0xTokenContract> [chainId]\nExample: /safety 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913 8453';
+      } else {
+        const report = await fetchOnChainTokenSecurity({
+          address: targetAddr,
+          chainId: Number.isInteger(targetChain) && targetChain > 0 ? targetChain : 8453,
+        });
+        reply = formatTelegramTokenSafetyReply(report);
+      }
+    } else if (cmd === '/wallet') {
+      const targetAddr = (parts[1] || '').trim();
+      if (!isValidEvmAddress(targetAddr)) {
+        reply = 'Usage: /wallet <0xWalletAddress>\nExample: /wallet 0x0000000000001ff3684f28c67538d4d072c22734';
+      } else {
+        const profile = await fetchFreeWalletProfile({ address: targetAddr, chainId: 8453 });
+        reply = formatTelegramWalletRiskReply(profile);
       }
     }
 

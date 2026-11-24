@@ -171,7 +171,7 @@ export default function KolHubPage() {
       const json = await res.json();
       if (json.success) {
         setKolProfile(json.data);
-        alert('✅ Profil KOL & Arkham Trust Passport berhasil diperbarui!');
+        alert('✅ Profil KOL & On-Chain Trust Passport (GoPlus + RPC) berhasil diperbarui!');
       } else {
         alert(`❌ Gagal: ${json.error?.message || 'Error'}`);
       }

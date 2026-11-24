@@ -81,7 +81,7 @@ export default function AgentPage() {
         setDefillamaWeight(saved.defillama);
       }
       setWeightsFeedback(
-        `✅ Bobot AI tersimpan & dinormalisasi ke PostgreSQL SSOT (Arkham ${Math.round((saved?.arkham ?? arkhamWeight) * 100)}% · Firecrawl ${Math.round((saved?.firecrawl ?? firecrawlWeight) * 100)}% · OHLCV ${Math.round((saved?.ohlcv ?? ohlcvWeight) * 100)}% · DefiLlama ${Math.round((saved?.defillama ?? defillamaWeight) * 100)}%).`
+        `✅ Bobot AI tersimpan & dinormalisasi ke PostgreSQL SSOT (On-Chain Intel ${Math.round((saved?.arkham ?? arkhamWeight) * 100)}% · Firecrawl ${Math.round((saved?.firecrawl ?? firecrawlWeight) * 100)}% · OHLCV ${Math.round((saved?.ohlcv ?? ohlcvWeight) * 100)}% · DefiLlama ${Math.round((saved?.defillama ?? defillamaWeight) * 100)}%).`
       );
     } catch (err: any) {
       setWeightsFeedback(`⚠️ Gagal menyimpan bobot: ${err?.message || 'Network error'}`);

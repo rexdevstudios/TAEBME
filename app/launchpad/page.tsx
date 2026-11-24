@@ -11,6 +11,7 @@ import { CreatorStudioPanel } from '../components/CreatorStudioPanel';
 import { PageWorkflowBanner } from '../components/PageWorkflowBanner';
 import { TokenAvatar } from '../components/TokenAvatar';
 import { BankrKeyVaultPanel } from '../components/BankrKeyVaultPanel';
+import { buildSocialShareUrl } from '@packages/notifications/webhook-dispatcher';
 import { ethers } from 'ethers';
 import {
   getContractConfiguration,
@@ -1676,8 +1677,8 @@ export default function LaunchpadPage() {
                       <span>Graduation Progress</span>
                       <span style={{ color: 'var(--color-foreground)', fontWeight: 700 }}>${raised.toLocaleString()} / ${target.toLocaleString()}</span>
                     </div>
-                    <div style={{ width: '100%', height: '6px', backgroundColor: 'var(--color-surface-inset)', borderRadius: '3px', overflow: 'hidden' }}>
-                      <div style={{ width: `${progressPct}%`, height: '100%', backgroundColor: 'var(--color-accent)' }} />
+                    <div className="cex-progress-track">
+                      <div className="cex-progress-fill" style={{ width: `${progressPct}%` }} />
                     </div>
                   </div>
 
@@ -1685,32 +1686,46 @@ export default function LaunchpadPage() {
                     <a
                       href={portalUrl}
                       className="btn-secondary"
-                      style={{ flex: '1 1 21%', padding: '6px 2px', textAlign: 'center', fontSize: '11px', justifyContent: 'center', color: 'var(--color-badge-info-text)', borderColor: 'var(--color-badge-info-border)' }}
+                      style={{ flex: '1 1 18%', padding: '6px 2px', textAlign: 'center', fontSize: '11px', justifyContent: 'center', color: 'var(--color-badge-info-text)', borderColor: 'var(--color-badge-info-border)' }}
                       title="Buka Portal Detail Token"
                     >
-                      Portal 🌐
+                      Portal
                     </a>
                     <a
                       href={`/trading?token=${token.contractAddress}`}
-                      className="btn-primary"
-                      style={{ flex: '1 1 21%', padding: '6px 2px', textAlign: 'center', fontSize: '11px', justifyContent: 'center' }}
+                      className="cex-btn-gold"
+                      style={{ flex: '1 1 20%', padding: '6px 4px', textAlign: 'center', fontSize: '11px', borderRadius: '6px', boxShadow: 'none' }}
                     >
                       Trade ⚡
                     </a>
                     <a
                       href={`/kol?launchId=${token.launchId || ''}&tab=MARKET`}
                       className="btn-secondary"
-                      style={{ flex: '1 1 21%', padding: '6px 2px', textAlign: 'center', fontSize: '11px', justifyContent: 'center', borderColor: 'var(--color-badge-purple-border)', color: 'var(--color-badge-purple-text)' }}
+                      style={{ flex: '1 1 18%', padding: '6px 2px', textAlign: 'center', fontSize: '11px', justifyContent: 'center', borderColor: 'var(--color-badge-purple-border)', color: 'var(--color-badge-purple-text)' }}
                       title="Ikuti Bounties, Kampanye Share & Staking di KOL Hub"
                     >
-                      SocialFi 🎯
+                      Bounty
+                    </a>
+                    <a
+                      href={buildSocialShareUrl('x', {
+                        text: `🚀 $${token.ticker || 'TOKEN'} (${token.name || 'Launch'}) live di POOLNET Launchpad (0% Tax · GoPlus Verified)!`,
+                        url: `https://pndigi.site${portalUrl}`,
+                        refWallet: walletAddress,
+                      })}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn-secondary"
+                      style={{ flex: '1 1 18%', padding: '6px 2px', textAlign: 'center', fontSize: '11px', justifyContent: 'center', borderColor: 'rgba(240, 185, 11, 0.35)', color: '#FCD34D' }}
+                      title="Bagikan ke X (Twitter) dengan link referral 0.25%"
+                    >
+                      Share X
                     </a>
                     <a
                       href={explorerUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="btn-secondary"
-                      style={{ flex: '1 1 21%', padding: '6px 2px', textAlign: 'center', fontSize: '11px', justifyContent: 'center' }}
+                      style={{ flex: '1 1 18%', padding: '6px 2px', textAlign: 'center', fontSize: '11px', justifyContent: 'center' }}
                     >
                       {explorerLabel}
                     </a>

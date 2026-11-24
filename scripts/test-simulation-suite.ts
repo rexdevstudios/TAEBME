@@ -33,6 +33,11 @@ import {
 import { runAutonomousCycleEvaluation } from '../packages/agent/autopilot-cycle-runner';
 import { buildTradeIntentsFromAutoPilotReport } from '../packages/agent/autopilot-intent-bridge';
 import {
+  formatTelegramTokenSafetyReply,
+  formatTelegramWalletRiskReply,
+  buildSocialShareUrl,
+} from '../packages/notifications/webhook-dispatcher';
+import {
   clearAutoPilotPeakPrice,
   computeDynamicSignalConfidence,
   computeUpdatedPeakPrice,
@@ -1080,6 +1085,38 @@ async function runSimulationSuite() {
       cdCreatorOk.valid === true &&
       cdCreatorOk.requiredCredits === 150,
     'Multi-Account Bankr Fleet deploy enforces CREATOR/AGENT tier gate & upfront 50 cr/account credit check'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 43: Interactive Telegram /safety & /wallet Scanner + Viral Share (Phase CK)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 43: Telegram /safety & /wallet Scanner + Viral Share Intent] ---');
+  const ckSafetyText = formatTelegramTokenSafetyReply({
+    address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+    chainId: 8453,
+    riskLevel: 'CRITICAL',
+    hardBlocked: true,
+    top10HolderPct: 91,
+    suspectedClusterCount: 4,
+    redFlags: ['HONEYPOT_DETECTED'],
+  });
+  const ckWalletText = formatTelegramWalletRiskReply({
+    walletAddress: '0x0000000000001ff3684f28c67538d4d072c22734',
+    arkhamEntityName: '0x AllowanceHolder',
+    arkhamEntityType: 'EXCHANGE',
+    riskPassportScore: 95,
+    isCounterpartyBlocked: false,
+  });
+  const ckShareUrl = buildSocialShareUrl('x', {
+    text: 'POOLNET Launch',
+    url: 'https://pndigi.site/launchpad',
+    refWallet: '0x0FB80514F29E336a35B2B3135C44b02B97F293a3',
+  });
+  assert(
+    ckSafetyText.includes('HARD-BLOCKED') &&
+      ckWalletText.includes('TRUSTED') &&
+      ckShareUrl.startsWith('https://x.com/intent/tweet?'),
+    'Telegram /safety & /wallet formatters and X viral referral share URL operate deterministically'
   );
 
   console.log('\n================================================================');
