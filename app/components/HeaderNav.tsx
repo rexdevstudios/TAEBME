@@ -201,7 +201,7 @@ export default function HeaderNav() {
             <Link
               key={item.href}
               href={item.href}
-              className={`nav-link ${active ? 'nav-link-active' : ''}`}
+              className={`nav-link ${active ? 'nav-link-active nav-link-cex-active' : ''}`}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -211,9 +211,7 @@ export default function HeaderNav() {
                 fontSize: '12px',
                 fontWeight: active ? 800 : 600,
                 whiteSpace: 'nowrap',
-                background: active ? 'rgba(240, 185, 11, 0.14)' : 'transparent',
-                color: active ? '#FCD34D' : undefined,
-                border: active ? '1px solid rgba(240, 185, 11, 0.35)' : '1px solid transparent',
+                border: '1px solid transparent',
                 transition: 'all 150ms ease',
               }}
             >

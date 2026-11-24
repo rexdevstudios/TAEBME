@@ -135,25 +135,13 @@ export default function AgentPage() {
   return (
     <div className="flex-col gap-lg">
       {/* CEX AI Auto-Pilot & 5-Agent Desk Hero Banner */}
-      <div
-        className="card"
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '14px',
-          padding: '18px 20px',
-          background: 'linear-gradient(135deg, rgba(19, 24, 34, 0.98) 0%, rgba(26, 33, 48, 0.92) 65%, rgba(56, 189, 248, 0.1) 100%)',
-          border: '1px solid rgba(56, 189, 248, 0.25)',
-        }}
-      >
+      <div className="cex-hero-banner cex-hero-cyan">
         <div>
-          <div style={{ fontSize: '11px', fontWeight: 800, color: '#38BDF8', letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: '4px' }}>
+          <div className="cex-hero-eyebrow" style={{ color: 'var(--color-badge-info-text)' }}>
             24/7 Autonomous AI Trading · Trailing Stop-Loss · GoPlus Anti-Insider
           </div>
           <h1 style={{ fontSize: '20px', fontWeight: 900, margin: '0 0 4px 0', color: 'var(--color-foreground)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Bot size={20} style={{ color: '#38BDF8' }} /> AI Auto-Pilot &amp; 5-Agent Desk
+            <Bot size={20} style={{ color: 'var(--color-badge-info-text)' }} /> AI Auto-Pilot &amp; 5-Agent Desk
           </h1>
           <p className="text-muted" style={{ margin: 0, fontSize: '12px' }}>
             Analisis peluang beli/jual berbasis data pasar live, likuiditas DEX, dan sentimen — 100% Non-Custodial dengan Risk Gate deterministik.
@@ -162,10 +150,10 @@ export default function AgentPage() {
         <div className="flex-row gap-sm items-center">
           {(userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN') && (
             <span className="badge badge-admin">
-              👑 Admin Aktif
+              Admin Aktif
             </span>
           )}
-          <span className="badge" style={{ backgroundColor: 'rgba(16, 185, 129, 0.12)', color: '#34D399', border: '1px solid rgba(16, 185, 129, 0.32)' }}>
+          <span className="badge" style={{ backgroundColor: 'var(--color-badge-success-bg)', color: 'var(--color-badge-success-text)', border: '1px solid var(--color-badge-success-border)' }}>
             Non-Custodial Guard
           </span>
         </div>
@@ -175,12 +163,13 @@ export default function AgentPage() {
       <div role="tablist" aria-label="Navigasi Ruang Kerja AI Agent" className="cex-tab-bar">
         {(
           [
-            { id: 'autopilot', label: '🤖 Auto-Pilot 24/7 & Sinyal', hint: 'Mudah · Pemula' },
-            { id: 'analyst', label: '🧠 5-Agent Analyst Desk', hint: 'Scanner · Analyst · Risk' },
-            { id: 'pro', label: '⚙️ Pro Vault & Session', hint: 'BYOK LLM · ERC-7715' },
+            { id: 'autopilot', label: 'Auto-Pilot 24/7 & Sinyal', hint: 'Mudah · Pemula', icon: Bot },
+            { id: 'analyst', label: '5-Agent Analyst Desk', hint: 'Scanner · Analyst · Risk', icon: BrainCircuit },
+            { id: 'pro', label: 'Pro Vault & Session', hint: 'BYOK LLM · ERC-7715', icon: Settings2 },
           ] as const
         ).map((tab) => {
           const active = activeAgentTab === tab.id;
+          const Icon = tab.icon;
           return (
             <button
               key={tab.id}
@@ -191,7 +180,9 @@ export default function AgentPage() {
               className={`cex-tab-btn ${active ? 'active' : ''}`}
               style={{ flex: '1 1 180px', justifyContent: 'space-between' }}
             >
-              <span>{tab.label}</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <Icon size={14} /> {tab.label}
+              </span>
               <span style={{ fontSize: '10px', opacity: 0.72, fontWeight: 600 }}>{tab.hint}</span>
             </button>
           );

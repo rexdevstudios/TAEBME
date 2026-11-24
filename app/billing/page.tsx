@@ -425,21 +425,9 @@ export default function BillingPage() {
   return (
     <div className="flex-col gap-lg">
       {/* CEX Account & Billing Hero Banner */}
-      <div
-        className="card"
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '14px',
-          padding: '18px 20px',
-          background: 'linear-gradient(135deg, rgba(19, 24, 34, 0.98) 0%, rgba(26, 33, 48, 0.92) 65%, rgba(240, 185, 11, 0.08) 100%)',
-          border: '1px solid rgba(240, 185, 11, 0.24)',
-        }}
-      >
+      <div className="cex-hero-banner">
         <div>
-          <div style={{ fontSize: '11px', fontWeight: 800, color: '#F0B90B', letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: '4px' }}>
+          <div className="cex-hero-eyebrow">
             Account · Plans · API Vaults · Telegram Alerts
           </div>
           <h1 style={{ fontSize: '20px', fontWeight: 900, margin: '0 0 4px 0', color: 'var(--color-foreground)', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -452,17 +440,17 @@ export default function BillingPage() {
         <div className="flex-row gap-sm items-center tabular-nums">
           {isConnected && (
             <>
-              <div className="bg-panel" style={{ border: '1px solid rgba(240, 185, 11, 0.3)', padding: '6px 12px', borderRadius: '8px', fontSize: '12px' }}>
+              <div className="bg-panel" style={{ border: '1px solid var(--color-badge-warning-border)', padding: '6px 12px', borderRadius: '8px', fontSize: '12px' }}>
                 <span className="text-muted">Paket: </span>
-                <span style={{ color: '#F0B90B', fontWeight: 800 }}>{activePlanId}</span>
+                <span style={{ color: 'var(--color-badge-warning-text)', fontWeight: 800 }}>{activePlanId}</span>
               </div>
               <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '6px 12px', borderRadius: '8px', fontSize: '12px' }}>
                 <span className="text-muted">Saldo: </span>
-                <span style={{ color: '#38BDF8', fontWeight: 800 }}>{credits.toLocaleString()} Kredit</span>
+                <span style={{ color: 'var(--color-badge-info-text)', fontWeight: 800 }}>{credits.toLocaleString()} Kredit</span>
               </div>
             </>
           )}
-          <span className="badge badge-trader" style={{ border: '1px solid rgba(16, 185, 129, 0.35)', color: '#34D399', backgroundColor: 'rgba(16, 185, 129, 0.12)' }}>
+          <span className="badge badge-trader" style={{ border: '1px solid var(--color-badge-success-border)', color: 'var(--color-badge-success-text)', backgroundColor: 'var(--color-badge-success-bg)' }}>
             {loading ? 'Memuat...' : 'Aktif'}
           </span>
         </div>
@@ -472,15 +460,16 @@ export default function BillingPage() {
       <div role="tablist" aria-label="Navigasi Halaman Billing dan Vault" className="cex-tab-bar">
         {(
           [
-            { id: 'plans', label: '💳 Paket & Harga', hint: 'FREE · CREATOR · TRADER · AGENT' },
-            { id: 'vaults', label: '🔔 Add-On, API & Telegram Alert', hint: 'Vault · Webhook · Provider' },
-            { id: 'history', label: '📜 Mutasi Kredit & Keamanan', hint: 'Ledger & Explorer Log' },
+            { id: 'plans', label: 'Paket & Harga', hint: 'FREE · CREATOR · TRADER · AGENT', icon: CreditCard },
+            { id: 'vaults', label: 'Add-On, API & Telegram Alert', hint: 'Vault · Webhook · Provider', icon: Zap },
+            { id: 'history', label: 'Mutasi Kredit & Keamanan', hint: 'Ledger & Explorer Log', icon: History },
             ...((hasCapability('MANAGE_BILLING_PLANS') || userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN' || userRole === 'BILLING_ADMIN')
-              ? [{ id: 'admin' as const, label: '⚙️ Admin Ops Console', hint: 'Promo · Risk · Kill-Switch' }]
+              ? [{ id: 'admin' as const, label: 'Admin Ops Console', hint: 'Promo · Risk · Kill-Switch', icon: ShieldAlert }]
               : []),
           ] as const
         ).map((tab) => {
           const active = activeBillingTab === tab.id;
+          const Icon = tab.icon;
           return (
             <button
               key={tab.id}
@@ -491,7 +480,9 @@ export default function BillingPage() {
               className={`cex-tab-btn ${active ? 'active' : ''}`}
               style={{ flex: '1 1 170px', justifyContent: 'space-between' }}
             >
-              <span>{tab.label}</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <Icon size={14} /> {tab.label}
+              </span>
               <span style={{ fontSize: '10px', opacity: 0.72, fontWeight: 600 }}>{tab.hint}</span>
             </button>
           );

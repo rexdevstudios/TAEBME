@@ -573,21 +573,9 @@ export default function TradingPage() {
   return (
     <div className="flex-col gap-lg">
       {/* CEX Pro Trading Terminal Top Ticker Bar */}
-      <div
-        className="card"
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '12px',
-          padding: '14px 18px',
-          background: 'linear-gradient(135deg, rgba(19, 24, 34, 0.98) 0%, rgba(26, 33, 48, 0.92) 70%, rgba(16, 185, 129, 0.08) 100%)',
-          border: '1px solid rgba(16, 185, 129, 0.25)',
-        }}
-      >
+      <div className="cex-hero-banner cex-hero-emerald" style={{ padding: '14px 18px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-          <h1 style={{ fontSize: '19px', fontWeight: 900, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <h1 style={{ fontSize: '19px', fontWeight: 900, margin: 0, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-foreground)' }}>
             <ActivitySquare size={19} style={{ color: '#10B981' }} /> Spot &amp; DEX Trading Terminal
           </h1>
           <span className="text-muted" style={{ fontSize: '12px' }}>
@@ -624,12 +612,13 @@ export default function TradingPage() {
       <div role="tablist" aria-label="Navigasi Halaman Trading" className="cex-tab-bar">
         {(
           [
-            { id: 'trade', label: '📈 Trade Terminal', hint: 'Chart · DEX 0x v2 · CEX Order' },
-            { id: 'history', label: '📊 Riwayat & Portfolio Recap', hint: 'KPI · Explorer · CSV' },
-            { id: 'vault', label: '⚙️ API Vault & Risk Guard', hint: 'Binance · Bybit · Risk Cap' },
+            { id: 'trade', label: 'Trade Terminal', hint: 'Chart · DEX 0x v2 · CEX Order', icon: ActivitySquare },
+            { id: 'history', label: 'Riwayat & Portfolio Recap', hint: 'KPI · Explorer · CSV', icon: BarChart3 },
+            { id: 'vault', label: 'API Vault & Risk Guard', hint: 'Binance · Bybit · Risk Cap', icon: Lock },
           ] as const
         ).map((tab) => {
           const active = activeTradingTab === tab.id;
+          const Icon = tab.icon;
           return (
             <button
               key={tab.id}
@@ -640,7 +629,9 @@ export default function TradingPage() {
               className={`cex-tab-btn ${active ? 'active' : ''}`}
               style={{ flex: '1 1 180px', justifyContent: 'space-between' }}
             >
-              <span>{tab.label}</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <Icon size={14} /> {tab.label}
+              </span>
               <span style={{ fontSize: '10px', opacity: 0.72, fontWeight: 600 }}>{tab.hint}</span>
             </button>
           );

@@ -427,20 +427,9 @@ export default function LaunchpadPage() {
   return (
     <div className="flex-col gap-lg">
       {/* CEX Launchpad Hero Spotlight Banner */}
-      <div
-        className="card"
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '16px',
-          background: 'linear-gradient(135deg, rgba(19, 24, 34, 0.98) 0%, rgba(26, 33, 48, 0.92) 65%, rgba(240, 185, 11, 0.08) 100%)',
-          border: '1px solid rgba(240, 185, 11, 0.25)',
-        }}
-      >
+      <div className="cex-hero-banner">
         <div>
-          <div style={{ fontSize: '11px', fontWeight: 800, color: '#F0B90B', letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: '4px' }}>
+          <div className="cex-hero-eyebrow">
             POOLNET CEX-Grade Token Launchpad · 0% Tax · Gas-Sponsored Base L2
           </div>
           <h1 style={{ fontSize: '22px', fontWeight: 900, margin: '0 0 4px 0', color: 'var(--color-foreground)', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -462,7 +451,18 @@ export default function LaunchpadPage() {
             type="button"
             onClick={() => setIsAngelModalOpen(true)}
             className="btn-secondary"
-            style={{ cursor: 'pointer', border: '1px solid rgba(168, 85, 247, 0.45)', color: '#D8B4FE', padding: '9px 13px', fontSize: '12px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            style={{
+              cursor: 'pointer',
+              borderColor: 'var(--color-badge-purple-border)',
+              color: 'var(--color-badge-purple-text)',
+              backgroundColor: 'var(--color-badge-purple-bg)',
+              padding: '9px 13px',
+              fontSize: '12px',
+              fontWeight: 700,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
           >
             <Users size={14} /> Angel Deal Room
           </button>
@@ -478,7 +478,7 @@ export default function LaunchpadPage() {
           onClick={() => setLaunchpadTab('POOLS')}
           className={`cex-tab-btn ${launchpadTab === 'POOLS' ? 'active' : ''}`}
         >
-          🔥 Live Pools <span className="cex-tab-count">{activeTokens.length}</span>
+          <TrendingUp size={14} /> Live Pools <span className="cex-tab-count">{activeTokens.length}</span>
         </button>
         <button
           type="button"
@@ -487,7 +487,7 @@ export default function LaunchpadPage() {
           onClick={() => setLaunchpadTab('CREATE')}
           className={`cex-tab-btn ${launchpadTab === 'CREATE' ? 'active' : ''}`}
         >
-          🚀 Launch Token &amp; Bankr Fleet
+          <Rocket size={14} /> Launch Token &amp; Bankr Fleet
         </button>
         <button
           type="button"
@@ -496,7 +496,7 @@ export default function LaunchpadPage() {
           onClick={() => setLaunchpadTab('STUDIO')}
           className={`cex-tab-btn ${launchpadTab === 'STUDIO' ? 'active' : ''}`}
         >
-          🎨 AI Brand Studio
+          <Sparkles size={14} /> AI Brand Studio
         </button>
         {isLaunchpadAdmin && (
           <button
@@ -506,7 +506,7 @@ export default function LaunchpadPage() {
             onClick={() => setLaunchpadTab('ADMIN')}
             className={`cex-tab-btn ${launchpadTab === 'ADMIN' ? 'active' : ''}`}
           >
-            🛡️ Admin Governance
+            <ShieldAlert size={14} /> Admin Governance
           </button>
         )}
       </div>

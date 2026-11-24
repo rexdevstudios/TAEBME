@@ -486,26 +486,18 @@ export default function KolHubPage() {
   return (
     <div className="container" style={{ paddingBottom: '60px' }}>
       {/* CEX Earn & KOL Hub Hero Banner */}
-      <div
-        className="card"
-        style={{
-          padding: '20px 22px',
-          background: 'linear-gradient(135deg, rgba(19, 24, 34, 0.98) 0%, rgba(26, 33, 48, 0.92) 65%, rgba(168, 85, 247, 0.1) 100%)',
-          border: '1px solid rgba(168, 85, 247, 0.25)',
-          marginBottom: '14px',
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+      <div className="cex-hero-banner cex-hero-purple" style={{ marginBottom: '14px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', width: '100%' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
-              <span className="badge" style={{ backgroundColor: 'rgba(16, 185, 129, 0.14)', color: '#34D399', border: '1px solid rgba(16, 185, 129, 0.3)', fontSize: '11px', padding: '2px 8px' }}>
+              <span className="badge" style={{ backgroundColor: 'var(--color-badge-success-bg)', color: 'var(--color-badge-success-text)', border: '1px solid var(--color-badge-success-border)', fontSize: '11px', padding: '2px 8px' }}>
                 Earn &amp; SocialFi Bounty Portal
               </span>
               <span className="badge" style={{ backgroundColor: 'var(--color-badge-neutral-bg)', border: '1px solid var(--color-badge-neutral-border)', color: 'var(--color-badge-neutral-text)', fontSize: '11px', padding: '2px 8px' }}>
                 GoPlus On-Chain Guard &amp; Merkle Verified
               </span>
             </div>
-            <h1 style={{ fontSize: '22px', fontWeight: 900, margin: 0, letterSpacing: '-0.3px' }}>
+            <h1 style={{ fontSize: '22px', fontWeight: 900, margin: 0, letterSpacing: '-0.3px', color: 'var(--color-foreground)' }}>
               Earn, KOL Hub &amp; Marketing Bounties
             </h1>
             <p className="text-muted" style={{ margin: '4px 0 0 0', fontSize: '13px' }}>
@@ -532,7 +524,7 @@ export default function KolHubPage() {
           className={`cex-tab-btn ${activeTab === 'PASSPORT' ? 'active' : ''}`}
           style={{ flex: '1 1 150px' }}
         >
-          <Award size={15} /> 🪪 KOL Passport
+          <Award size={15} /> KOL Passport
         </button>
         <button
           type="button"
@@ -542,7 +534,7 @@ export default function KolHubPage() {
           className={`cex-tab-btn ${activeTab === 'MARKET' ? 'active' : ''}`}
           style={{ flex: '1 1 150px' }}
         >
-          <Coins size={15} /> 🏆 Active Bounties
+          <Coins size={15} /> Active Bounties
         </button>
         <button
           type="button"
@@ -552,7 +544,7 @@ export default function KolHubPage() {
           className={`cex-tab-btn ${activeTab === 'CLAIM' ? 'active' : ''}`}
           style={{ flex: '1 1 150px' }}
         >
-          <Share2 size={15} /> ✅ Submit &amp; Claim
+          <Share2 size={15} /> Submit &amp; Claim
         </button>
         <button
           type="button"
@@ -562,7 +554,7 @@ export default function KolHubPage() {
           className={`cex-tab-btn ${activeTab === 'CREATOR' ? 'active' : ''}`}
           style={{ flex: '1 1 150px' }}
         >
-          <Flame size={15} /> 🔥 Creator Escrow
+          <Flame size={15} /> Creator Escrow
         </button>
       </div>
 

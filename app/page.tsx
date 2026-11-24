@@ -325,23 +325,12 @@ export default function OverviewPage() {
         </div>
 
         {/* CEX Launchpad Spotlight Banner & Dual Primary CTAs */}
-        <div
-          className="card"
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: '16px',
-            background: 'linear-gradient(135deg, rgba(19, 24, 34, 0.98) 0%, rgba(26, 33, 48, 0.92) 60%, rgba(240, 185, 11, 0.08) 100%)',
-            border: '1px solid rgba(240, 185, 11, 0.24)',
-          }}
-        >
+        <div className="cex-hero-banner">
           <div>
-            <div style={{ fontSize: '11px', fontWeight: 800, color: '#F0B90B', letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: '4px' }}>
+            <div className="cex-hero-eyebrow">
               Non-Custodial CEX-Grade Launchpad &amp; AI Trading Hub
             </div>
-            <h1 style={{ margin: '0 0 6px 0', fontSize: '22px', fontWeight: 900 }}>
+            <h1 style={{ margin: '0 0 6px 0', fontSize: '22px', fontWeight: 900, color: 'var(--color-foreground)' }}>
               Selamat datang, {walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : 'Trader'}
             </h1>
             <p className="text-muted" style={{ margin: 0, fontSize: '13px' }}>
