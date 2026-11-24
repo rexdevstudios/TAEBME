@@ -325,6 +325,13 @@ async function runFullTestnetUsecase() {
       `POST /api/agent/desk/run completed 5-Agent cycle (agents=${deskJson?.data?.agents?.length ?? 0})`
     );
 
+    const mktRes = await fetch(`${BASE_URL}/api/agent/marketplace`);
+    const mktJson: any = await mktRes.json();
+    assert(
+      mktRes.status === 200 && mktJson?.success === true && mktJson?.data?.platformFeePct === 20,
+      `GET /api/agent/marketplace returned 80/20 Copy-Trading Marketplace (HTTP 200)`
+    );
+
     // =========================================================================
     // STAGE 7: KOL Hub, Active Bounties & Public Transparency
     // =========================================================================

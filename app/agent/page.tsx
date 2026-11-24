@@ -12,6 +12,7 @@ import { ByokLlmVaultPanel, type SelectedLlmProvider } from '../components/ByokL
 import { AutonomousAgentTerminalCard } from '../components/AutonomousAgentTerminalCard';
 import { SessionAllowancePanel } from '../components/SessionAllowancePanel';
 import { AutoPilotControlPanel } from '../components/AutoPilotControlPanel';
+import { SignalMarketplacePanel } from '../components/SignalMarketplacePanel';
 import type { CustomAgentProfile } from '@packages/agent/skill-registry';
 
 export default function AgentPage() {
@@ -195,6 +196,7 @@ export default function AgentPage() {
       {activeAgentTab === 'autopilot' && (
         <div className="flex-col gap-lg">
           <AutoPilotControlPanel isConnected={isConnected} />
+          <SignalMarketplacePanel isConnected={isConnected} />
           <AutonomousAgentTerminalCard isConnected={isConnected} />
         </div>
       )}

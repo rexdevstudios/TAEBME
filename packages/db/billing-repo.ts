@@ -14,6 +14,10 @@ import {
   type FeaturedBoostRecord,
 } from '../billing/high-margin-revenue';
 import {
+  computeMarketplaceSplit,
+  type SignalPresetListing,
+} from '../agent/signal-marketplace';
+import {
   PlanId,
   BillingDbAdapter,
   UserRiskPolicy,
@@ -912,6 +916,133 @@ export class PostgresBillingDbAdapter implements BillingDbAdapter {
     this.inMemoryRedeemedBoostTxHashes.add(normTx);
     this.inMemoryFeaturedBoosts = filterActiveFeaturedBoosts([record, ...this.inMemoryFeaturedBoosts]);
     return { ok: true, activeBoosts: this.inMemoryFeaturedBoosts };
+  }
+
+  private inMemoryMarketplacePresets: SignalPresetListing[] = [];
+
+  async getMarketplacePresets(): Promise<SignalPresetListing[]> {
+    const pool = this.resolveDeps()?.getDbPool() || null;
+    if (pool) {
+      try {
+        const res = await pool.query(`SELECT features FROM plans WHERE id = 'FREE' LIMIT 1`);
+        if (res.rows.length > 0) {
+          const feat =
+            typeof res.rows[0].features === 'string'
+              ? JSON.parse(res.rows[0].features)
+              : res.rows[0].features || {};
+          if (Array.isArray(feat.signalMarketplacePresets)) {
+            return feat.signalMarketplacePresets as SignalPresetListing[];
+          }
+        }
+      } catch (err: any) {
+        console.warn('[PostgresBillingDbAdapter] getMarketplacePresets warning:', err?.message);
+      }
+    }
+    return [...this.inMemoryMarketplacePresets];
+  }
+
+  async publishMarketplacePreset(
+    input: Omit<SignalPresetListing, 'id' | 'subscribersCount' | 'createdAt'>
+  ): Promise<SignalPresetListing> {
+    const record: SignalPresetListing = {
+      ...input,
+      id: `preset-${crypto.randomUUID().slice(0, 12)}`,
+      subscribersCount: 0,
+      createdAt: new Date().toISOString(),
+    };
+    const existing = await this.getMarketplacePresets();
+    const next = [record, ...existing].slice(0, 50);
+
+    const pool = this.resolveDeps()?.getDbPool() || null;
+    if (pool) {
+      try {
+        const patch = JSON.stringify({ signalMarketplacePresets: next });
+        await pool.query(
+          `INSERT INTO plans (id, name, base_price_cents, monthly_credits, features)
+           VALUES ('FREE', 'FREE Tier', 0, 100, $1::jsonb)
+           ON CONFLICT (id) DO UPDATE SET
+             features = COALESCE(plans.features, '{}'::jsonb) || $1::jsonb`,
+          [patch]
+        );
+      } catch (err: any) {
+        console.warn('[PostgresBillingDbAdapter] publishMarketplacePreset warning:', err?.message);
+      }
+    }
+    this.inMemoryMarketplacePresets = next;
+    return record;
+  }
+
+  async subscribeMarketplacePreset(
+    subscriberWallet: string,
+    presetId: string
+  ): Promise<{
+    ok: boolean;
+    error?: string;
+    preset?: SignalPresetListing;
+    split?: { totalCredits: number; creatorCredits: number; platformCredits: number };
+  }> {
+    const presets = await this.getMarketplacePresets();
+    const target = presets.find((p) => p.id === presetId);
+    if (!target) {
+      return { ok: false, error: 'PRESET_NOT_FOUND: Strategy preset does not exist.' };
+    }
+    if (target.creatorWallet.toLowerCase() === subscriberWallet.toLowerCase()) {
+      return { ok: false, error: 'SELF_SUBSCRIBE_FORBIDDEN: You cannot subscribe to your own preset.' };
+    }
+
+    const balance = await this.getUserCreditBalance(subscriberWallet);
+    if (balance < target.priceCredits) {
+      return {
+        ok: false,
+        error: `INSUFFICIENT_CREDITS: Required ${target.priceCredits} cr, available ${balance} cr.`,
+      };
+    }
+
+    const split = computeMarketplaceSplit(target.priceCredits);
+    const refId = `mkt-sub:${target.id}:${Date.now()}`;
+
+    await this.recordLedgerEntry({
+      userId: subscriberWallet,
+      amount: -split.totalCredits,
+      currency: 'CREDITS',
+      type: 'MARKETPLACE_PRESET_SUBSCRIBE',
+      referenceId: refId,
+      description: `Subscribed to preset "${target.title}" (${split.totalCredits} cr)`,
+    });
+
+    if (split.creatorCredits > 0) {
+      await this.recordLedgerEntry({
+        userId: target.creatorWallet,
+        amount: split.creatorCredits,
+        currency: 'CREDITS',
+        type: 'MARKETPLACE_CREATOR_REVENUE',
+        referenceId: `${refId}:creator`,
+        description: `80% Creator revenue share for preset "${target.title}"`,
+      });
+    }
+
+    const updatedList = presets.map((p) =>
+      p.id === target.id ? { ...p, subscribersCount: (p.subscribersCount || 0) + 1 } : p
+    );
+    const pool = this.resolveDeps()?.getDbPool() || null;
+    if (pool) {
+      try {
+        const patch = JSON.stringify({ signalMarketplacePresets: updatedList });
+        await pool.query(
+          `UPDATE plans SET features = COALESCE(features, '{}'::jsonb) || $1::jsonb WHERE id = 'FREE'`,
+          [patch]
+        );
+      } catch (err: any) {
+        console.warn('[PostgresBillingDbAdapter] subscribeMarketplacePreset warning:', err?.message);
+      }
+    }
+    this.inMemoryMarketplacePresets = updatedList;
+
+    return {
+      ok: true,
+      preset: updatedList.find((p) => p.id === target.id) || target,
+      split,
+    };
   }
 
   async createAuditLog(_actorId: string, _action: string, _entityId?: string, _reason?: string): Promise<void> {
