@@ -18,6 +18,14 @@ import {
   type SignalPresetListing,
 } from '../agent/signal-marketplace';
 import {
+  GENESIS_SBT_REFERRAL_BONUS_CREDITS,
+  GENESIS_SBT_SUPPLY_CAP,
+  GENESIS_SBT_WELCOME_CREDITS,
+  computeGenesisReferralLeaderboard,
+  type GenesisReferralLeaderRow,
+  type GenesisSbtMintRecord,
+} from '../billing/genesis-sbt';
+import {
   PlanId,
   BillingDbAdapter,
   UserRiskPolicy,
@@ -1042,6 +1050,167 @@ export class PostgresBillingDbAdapter implements BillingDbAdapter {
       ok: true,
       preset: updatedList.find((p) => p.id === target.id) || target,
       split,
+    };
+  }
+
+  private inMemoryGenesisSbtRecords: GenesisSbtMintRecord[] = [];
+  private inMemoryGenesisTxHashes: Set<string> = new Set();
+
+  async getGenesisSbtState(walletAddress?: string): Promise<{
+    totalMinted: number;
+    userPass: GenesisSbtMintRecord | null;
+    leaderboard: GenesisReferralLeaderRow[];
+  }> {
+    let records = [...this.inMemoryGenesisSbtRecords];
+    const pool = this.resolveDeps()?.getDbPool() || null;
+    if (pool) {
+      try {
+        const res = await pool.query(`SELECT features FROM plans WHERE id = 'FREE' LIMIT 1`);
+        if (res.rows.length > 0) {
+          const feat =
+            typeof res.rows[0].features === 'string'
+              ? JSON.parse(res.rows[0].features)
+              : res.rows[0].features || {};
+          if (Array.isArray(feat.genesisSbtMints)) {
+            records = feat.genesisSbtMints as GenesisSbtMintRecord[];
+          }
+        }
+      } catch (err: any) {
+        console.warn('[PostgresBillingDbAdapter] getGenesisSbtState warning:', err?.message);
+      }
+    }
+
+    const normWallet = (walletAddress || '').trim().toLowerCase();
+    const userPass = normWallet
+      ? records.find((r) => r.walletAddress.trim().toLowerCase() === normWallet) || null
+      : null;
+
+    return {
+      totalMinted: records.length,
+      userPass,
+      leaderboard: computeGenesisReferralLeaderboard(records, 10),
+    };
+  }
+
+  async recordGenesisSbtMint(params: {
+    walletAddress: string;
+    txHash: string;
+    chain: string;
+    referredBy: string | null;
+  }): Promise<{
+    ok: boolean;
+    code?: 'ALREADY_MINTED' | 'REPLAY_TX_HASH' | 'SUPPLY_EXHAUSTED';
+    error?: string;
+    pass?: GenesisSbtMintRecord;
+    totalMinted?: number;
+    leaderboard?: GenesisReferralLeaderRow[];
+  }> {
+    const normWallet = params.walletAddress.trim().toLowerCase();
+    const normTx = params.txHash.trim().toLowerCase();
+
+    const pool = this.resolveDeps()?.getDbPool() || null;
+    let existing: GenesisSbtMintRecord[] = [...this.inMemoryGenesisSbtRecords];
+    let redeemedTxs: string[] = Array.from(this.inMemoryGenesisTxHashes);
+
+    if (pool) {
+      try {
+        const res = await pool.query(`SELECT features FROM plans WHERE id = 'FREE' LIMIT 1`);
+        if (res.rows.length > 0) {
+          const feat =
+            typeof res.rows[0].features === 'string'
+              ? JSON.parse(res.rows[0].features)
+              : res.rows[0].features || {};
+          if (Array.isArray(feat.genesisSbtMints)) {
+            existing = feat.genesisSbtMints as GenesisSbtMintRecord[];
+          }
+          if (Array.isArray(feat.genesisSbtTxHashes)) {
+            redeemedTxs = feat.genesisSbtTxHashes as string[];
+          }
+        }
+      } catch (err: any) {
+        console.warn('[PostgresBillingDbAdapter] recordGenesisSbtMint load warning:', err?.message);
+      }
+    }
+
+    if (existing.some((r) => r.walletAddress.trim().toLowerCase() === normWallet)) {
+      return {
+        ok: false,
+        code: 'ALREADY_MINTED',
+        error: 'ALREADY_MINTED: This wallet has already claimed its Genesis Pioneer SBT.',
+      };
+    }
+    if (redeemedTxs.some((t) => String(t).toLowerCase() === normTx)) {
+      return {
+        ok: false,
+        code: 'REPLAY_TX_HASH',
+        error: 'REPLAY_TX_HASH: This transaction hash has already been redeemed.',
+      };
+    }
+    if (existing.length >= GENESIS_SBT_SUPPLY_CAP) {
+      return {
+        ok: false,
+        code: 'SUPPLY_EXHAUSTED',
+        error: 'SUPPLY_EXHAUSTED: All 10,000 Genesis Pioneer SBTs have been minted.',
+      };
+    }
+
+    const pass: GenesisSbtMintRecord = {
+      serialNumber: existing.length + 1,
+      walletAddress: params.walletAddress.trim(),
+      txHash: params.txHash.trim(),
+      chain: params.chain,
+      referredBy: params.referredBy,
+      mintedAt: new Date().toISOString(),
+    };
+    const nextRecords = [...existing, pass];
+    const nextTxs = [normTx, ...redeemedTxs].slice(0, 12000);
+
+    if (pool) {
+      try {
+        const patch = JSON.stringify({
+          genesisSbtMints: nextRecords,
+          genesisSbtTxHashes: nextTxs,
+        });
+        await pool.query(
+          `INSERT INTO plans (id, name, base_price_cents, monthly_credits, features)
+           VALUES ('FREE', 'FREE Tier', 0, 100, $1::jsonb)
+           ON CONFLICT (id) DO UPDATE SET
+             features = COALESCE(plans.features, '{}'::jsonb) || $1::jsonb`,
+          [patch]
+        );
+      } catch (err: any) {
+        console.warn('[PostgresBillingDbAdapter] recordGenesisSbtMint save warning:', err?.message);
+      }
+    }
+
+    this.inMemoryGenesisSbtRecords = nextRecords;
+    this.inMemoryGenesisTxHashes.add(normTx);
+
+    await this.recordLedgerEntry({
+      userId: pass.walletAddress,
+      amount: GENESIS_SBT_WELCOME_CREDITS,
+      currency: 'CREDITS',
+      type: 'GENESIS_SBT_WELCOME_BONUS',
+      referenceId: `genesis-sbt:${pass.serialNumber}`,
+      description: `Genesis Pioneer SBT #${pass.serialNumber} welcome bonus (+${GENESIS_SBT_WELCOME_CREDITS} cr)`,
+    });
+
+    if (pass.referredBy) {
+      await this.recordLedgerEntry({
+        userId: pass.referredBy,
+        amount: GENESIS_SBT_REFERRAL_BONUS_CREDITS,
+        currency: 'CREDITS',
+        type: 'GENESIS_SBT_REFERRAL_BONUS',
+        referenceId: `genesis-ref:${pass.serialNumber}`,
+        description: `Genesis Pioneer referral bonus for inviting #${pass.serialNumber} (+${GENESIS_SBT_REFERRAL_BONUS_CREDITS} cr)`,
+      });
+    }
+
+    return {
+      ok: true,
+      pass,
+      totalMinted: nextRecords.length,
+      leaderboard: computeGenesisReferralLeaderboard(nextRecords, 10),
     };
   }
 

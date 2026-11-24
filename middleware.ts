@@ -54,6 +54,7 @@ const PUBLIC_GET_ONLY_PATHS = new Set([
   '/api/system/transparency', // GET (Public platform transparency & on-chain fee/treasury metrics) is public read-only
   '/api/launchpad/featured-boost', // GET (Active Launchpad Featured Boost slots) is public; POST requires SIWE session
   '/api/agent/marketplace', // GET (Copy-Trading Signal Preset Marketplace) is public; POST requires SIWE session
+  '/api/gamefi/genesis-sbt', // GET (Genesis Pioneer SBT live counter & leaderboard) is public; POST requires SIWE session
 ]);
 
 // Security headers applied to ALL responses

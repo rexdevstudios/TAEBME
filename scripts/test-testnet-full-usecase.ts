@@ -103,6 +103,13 @@ async function runFullTestnetUsecase() {
     const siweQuestJson: any = await siweQuestRes.json();
     assert(siweQuestRes.status === 200 && siweQuestJson?.success === true, `GameFi SIWE Login quest succeeded (+100 XP / +10 cr)`);
 
+    const sbtGetRes = await fetch(`${BASE_URL}/api/gamefi/genesis-sbt`);
+    const sbtGetJson: any = await sbtGetRes.json();
+    assert(
+      sbtGetRes.status === 200 && sbtGetJson?.success === true && sbtGetJson?.data?.mintPriceEth === '0',
+      `GET /api/gamefi/genesis-sbt returned FREE Mint Genesis SBT state (protocolFee=${sbtGetJson?.data?.protocolFeeEth} ETH)`
+    );
+
     // =========================================================================
     // STAGE 2: 1-Click Testnet Tier Upgrades (FREE -> CREATOR -> AGENT) & Ledger
     // =========================================================================

@@ -6,6 +6,7 @@ import { useLocale } from './context/LocaleContext';
 import { Activity, ShieldAlert, Zap, Rocket, Award, Server, Cpu, Lock, Network, Wallet, BrainCircuit } from 'lucide-react';
 import { executeKillSwitchToggle } from './lib/kill-switch-admin-client';
 import { LandingHeroMotion } from './components/LandingHeroMotion';
+import { GenesisSbtCard } from './components/GenesisSbtCard';
 
 interface OverviewData {
   status: string;
@@ -554,6 +555,9 @@ export default function OverviewPage() {
             </div>
           );
         })()}
+
+        {/* Free-Mint Genesis Pioneer SBT & Viral Referral Card (Phase DF) */}
+        <GenesisSbtCard />
 
         {/* GameFi Trader Pass & Quest Progression Card */}
         <div className="card" style={{ border: '1px solid var(--color-border)' }}>
