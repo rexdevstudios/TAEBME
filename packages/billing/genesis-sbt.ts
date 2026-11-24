@@ -71,3 +71,86 @@ export function buildGenesisReferralUrl(origin: string, walletAddress: string): 
   const cleanOrigin = (origin || 'https://pndigi.site').replace(/\/+$/, '');
   return `${cleanOrigin}/?ref=${encodeURIComponent(walletAddress.trim())}`;
 }
+
+export type GenesisWhitelistTier = 'PIONEER' | 'AMBASSADOR' | 'WHALE_REFERRER';
+
+export interface GenesisWhitelistEntry {
+  serialNumber: number;
+  walletAddress: string;
+  referralsCount: number;
+  allocationWeight: number;
+  tier: GenesisWhitelistTier;
+  chain: string;
+  mintedAt: string;
+}
+
+/**
+ * Pure deterministic Merkle Whitelist aggregator for Post-Genesis TGE / Angel Deal Room (Phase DK).
+ * Allocation weight = 1.00 base + 0.25 per valid referral (capped at +2.50 bonus -> max 3.50x).
+ */
+export function buildGenesisMerkleWhitelist(
+  records: readonly GenesisSbtMintRecord[]
+): GenesisWhitelistEntry[] {
+  const refCounts = new Map<string, number>();
+  for (const r of records || []) {
+    if (!r?.referredBy) continue;
+    const key = r.referredBy.trim().toLowerCase();
+    refCounts.set(key, (refCounts.get(key) || 0) + 1);
+  }
+
+  return (records || [])
+    .slice()
+    .sort((a, b) => a.serialNumber - b.serialNumber)
+    .map((r) => {
+      const referralsCount = refCounts.get(r.walletAddress.trim().toLowerCase()) || 0;
+      const allocationWeight = Number((1 + Math.min(referralsCount, 10) * 0.25).toFixed(2));
+      const tier: GenesisWhitelistTier =
+        referralsCount >= 5 ? 'WHALE_REFERRER' : referralsCount >= 1 ? 'AMBASSADOR' : 'PIONEER';
+      return {
+        serialNumber: r.serialNumber,
+        walletAddress: r.walletAddress.trim(),
+        referralsCount,
+        allocationWeight,
+        tier,
+        chain: r.chain || 'base-mainnet',
+        mintedAt: r.mintedAt,
+      };
+    });
+}
+
+function escapeCsvCell(raw: unknown): string {
+  let str = String(raw ?? '');
+  // Formula-injection neutralization (OWASP CSV injection guard)
+  if (/^[=+\-@\t\r]/.test(str)) {
+    str = `'${str}`;
+  }
+  if (/[",\r\n]/.test(str)) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
+
+export function serializeGenesisSnapshotToCsv(records: readonly GenesisSbtMintRecord[]): string {
+  const entries = buildGenesisMerkleWhitelist(records);
+  const header = [
+    'serial_number',
+    'wallet_address',
+    'tier',
+    'allocation_weight',
+    'referrals_count',
+    'chain',
+    'minted_at',
+  ].join(',');
+  const rows = entries.map((e) =>
+    [
+      escapeCsvCell(e.serialNumber),
+      escapeCsvCell(e.walletAddress),
+      escapeCsvCell(e.tier),
+      escapeCsvCell(e.allocationWeight.toFixed(2)),
+      escapeCsvCell(e.referralsCount),
+      escapeCsvCell(e.chain),
+      escapeCsvCell(e.mintedAt),
+    ].join(',')
+  );
+  return [header, ...rows].join('\n');
+}

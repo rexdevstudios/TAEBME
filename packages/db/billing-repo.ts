@@ -1099,6 +1099,28 @@ export class PostgresBillingDbAdapter implements BillingDbAdapter {
     };
   }
 
+  async getAllGenesisSbtRecords(): Promise<GenesisSbtMintRecord[]> {
+    let records = [...this.inMemoryGenesisSbtRecords];
+    const pool = this.resolveDeps()?.getDbPool() || null;
+    if (pool) {
+      try {
+        const res = await pool.query(`SELECT features FROM plans WHERE id = 'FREE' LIMIT 1`);
+        if (res.rows.length > 0) {
+          const feat =
+            typeof res.rows[0].features === 'string'
+              ? JSON.parse(res.rows[0].features)
+              : res.rows[0].features || {};
+          if (Array.isArray(feat.genesisSbtMints)) {
+            records = feat.genesisSbtMints as GenesisSbtMintRecord[];
+          }
+        }
+      } catch (err: any) {
+        console.warn('[PostgresBillingDbAdapter] getAllGenesisSbtRecords warning:', err?.message);
+      }
+    }
+    return records;
+  }
+
   async recordGenesisSbtMint(params: {
     walletAddress: string;
     txHash: string;

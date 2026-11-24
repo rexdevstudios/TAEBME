@@ -194,3 +194,213 @@ export function validateBankrMultiAccountBatch(params: {
     requiredCredits,
   };
 }
+
+// ============================================================================
+// BANKR AGENT API RAIL (Phase DK) — POST /agent/prompt & GET /agent/job/{id}
+// ============================================================================
+export const BANKR_AGENT_PROMPT_URL = 'https://api.bankr.bot/agent/prompt';
+export const BANKR_AGENT_JOB_URL = 'https://api.bankr.bot/agent/job';
+export const MAX_BANKR_AGENT_PROMPT_LEN = 1000;
+
+export interface BankrAgentPromptValidation {
+  valid: boolean;
+  sanitizedPrompt: string;
+  errorCode?: 'EMPTY_PROMPT' | 'PROMPT_TOO_LONG' | 'SENSITIVE_SECRET_DETECTED';
+  errorMessage?: string;
+}
+
+export interface BankrAgentJobResponse {
+  status: 'pending' | 'completed' | 'failed' | 'unknown';
+  jobId?: string;
+  response?: string;
+  transactions?: unknown[];
+  httpStatus?: number;
+  message: string;
+  keySource?: 'BYOK_VAULT' | 'PLATFORM_ENV';
+}
+
+/**
+ * Pure deterministic validator for Bankr Agent API prompts (Phase DK).
+ * Blocks empty/oversized prompts and prevents accidental private-key / seed-phrase exfiltration.
+ */
+export function validateBankrAgentPromptInput(rawPrompt: unknown): BankrAgentPromptValidation {
+  const sanitizedPrompt = typeof rawPrompt === 'string' ? rawPrompt.trim() : '';
+  if (sanitizedPrompt.length < 3) {
+    return {
+      valid: false,
+      sanitizedPrompt,
+      errorCode: 'EMPTY_PROMPT',
+      errorMessage: 'EMPTY_PROMPT: Prompt Bankr Agent minimal 3 karakter.',
+    };
+  }
+  if (sanitizedPrompt.length > MAX_BANKR_AGENT_PROMPT_LEN) {
+    return {
+      valid: false,
+      sanitizedPrompt,
+      errorCode: 'PROMPT_TOO_LONG',
+      errorMessage: `PROMPT_TOO_LONG: Maksimal ${MAX_BANKR_AGENT_PROMPT_LEN} karakter per perintah Bankr Agent.`,
+    };
+  }
+  // Non-custodial guard: reject raw 64-hex private keys or mnemonic seed phrases
+  if (/\b0x[a-fA-F0-9]{64}\b/.test(sanitizedPrompt) || /\b(seed phrase|mnemonic|private key)\b/i.test(sanitizedPrompt)) {
+    return {
+      valid: false,
+      sanitizedPrompt: '',
+      errorCode: 'SENSITIVE_SECRET_DETECTED',
+      errorMessage: 'SENSITIVE_SECRET_DETECTED: Dilarang mengirim private key atau seed phrase ke prompt AI Agent.',
+    };
+  }
+  return { valid: true, sanitizedPrompt };
+}
+
+export async function submitBankrAgentPrompt(params: {
+  prompt: string;
+  apiKeyOverride?: string;
+}): Promise<BankrAgentJobResponse> {
+  const check = validateBankrAgentPromptInput(params.prompt);
+  if (!check.valid) {
+    return {
+      status: 'failed',
+      message: check.errorMessage || 'INVALID_PROMPT',
+    };
+  }
+
+  const overrideKey = params.apiKeyOverride?.trim();
+  const apiKey = overrideKey || process.env.BANKR_API_KEY?.trim();
+  const keySource: 'BYOK_VAULT' | 'PLATFORM_ENV' = overrideKey ? 'BYOK_VAULT' : 'PLATFORM_ENV';
+
+  if (!apiKey || apiKey.startsWith('mock_')) {
+    return {
+      status: 'failed',
+      keySource,
+      message:
+        'BANKR_API_KEY belum tersedia. Simpan Bankr API Key Anda di Multi-Key BYOK Vault terlebih dahulu.',
+    };
+  }
+
+  try {
+    const res = await fetch(BANKR_AGENT_PROMPT_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': apiKey,
+      },
+      body: JSON.stringify({ prompt: check.sanitizedPrompt }),
+      signal: AbortSignal.timeout(20000),
+    });
+
+    const data = (await res.json().catch(() => ({}))) as Record<string, any>;
+    if (!res.ok) {
+      return {
+        status: 'failed',
+        httpStatus: res.status,
+        keySource,
+        message: String(data?.error || data?.message || `Bankr Agent API returned HTTP ${res.status}`),
+      };
+    }
+
+    const jobId = typeof data?.jobId === 'string' ? data.jobId : typeof data?.job_id === 'string' ? data.job_id : undefined;
+    const rawStatus = String(data?.status || (jobId ? 'pending' : 'completed')).toLowerCase();
+    const mappedStatus: BankrAgentJobResponse['status'] =
+      rawStatus === 'completed' || rawStatus === 'done'
+        ? 'completed'
+        : rawStatus === 'failed' || rawStatus === 'error'
+          ? 'failed'
+          : 'pending';
+
+    return {
+      status: mappedStatus,
+      jobId,
+      response: typeof data?.response === 'string' ? data.response : undefined,
+      transactions: Array.isArray(data?.transactions) ? data.transactions : undefined,
+      httpStatus: res.status,
+      keySource,
+      message: jobId ? `Bankr Agent job submitted (${jobId}).` : 'Bankr Agent prompt accepted.',
+    };
+  } catch (err: unknown) {
+    // NEVER blindly retry on timeout — return 'unknown' to prevent duplicate execution
+    const isTimeout = err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError');
+    return {
+      status: isTimeout ? 'unknown' : 'failed',
+      keySource,
+      message: isTimeout
+        ? 'BANKR_AGENT_TIMEOUT_UNKNOWN: Request timed out. Check Bankr job status before retrying.'
+        : 'BANKR_AGENT_NETWORK_ERROR: Failed to contact Bankr Agent API.',
+    };
+  }
+}
+
+export async function getBankrAgentJobStatus(params: {
+  jobId: string;
+  apiKeyOverride?: string;
+}): Promise<BankrAgentJobResponse> {
+  const cleanJobId = String(params.jobId || '').trim();
+  if (!cleanJobId || !/^[a-zA-Z0-9_-]{3,128}$/.test(cleanJobId)) {
+    return {
+      status: 'failed',
+      message: 'INVALID_JOB_ID: jobId is required and must be alphanumeric.',
+    };
+  }
+
+  const overrideKey = params.apiKeyOverride?.trim();
+  const apiKey = overrideKey || process.env.BANKR_API_KEY?.trim();
+  const keySource: 'BYOK_VAULT' | 'PLATFORM_ENV' = overrideKey ? 'BYOK_VAULT' : 'PLATFORM_ENV';
+
+  if (!apiKey || apiKey.startsWith('mock_')) {
+    return {
+      status: 'failed',
+      jobId: cleanJobId,
+      keySource,
+      message: 'BANKR_API_KEY belum tersedia di BYOK Vault atau environment.',
+    };
+  }
+
+  try {
+    const res = await fetch(`${BANKR_AGENT_JOB_URL}/${encodeURIComponent(cleanJobId)}`, {
+      method: 'GET',
+      headers: {
+        'X-API-Key': apiKey,
+      },
+      signal: AbortSignal.timeout(15000),
+    });
+
+    const data = (await res.json().catch(() => ({}))) as Record<string, any>;
+    if (!res.ok) {
+      return {
+        status: 'failed',
+        jobId: cleanJobId,
+        httpStatus: res.status,
+        keySource,
+        message: String(data?.error || data?.message || `Bankr Job API returned HTTP ${res.status}`),
+      };
+    }
+
+    const rawStatus = String(data?.status || 'pending').toLowerCase();
+    const mappedStatus: BankrAgentJobResponse['status'] =
+      rawStatus === 'completed' || rawStatus === 'done'
+        ? 'completed'
+        : rawStatus === 'failed' || rawStatus === 'error'
+          ? 'failed'
+          : 'pending';
+
+    return {
+      status: mappedStatus,
+      jobId: cleanJobId,
+      response: typeof data?.response === 'string' ? data.response : undefined,
+      transactions: Array.isArray(data?.transactions) ? data.transactions : undefined,
+      httpStatus: res.status,
+      keySource,
+      message: `Job ${cleanJobId} status: ${mappedStatus}`,
+    };
+  } catch (err: unknown) {
+    const isTimeout = err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError');
+    return {
+      status: isTimeout ? 'unknown' : 'failed',
+      jobId: cleanJobId,
+      keySource,
+      message: isTimeout
+        ? 'BANKR_JOB_POLL_TIMEOUT: Timed out polling Bankr job status.'
+        : 'BANKR_JOB_NETWORK_ERROR: Failed to poll Bankr job status.',
+    };
+  }
+}
