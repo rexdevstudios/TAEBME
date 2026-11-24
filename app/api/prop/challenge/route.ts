@@ -19,6 +19,7 @@ import {
   PROP_CHALLENGE_RULES,
   type PropTradeSample,
 } from '@packages/trading/prop-challenge';
+import { notifyPublicTelegramChannelBestEffort } from '@packages/notifications/webhook-dispatcher';
 
 export const dynamic = 'force-dynamic';
 
@@ -186,6 +187,22 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
       }
+      if (evalRes.challenge?.status === 'PASSED') {
+        const maskedWallet = `${session.walletAddress.slice(0, 6)}...${session.walletAddress.slice(-4)}`;
+        await notifyPublicTelegramChannelBestEffort({
+          event: 'PROP_CHALLENGE_PASSED',
+          title: 'New POOLNET Verified Prop Trader',
+          message:
+            `Wallet ${maskedWallet} PASSED the POOLNET Proof-of-Skill Prop Trading Cup (+${evalRes.challenge.pnlPct.toFixed(2)}% PnL, +${PROP_CHALLENGE_RULES.passRewardCredits} Credits).\n` +
+            `Join the Cup: https://pndigi.site/prop`,
+          metadata: {
+            pnlPct: evalRes.challenge.pnlPct,
+            tradingDays: evalRes.challenge.tradingDaysCount,
+            rewardCredits: PROP_CHALLENGE_RULES.passRewardCredits,
+          },
+        });
+      }
+
       return NextResponse.json(
         { success: true, data: evalRes.challenge, timestamp: new Date().toISOString() },
         { status: 200 }

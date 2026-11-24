@@ -22,6 +22,7 @@ import {
   GENESIS_SBT_WELCOME_CREDITS,
   normalizeReferrerWallet,
 } from '@packages/billing/genesis-sbt';
+import { notifyPublicTelegramChannelBestEffort } from '@packages/notifications/webhook-dispatcher';
 
 export const dynamic = 'force-dynamic';
 
@@ -129,6 +130,21 @@ export async function POST(req: NextRequest) {
         { status }
       );
     }
+
+    const maskedWallet = `${session.walletAddress.slice(0, 6)}...${session.walletAddress.slice(-4)}`;
+    await notifyPublicTelegramChannelBestEffort({
+      event: 'GENESIS_SBT_MINTED',
+      title: `New Genesis Pioneer #${result.pass?.serialNumber || result.totalMinted} Minted`,
+      message:
+        `Wallet ${maskedWallet} just claimed Free-Mint Genesis Pioneer SBT #${result.pass?.serialNumber || result.totalMinted} (${result.totalMinted} / ${GENESIS_SBT_SUPPLY_CAP.toLocaleString()}).\n` +
+        `Claim yours free (+200 Credits): https://pndigi.site`,
+      metadata: {
+        serial: result.pass?.serialNumber || 0,
+        totalMinted: result.totalMinted || 0,
+        chain,
+        referred: Boolean(referredBy),
+      },
+    });
 
     return NextResponse.json(
       {

@@ -15,7 +15,9 @@ export type AlertEventType =
   | 'DAILY_LOSS_WARNING'
   | 'TOKEN_DEPLOYED'
   | 'KEY_FROZEN_OVER_QUOTA'
-  | 'GENESIS_WEEKLY_DIGEST';
+  | 'GENESIS_WEEKLY_DIGEST'
+  | 'GENESIS_SBT_MINTED'
+  | 'PROP_CHALLENGE_PASSED';
 
 export interface OutboundAlertPayload {
   event: AlertEventType;
@@ -72,6 +74,8 @@ const EVENT_EMOJI: Record<AlertEventType, string> = {
   TOKEN_DEPLOYED: '🚀',
   KEY_FROZEN_OVER_QUOTA: '🧊',
   GENESIS_WEEKLY_DIGEST: '🏆',
+  GENESIS_SBT_MINTED: '🎖️',
+  PROP_CHALLENGE_PASSED: '🥇',
 };
 
 /**
@@ -300,4 +304,53 @@ export function buildSocialShareUrl(
     return `https://warpcast.com/~/compose?text=${encodeURIComponent(text)}&embeds[]=${encodeURIComponent(finalUrl)}`;
   }
   return `https://x.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(finalUrl)}`;
+}
+
+/**
+ * Resolves the configured public Telegram digest/broadcast URL from environment variables (Phase DP).
+ * Priority: GENESIS_DIGEST_WEBHOOK_URL -> TELEGRAM_BOT_TOKEN + TELEGRAM_DIGEST_CHAT_ID -> null.
+ */
+export function resolvePublicTelegramDigestUrl(): string | null {
+  const explicitUrl = process.env.GENESIS_DIGEST_WEBHOOK_URL?.trim();
+  if (explicitUrl) return explicitUrl;
+
+  const botToken = process.env.TELEGRAM_BOT_TOKEN?.trim();
+  const chatId = process.env.TELEGRAM_DIGEST_CHAT_ID?.trim();
+  if (botToken && chatId) {
+    return `https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${encodeURIComponent(chatId)}`;
+  }
+  return null;
+}
+
+/**
+ * Strictly non-blocking best-effort broadcaster for public community milestones
+ * (GENESIS_SBT_MINTED, PROP_CHALLENGE_PASSED). Never throws or blocks core user transactions.
+ */
+export async function notifyPublicTelegramChannelBestEffort(
+  payload: OutboundAlertPayload,
+  fetchImpl?: typeof fetch
+): Promise<{ attempted: boolean; delivered: boolean; statusCode?: number; error?: string }> {
+  try {
+    const targetUrl = resolvePublicTelegramDigestUrl();
+    if (!targetUrl) {
+      return { attempted: false, delivered: false };
+    }
+    const res = await dispatchOutboundAlert({
+      webhookUrl: targetUrl,
+      payload,
+      fetchImpl,
+    });
+    return {
+      attempted: true,
+      delivered: res.delivered,
+      statusCode: res.statusCode,
+      error: res.error,
+    };
+  } catch (err: any) {
+    return {
+      attempted: true,
+      delivered: false,
+      error: err?.message || 'PUBLIC_TELEGRAM_NOTIFY_ERROR',
+    };
+  }
 }

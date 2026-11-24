@@ -13,7 +13,10 @@ import {
   GENESIS_SBT_SUPPLY_CAP,
   formatWeeklyGenesisDigestMessage,
 } from '@packages/billing/genesis-sbt';
-import { dispatchOutboundAlert } from '@packages/notifications/webhook-dispatcher';
+import {
+  dispatchOutboundAlert,
+  resolvePublicTelegramDigestUrl,
+} from '@packages/notifications/webhook-dispatcher';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,18 +25,6 @@ function isCronAuthorized(req: NextRequest): boolean {
   if (!cronSecret || cronSecret.length < 16) return false;
   const authHeader = req.headers.get('authorization');
   return Boolean(authHeader && authHeader === `Bearer ${cronSecret}`);
-}
-
-function resolveDigestTargetUrl(): string | null {
-  const explicitUrl = process.env.GENESIS_DIGEST_WEBHOOK_URL?.trim();
-  if (explicitUrl) return explicitUrl;
-
-  const botToken = process.env.TELEGRAM_BOT_TOKEN?.trim();
-  const chatId = process.env.TELEGRAM_DIGEST_CHAT_ID?.trim();
-  if (botToken && chatId) {
-    return `https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${encodeURIComponent(chatId)}`;
-  }
-  return null;
 }
 
 export async function GET(req: NextRequest) {
@@ -65,7 +56,7 @@ export async function GET(req: NextRequest) {
       siteOrigin: process.env.NEXT_PUBLIC_APP_URL || 'https://pndigi.site',
     });
 
-    const targetUrl = resolveDigestTargetUrl();
+    const targetUrl = resolvePublicTelegramDigestUrl();
     if (dryRun || !targetUrl) {
       return NextResponse.json(
         {
