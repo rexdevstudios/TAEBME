@@ -18,6 +18,11 @@ import {
   useTokenWatchlist,
 } from '../components/TokenWatchlistBar';
 import {
+  LAUNCHPAD_CURVE_PAIRS,
+  TOP_LIQUID_CEX_PAIRS,
+  isValidMarketSymbol,
+} from '@packages/shared/market-pairs';
+import {
   EVM_DEX_CHAINS,
   ensureEvmNetwork,
   findDexTokenPresetByAddress,
@@ -597,15 +602,37 @@ export default function TradingPage() {
             className="input"
             style={{ padding: '7px 12px', fontSize: '12px', fontWeight: 700, width: 'auto', display: 'inline-block' }}
           >
-            <option value="BTCUSDT">BTC / USDT (Binance Live)</option>
-            <option value="ETHUSDT">ETH / USDT (Binance Live)</option>
-            <option value="SOLUSDT">SOL / USDT (Binance Live)</option>
-            <option value="BASEUSDT">BASE / USDT (Binance Live)</option>
-            <option value="PUMPRUN/WETH">PUMPRUN / WETH (Base Doppler v4)</option>
-            <option value="MOON/ETH">MOON / ETH (Bonding Curve)</option>
-            <option value="PEOPLE/ETH">PEOPLE / ETH (Fair Launch)</option>
-            <option value="CDAO/ETH">CDAO / ETH (Community Prelaunch)</option>
+            {!TOP_LIQUID_CEX_PAIRS.some((p) => p.symbol === symbol) &&
+              !LAUNCHPAD_CURVE_PAIRS.some((p) => p.symbol === symbol) && (
+                <option value={symbol}>{symbol} (Custom)</option>
+              )}
+            {TOP_LIQUID_CEX_PAIRS.map((p) => (
+              <option key={p.symbol} value={p.symbol}>
+                {p.label}
+              </option>
+            ))}
+            {LAUNCHPAD_CURVE_PAIRS.map((p) => (
+              <option key={p.symbol} value={p.symbol}>
+                {p.label}
+              </option>
+            ))}
           </select>
+          <input
+            type="text"
+            aria-label="Custom pair ticker"
+            placeholder={tr('Custom pair (e.g. WIFUSDT)', 'Pair kustom (mis. WIFUSDT)')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                const candidate = (e.currentTarget.value || '').trim().toUpperCase();
+                if (isValidMarketSymbol(candidate)) {
+                  setSymbol(candidate);
+                  e.currentTarget.value = '';
+                }
+              }
+            }}
+            className="input"
+            style={{ padding: '7px 10px', fontSize: '11px', fontFamily: 'var(--font-mono)', width: '165px', display: 'inline-block' }}
+          />
           <span
             className={error ? 'badge badge-admin' : 'badge-live'}
             role="status"

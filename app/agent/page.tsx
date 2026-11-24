@@ -15,6 +15,7 @@ import { MultiRailAgentExecutionPanel } from '../components/MultiRailAgentExecut
 import { AutoPilotControlPanel } from '../components/AutoPilotControlPanel';
 import { SignalMarketplacePanel } from '../components/SignalMarketplacePanel';
 import type { CustomAgentProfile } from '@packages/agent/skill-registry';
+import { TOP_LIQUID_CEX_PAIRS } from '@packages/shared/market-pairs';
 
 export default function AgentPage() {
   const { isConnected, userRole, hasCapability, entitlements, connectMetaMask, isConnecting, refreshSession } = useAuth();
@@ -248,9 +249,11 @@ export default function AgentPage() {
                 className="input"
                 style={{ padding: '12px', color: 'var(--color-accent)', fontWeight: 800, fontFamily: 'var(--font-mono)' }}
               >
-                <option value="BTCUSDT">BTC / USDT</option>
-                <option value="ETHUSDT">ETH / USDT</option>
-                <option value="SOLUSDT">SOL / USDT</option>
+                {TOP_LIQUID_CEX_PAIRS.map((p) => (
+                  <option key={p.symbol} value={p.symbol}>
+                    {p.symbol.replace(/USDT$/, ' / USDT')}
+                  </option>
+                ))}
                 <option value="DEGEN/USDT">DEGEN / USDT</option>
               </select>
             </div>

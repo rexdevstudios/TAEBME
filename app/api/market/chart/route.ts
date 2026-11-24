@@ -6,6 +6,7 @@ import { fetchDefiLlamaMacroSignal } from '@packages/intelligence/defillama-clie
 import { TradingSignalEngine } from '@packages/intelligence/trading-signal-engine';
 import { fetchDexTokenSnapshot, DexTokenSnapshot } from '@packages/intelligence/dex-market-scanner';
 import { ApiResponse } from '@packages/shared/contracts/api-contracts';
+import { isValidChartInterval, isValidMarketSymbol } from '@packages/shared/market-pairs';
 
 const INTERVAL_MS: Record<string, number> = {
   '5m': 5 * 60 * 1000,
@@ -73,9 +74,31 @@ function buildTokenCandles(params: {
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const symbol = (searchParams.get('symbol') || 'BTCUSDT').toUpperCase();
-    const interval = (searchParams.get('interval') || '1h') as BinanceKlineInterval;
+    const symbol = (searchParams.get('symbol') || 'BTCUSDT').trim().toUpperCase();
+    const rawInterval = (searchParams.get('interval') || '1h').trim();
     const tokenAddress = (searchParams.get('address') || '').trim();
+
+    if (!isValidMarketSymbol(symbol)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: { code: 'INVALID_SYMBOL', message: 'Symbol must be a valid CEX ticker (e.g. BTCUSDT) or pair (e.g. MOON/ETH).' },
+          timestamp: new Date().toISOString(),
+        },
+        { status: 400 }
+      );
+    }
+    if (!isValidChartInterval(rawInterval)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: { code: 'INVALID_INTERVAL', message: 'Supported intervals are 5m, 15m, 1h, 4h, 1d.' },
+          timestamp: new Date().toISOString(),
+        },
+        { status: 400 }
+      );
+    }
+    const interval = rawInterval as BinanceKlineInterval;
     const chain = (searchParams.get('chain') || 'base').trim().toLowerCase();
     const ticker = (searchParams.get('ticker') || symbol).toUpperCase();
     const raised = Number(searchParams.get('raised') || 0);
@@ -206,7 +229,12 @@ export async function GET(req: NextRequest) {
       timestamp: new Date().toISOString(),
     };
 
-    return NextResponse.json(response, { status: 200 });
+    return NextResponse.json(response, {
+      status: 200,
+      headers: {
+        'Cache-Control': 'public, s-maxage=10, stale-while-revalidate=20',
+      },
+    });
 
   } catch (err) {
     const response: ApiResponse<null> = {
