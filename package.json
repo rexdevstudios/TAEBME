@@ -38,6 +38,7 @@
     "verify:siwe:testnet": "bun run scripts/test-siwe-e2e-smoke.ts",
     "verify:db:drift": "bun run scripts/check-neon-drift.ts",
     "verify:ui:smoke": "bun run scripts/test-ui-smoke.ts",
+    "verify:live:all": "bun run verify:blackbox:dual && bun run verify:ui:smoke",
     "verify:all": "npx tsc -p tsconfig.vercel.json --noEmit && bun run verify:unit && bun run verify:whitebox && bun run verify:sim",
     "typecheck": "tsc --noEmit",
     "db:seed": "npx tsx scripts/seed-db.ts",
