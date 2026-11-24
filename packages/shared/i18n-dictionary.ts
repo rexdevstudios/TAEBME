@@ -15,6 +15,7 @@ export const I18N_DICTIONARY: Record<AppLocale, Record<string, string>> = {
     'nav.trade': 'Trade',
     'nav.agent': 'AI Auto-Pilot',
     'nav.kol': 'Earn & KOL',
+    'nav.prop': 'Prop Cup',
     'nav.transparency': 'Transparency',
     'nav.account': 'Account',
     'nav.connect': 'Connect Wallet',
@@ -75,6 +76,10 @@ export const I18N_DICTIONARY: Record<AppLocale, Record<string, string>> = {
     'billing.tabVaults': 'Add-Ons, API & Telegram Alerts',
     'billing.tabHistory': 'Credit Ledger & Security',
     'billing.tabAdmin': 'Admin Ops Console',
+
+    // Prop Trading Cup (/prop)
+    'prop.title': 'POOLNET Trading Cup — Proof-of-Skill Challenge',
+    'prop.subtitle': '100% non-custodial skill evaluation on $10,000 virtual equity with live market feeds. Pass to unlock Verified Trader status, +250 Credits, and Signal Marketplace.',
   },
   id: {
     // Navbar
@@ -83,6 +88,7 @@ export const I18N_DICTIONARY: Record<AppLocale, Record<string, string>> = {
     'nav.trade': 'Trading',
     'nav.agent': 'AI Auto-Pilot',
     'nav.kol': 'Earn & KOL',
+    'nav.prop': 'Prop Cup',
     'nav.transparency': 'Transparansi',
     'nav.account': 'Akun',
     'nav.connect': 'Hubungkan Dompet',
@@ -143,6 +149,10 @@ export const I18N_DICTIONARY: Record<AppLocale, Record<string, string>> = {
     'billing.tabVaults': 'Add-On, API & Telegram Alert',
     'billing.tabHistory': 'Mutasi Kredit & Keamanan',
     'billing.tabAdmin': 'Admin Ops Console',
+
+    // Prop Trading Cup (/prop)
+    'prop.title': 'POOLNET Trading Cup — Tantangan Proof-of-Skill',
+    'prop.subtitle': 'Evaluasi skill 100% non-kustodial di modal virtual $10.000 dengan harga pasar live. Lulus untuk membuka status Verified Trader, +250 Credits, & Signal Marketplace.',
   },
 };
 

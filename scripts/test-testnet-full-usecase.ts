@@ -365,6 +365,9 @@ async function runFullTestnetUsecase() {
       `GET /api/prop/challenge returned Proof-of-Skill Prop Challenge rules & leaderboard (HTTP 200)`
     );
 
+    const propPageRes = await fetch(`${BASE_URL}/prop`);
+    assert(propPageRes.status === 200, `GET /prop public Trading Cup UI rendered cleanly (HTTP ${propPageRes.status})`);
+
     // =========================================================================
     // STAGE 8: RBAC Admin Fail-Closed + Cleanup + Logout Invalidation
     // =========================================================================

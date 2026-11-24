@@ -22,6 +22,7 @@ import {
   Globe,
   PanelLeft,
   PanelLeftClose,
+  Trophy,
 } from 'lucide-react';
 import { getNetworkLabel } from '../lib/classifyHostname';
 
@@ -101,6 +102,7 @@ export default function HeaderNav() {
     { href: '/trading', label: t('nav.trade'), icon: Network },
     { href: '/agent', label: t('nav.agent'), icon: BrainCircuit },
     { href: '/kol', label: t('nav.kol'), icon: Award },
+    { href: '/prop', label: t('nav.prop'), icon: Trophy },
     { href: '/transparency', label: t('nav.transparency'), icon: BarChart3 },
     { href: '/billing', label: t('nav.account'), icon: CreditCard },
   ];
@@ -417,7 +419,7 @@ export default function HeaderNav() {
 
       {/* Phase CV: Mobile Bottom Navigation Bar (< 768px native fintech feel) */}
       <nav className="pons-mobile-bottom-nav" aria-label="Mobile Bottom Navigation">
-        {[navItems[0], navItems[1], navItems[2], navItems[3], navItems[6]].map((item) => {
+        {[navItems[0], navItems[1], navItems[2], navItems[3], navItems[navItems.length - 1]].map((item) => {
           const Icon = item.icon;
           const active = isActive(item.href);
           return (
