@@ -243,12 +243,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         accounts = await requestWithTimeout<string[]>(
           ethereum.request({ method: 'eth_requestAccounts' }),
           30000,
-          'Popup MetaMask belum disetujui. Klik ikon ekstensi MetaMask (🦊) di pojok kanan atas browser Anda untuk membuka popup yang tertunda.'
+          'Popup MetaMask belum disetujui. Klik ikon ekstensi MetaMask () di pojok kanan atas browser Anda untuk membuka popup yang tertunda.'
         );
       } catch (reqErr: any) {
         if (reqErr?.code === 4001) throw new Error('Koneksi dompet dibatalkan di MetaMask.');
         if (reqErr?.code === -32002) {
-          throw new Error('Permintaan koneksi sudah terbuka di MetaMask. Klik ikon ekstensi MetaMask (🦊) di pojok kanan atas browser Anda.');
+          throw new Error('Permintaan koneksi sudah terbuka di MetaMask. Klik ikon ekstensi MetaMask () di pojok kanan atas browser Anda.');
         }
         // Fallback to eth_accounts only if eth_requestAccounts is unsupported by a legacy wallet
         accounts = await ethereum.request({ method: 'eth_accounts' }).catch(() => []);
@@ -284,7 +284,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // 3. Prompt wallet popup immediately (0ms synchronous hex encoding to preserve browser user gesture)
       const hexMessage = utf8ToHex(messageToSign);
       const pendingPopupHint =
-        'Menunggu tanda tangan di MetaMask. Jika popup tidak muncul otomatis, klik ikon ekstensi MetaMask (🦊) di pojok kanan atas browser Anda.';
+        'Menunggu tanda tangan di MetaMask. Jika popup tidak muncul otomatis, klik ikon ekstensi MetaMask () di pojok kanan atas browser Anda.';
       let signature: string;
       try {
         signature = await requestWithTimeout<string>(
@@ -360,7 +360,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (err: any) {
       const msg =
         err?.code === -32002
-          ? 'Permintaan MetaMask sudah terbuka di latar belakang. Klik ikon ekstensi MetaMask (🦊) di pojok kanan atas browser Anda.'
+          ? 'Permintaan MetaMask sudah terbuka di latar belakang. Klik ikon ekstensi MetaMask () di pojok kanan atas browser Anda.'
           : err?.message || 'Koneksi dompet dibatalkan atau gagal.';
       return { success: false, error: msg };
     } finally {

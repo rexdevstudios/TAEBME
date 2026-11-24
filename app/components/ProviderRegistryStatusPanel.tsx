@@ -71,7 +71,7 @@ export function ProviderRegistryStatusPanel() {
             border: '1px solid rgba(56, 189, 248, 0.35)',
             fontSize: '11px',
             fontFamily: 'var(--font-mono)',
-            color: '#7DD3FC',
+            color: 'var(--color-accent-info)',
           }}
         >
           <Cpu size={12} />
@@ -104,7 +104,7 @@ export function ProviderRegistryStatusPanel() {
                     borderRadius: '4px',
                     whiteSpace: 'nowrap',
                     background: isLive ? 'rgba(16,185,129,0.15)' : 'rgba(168,85,247,0.16)',
-                    color: isLive ? '#10B981' : '#C084FC',
+                    color: isLive ? '#10B981' : 'var(--color-accent-purple)',
                   }}
                 >
                   {p.status}
@@ -112,7 +112,7 @@ export function ProviderRegistryStatusPanel() {
               </div>
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', fontSize: '9px', fontFamily: 'var(--font-mono)' }}>
                 <span style={{ color: 'var(--color-accent)' }}>{p.category}</span>
-                {p.supportsByok && <span style={{ color: '#38BDF8' }}>· BYOK</span>}
+                {p.supportsByok && <span style={{ color: 'var(--color-accent-info)' }}>· BYOK</span>}
                 <span className="text-muted">· {p.supportedChainsOrMarkets.join(', ')}</span>
               </div>
               <div className="text-muted" style={{ fontSize: '10px', lineHeight: 1.4, display: 'flex', alignItems: 'flex-start', gap: '4px' }}>

@@ -40,7 +40,7 @@ export const AngelDealRoomModal: React.FC<AngelDealRoomModalProps> = ({
 
   const handleCheckEligibility = async () => {
     if (!connectedWallet) {
-      setActionFeedback('⚠️ Silakan hubungkan dompet Web3 terlebih dahulu.');
+      setActionFeedback('Notice: Silakan hubungkan dompet Web3 terlebih dahulu.');
       return;
     }
     setActionFeedback(null);
@@ -57,13 +57,13 @@ export const AngelDealRoomModal: React.FC<AngelDealRoomModalProps> = ({
           root: json.data.merkleRoot,
         });
         if (!json.data.isWhitelisted) {
-          setActionFeedback('❌ Dompet Anda tidak terdaftar dalam whitelist alokasi kampanye ini.');
+          setActionFeedback('Error: Dompet Anda tidak terdaftar dalam whitelist alokasi kampanye ini.');
         }
       } else {
-        setActionFeedback(`❌ Gagal verifikasi whitelist: ${json.error?.message || 'Error'}`);
+        setActionFeedback(`Error: Gagal verifikasi whitelist: ${json.error?.message || 'Error'}`);
       }
     } catch (err: any) {
-      setActionFeedback(`❌ Error verifikasi: ${err.message}`);
+      setActionFeedback(`Error: Error verifikasi: ${err.message}`);
     }
   };
 
@@ -72,56 +72,56 @@ export const AngelDealRoomModal: React.FC<AngelDealRoomModalProps> = ({
     setActionFeedback(null);
     try {
       if (!connectedWallet) {
-        setActionFeedback('⚠️ Silakan hubungkan dompet Web3 MetaMask terlebih dahulu.');
+        setActionFeedback('Notice: Silakan hubungkan dompet Web3 MetaMask terlebih dahulu.');
         return;
       }
 
       // 1. Contract Address Verification Gate (Rule 6)
       const contractConfig = getContractConfiguration();
       if (!contractConfig.isConfigured || !contractConfig.contractAddress) {
-        setActionFeedback(`❌ ${contractConfig.message} Pembelian on-chain dinonaktifkan demi keamanan.`);
+        setActionFeedback(`Error: ${contractConfig.message} Pembelian on-chain dinonaktifkan demi keamanan.`);
         return;
       }
 
       // 2. Base Network Validation (Rule 8)
       const networkCheck = await ensureBaseNetwork('0x2105');
       if (!networkCheck.success) {
-        setActionFeedback(`❌ ${networkCheck.error || 'Harap beralih ke jaringan Base'}`);
+        setActionFeedback(`Error: ${networkCheck.error || 'Harap beralih ke jaringan Base'}`);
         return;
       }
 
       if (!whitelistCheck || !whitelistCheck.isEligible) {
-        setActionFeedback('❌ Alamat dompet tidak memiliki alokasi whitelist yang valid.');
+        setActionFeedback('Error: Alamat dompet tidak memiliki alokasi whitelist yang valid.');
         return;
       }
 
       // 3. Real Web3 Execution via MetaMask Signer
-      setActionFeedback('⏳ Menghitung estimasi biaya pembelian...');
+      setActionFeedback('Menghitung estimasi biaya pembelian...');
       const signer = await getBrowserSigner();
       const contract = getLaunchpadContract(signer);
 
       const tokenAmountWei = ethers.parseEther(allocationAmount || '1000');
       const costWei = await contract.calculateCost(targetToken, tokenAmountWei);
 
-      setActionFeedback(`⏳ Menunggu konfirmasi transaksi di MetaMask (Biaya: ${ethers.formatEther(costWei)} ETH)...`);
+      setActionFeedback(`Menunggu konfirmasi transaksi di MetaMask (Biaya: ${ethers.formatEther(costWei)} ETH)...`);
       const tx = await contract.buyWhitelistTokens(targetToken, tokenAmountWei, whitelistCheck.proof, {
         value: costWei,
       });
 
-      setActionFeedback(`📡 Transaksi terkirim: ${tx.hash}. Menunggu konfirmasi blok Base...`);
+      setActionFeedback(`Transaksi terkirim: ${tx.hash}. Menunggu konfirmasi blok Base...`);
       const receipt = await tx.wait(1);
 
       if (receipt && receipt.status === 1) {
         setTxHash(tx.hash);
         setClaimSuccess(true);
         setActionFeedback(
-          `✅ Pembelian alokasi Angel Investor berhasil! Blok #${receipt.blockNumber}. Hash: ${tx.hash}`
+          `OK: Pembelian alokasi Angel Investor berhasil! Blok #${receipt.blockNumber}. Hash: ${tx.hash}`
         );
       } else {
-        setActionFeedback('❌ Transaksi gagal dieksekusi di blockchain Base.');
+        setActionFeedback('Error: Transaksi gagal dieksekusi di blockchain Base.');
       }
     } catch (err: any) {
-      setActionFeedback(`❌ Gagal klaim seed on-chain: ${normalizeWeb3Error(err)}`);
+      setActionFeedback(`Error: Gagal klaim seed on-chain: ${normalizeWeb3Error(err)}`);
     } finally {
       setIsClaiming(false);
     }
@@ -149,7 +149,7 @@ export const AngelDealRoomModal: React.FC<AngelDealRoomModalProps> = ({
         style={{
           width: '100%',
           maxWidth: '520px',
-          border: '1px solid #D500F9',
+          border: '1px solid var(--color-accent-purple)',
           borderRadius: '12px',
           padding: '24px',
           position: 'relative',
@@ -188,7 +188,7 @@ export const AngelDealRoomModal: React.FC<AngelDealRoomModalProps> = ({
             readOnly
             value={connectedWallet || '0xConnectYourWalletFirst'}
             className="input"
-            style={{ padding: '10px', fontSize: '12px', color: '#00E5FF' }}
+            style={{ padding: '10px', fontSize: '12px', color: 'var(--color-accent-info)' }}
           />
         </div>
 
@@ -245,8 +245,8 @@ export const AngelDealRoomModal: React.FC<AngelDealRoomModalProps> = ({
           <div className="flex-col gap-sm">
             <div
               style={{
-                backgroundColor: '#1A0826',
-                border: '1px solid #D500F9',
+                backgroundColor: 'var(--color-badge-purple-bg)',
+                border: '1px solid var(--color-accent-purple)',
                 borderRadius: '8px',
                 padding: '12px',
                 fontSize: '11px',
@@ -259,7 +259,7 @@ export const AngelDealRoomModal: React.FC<AngelDealRoomModalProps> = ({
                 Merkle Root: <span style={{ color: 'var(--color-foreground)' }}>{whitelistCheck.root.slice(0, 16)}...</span>
               </div>
               <div style={{ color: 'var(--color-muted)' }}>
-                Available Allocation: <span style={{ color: '#00E676', fontWeight: 800 }}>100,000 TOKENS (Fixed Rate)</span>
+                Available Allocation: <span style={{ color: 'var(--color-text-positive)', fontWeight: 800 }}>100,000 TOKENS (Fixed Rate)</span>
               </div>
             </div>
 
@@ -278,7 +278,7 @@ export const AngelDealRoomModal: React.FC<AngelDealRoomModalProps> = ({
                     onClick={handleClaimSeed}
                     disabled={isClaiming}
                     className="btn-primary"
-                    style={{ padding: '10px 16px', backgroundColor: '#00E676', color: '#000', fontWeight: 800 }}
+                    style={{ padding: '10px 16px', backgroundColor: 'var(--color-text-positive)', color: '#000', fontWeight: 800 }}
                   >
                     <Coins size={16} />
                     {isClaiming ? 'Claiming...' : 'Claim & Buy On-Chain'}
@@ -288,7 +288,7 @@ export const AngelDealRoomModal: React.FC<AngelDealRoomModalProps> = ({
             ) : (
               <div
                 style={{
-                  backgroundColor: '#041E15',
+                  backgroundColor: 'var(--color-badge-success-bg)',
                   border: '1px solid var(--color-accent)',
                   borderRadius: '8px',
                   padding: '12px',
@@ -298,7 +298,7 @@ export const AngelDealRoomModal: React.FC<AngelDealRoomModalProps> = ({
                   fontSize: '12px',
                 }}
               >
-                🎉 Success! {allocationAmount} Seed tokens allocated and locked in your wallet vesting schedule.
+                Success! {allocationAmount} Seed tokens allocated and locked in your wallet vesting schedule.
               </div>
             )}
 
@@ -309,23 +309,23 @@ export const AngelDealRoomModal: React.FC<AngelDealRoomModalProps> = ({
                   padding: '10px 12px',
                   borderRadius: '6px',
                   fontSize: '12px',
-                  backgroundColor: actionFeedback.includes('✅')
+                  backgroundColor: actionFeedback.includes('OK:')
                     ? 'rgba(16, 185, 129, 0.1)'
-                    : actionFeedback.includes('❌') || actionFeedback.includes('BLOCKED')
+                    : actionFeedback.includes('Error:') || actionFeedback.includes('BLOCKED')
                     ? 'rgba(239, 68, 68, 0.1)'
                     : 'rgba(0, 229, 255, 0.1)',
                   border: `1px solid ${
-                    actionFeedback.includes('✅')
+                    actionFeedback.includes('OK:')
                       ? '#10B981'
-                      : actionFeedback.includes('❌') || actionFeedback.includes('BLOCKED')
+                      : actionFeedback.includes('Error:') || actionFeedback.includes('BLOCKED')
                       ? '#EF4444'
-                      : '#00E5FF'
+                      : 'var(--color-accent-info)'
                   }`,
-                  color: actionFeedback.includes('✅')
+                  color: actionFeedback.includes('OK:')
                     ? '#10B981'
-                    : actionFeedback.includes('❌') || actionFeedback.includes('BLOCKED')
+                    : actionFeedback.includes('Error:') || actionFeedback.includes('BLOCKED')
                     ? '#EF4444'
-                    : '#00E5FF',
+                    : 'var(--color-accent-info)',
                 }}
               >
                 {actionFeedback}

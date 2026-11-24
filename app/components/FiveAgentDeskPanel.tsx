@@ -20,7 +20,7 @@ interface FiveAgentDeskPanelProps {
 const AGENT_META: Record<string, { color: string; icon: React.ReactNode; subtitle: string }> = {
   SCANNER: { color: '#10B981', icon: <Radar size={15} />, subtitle: 'Finds pairs & macro regime' },
   ANALYST: { color: '#A855F7', icon: <Microscope size={15} />, subtitle: 'Evaluates tokens & risk flags' },
-  BRAIN: { color: '#38BDF8', icon: <BrainCircuit size={15} />, subtitle: 'Sizes entries & LLM advisory' },
+  BRAIN: { color: 'var(--color-accent-info)', icon: <BrainCircuit size={15} />, subtitle: 'Sizes entries & LLM advisory' },
   RISK: { color: '#F43F5E', icon: <ShieldCheck size={15} />, subtitle: 'Immutable loss & rule guard' },
   EXECUTOR: { color: '#F59E0B', icon: <Zap size={15} />, subtitle: 'Zero-collision execution' },
 };
@@ -141,14 +141,14 @@ export function FiveAgentDeskPanel({
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
-          <span style={{ padding: '4px 8px', borderRadius: '4px', backgroundColor: 'rgba(16, 185, 129, 0.14)', color: '#6EE7B7', border: '1px solid rgba(16, 185, 129, 0.35)' }}>
+          <span style={{ padding: '4px 8px', borderRadius: '4px', backgroundColor: 'rgba(16, 185, 129, 0.14)', color: 'var(--color-text-positive)', border: '1px solid rgba(16, 185, 129, 0.35)' }}>
             COLLISIONS: {report ? report.collisions : 0}
           </span>
           <span style={{ padding: '4px 8px', borderRadius: '4px', backgroundColor: 'rgba(244, 63, 94, 0.14)', color: '#FDA4AF', border: '1px solid rgba(244, 63, 94, 0.35)' }}>
             RULES: IMMUTABLE
           </span>
           {report?.llmAdvisory?.provider && (
-            <span style={{ padding: '4px 8px', borderRadius: '4px', backgroundColor: 'rgba(56, 189, 248, 0.14)', color: '#7DD3FC', border: '1px solid rgba(56, 189, 248, 0.35)' }}>
+            <span style={{ padding: '4px 8px', borderRadius: '4px', backgroundColor: 'rgba(56, 189, 248, 0.14)', color: 'var(--color-accent-info)', border: '1px solid rgba(56, 189, 248, 0.35)' }}>
               LLM: {report.llmAdvisory.provider}
             </span>
           )}
@@ -158,9 +158,9 @@ export function FiveAgentDeskPanel({
       {/* Universal Target Source Tabs (Launchpad Kita / External DEX CA / Major CEX) */}
       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
         {[
-          { id: 'LAUNCHPAD' as const, label: `🚀 Token Launchpad Kita (${launchpadTokens.length})` },
-          { id: 'EXTERNAL_DEX' as const, label: '🦎 Paste CA Eksternal (GeckoTerminal / DexScreener)' },
-          { id: 'CEX' as const, label: '📊 Major CEX Pair' },
+          { id: 'LAUNCHPAD' as const, label: `Token Launchpad Kita (${launchpadTokens.length})` },
+          { id: 'EXTERNAL_DEX' as const, label: 'Paste CA Eksternal (GeckoTerminal / DexScreener)' },
+          { id: 'CEX' as const, label: 'Major CEX Pair' },
         ].map((t) => (
           <button
             key={t.id}
@@ -242,7 +242,7 @@ export function FiveAgentDeskPanel({
           value={strategyProfile}
           onChange={(e) => handleSelectStrategy(e.target.value as StrategyProfileId)}
           title={STRATEGY_PROFILES[strategyProfile]?.description}
-          style={{ padding: '7px 10px', borderRadius: '6px', backgroundColor: 'var(--color-surface-elevated)', border: '1px solid rgba(168, 85, 247, 0.45)', color: '#E9D5FF', fontSize: '12px', fontWeight: 700 }}
+          style={{ padding: '7px 10px', borderRadius: '6px', backgroundColor: 'var(--color-surface-elevated)', border: '1px solid rgba(168, 85, 247, 0.45)', color: 'var(--color-accent-purple)', fontSize: '12px', fontWeight: 700 }}
         >
           {Object.values(STRATEGY_PROFILES).map((sp) => (
             <option key={sp.id} value={sp.id}>
@@ -377,11 +377,11 @@ export function FiveAgentDeskPanel({
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                <span style={{ fontWeight: 800, color: '#6EE7B7' }}>
+                <span style={{ fontWeight: 800, color: 'var(--color-text-positive)' }}>
                   Live DEX Telemetry: ${report.dexSnapshot.symbol} ({report.dexSnapshot.source})
                 </span>
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <a href={report.dexSnapshot.pairUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#38BDF8', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                  <a href={report.dexSnapshot.pairUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-accent-info)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
                     DexScreener <ExternalLink size={10} />
                   </a>
                   <a href={report.dexSnapshot.geckoTerminalUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#A7F3D0', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
@@ -408,17 +408,17 @@ export function FiveAgentDeskPanel({
                 fontSize: '11px',
               }}
             >
-              <div style={{ fontWeight: 800, color: '#38BDF8', marginBottom: '4px' }}>
+              <div style={{ fontWeight: 800, color: 'var(--color-accent-info)', marginBottom: '4px' }}>
                 AI Narrative Advisory ({report.llmAdvisory.provider} · Advisory Only)
               </div>
               <div style={{ color: '#E2E8F0', marginBottom: '4px' }}>{report.llmAdvisory.summary}</div>
-              <div style={{ color: '#FDE047' }}>⚠ {report.llmAdvisory.caution}</div>
+              <div style={{ color: 'var(--color-accent-amber)' }}>{report.llmAdvisory.caution}</div>
             </div>
           )}
 
           {report?.agentActionCards?.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <div style={{ fontSize: '10px', fontWeight: 800, color: '#38BDF8', fontFamily: 'var(--font-mono)', letterSpacing: '0.05em' }}>
+              <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--color-accent-info)', fontFamily: 'var(--font-mono)', letterSpacing: '0.05em' }}>
                 {selectedAgentName ? `SKILL ACTION CARDS (${selectedAgentName.toUpperCase()})` : 'MODULAR SKILL ACTION CARDS'}
               </div>
               {report.agentActionCards.map((card: any) => (
@@ -440,7 +440,7 @@ export function FiveAgentDeskPanel({
                     <strong style={{ color: 'var(--color-foreground)' }}>{card.title}</strong>
                     <span className="text-muted" style={{ fontSize: '10px' }}>{card.subtitle}</span>
                   </div>
-                  <span style={{ fontSize: '9px', fontWeight: 800, fontFamily: 'var(--font-mono)', color: '#38BDF8', flexShrink: 0 }}>
+                  <span style={{ fontSize: '9px', fontWeight: 800, fontFamily: 'var(--font-mono)', color: 'var(--color-accent-info)', flexShrink: 0 }}>
                     {card.badge} →
                   </span>
                 </a>
@@ -463,14 +463,14 @@ export function FiveAgentDeskPanel({
                   className="btn-secondary"
                   style={{ fontSize: '11px', padding: '7px 10px', justifyContent: 'center', display: 'inline-flex', alignItems: 'center', gap: '5px', textDecoration: 'none' }}
                 >
-                  ⚡ Execute via Binance CEX →
+                  Execute via Binance CEX →
                 </a>
                 <a
                   href={`/launchpad?name=${encodeURIComponent(symbol.replace(/USDT|USD|WETH|ETH|\//gi, '') || symbol)}&symbol=${encodeURIComponent((symbol.replace(/USDT|USD|WETH|ETH|\//gi, '') || symbol).slice(0, 8))}`}
                   className="btn-secondary"
                   style={{ fontSize: '11px', padding: '7px 10px', justifyContent: 'center', display: 'inline-flex', alignItems: 'center', gap: '5px', textDecoration: 'none' }}
                 >
-                  🚀 Deploy via Bankr Vault →
+                  Deploy via Bankr Vault →
                 </a>
               </div>
             </div>

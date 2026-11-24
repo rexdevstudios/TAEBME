@@ -31,9 +31,9 @@ export const NutritionLabelCard: React.FC<NutritionLabelProps> = ({
   const isLow = overallTier === 'LOW';
   const isMed = overallTier === 'MEDIUM';
 
-  const borderColor = isLow ? 'var(--color-accent, #00E676)' : isMed ? '#FFD600' : 'var(--color-destructive, #FF1744)';
-  const badgeBg = isLow ? '#041E15' : isMed ? '#2A1F00' : '#2A050A';
-  const textColor = isLow ? 'var(--color-accent, #00E676)' : isMed ? '#FFD600' : 'var(--color-destructive, #FF1744)';
+  const borderColor = isLow ? 'var(--color-accent, var(--color-text-positive))' : isMed ? 'var(--color-accent-amber)' : 'var(--color-destructive, #FF1744)';
+  const badgeBg = isLow ? 'var(--color-badge-success-bg)' : isMed ? '#2A1F00' : '#2A050A';
+  const textColor = isLow ? 'var(--color-accent, var(--color-text-positive))' : isMed ? 'var(--color-accent-amber)' : 'var(--color-destructive, #FF1744)';
 
   return (
     <div
@@ -69,7 +69,7 @@ export const NutritionLabelCard: React.FC<NutritionLabelProps> = ({
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           <span className="text-muted">Liquidity Pool:</span>
-          <span style={{ color: liquidityLocked ? 'var(--color-accent, #00E676)' : '#FFD600', fontWeight: 700 }}>
+          <span style={{ color: liquidityLocked ? 'var(--color-accent, var(--color-text-positive))' : 'var(--color-accent-amber)', fontWeight: 700 }}>
             {liquidityLocked ? 'LOCKED (100% SAFE)' : 'IN BONDING CURVE'}
           </span>
         </div>
@@ -77,8 +77,8 @@ export const NutritionLabelCard: React.FC<NutritionLabelProps> = ({
         {timeLockDays !== undefined && timeLockDays > 0 && (
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span className="text-muted">Time-Lock Vault:</span>
-            <span style={{ color: 'var(--color-accent, #00E676)', fontWeight: 700 }}>
-              🔒 {timeLockDays} HARI TERKUNCI (ANTI-RUG)
+            <span style={{ color: 'var(--color-accent, var(--color-text-positive))', fontWeight: 700 }}>
+              Auth: {timeLockDays} HARI TERKUNCI (ANTI-RUG)
             </span>
           </div>
         )}
@@ -86,8 +86,8 @@ export const NutritionLabelCard: React.FC<NutritionLabelProps> = ({
         {yieldStakingActive && (
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span className="text-muted">Liquid Staking:</span>
-            <span style={{ color: 'var(--color-accent, #00E676)', fontWeight: 700 }}>
-              🌾 {stakingApy || 4.2}% APY YIELD (ACTIVE)
+            <span style={{ color: 'var(--color-accent, var(--color-text-positive))', fontWeight: 700 }}>
+              {stakingApy || 4.2}% APY YIELD (ACTIVE)
             </span>
           </div>
         )}
@@ -95,8 +95,8 @@ export const NutritionLabelCard: React.FC<NutritionLabelProps> = ({
         {yieldStakingActive && autoCompounding && (
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span className="text-muted">Auto-Compounding:</span>
-            <span style={{ color: 'var(--color-accent, #00E676)', fontWeight: 700 }}>
-              🤖 WEEKLY (CHAINLINK KEEPER)
+            <span style={{ color: 'var(--color-accent, var(--color-text-positive))', fontWeight: 700 }}>
+              WEEKLY (CHAINLINK KEEPER)
             </span>
           </div>
         )}
@@ -104,22 +104,22 @@ export const NutritionLabelCard: React.FC<NutritionLabelProps> = ({
         {liquidityLocked && mevProtected && (
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span className="text-muted">MEV Protection:</span>
-            <span style={{ color: 'var(--color-accent, #00E676)', fontWeight: 700 }}>
-              🛡️ ACTIVE (MAX 1.5% SLIPPAGE)
+            <span style={{ color: 'var(--color-accent, var(--color-text-positive))', fontWeight: 700 }}>
+              ACTIVE (MAX 1.5% SLIPPAGE)
             </span>
           </div>
         )}
 
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           <span className="text-muted">Mint Function:</span>
-          <span style={{ color: mintRevoked ? 'var(--color-accent, #00E676)' : 'var(--color-destructive, #FF1744)', fontWeight: 700 }}>
+          <span style={{ color: mintRevoked ? 'var(--color-accent, var(--color-text-positive))' : 'var(--color-destructive, #FF1744)', fontWeight: 700 }}>
             {mintRevoked ? 'REVOKED (NO INFLATION)' : 'ACTIVE'}
           </span>
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           <span className="text-muted">Creator Trust Score:</span>
-          <span style={{ color: creatorTrustScore >= 60 ? 'var(--color-accent, #00E676)' : '#FFD600', fontWeight: 800 }}>
+          <span style={{ color: creatorTrustScore >= 60 ? 'var(--color-accent, var(--color-text-positive))' : 'var(--color-accent-amber)', fontWeight: 800 }}>
             {creatorTrustScore}/100
           </span>
         </div>

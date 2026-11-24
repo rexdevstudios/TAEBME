@@ -76,9 +76,9 @@ export function UserSecurityActivityPanel({ isConnected }: UserSecurityActivityP
                   padding: '3px 7px',
                   borderRadius: '999px',
                   cursor: 'pointer',
-                  border: !onlyDexOnChain ? '1px solid #38BDF8' : '1px solid var(--color-border)',
+                  border: !onlyDexOnChain ? '1px solid var(--color-accent-info)' : '1px solid var(--color-border)',
                   background: !onlyDexOnChain ? 'rgba(56, 189, 248, 0.14)' : 'transparent',
-                  color: !onlyDexOnChain ? '#38BDF8' : 'var(--color-muted)',
+                  color: !onlyDexOnChain ? 'var(--color-accent-info)' : 'var(--color-muted)',
                 }}
               >
                 All ({rows.length})
@@ -92,9 +92,9 @@ export function UserSecurityActivityPanel({ isConnected }: UserSecurityActivityP
                   padding: '3px 7px',
                   borderRadius: '999px',
                   cursor: 'pointer',
-                  border: onlyDexOnChain ? '1px solid #38BDF8' : '1px solid var(--color-border)',
+                  border: onlyDexOnChain ? '1px solid var(--color-accent-info)' : '1px solid var(--color-border)',
                   background: onlyDexOnChain ? 'rgba(56, 189, 248, 0.14)' : 'transparent',
-                  color: onlyDexOnChain ? '#38BDF8' : 'var(--color-muted)',
+                  color: onlyDexOnChain ? 'var(--color-accent-info)' : 'var(--color-muted)',
                 }}
               >
                 DEX On-Chain ({dexCount})
@@ -150,7 +150,7 @@ export function UserSecurityActivityPanel({ isConnected }: UserSecurityActivityP
                       fontFamily: 'var(--font-mono)',
                       fontSize: '10px',
                       fontWeight: 800,
-                      color: '#38BDF8',
+                      color: 'var(--color-accent-info)',
                       textDecoration: 'none',
                       display: 'inline-flex',
                       alignItems: 'center',

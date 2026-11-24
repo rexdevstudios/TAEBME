@@ -79,7 +79,7 @@ export function BinanceKeyVaultPanel({
     e.preventDefault();
     if (!label.trim() || !apiKey.trim() || !secretKey.trim()) return;
     if (!confirmNoWithdraw) {
-      setFeedback('⚠️ Harap konfirmasi bahwa izin Enable Withdrawals NONAKTIF pada API Key Binance Anda.');
+      setFeedback('Notice: Harap konfirmasi bahwa izin Enable Withdrawals NONAKTIF pada API Key Binance Anda.');
       return;
     }
 
@@ -100,20 +100,20 @@ export function BinanceKeyVaultPanel({
       });
       const json = await res.json();
       if (!res.ok || !json?.success) {
-        setFeedback(`⚠️ ${json?.error || 'Gagal menyimpan kredensial Binance'}`);
+        setFeedback(`Notice: ${json?.error || 'Gagal menyimpan kredensial Binance'}`);
       } else {
         setLabel('');
         setApiKey('');
         setSecretKey('');
         setShowAddForm(false);
-        setFeedback(`✅ Akun "${json.data.label}" (${json.data.maskedApiKey}) berhasil dienkripsi AES-256-GCM.`);
+        setFeedback(`OK: Akun "${json.data.label}" (${json.data.maskedApiKey}) berhasil dienkripsi AES-256-GCM.`);
         await fetchAccounts();
         if (json.data?.id) {
           onSelectCredentialId(json.data.id);
         }
       }
     } catch (err: any) {
-      setFeedback(`⚠️ ${err?.message || 'Network error'}`);
+      setFeedback(`Notice: ${err?.message || 'Network error'}`);
     } finally {
       setSaving(false);
     }
@@ -161,14 +161,14 @@ export function BinanceKeyVaultPanel({
         } else if (d.canWithdraw) {
           setPingStatusMap((prev) => ({
             ...prev,
-            [credentialId]: { ok: false, text: `⚠️ WITHDRAWAL AKTIF! Nonaktifkan di Binance (${d.latencyMs}ms)` },
+            [credentialId]: { ok: false, text: `Notice: WITHDRAWAL AKTIF! Nonaktifkan di Binance (${d.latencyMs}ms)` },
           }));
         } else {
           setPingStatusMap((prev) => ({
             ...prev,
             [credentialId]: {
               ok: true,
-              text: `✅ Verified · Trade ${d.canTrade ? 'ON' : 'OFF'} · Withdraw OFF (${d.latencyMs}ms)`,
+              text: `OK: Verified · Trade ${d.canTrade ? 'ON' : 'OFF'} · Withdraw OFF (${d.latencyMs}ms)`,
             },
           }));
         }
@@ -193,7 +193,7 @@ export function BinanceKeyVaultPanel({
         if (selectedCredentialId === credentialId) {
           onSelectCredentialId('DEFAULT');
         }
-        setFeedback('🗑️ Akun Binance berhasil dicabut dari vault.');
+        setFeedback('Akun Binance berhasil dicabut dari vault.');
         await fetchAccounts();
       }
     } catch {
@@ -221,7 +221,7 @@ export function BinanceKeyVaultPanel({
             Binance Multi-Account Vault ({accounts.length}/{maxAccounts} · {planId})
           </span>
           {accounts.length >= maxAccounts && (
-            <a href="/billing" style={{ fontSize: '10px', fontWeight: 800, color: '#38BDF8', textDecoration: 'underline' }}>
+            <a href="/billing" style={{ fontSize: '10px', fontWeight: 800, color: 'var(--color-accent-info)', textDecoration: 'underline' }}>
               Upgrade →
             </a>
           )}
@@ -276,7 +276,7 @@ export function BinanceKeyVaultPanel({
                   const isFrozen = Boolean(acc.quotaStatus && acc.quotaStatus !== 'ACTIVE');
                   return (
                     <option key={acc.id} value={acc.id} disabled={isFrozen}>
-                      {isFrozen ? '🔒 [FROZEN] ' : ''}{acc.label} ({acc.maskedApiKey}) — {acc.environment} {acc.isDefault ? '★ Default' : ''}
+                      {isFrozen ? 'Auth: [FROZEN] ' : ''}{acc.label} ({acc.maskedApiKey}) — {acc.environment} {acc.isDefault ? '★ Default' : ''}
                     </option>
                   );
                 })}
@@ -307,7 +307,7 @@ export function BinanceKeyVaultPanel({
                             padding: '1px 5px',
                             borderRadius: '4px',
                             background: acc.environment === 'MAINNET' ? 'rgba(245,158,11,0.16)' : 'rgba(56,189,248,0.16)',
-                            color: acc.environment === 'MAINNET' ? '#F59E0B' : '#38BDF8',
+                            color: acc.environment === 'MAINNET' ? '#F59E0B' : 'var(--color-accent-info)',
                           }}
                         >
                           {acc.environment}
@@ -336,7 +336,7 @@ export function BinanceKeyVaultPanel({
                             }}
                             title="Akun aman tersimpan namun terkunci sementara sesuai paket aktif. Perpanjang atau beli slot di /billing."
                           >
-                            {acc.quotaStatus === 'FROZEN_MAINNET_LOCKED' ? '🔒 MAINNET LOCKED' : '🔒 FROZEN'}
+                            {acc.quotaStatus === 'FROZEN_MAINNET_LOCKED' ? 'Auth: MAINNET LOCKED' : 'Auth: FROZEN'}
                           </span>
                         )}
                       </div>
@@ -478,7 +478,7 @@ export function BinanceKeyVaultPanel({
             padding: '6px 8px',
             borderRadius: '6px',
             border: '1px solid var(--color-border)',
-            color: feedback.startsWith('✅') ? '#10B981' : '#F59E0B',
+            color: feedback.startsWith('OK:') ? '#10B981' : '#F59E0B',
           }}
         >
           {feedback}

@@ -286,7 +286,7 @@ export default async function TokenPortalPage({ params }: PageProps) {
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '8px' }}>
               <span style={{ color: isGraduated ? 'var(--color-badge-success-text)' : 'var(--color-muted)', fontWeight: isGraduated ? 700 : 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                {isGraduated ? '🎓 Graduated to DEX (Liquidity Locked)' : 'Bonding Curve Graduation'}
+                {isGraduated ? 'Graduated to DEX (Liquidity Locked)' : 'Bonding Curve Graduation'}
               </span>
               <span style={{ color: 'var(--color-badge-success-text)', fontWeight: 700 }}>
                 {isGraduated ? '100% (COMPLETED)' : `${graduationProgress}%`}
@@ -297,7 +297,7 @@ export default async function TokenPortalPage({ params }: PageProps) {
                 style={{
                   width: `${isGraduated ? 100 : graduationProgress}%`,
                   height: '100%',
-                  background: 'linear-gradient(90deg, #22C55E 0%, #38BDF8 100%)',
+                  background: 'linear-gradient(90deg, #22C55E 0%, var(--color-accent-info) 100%)',
                   borderRadius: '4px',
                 }}
               />
@@ -445,10 +445,10 @@ export default async function TokenPortalPage({ params }: PageProps) {
               const isHold = t.includes('hold') || t.includes('hodl') || t.includes('loyalty');
 
               const badgeColor = isStake
-                ? { bg: 'rgba(16, 185, 129, 0.12)', text: '#10B981', border: 'rgba(16, 185, 129, 0.3)', label: '🥩 Liquid Staking & Yield' }
+                ? { bg: 'rgba(16, 185, 129, 0.12)', text: '#10B981', border: 'rgba(16, 185, 129, 0.3)', label: 'Liquid Staking & Yield' }
                 : isHold
-                ? { bg: 'rgba(168, 85, 247, 0.12)', text: '#C084FC', border: 'rgba(168, 85, 247, 0.3)', label: '💎 Diamond Hands HODL' }
-                : { bg: 'rgba(56, 189, 248, 0.12)', text: '#38BDF8', border: 'rgba(56, 189, 248, 0.3)', label: '🚀 Viral Community Raid' };
+                ? { bg: 'rgba(168, 85, 247, 0.12)', text: 'var(--color-accent-purple)', border: 'rgba(168, 85, 247, 0.3)', label: 'Diamond Hands HODL' }
+                : { bg: 'rgba(56, 189, 248, 0.12)', text: 'var(--color-accent-info)', border: 'rgba(56, 189, 248, 0.3)', label: 'Viral Community Raid' };
 
               const rewardDisplay = (() => {
                 try {

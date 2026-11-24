@@ -125,7 +125,7 @@ export function AdminOpsHealthPanel() {
       const createdId = String(json?.data?.request?.id || '');
       setKsFeedback({
         ok: true,
-        text: `✅ Step 1 Selesai: Request PENDING dibuat (#${createdId.slice(0, 8)}…). Minta Admin ke-2 klik Approve.`,
+        text: `OK: Step 1 Selesai: Request PENDING dibuat (#${createdId.slice(0, 8)}…). Minta Admin ke-2 klik Approve.`,
       });
       await loadDualControlRequests();
     } catch (err: unknown) {
@@ -160,7 +160,7 @@ export function AdminOpsHealthPanel() {
       setKsDualControlId(requestId);
       setKsFeedback({
         ok: true,
-        text: `✅ Step 2 Selesai: Request #${requestId.slice(0, 8)}… APPROVED dan otomatis diisi ke Step 3!`,
+        text: `OK: Step 2 Selesai: Request #${requestId.slice(0, 8)}… APPROVED dan otomatis diisi ke Step 3!`,
       });
       await loadDualControlRequests();
     } catch (err: unknown) {
@@ -213,7 +213,7 @@ export function AdminOpsHealthPanel() {
       }
       setKsFeedback({
         ok: true,
-        text: `✅ Kill-Switch ${ksAction} (${ksScope}) sukses · Dual-Control #${json?.data?.dualControlId || trimmedId}`,
+        text: `OK: Kill-Switch ${ksAction} (${ksScope}) sukses · Dual-Control #${json?.data?.dualControlId || trimmedId}`,
       });
       setKsDualControlId('');
       await Promise.all([loadSummary(), loadDualControlRequests()]);
@@ -256,7 +256,7 @@ export function AdminOpsHealthPanel() {
             style={{
               fontWeight: 800,
               fontSize: '13px',
-              color: '#00E5FF',
+              color: 'var(--color-accent-info)',
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
@@ -316,7 +316,7 @@ export function AdminOpsHealthPanel() {
         >
           <div
             style={{
-              color: '#00E5FF',
+              color: 'var(--color-accent-info)',
               fontWeight: 800,
               fontSize: '11px',
               display: 'flex',
@@ -332,7 +332,7 @@ export function AdminOpsHealthPanel() {
               fontWeight: 900,
               margin: '6px 0',
               fontFamily: 'var(--font-mono)',
-              color: data?.database.connected ? '#6EE7B7' : '#FDE047',
+              color: data?.database.connected ? 'var(--color-text-positive)' : 'var(--color-accent-amber)',
             }}
           >
             {loading && !data
@@ -350,7 +350,7 @@ export function AdminOpsHealthPanel() {
         >
           <div
             style={{
-              color: data && data.killSwitches.activeCount > 0 ? '#FCA5A5' : '#6EE7B7',
+              color: data && data.killSwitches.activeCount > 0 ? '#FCA5A5' : 'var(--color-text-positive)',
               fontWeight: 800,
               fontSize: '11px',
               display: 'flex',
@@ -366,7 +366,7 @@ export function AdminOpsHealthPanel() {
               fontWeight: 900,
               margin: '6px 0',
               fontFamily: 'var(--font-mono)',
-              color: data && data.killSwitches.activeCount > 0 ? '#F87171' : '#6EE7B7',
+              color: data && data.killSwitches.activeCount > 0 ? '#F87171' : 'var(--color-text-positive)',
             }}
           >
             {loading && !data ? '...' : `${data?.killSwitches.activeCount ?? 0} ACTIVE`}
@@ -384,7 +384,7 @@ export function AdminOpsHealthPanel() {
         >
           <div
             style={{
-              color: '#D500F9',
+              color: 'var(--color-accent-purple)',
               fontWeight: 800,
               fontSize: '11px',
               display: 'flex',
@@ -417,7 +417,7 @@ export function AdminOpsHealthPanel() {
         >
           <div
             style={{
-              color: '#FFC400',
+              color: 'var(--color-accent-amber)',
               fontWeight: 800,
               fontSize: '11px',
               display: 'flex',
@@ -449,7 +449,7 @@ export function AdminOpsHealthPanel() {
       <div style={{ marginTop: '12px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '10px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <span className="text-muted" style={{ fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-            <Lock size={12} color="#FDE047" />
+            <Lock size={12} color="var(--color-accent-amber)" />
             SOP-07 Strict Dual-Control Kill-Switch (Memerlukan Approved Dual-Control Request ID &amp; Role SUPER_ADMIN)
           </span>
           <button
@@ -538,7 +538,7 @@ export function AdminOpsHealthPanel() {
                   onClick={() => void handleProposeDualControl()}
                   disabled={dcBusyId === 'PROPOSE' || ksSubmitting}
                   className="btn-secondary"
-                  style={{ padding: '7px 12px', fontSize: '11px', borderColor: 'rgba(250, 204, 21, 0.45)', color: '#FDE047' }}
+                  style={{ padding: '7px 12px', fontSize: '11px', borderColor: 'rgba(250, 204, 21, 0.45)', color: 'var(--color-accent-amber)' }}
                 >
                   {dcBusyId === 'PROPOSE' ? 'Proposing...' : `1. Propose Request (${ksScope})`}
                 </button>
@@ -561,7 +561,7 @@ export function AdminOpsHealthPanel() {
               style={{
                 padding: '8px 10px',
                 borderRadius: '6px',
-                backgroundColor: 'rgba(15, 23, 42, 0.65)',
+                backgroundColor: 'var(--color-surface-subtle)',
                 border: '1px solid rgba(255, 255, 255, 0.08)',
               }}
             >
@@ -625,9 +625,9 @@ export function AdminOpsHealthPanel() {
                                   : 'rgba(148, 163, 184, 0.15)',
                               color:
                                 reqItem.status === 'APPROVED'
-                                  ? '#6EE7B7'
+                                  ? 'var(--color-text-positive)'
                                   : reqItem.status === 'PENDING'
-                                  ? '#FDE047'
+                                  ? 'var(--color-accent-amber)'
                                   : '#94A3B8',
                             }}
                           >
@@ -645,7 +645,7 @@ export function AdminOpsHealthPanel() {
                               onClick={() => void handleApproveDualControl(reqItem.id)}
                               disabled={dcBusyId === reqItem.id}
                               className="btn-secondary"
-                              style={{ padding: '2px 7px', fontSize: '10px', color: '#6EE7B7', borderColor: 'rgba(16, 185, 129, 0.4)' }}
+                              style={{ padding: '2px 7px', fontSize: '10px', color: 'var(--color-text-positive)', borderColor: 'rgba(16, 185, 129, 0.4)' }}
                             >
                               {dcBusyId === reqItem.id ? 'Approving...' : '2. Approve (2nd Admin)'}
                             </button>
@@ -655,7 +655,7 @@ export function AdminOpsHealthPanel() {
                               type="button"
                               onClick={() => setKsDualControlId(reqItem.id)}
                               className="btn-secondary"
-                              style={{ padding: '2px 7px', fontSize: '10px', color: '#38BDF8' }}
+                              style={{ padding: '2px 7px', fontSize: '10px', color: 'var(--color-accent-info)' }}
                             >
                               Use ID → Step 3
                             </button>
@@ -675,7 +675,7 @@ export function AdminOpsHealthPanel() {
                   fontSize: '11px',
                   fontWeight: 700,
                   backgroundColor: ksFeedback.ok ? 'rgba(16, 185, 129, 0.14)' : 'rgba(239, 68, 68, 0.14)',
-                  color: ksFeedback.ok ? '#6EE7B7' : '#FCA5A5',
+                  color: ksFeedback.ok ? 'var(--color-text-positive)' : '#FCA5A5',
                   border: `1px solid ${ksFeedback.ok ? 'rgba(16, 185, 129, 0.35)' : 'rgba(239, 68, 68, 0.35)'}`,
                 }}
               >

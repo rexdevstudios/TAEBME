@@ -56,13 +56,13 @@ export function WalletRiskBadgeCard({
           padding: '8px 10px',
           borderRadius: '6px',
           border: '1px solid var(--color-border)',
-          background: 'rgba(15, 23, 42, 0.45)',
+          background: 'var(--color-surface-subtle)',
           fontSize: '11px',
           color: 'var(--color-muted)',
           fontFamily: 'var(--font-mono)',
         }}
       >
-        🛡️ Memindai reputasi wallet on-chain (GoPlus + Public RPC)...
+        Memindai reputasi wallet on-chain (GoPlus + Public RPC)...
       </div>
     );
   }
@@ -75,7 +75,7 @@ export function WalletRiskBadgeCard({
     ? { border: 'rgba(239, 68, 68, 0.5)', bg: 'rgba(239, 68, 68, 0.1)', color: '#F87171' }
     : isCaution
     ? { border: 'rgba(245, 158, 11, 0.45)', bg: 'rgba(245, 158, 11, 0.08)', color: '#FBBF24' }
-    : { border: 'rgba(16, 185, 129, 0.4)', bg: 'rgba(16, 185, 129, 0.08)', color: '#34D399' };
+    : { border: 'rgba(16, 185, 129, 0.4)', bg: 'rgba(16, 185, 129, 0.08)', color: 'var(--color-text-positive)' };
 
   return (
     <div
@@ -121,7 +121,7 @@ export function WalletRiskBadgeCard({
                 padding: '2px 6px',
                 borderRadius: '999px',
                 border: '1px solid rgba(148, 163, 184, 0.25)',
-                background: 'rgba(15, 23, 42, 0.6)',
+                background: 'var(--color-surface-subtle)',
                 color: '#CBD5E1',
               }}
             >

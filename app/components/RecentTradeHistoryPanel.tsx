@@ -153,7 +153,7 @@ export function RecentTradeHistoryPanel({
           </div>
           <div style={{ padding: '7px 9px', borderRadius: '6px', background: 'rgba(56,189,248,0.08)', border: '1px solid rgba(56,189,248,0.2)' }}>
             <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-muted)', textTransform: 'uppercase' }}>Est. Volume</div>
-            <div style={{ fontSize: '13px', fontWeight: 800, color: '#38BDF8' }}>
+            <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--color-accent-info)' }}>
               ${recap.estimatedVolumeUsd.toLocaleString()}{' '}
               <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-muted)' }}>
                 · DEX {recap.dexCount}
@@ -162,7 +162,7 @@ export function RecentTradeHistoryPanel({
           </div>
           <div style={{ padding: '7px 9px', borderRadius: '6px', background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.2)' }}>
             <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-muted)', textTransform: 'uppercase' }}>Auto-Pilot / TSL</div>
-            <div style={{ fontSize: '13px', fontWeight: 800, color: '#C084FC' }}>
+            <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--color-accent-purple)' }}>
               {recap.autoPilotCount} Auto{' '}
               <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-muted)' }}>
                 · {recap.trailingStopCount} TSL
@@ -208,9 +208,9 @@ export function RecentTradeHistoryPanel({
                   padding: '2px 7px',
                   borderRadius: '999px',
                   cursor: 'pointer',
-                  border: active ? '1px solid #38BDF8' : '1px solid var(--color-border)',
+                  border: active ? '1px solid var(--color-accent-info)' : '1px solid var(--color-border)',
                   background: active ? 'rgba(56, 189, 248, 0.14)' : 'transparent',
-                  color: active ? '#38BDF8' : 'var(--color-muted)',
+                  color: active ? 'var(--color-accent-info)' : 'var(--color-muted)',
                 }}
               >
                 {tab.label}
@@ -270,10 +270,10 @@ export function RecentTradeHistoryPanel({
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                  <span style={{ fontWeight: 800, color: isBuy ? '#34D399' : '#F28B82' }}>{item.side}</span>
+                  <span style={{ fontWeight: 800, color: isBuy ? 'var(--color-text-positive)' : '#F28B82' }}>{item.side}</span>
                   <strong style={{ color: 'var(--color-foreground)' }}>{item.symbol}</strong>
                   <span className="text-muted">×{item.quantity}</span>
-                  <span style={{ fontSize: '9px', color: '#38BDF8', fontWeight: 700 }}>{item.stage}</span>
+                  <span style={{ fontSize: '9px', color: 'var(--color-accent-info)', fontWeight: 700 }}>{item.stage}</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span
@@ -283,7 +283,7 @@ export function RecentTradeHistoryPanel({
                       padding: '2px 5px',
                       borderRadius: '4px',
                       background: isApproved ? 'rgba(16, 185, 129, 0.14)' : 'rgba(239, 68, 68, 0.14)',
-                      color: isApproved ? '#34D399' : '#F28B82',
+                      color: isApproved ? 'var(--color-text-positive)' : '#F28B82',
                     }}
                   >
                     {item.status}
@@ -299,7 +299,7 @@ export function RecentTradeHistoryPanel({
                         style={{
                           fontSize: '9px',
                           fontWeight: 800,
-                          color: '#38BDF8',
+                          color: 'var(--color-accent-info)',
                           textDecoration: 'none',
                           display: 'inline-flex',
                           alignItems: 'center',
@@ -316,7 +316,7 @@ export function RecentTradeHistoryPanel({
                     style={{
                       fontSize: '9px',
                       fontWeight: 800,
-                      color: '#A78BFA',
+                      color: 'var(--color-accent-purple)',
                       textDecoration: 'none',
                       display: 'inline-flex',
                       alignItems: 'center',

@@ -68,7 +68,7 @@ export function CustomAgentBuilderPanel({
     e.preventDefault();
     if (!name.trim() || systemPrompt.trim().length < 10) return;
     if (selectedSkills.length === 0) {
-      setFeedback('⚠️ Pilih minimal 1 Modular Agent Skill.');
+      setFeedback('Notice: Pilih minimal 1 Modular Agent Skill.');
       return;
     }
     setSaving(true);
@@ -88,17 +88,17 @@ export function CustomAgentBuilderPanel({
       });
       const json = await res.json();
       if (!res.ok || !json?.success) {
-        setFeedback(`⚠️ ${json?.error || 'Gagal membuat custom agent'}`);
+        setFeedback(`Notice: ${json?.error || 'Gagal membuat custom agent'}`);
       } else {
         setName('');
         setSystemPrompt('');
         setShowCreateForm(false);
-        setFeedback(`✅ Custom Agent "${json.data.name}" berhasil dibuat dengan ${json.data.enabledSkills.length} skill aktif.`);
+        setFeedback(`OK: Custom Agent "${json.data.name}" berhasil dibuat dengan ${json.data.enabledSkills.length} skill aktif.`);
         await loadAgents();
         onSelectAgent(json.data);
       }
     } catch (err: any) {
-      setFeedback(`⚠️ ${err?.message || 'Network error'}`);
+      setFeedback(`Notice: ${err?.message || 'Network error'}`);
     } finally {
       setSaving(false);
     }
@@ -136,7 +136,7 @@ export function CustomAgentBuilderPanel({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
         <div>
           <h2 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 800, color: 'var(--color-foreground)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Bot size={16} style={{ color: '#38BDF8' }} /> Custom AI Agent Builder &amp; Modular Skills ({agents.length}/{maxAgents} · {planId})
+            <Bot size={16} style={{ color: 'var(--color-accent-info)' }} /> Custom AI Agent Builder &amp; Modular Skills ({agents.length}/{maxAgents} · {planId})
           </h2>
           <p className="text-muted" style={{ margin: 0, fontSize: '12px' }}>
             Rancang AI Agent dengan strategi, prompt, dan pilihan skill sendiri (Binance CEX, Bankr Deploy, NFT Mint Voucher, DEX Swap) — 100% Non-Custodial.
@@ -145,7 +145,7 @@ export function CustomAgentBuilderPanel({
         {isConnected && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             {agents.length >= maxAgents && (
-              <a href="/billing" style={{ fontSize: '11px', fontWeight: 800, color: '#38BDF8', textDecoration: 'underline' }}>
+              <a href="/billing" style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-accent-info)', textDecoration: 'underline' }}>
                 Upgrade Slot →
               </a>
             )}
@@ -287,7 +287,7 @@ export function CustomAgentBuilderPanel({
                     style={{
                       padding: '12px',
                       borderRadius: '8px',
-                      border: `1px solid ${isSelected ? '#38BDF8' : 'var(--color-border)'}`,
+                      border: `1px solid ${isSelected ? 'var(--color-accent-info)' : 'var(--color-border)'}`,
                       background: isSelected ? 'rgba(56, 189, 248, 0.07)' : 'transparent',
                       display: 'flex',
                       flexDirection: 'column',
@@ -360,7 +360,7 @@ export function CustomAgentBuilderPanel({
       )}
 
       {feedback && (
-        <div style={{ fontSize: '12px', color: feedback.startsWith('✅') ? '#10B981' : '#F59E0B' }}>
+        <div style={{ fontSize: '12px', color: feedback.startsWith('OK:') ? '#10B981' : '#F59E0B' }}>
           {feedback}
         </div>
       )}

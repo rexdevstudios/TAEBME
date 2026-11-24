@@ -61,7 +61,7 @@ export function AutonomousAgentTerminalCard({ isConnected }: AutonomousAgentTerm
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <Bot size={18} color="#34D399" />
+            <Bot size={18} color="var(--color-text-positive)" />
             <span style={{ fontSize: '16px', fontWeight: 900, color: '#F8FAFC' }}>
               RTrader Autonomous Terminal
             </span>
@@ -85,7 +85,7 @@ export function AutonomousAgentTerminalCard({ isConnected }: AutonomousAgentTerm
                 padding: '2px 7px',
                 borderRadius: '999px',
                 background: snapshot?.mode === 'LIVE_NON_CUSTODIAL' ? 'rgba(16, 185, 129, 0.18)' : 'rgba(56, 189, 248, 0.16)',
-                color: snapshot?.mode === 'LIVE_NON_CUSTODIAL' ? '#34D399' : '#38BDF8',
+                color: snapshot?.mode === 'LIVE_NON_CUSTODIAL' ? 'var(--color-text-positive)' : 'var(--color-accent-info)',
               }}
             >
               ● {snapshot?.mode === 'LIVE_NON_CUSTODIAL' ? 'LIVE NON-CUSTODIAL' : 'PAPER / ADVISORY'}
@@ -132,7 +132,7 @@ export function AutonomousAgentTerminalCard({ isConnected }: AutonomousAgentTerm
       {/* Dual-Rail Readiness Strip (User-Friendly Overview) */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px' }}>
         <div style={{ padding: '10px 12px', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)' }}>
-          <div style={{ fontSize: '10px', fontWeight: 800, color: '#34D399', display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--color-text-positive)', display: 'flex', alignItems: 'center', gap: '5px' }}>
             <Layers size={12} /> INTERNAL · LAUNCHPAD
           </div>
           <div style={{ fontSize: '12px', fontWeight: 700, color: '#E2E8F0', marginTop: '3px' }}>
@@ -140,7 +140,7 @@ export function AutonomousAgentTerminalCard({ isConnected }: AutonomousAgentTerm
           </div>
         </div>
         <div style={{ padding: '10px 12px', borderRadius: '8px', background: 'rgba(168, 85, 247, 0.08)', border: '1px solid rgba(168, 85, 247, 0.25)' }}>
-          <div style={{ fontSize: '10px', fontWeight: 800, color: '#C084FC', display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--color-accent-purple)', display: 'flex', alignItems: 'center', gap: '5px' }}>
             <Globe2 size={12} /> EXTERNAL · DEX 0x v2
           </div>
           <div style={{ fontSize: '12px', fontWeight: 700, color: '#E2E8F0', marginTop: '3px' }}>
@@ -148,7 +148,7 @@ export function AutonomousAgentTerminalCard({ isConnected }: AutonomousAgentTerm
           </div>
         </div>
         <div style={{ padding: '10px 12px', borderRadius: '8px', background: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.25)' }}>
-          <div style={{ fontSize: '10px', fontWeight: 800, color: '#60A5FA', display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--color-accent-info)', display: 'flex', alignItems: 'center', gap: '5px' }}>
             <Cpu size={12} /> EXTERNAL · CEX AUTO
           </div>
           <div style={{ fontSize: '12px', fontWeight: 700, color: '#E2E8F0', marginTop: '3px' }}>
@@ -180,7 +180,7 @@ export function AutonomousAgentTerminalCard({ isConnected }: AutonomousAgentTerm
           {/* Progress & Approval Metrics */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: '8px' }}>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', fontWeight: 800, color: '#34D399' }}>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', fontWeight: 800, color: 'var(--color-text-positive)' }}>
                 {snapshot.totalTrades} intents · {snapshot.approvalRatePct}% Risk-Approved
                 <span className="text-muted" style={{ fontWeight: 600, marginLeft: '8px', fontSize: '11px' }}>
                   Tier {snapshot.planId}
@@ -195,7 +195,7 @@ export function AutonomousAgentTerminalCard({ isConnected }: AutonomousAgentTerm
                 style={{
                   height: '100%',
                   width: `${Math.max(4, snapshot.goalProgressPct)}%`,
-                  background: 'linear-gradient(90deg, #F97316, #34D399)',
+                  background: 'linear-gradient(90deg, #F97316, var(--color-text-positive))',
                   borderRadius: '999px',
                 }}
               />
@@ -256,12 +256,12 @@ export function AutonomousAgentTerminalCard({ isConnected }: AutonomousAgentTerm
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px' }}>
                         <strong style={{ color: '#F8FAFC' }}>${card.symbol}</strong>
-                        <span style={{ fontSize: '9px', fontWeight: 800, color: card.side === 'BUY' ? '#34D399' : '#F28B82' }}>
+                        <span style={{ fontSize: '9px', fontWeight: 800, color: card.side === 'BUY' ? 'var(--color-text-positive)' : '#F28B82' }}>
                           {card.side}
                         </span>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '10px' }}>
-                        <span style={{ color: isApproved ? '#34D399' : '#F28B82', fontWeight: 800 }}>{card.status}</span>
+                        <span style={{ color: isApproved ? 'var(--color-text-positive)' : '#F28B82', fontWeight: 800 }}>{card.status}</span>
                         <span className="text-muted">×{card.quantity}</span>
                       </div>
                       {card.href && (
@@ -276,7 +276,7 @@ export function AutonomousAgentTerminalCard({ isConnected }: AutonomousAgentTerm
                                 href={card.explorerUrl}
                                 target="_blank"
                                 rel="noreferrer"
-                                style={{ color: '#6EE7B7', fontWeight: 800, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '1px' }}
+                                style={{ color: 'var(--color-text-positive)', fontWeight: 800, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '1px' }}
                                 title={`On-chain Tx: ${card.txHash || ''}`}
                               >
                                 Tx <ArrowUpRight size={9} />
@@ -284,7 +284,7 @@ export function AutonomousAgentTerminalCard({ isConnected }: AutonomousAgentTerm
                             )}
                             <a
                               href={card.href}
-                              style={{ color: '#38BDF8', fontWeight: 800, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '2px' }}
+                              style={{ color: 'var(--color-accent-info)', fontWeight: 800, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '2px' }}
                             >
                               Re-Trade <ArrowUpRight size={10} />
                             </a>
@@ -328,9 +328,9 @@ export function AutonomousAgentTerminalCard({ isConnected }: AutonomousAgentTerm
                         fontWeight: 800,
                         borderRadius: '999px',
                         cursor: 'pointer',
-                        border: active ? '1px solid #34D399' : '1px solid rgba(148, 163, 184, 0.25)',
-                        backgroundColor: active ? 'rgba(16, 185, 129, 0.2)' : 'rgba(15, 23, 42, 0.6)',
-                        color: active ? '#6EE7B7' : '#94A3B8',
+                        border: active ? '1px solid var(--color-text-positive)' : '1px solid rgba(148, 163, 184, 0.25)',
+                        backgroundColor: active ? 'rgba(16, 185, 129, 0.2)' : 'var(--color-surface-subtle)',
+                        color: active ? 'var(--color-text-positive)' : '#94A3B8',
                       }}
                     >
                       {pill.label}
@@ -355,7 +355,7 @@ export function AutonomousAgentTerminalCard({ isConnected }: AutonomousAgentTerm
                     flexWrap: 'wrap',
                     padding: '8px 10px',
                     borderRadius: '8px',
-                    background: 'rgba(15, 23, 42, 0.75)',
+                    background: 'var(--color-surface-subtle)',
                     borderLeft: `3px solid ${item.color}`,
                   }}
                 >

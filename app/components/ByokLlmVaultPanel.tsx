@@ -90,7 +90,7 @@ export function ByokLlmVaultPanel({
 
   const handleProviderSelect = (v: SelectedLlmProvider) => {
     if (v !== 'PLATFORM' && !isByokAllowed) {
-      setFeedback('🔒 BYOK LLM eksklusif untuk pelanggan Pro Terminal Trader (TRADER) & AI Autonomous Desk (AGENT).');
+      setFeedback('Auth: BYOK LLM eksklusif untuk pelanggan Pro Terminal Trader (TRADER) & AI Autonomous Desk (AGENT).');
       return;
     }
     onSelectLlmProvider(v);
@@ -121,18 +121,18 @@ export function ByokLlmVaultPanel({
       });
       const json = await res.json();
       if (!res.ok || !json?.success) {
-        setFeedback(`⚠️ ${json?.error || 'Gagal menyimpan API Key LLM'}`);
+        setFeedback(`Notice: ${json?.error || 'Gagal menyimpan API Key LLM'}`);
       } else {
         setLabel('');
         setApiKey('');
         setShowAdd(false);
         onSelectLlmProvider(activeTab);
         onSelectLlmModel(BYOK_MODEL_CATALOG[activeTab][0].id);
-        setFeedback(`✅ BYOK ${activeTab} Key (${json.data.maskedKey}) aktif — hemat biaya desk menjadi 2 Cr/run!`);
+        setFeedback(`OK: BYOK ${activeTab} Key (${json.data.maskedKey}) aktif — hemat biaya desk menjadi 2 Cr/run!`);
         await loadKeys(activeTab);
       }
     } catch (err: any) {
-      setFeedback(`⚠️ ${err?.message || 'Network error'}`);
+      setFeedback(`Notice: ${err?.message || 'Network error'}`);
     } finally {
       setSaving(false);
     }
@@ -149,15 +149,15 @@ export function ByokLlmVaultPanel({
       });
       const json = await res.json();
       if (!res.ok || !json?.success) {
-        setFeedback(`⚠️ Test ${k.label} gagal: ${json?.error || `HTTP ${res.status}`}`);
+        setFeedback(`Notice: Test ${k.label} gagal: ${json?.error || `HTTP ${res.status}`}`);
       } else if (json.data?.connected) {
-        setFeedback(`✅ ${activeTab} Key "${k.label}" terverifikasi live (${json.data.latencyMs}ms · $0 token cost).`);
+        setFeedback(`OK: ${activeTab} Key "${k.label}" terverifikasi live (${json.data.latencyMs}ms · $0 token cost).`);
         await loadKeys(activeTab);
       } else {
-        setFeedback(`⚠️ ${activeTab} Key "${k.label}" ditolak provider: ${json.data?.error || 'Auth failed'} (${json.data?.latencyMs ?? 0}ms).`);
+        setFeedback(`Notice: ${activeTab} Key "${k.label}" ditolak provider: ${json.data?.error || 'Auth failed'} (${json.data?.latencyMs ?? 0}ms).`);
       }
     } catch (err: any) {
-      setFeedback(`⚠️ ${err?.message || 'Network error'}`);
+      setFeedback(`Notice: ${err?.message || 'Network error'}`);
     } finally {
       setTestingKeyId(null);
     }
@@ -197,7 +197,7 @@ export function ByokLlmVaultPanel({
               padding: '2px 6px',
               borderRadius: '4px',
               background: 'rgba(168,85,247,0.16)',
-              color: '#C084FC',
+              color: 'var(--color-accent-purple)',
             }}
           >
             <Crown size={10} style={{ display: 'inline', marginRight: '3px', verticalAlign: 'middle' }} />
@@ -228,13 +228,13 @@ export function ByokLlmVaultPanel({
           >
             <option value="PLATFORM">LLM: Platform Default · BytePlus/Gemini (5 Cr)</option>
             <option value="GEMINI" disabled={isConnected && !isByokAllowed}>
-              LLM: BYOK Google Gemini (2 Cr){isConnected && !isByokAllowed ? ' 🔒' : ''}
+              LLM: BYOK Google Gemini (2 Cr){isConnected && !isByokAllowed ? ' ' : ''}
             </option>
             <option value="OPENAI" disabled={isConnected && !isByokAllowed}>
-              LLM: BYOK OpenAI GPT (2 Cr){isConnected && !isByokAllowed ? ' 🔒' : ''}
+              LLM: BYOK OpenAI GPT (2 Cr){isConnected && !isByokAllowed ? ' ' : ''}
             </option>
             <option value="ANTHROPIC" disabled={isConnected && !isByokAllowed}>
-              LLM: BYOK Anthropic Claude (2 Cr){isConnected && !isByokAllowed ? ' 🔒' : ''}
+              LLM: BYOK Anthropic Claude (2 Cr){isConnected && !isByokAllowed ? ' ' : ''}
             </option>
           </select>
 
@@ -391,7 +391,7 @@ export function ByokLlmVaultPanel({
       )}
 
       {feedback && (
-        <div style={{ fontSize: '11px', color: feedback.startsWith('✅') ? '#10B981' : '#F59E0B' }}>
+        <div style={{ fontSize: '11px', color: feedback.startsWith('OK:') ? '#10B981' : '#F59E0B' }}>
           {feedback}
         </div>
       )}

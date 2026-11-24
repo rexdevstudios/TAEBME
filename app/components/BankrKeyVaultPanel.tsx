@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { KeyRound, ShieldCheck, Plus, Trash2, CheckCircle2, Lock } from 'lucide-react';
+import { useLocale } from '../context/LocaleContext';
 
 export interface ProviderKeyItem {
   id: string;
@@ -35,6 +36,7 @@ export function BankrKeyVaultPanel({
   canPublishLaunch,
   activePlanLabel = 'FREE',
 }: BankrKeyVaultPanelProps) {
+  const { tr } = useLocale();
   const [keys, setKeys] = useState<ProviderKeyItem[]>([]);
   const [maxKeys, setMaxKeys] = useState<number>(10);
   const [vaultPlanId, setVaultPlanId] = useState<string>(activePlanLabel || 'FREE');
@@ -95,19 +97,19 @@ export function BankrKeyVaultPanel({
       });
       const json = await res.json();
       if (!res.ok || !json?.success) {
-        setFeedback(`⚠️ ${json?.error || 'Gagal menyimpan API Key'}`);
+        setFeedback(`Notice: ${json?.error || 'Gagal menyimpan API Key'}`);
       } else {
         setLabel('');
         setApiKey('');
         setShowAddForm(false);
-        setFeedback(`✅ API Key "${json.data.label}" (${json.data.maskedKey}) berhasil dienkripsi & disimpan.`);
+        setFeedback(`OK: API Key "${json.data.label}" (${json.data.maskedKey}) berhasil dienkripsi & disimpan.`);
         await fetchKeys();
         if (json.data?.id) {
           onSelectKeyId(json.data.id);
         }
       }
     } catch (err: any) {
-      setFeedback(`⚠️ ${err?.message || 'Network error'}`);
+      setFeedback(`Notice: ${err?.message || 'Network error'}`);
     } finally {
       setSaving(false);
     }
@@ -137,7 +139,7 @@ export function BankrKeyVaultPanel({
         method: 'DELETE',
       });
       if (res.ok) {
-        setFeedback(`🗑️ API Key "${keyLabel}" berhasil dicabut.`);
+        setFeedback(`API Key "${keyLabel}" berhasil dicabut.`);
         if (selectedKeyId === keyId) {
           onSelectKeyId('PLATFORM_DEFAULT');
         }
@@ -166,8 +168,8 @@ export function BankrKeyVaultPanel({
             Multi-Key Bankr BYOK Vault ({keys.length}/{maxKeys} · {vaultPlanId})
           </span>
           {keys.length >= maxKeys && (
-            <a href="/billing" style={{ fontSize: '10px', fontWeight: 800, color: '#38BDF8', textDecoration: 'underline' }}>
-              Upgrade Kuota →
+            <a href="/billing" style={{ fontSize: '10px', fontWeight: 800, color: 'var(--color-accent-info)', textDecoration: 'underline' }}>
+              {tr('Upgrade Quota →', 'Upgrade Kuota →')}
             </a>
           )}
           <span
@@ -193,7 +195,7 @@ export function BankrKeyVaultPanel({
             style={{ padding: '4px 10px', fontSize: '11px', gap: '4px' }}
           >
             <Plus size={12} />
-            {showAddForm ? 'Tutup Form' : 'Tambah Bankr API Key'}
+            {showAddForm ? tr('Close Form', 'Tutup Form') : tr('Add Bankr API Key', 'Tambah Bankr API Key')}
           </button>
         )}
       </div>
@@ -202,12 +204,18 @@ export function BankrKeyVaultPanel({
       <div style={{ fontSize: '11px', color: 'var(--color-muted)', marginBottom: '10px', lineHeight: 1.45 }}>
         {canPublishLaunch ? (
           <span>
-            ✅ Paket aktif Anda (<strong>{activePlanLabel}</strong>) memiliki akses penuh <strong>Publish &amp; Bankr Deploy</strong>. Anda dapat menyimpan hingga 10 API Key Bankr dengan batasan jaringan (<em>chain scope</em>) terisolasi.
+            {tr(
+              `OK: Your active plan (${activePlanLabel}) has full Publish & Bankr Deploy access. You can store up to ${maxKeys} Bankr API Keys with isolated chain scopes.`,
+              `OK: Paket aktif Anda (${activePlanLabel}) memiliki akses penuh Publish & Bankr Deploy. Anda dapat menyimpan hingga ${maxKeys} API Key Bankr dengan batasan jaringan (chain scope) terisolasi.`
+            )}
           </span>
         ) : (
           <span>
             <Lock size={11} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle', color: 'var(--color-badge-warning-text)' }} />
-            Akses <strong>Publish &amp; Bankr Deploy</strong> khusus untuk pelanggan paket <strong>Token Creator (CREATOR)</strong> atau <strong>AI Autonomous Desk (AGENT)</strong>. Anda tetap bisa menyimpan API Key di vault akun Anda sekarang.
+            {tr(
+              'Publish & Bankr Deploy access is exclusive to Token Creator (CREATOR) or AI Autonomous Desk (AGENT) plans. You can still store API Keys in your account vault now.',
+              'Akses Publish & Bankr Deploy khusus untuk pelanggan paket Token Creator (CREATOR) atau AI Autonomous Desk (AGENT). Anda tetap bisa menyimpan API Key di vault akun Anda sekarang.'
+            )}
           </span>
         )}
       </div>
@@ -216,7 +224,7 @@ export function BankrKeyVaultPanel({
       {isConnected && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: keys.length > 0 || showAddForm ? '10px' : '0' }}>
           <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-muted)' }}>
-            Sumber Key Deploy ({selectedChain.toUpperCase()}):
+            {tr(`Deploy Key Source (${selectedChain.toUpperCase()}):`, `Sumber Key Deploy (${selectedChain.toUpperCase()}):`)}
           </label>
           <select
             value={selectedKeyId}
@@ -225,13 +233,16 @@ export function BankrKeyVaultPanel({
             style={{ flex: '1 1 200px', padding: '6px 10px', fontSize: '11px', fontFamily: 'var(--font-mono)' }}
           >
             <option value="PLATFORM_DEFAULT">
-              🌐 Default Platform Key {platformFallbackAvailable ? '(Tersedia)' : '(Perlu BYOK Key)'}
+              {tr(
+                `Default Platform Key ${platformFallbackAvailable ? '(Available)' : '(BYOK Key Required)'}`,
+                `Default Platform Key ${platformFallbackAvailable ? '(Tersedia)' : '(Perlu BYOK Key)'}`
+              )}
             </option>
             {keys.map((k) => {
               const scopeMismatch = k.chainScope !== 'all' && k.chainScope !== selectedChain.toLowerCase();
               return (
                 <option key={k.id} value={k.id} disabled={scopeMismatch}>
-                  🔑 {k.label} ({k.maskedKey}) · Scope: {k.chainScope.toUpperCase()}
+                  {k.label} ({k.maskedKey}) · Scope: {k.chainScope.toUpperCase()}
                   {k.isDefault ? ' ★ Default' : ''}
                   {scopeMismatch ? ` [Khusus ${k.chainScope.toUpperCase()}]` : ''}
                 </option>
@@ -267,7 +278,7 @@ export function BankrKeyVaultPanel({
                     (vaultPlanId === 'CREATOR' || vaultPlanId === 'AGENT') &&
                     (!k.quotaStatus || k.quotaStatus === 'ACTIVE') && (
                       <label
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '10px', color: '#38BDF8', fontWeight: 700 }}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '10px', color: 'var(--color-accent-info)', fontWeight: 700 }}
                         title="Centang untuk Multi-Account Fleet Deploy (maks 5 akun/batch)"
                       >
                         <input
@@ -310,7 +321,7 @@ export function BankrKeyVaultPanel({
                       }}
                       title="Key aman tersimpan, tetapi terkunci sementara karena melebihi kuota paket aktif. Klik Set Default untuk menukar ke slot aktif atau tambah slot di /billing."
                     >
-                      🔒 FROZEN (OVER-QUOTA)
+                      Auth: FROZEN (OVER-QUOTA)
                     </span>
                   )}
                   {k.isDefault && (
@@ -405,7 +416,7 @@ export function BankrKeyVaultPanel({
           />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '10px', color: 'var(--color-muted)' }}>
-              🔒 Dienkripsi AES-256-GCM sebelum disimpan. Sistem otomatis menolak input berbentuk private key wallet.
+              Auth: Dienkripsi AES-256-GCM sebelum disimpan. Sistem otomatis menolak input berbentuk private key wallet.
             </span>
             <button
               type="submit"
@@ -426,9 +437,9 @@ export function BankrKeyVaultPanel({
             padding: '6px 10px',
             borderRadius: '6px',
             fontSize: '11px',
-            backgroundColor: feedback.startsWith('✅') ? 'var(--color-badge-success-bg)' : 'var(--color-badge-warning-bg)',
-            color: feedback.startsWith('✅') ? 'var(--color-badge-success-text)' : 'var(--color-badge-warning-text)',
-            border: `1px solid ${feedback.startsWith('✅') ? 'var(--color-badge-success-border)' : 'var(--color-badge-warning-border)'}`,
+            backgroundColor: feedback.startsWith('OK:') ? 'var(--color-badge-success-bg)' : 'var(--color-badge-warning-bg)',
+            color: feedback.startsWith('OK:') ? 'var(--color-badge-success-text)' : 'var(--color-badge-warning-text)',
+            border: `1px solid ${feedback.startsWith('OK:') ? 'var(--color-badge-success-border)' : 'var(--color-badge-warning-border)'}`,
           }}
         >
           {feedback}

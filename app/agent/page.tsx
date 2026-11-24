@@ -72,7 +72,7 @@ export default function AgentPage() {
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
-        setWeightsFeedback(`⚠️ Gagal menyimpan bobot (${res.status}): ${json.error || 'Forbidden / Error'}`);
+        setWeightsFeedback(`Notice: Gagal menyimpan bobot (${res.status}): ${json.error || 'Forbidden / Error'}`);
         return;
       }
       const saved = json.data?.aiFeatureWeights;
@@ -83,10 +83,10 @@ export default function AgentPage() {
         setDefillamaWeight(saved.defillama);
       }
       setWeightsFeedback(
-        `✅ Bobot AI tersimpan & dinormalisasi ke PostgreSQL SSOT (On-Chain Intel ${Math.round((saved?.arkham ?? arkhamWeight) * 100)}% · Firecrawl ${Math.round((saved?.firecrawl ?? firecrawlWeight) * 100)}% · OHLCV ${Math.round((saved?.ohlcv ?? ohlcvWeight) * 100)}% · DefiLlama ${Math.round((saved?.defillama ?? defillamaWeight) * 100)}%).`
+        `OK: Bobot AI tersimpan & dinormalisasi ke PostgreSQL SSOT (On-Chain Intel ${Math.round((saved?.arkham ?? arkhamWeight) * 100)}% · Firecrawl ${Math.round((saved?.firecrawl ?? firecrawlWeight) * 100)}% · OHLCV ${Math.round((saved?.ohlcv ?? ohlcvWeight) * 100)}% · DefiLlama ${Math.round((saved?.defillama ?? defillamaWeight) * 100)}%).`
       );
     } catch (err: any) {
-      setWeightsFeedback(`⚠️ Gagal menyimpan bobot: ${err?.message || 'Network error'}`);
+      setWeightsFeedback(`Notice: Gagal menyimpan bobot: ${err?.message || 'Network error'}`);
     } finally {
       setWeightsSaving(false);
     }
@@ -97,12 +97,12 @@ export default function AgentPage() {
     setFirecrawlWeight(0.25);
     setOhlcvWeight(0.25);
     setDefillamaWeight(0.15);
-    setWeightsFeedback('ℹ️ Bobot dikembalikan ke default (35% / 25% / 25% / 15%). Klik "Simpan Bobot ke SSOT" untuk menerapkan.');
+    setWeightsFeedback('Bobot dikembalikan ke default (35% / 25% / 25% / 15%). Klik "Simpan Bobot ke SSOT" untuk menerapkan.');
   };
 
   const handleGenerateProposal = async () => {
     if (!isConnected) {
-      setError('🔒 Wallet connection required to trigger AI strategy proposals.');
+      setError('Auth: Wallet connection required to trigger AI strategy proposals.');
       return;
     }
 
@@ -315,13 +315,13 @@ export default function AgentPage() {
                   marginTop: '8px'
                 }}
               >
-                {loading ? 'Generating Proposal via Feature Engine...' : '🚀 Generate Intelligence Proposal'}
+                {loading ? 'Generating Proposal via Feature Engine...' : 'Generate Intelligence Proposal'}
               </button>
             )}
 
             {error && (
               <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-destructive)', border: '1px solid var(--color-destructive)', padding: '12px', borderRadius: '6px', fontSize: '12px' }}>
-                ❌ {error}
+                Error: {error}
               </div>
             )}
           </div>
@@ -337,7 +337,7 @@ export default function AgentPage() {
             <div className="bg-panel" style={{ padding: '16px', borderRadius: '6px', border: '1px solid var(--color-border)', fontSize: '12px', fontFamily: 'var(--font-mono)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                 <span className="text-muted">Proposal ID:</span>
-                <span style={{ color: '#D500F9', fontWeight: 800 }}>{proposal.proposalId || proposal.id}</span>
+                <span style={{ color: 'var(--color-accent-purple)', fontWeight: 800 }}>{proposal.proposalId || proposal.id}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                 <span className="text-muted">Confidence Score:</span>
@@ -347,7 +347,7 @@ export default function AgentPage() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                 <span className="text-muted">Macro Sentiment:</span>
-                <span style={{ color: '#00E5FF', fontWeight: 800 }}>
+                <span style={{ color: 'var(--color-accent-info)', fontWeight: 800 }}>
                   {proposal.intelligenceSignal?.inputs?.macroSentiment || 'UNAVAILABLE'}
                 </span>
               </div>
@@ -408,7 +408,7 @@ export default function AgentPage() {
         <div className="bg-panel" style={{ border: '1px solid #FF9100', borderRadius: '8px', padding: '24px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '16px' }}>
             <div>
-              <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#FFD600', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 800, color: 'var(--color-accent-amber)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Settings2 size={18} /> Pengaturan Bobot Analisis AI (Admin)
               </h3>
               <p className="text-muted" style={{ margin: '4px 0 0 0', fontSize: '12px' }}>
@@ -416,7 +416,7 @@ export default function AgentPage() {
               </p>
             </div>
             <div className="flex-row gap-sm items-center">
-              <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: '#38BDF8', fontWeight: 800 }}>
+              <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--color-accent-info)', fontWeight: 800 }}>
                 Total Input: {Math.round((arkhamWeight + firecrawlWeight + ohlcvWeight + defillamaWeight) * 100)}%
               </span>
               <button
@@ -441,7 +441,7 @@ export default function AgentPage() {
           </div>
           <div className="grid-4">
             <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '16px', borderRadius: '6px' }}>
-              <div style={{ color: '#00E5FF', fontWeight: 800, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}><ShieldAlert size={14} /> On-Chain Wallet Guard</div>
+              <div style={{ color: 'var(--color-accent-info)', fontWeight: 800, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}><ShieldAlert size={14} /> On-Chain Wallet Guard</div>
               <div style={{ fontSize: '18px', fontWeight: 900, color: 'var(--color-foreground)', margin: '8px 0', fontFamily: 'var(--font-mono)' }}>{Math.round(arkhamWeight * 100)}%</div>
               <input
                 type="range"
@@ -455,7 +455,7 @@ export default function AgentPage() {
               <div className="text-muted" style={{ fontSize: '11px' }}>GoPlus + RPC Counterparty &amp; Sanctions Risk ($0)</div>
             </div>
             <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '16px', borderRadius: '6px' }}>
-              <div style={{ color: '#D500F9', fontWeight: 800, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}><Activity size={14} /> Firecrawl Sentiment</div>
+              <div style={{ color: 'var(--color-accent-purple)', fontWeight: 800, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}><Activity size={14} /> Firecrawl Sentiment</div>
               <div style={{ fontSize: '18px', fontWeight: 900, color: 'var(--color-foreground)', margin: '8px 0', fontFamily: 'var(--font-mono)' }}>{Math.round(firecrawlWeight * 100)}%</div>
               <input
                 type="range"
@@ -483,7 +483,7 @@ export default function AgentPage() {
               <div className="text-muted" style={{ fontSize: '11px' }}>Technical Momentum Indicators</div>
             </div>
             <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '16px', borderRadius: '6px' }}>
-              <div style={{ color: '#FFC400', fontWeight: 800, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}><Activity size={14} /> DefiLlama Macro TVL</div>
+              <div style={{ color: 'var(--color-accent-amber)', fontWeight: 800, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}><Activity size={14} /> DefiLlama Macro TVL</div>
               <div style={{ fontSize: '18px', fontWeight: 900, color: 'var(--color-foreground)', margin: '8px 0', fontFamily: 'var(--font-mono)' }}>{Math.round(defillamaWeight * 100)}%</div>
               <input
                 type="range"
@@ -498,7 +498,7 @@ export default function AgentPage() {
             </div>
           </div>
           {weightsFeedback && (
-            <div style={{ marginTop: '12px', padding: '10px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 700, backgroundColor: weightsFeedback.includes('✅') ? 'rgba(16, 185, 129, 0.14)' : 'rgba(245, 158, 11, 0.14)', color: weightsFeedback.includes('✅') ? '#6EE7B7' : '#FDE047', border: `1px solid ${weightsFeedback.includes('✅') ? 'rgba(16, 185, 129, 0.35)' : 'rgba(245, 158, 11, 0.35)'}` }}>
+            <div style={{ marginTop: '12px', padding: '10px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 700, backgroundColor: weightsFeedback.includes('OK:') ? 'rgba(16, 185, 129, 0.14)' : 'rgba(245, 158, 11, 0.14)', color: weightsFeedback.includes('OK:') ? 'var(--color-text-positive)' : 'var(--color-accent-amber)', border: `1px solid ${weightsFeedback.includes('OK:') ? 'rgba(16, 185, 129, 0.35)' : 'rgba(245, 158, 11, 0.35)'}` }}>
               {weightsFeedback}
             </div>
           )}

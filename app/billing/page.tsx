@@ -76,7 +76,7 @@ interface Plan {
 
 export default function BillingPage() {
   const { isConnected, userRole, hasCapability, planId, credits, connectMetaMask, isConnecting, refreshSession } = useAuth();
-  const { t } = useLocale();
+  const { t, tr } = useLocale();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [activePlanId, setActivePlanId] = useState<string>('FREE');
@@ -205,17 +205,17 @@ export default function BillingPage() {
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
-        setDiscountFeedback(`⚠️ Gagal menyimpan diskon (${res.status}): ${json.error || 'Forbidden / Error'}`);
+        setDiscountFeedback(`Notice: Gagal menyimpan diskon (${res.status}): ${json.error || 'Forbidden / Error'}`);
         return;
       }
       await fetchPlans();
       setDiscountFeedback(
         pctToApply > 0
-          ? `✅ Diskon ${pctToApply}% (${promoLabelInput || 'PROMO'}) diterapkan pada paket ${discountPlanId}!`
-          : `✅ Diskon paket ${discountPlanId} di-reset ke harga normal (0%).`
+          ? `OK: Diskon ${pctToApply}% (${promoLabelInput || 'PROMO'}) diterapkan pada paket ${discountPlanId}!`
+          : `OK: Diskon paket ${discountPlanId} di-reset ke harga normal (0%).`
       );
     } catch (err: any) {
-      setDiscountFeedback(`⚠️ Gagal menyimpan diskon: ${err?.message || 'Network error'}`);
+      setDiscountFeedback(`Notice: Gagal menyimpan diskon: ${err?.message || 'Network error'}`);
     } finally {
       setDiscountSaving(false);
     }
@@ -224,12 +224,12 @@ export default function BillingPage() {
   const handleVerifyContractBytecode = async () => {
     const addr = launchpadContractAddress.trim();
     if (!addr || !ethers.isAddress(addr)) {
-      setConfigFeedback('⚠️ Masukkan alamat EVM 0x... yang valid terlebih dahulu sebelum verifikasi bytecode.');
+      setConfigFeedback('Notice: Masukkan alamat EVM 0x... yang valid terlebih dahulu sebelum verifikasi bytecode.');
       return;
     }
     const ethereum = resolveBrowserEthereumProvider();
     if (!ethereum) {
-      setConfigFeedback('⚠️ MetaMask tidak terdeteksi untuk mengecek bytecode on-chain (eth_getCode).');
+      setConfigFeedback('Notice: MetaMask tidak terdeteksi untuk mengecek bytecode on-chain (eth_getCode).');
       return;
     }
     setIsVerifyingBytecode(true);
@@ -242,15 +242,15 @@ export default function BillingPage() {
       if (typeof code === 'string' && code.length > 2 && code !== '0x0') {
         const byteLen = Math.floor((code.length - 2) / 2);
         setConfigFeedback(
-          `✅ Kontrak terverifikasi on-chain pada chain ${activeChainHex} (${byteLen.toLocaleString()} bytes bytecode). Siap disimpan ke SSOT.`
+          `OK: Kontrak terverifikasi on-chain pada chain ${activeChainHex} (${byteLen.toLocaleString()} bytes bytecode). Siap disimpan ke SSOT.`
         );
       } else {
         setConfigFeedback(
-          `⚠️ Tidak ditemukan bytecode kontrak (eth_getCode = 0x) untuk ${addr} pada chain ${activeChainHex}. Pastikan alamat adalah Smart Contract (bukan dompet EOA) dan jaringan MetaMask sesuai.`
+          `Notice: Tidak ditemukan bytecode kontrak (eth_getCode = 0x) untuk ${addr} pada chain ${activeChainHex}. Pastikan alamat adalah Smart Contract (bukan dompet EOA) dan jaringan MetaMask sesuai.`
         );
       }
     } catch (err: any) {
-      setConfigFeedback(`⚠️ Gagal memeriksa bytecode on-chain: ${normalizeWeb3Error(err)}`);
+      setConfigFeedback(`Notice: Gagal memeriksa bytecode on-chain: ${normalizeWeb3Error(err)}`);
     } finally {
       setIsVerifyingBytecode(false);
     }
@@ -279,15 +279,15 @@ export default function BillingPage() {
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
-        setConfigFeedback(`⚠️ Gagal menyimpan konfigurasi (${res.status}): ${json.error || 'Error'}`);
+        setConfigFeedback(`Notice: Gagal menyimpan konfigurasi (${res.status}): ${json.error || 'Error'}`);
         return;
       }
       await fetchPlans();
       setConfigFeedback(
-        `✅ Parameter bisnis & Risk Gate berhasil diperbarui di PostgreSQL SSOT (Burn: ${studioCostCr}/${deskCostCr}/${launchCostCr} cr · Max Order: $${maxOrderValueUsd.toLocaleString()}).`
+        `OK: Parameter bisnis & Risk Gate berhasil diperbarui di PostgreSQL SSOT (Burn: ${studioCostCr}/${deskCostCr}/${launchCostCr} cr · Max Order: $${maxOrderValueUsd.toLocaleString()}).`
       );
     } catch (err: any) {
-      setConfigFeedback(`⚠️ Gagal menyimpan konfigurasi: ${err?.message || 'Network error'}`);
+      setConfigFeedback(`Notice: Gagal menyimpan konfigurasi: ${err?.message || 'Network error'}`);
     } finally {
       setConfigSaving(false);
     }
@@ -295,7 +295,7 @@ export default function BillingPage() {
 
   const handlePayWithMetaMask = async (plan: Plan) => {
     if (!isConnected) {
-      setPaymentFeedback('🔒 SIWE Session Required: Silakan hubungkan dompet MetaMask terlebih dahulu.');
+      setPaymentFeedback('Auth: SIWE Session Required: Silakan hubungkan dompet MetaMask terlebih dahulu.');
       return;
     }
     const targetPlanId = plan.id.toUpperCase();
@@ -306,11 +306,11 @@ export default function BillingPage() {
     }
 
     setIsProcessing(targetPlanId);
-    setPaymentFeedback(`⏳ Memeriksa jaringan Base L2 & menyiapkan pembayaran ${ethStr} ETH di MetaMask...`);
+    setPaymentFeedback(`Memeriksa jaringan Base L2 & menyiapkan pembayaran ${ethStr} ETH di MetaMask...`);
     try {
       const netCheck = await ensureBaseNetwork();
       if (!netCheck.success) {
-        setPaymentFeedback(`⚠️ ${netCheck.error || 'Harap beralih ke jaringan Base di MetaMask.'}`);
+        setPaymentFeedback(`Notice: ${netCheck.error || 'Harap beralih ke jaringan Base di MetaMask.'}`);
         return;
       }
       const signer = await getBrowserSigner();
@@ -327,7 +327,7 @@ export default function BillingPage() {
         if (balanceWei !== null && balanceWei < requiredWei) {
           const formattedBal = Number(ethers.formatEther(balanceWei)).toFixed(6);
           setPaymentFeedback(
-            `⚠️ Saldo ETH di ${networkLabel} tidak mencukupi: saldo Anda ${formattedBal} ETH, dibutuhkan minimal ${ethStr} ETH + biaya gas. Silakan isi ETH di ${networkLabel} terlebih dahulu.`
+            `Notice: Saldo ETH di ${networkLabel} tidak mencukupi: saldo Anda ${formattedBal} ETH, dibutuhkan minimal ${ethStr} ETH + biaya gas. Silakan isi ETH di ${networkLabel} terlebih dahulu.`
           );
           return;
         }
@@ -343,7 +343,7 @@ export default function BillingPage() {
         ...(isPlainEoa ? { gasLimit: BigInt(21000) } : {}),
       });
       setTxHashInput(tx.hash);
-      setPaymentFeedback(`📡 Transaksi terkirim (${tx.hash.slice(0, 12)}...). Menunggu 1 konfirmasi blok Base...`);
+      setPaymentFeedback(`Transaksi terkirim (${tx.hash.slice(0, 12)}...). Menunggu 1 konfirmasi blok Base...`);
       await tx.wait(1);
 
       const settledChain = netCheck.hexChainId === '0x14a34' ? 'base-sepolia' : 'base-mainnet';
@@ -359,17 +359,17 @@ export default function BillingPage() {
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
-        setPaymentFeedback(`⚠️ Pembayaran terkirim (${tx.hash}), namun aktivasi gagal: ${json.error || 'Unknown error'}`);
+        setPaymentFeedback(`Notice: Pembayaran terkirim (${tx.hash}), namun aktivasi gagal: ${json.error || 'Unknown error'}`);
         return;
       }
       setActivePlanId(targetPlanId);
       await refreshSession();
       await fetchLedger();
       setPaymentFeedback(
-        `✅ Pembayaran On-Chain (${tx.hash.slice(0, 10)}...) terverifikasi! Tier ${plan.name} aktif dengan ${Number(json.data.credits).toLocaleString()} Credits.`
+        `OK: Pembayaran On-Chain (${tx.hash.slice(0, 10)}...) terverifikasi! Tier ${plan.name} aktif dengan ${Number(json.data.credits).toLocaleString()} Credits.`
       );
     } catch (err: any) {
-      setPaymentFeedback(`⚠️ Pembayaran MetaMask dibatalkan / gagal: ${normalizeWeb3Error(err)}`);
+      setPaymentFeedback(`Notice: Pembayaran MetaMask dibatalkan / gagal: ${normalizeWeb3Error(err)}`);
     } finally {
       setIsProcessing(null);
     }
@@ -377,7 +377,7 @@ export default function BillingPage() {
 
   const handleSubscribe = async (plan: Plan) => {
     if (!isConnected) {
-      setPaymentFeedback('🔒 SIWE Session Required: Silakan hubungkan dompet MetaMask terlebih dahulu.');
+      setPaymentFeedback('Auth: SIWE Session Required: Silakan hubungkan dompet MetaMask terlebih dahulu.');
       return;
     }
 
@@ -398,7 +398,7 @@ export default function BillingPage() {
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
-        setPaymentFeedback(`⚠️ Upgrade gagal (${res.status}): ${json.error || 'Unknown error'}`);
+        setPaymentFeedback(`Notice: Upgrade gagal (${res.status}): ${json.error || 'Unknown error'}`);
         return;
       }
 
@@ -406,10 +406,10 @@ export default function BillingPage() {
       await refreshSession();
       await fetchLedger();
       setPaymentFeedback(
-        `✅ Tier ${plan.name} (${targetPlanId}) aktif! Saldo kredit: ${Number(json.data.credits).toLocaleString()} Credits${json.data.unlockedCreatorRole ? ' · Role CREATOR terbuka!' : ''}`
+        `OK: Tier ${plan.name} (${targetPlanId}) aktif! Saldo kredit: ${Number(json.data.credits).toLocaleString()} Credits${json.data.unlockedCreatorRole ? ' · Role CREATOR terbuka!' : ''}`
       );
     } catch (err: any) {
-      setPaymentFeedback(`⚠️ Koneksi gagal: ${err?.message || 'Tidak dapat menghubungi server'}`);
+      setPaymentFeedback(`Notice: Koneksi gagal: ${err?.message || 'Tidak dapat menghubungi server'}`);
     } finally {
       setIsProcessing(null);
     }
@@ -433,7 +433,7 @@ export default function BillingPage() {
             Account · Plans · API Vaults · Telegram Alerts
           </div>
           <h1 style={{ fontSize: '20px', fontWeight: 900, margin: '0 0 4px 0', color: 'var(--color-foreground)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <CreditCard size={20} style={{ color: '#F0B90B' }} /> {t('billing.title')}
+            <CreditCard size={20} style={{ color: 'var(--color-accent-amber)' }} /> {t('billing.title')}
           </h1>
           <p className="text-muted" style={{ margin: 0, fontSize: '12px' }}>
             {t('billing.subtitle')}
@@ -443,17 +443,17 @@ export default function BillingPage() {
           {isConnected && (
             <>
               <div className="bg-panel" style={{ border: '1px solid var(--color-badge-warning-border)', padding: '6px 12px', borderRadius: '8px', fontSize: '12px' }}>
-                <span className="text-muted">Paket: </span>
+                <span className="text-muted">{tr('Plan: ', 'Paket: ')}</span>
                 <span style={{ color: 'var(--color-badge-warning-text)', fontWeight: 800 }}>{activePlanId}</span>
               </div>
               <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '6px 12px', borderRadius: '8px', fontSize: '12px' }}>
-                <span className="text-muted">Saldo: </span>
-                <span style={{ color: 'var(--color-badge-info-text)', fontWeight: 800 }}>{credits.toLocaleString()} Kredit</span>
+                <span className="text-muted">{tr('Balance: ', 'Saldo: ')}</span>
+                <span style={{ color: 'var(--color-badge-info-text)', fontWeight: 800 }}>{credits.toLocaleString()} {tr('Credits', 'Kredit')}</span>
               </div>
             </>
           )}
           <span className="badge badge-trader" style={{ border: '1px solid var(--color-badge-success-border)', color: 'var(--color-badge-success-text)', backgroundColor: 'var(--color-badge-success-bg)' }}>
-            {loading ? 'Memuat...' : 'Aktif'}
+            {loading ? tr('Loading...', 'Memuat...') : tr('Active', 'Aktif')}
           </span>
         </div>
       </div>
@@ -496,14 +496,17 @@ export default function BillingPage() {
         <div className="flex-col gap-lg">
       {/* Workflow & Plan Entitlement Guide */}
       <PageWorkflowBanner
-        title="Cara Berlangganan & Menggunakan Kredit"
+        title={tr('How Subscriptions & Credits Work', 'Cara Berlangganan & Menggunakan Kredit')}
         isUnlocked={true}
-        creditSummary={`Tarif Fitur: Studio ${studioCostCr} cr · AI Desk ${deskCostCr} cr · Launch ${launchCostCr} cr`}
+        creditSummary={tr(
+          `Feature Rates: Studio ${studioCostCr} cr · AI Desk ${deskCostCr} cr · Launch ${launchCostCr} cr`,
+          `Tarif Fitur: Studio ${studioCostCr} cr · AI Desk ${deskCostCr} cr · Launch ${launchCostCr} cr`
+        )}
         steps={[
-          { step: '1', label: 'Pilih Paket (FREE / CREATOR / TRADER / AGENT)' },
-          { step: '2', label: 'Bayar 1-Klik ETH via MetaMask / Promo' },
-          { step: '3', label: 'Paket & Kredit Langsung Aktif' },
-          { step: '4', label: 'Pantau Riwayat di Mutasi Kredit' },
+          { step: '1', label: tr('Choose Plan (FREE / CREATOR / TRADER / AGENT)', 'Pilih Paket (FREE / CREATOR / TRADER / AGENT)') },
+          { step: '2', label: tr('1-Click ETH Payment via MetaMask / Promo', 'Bayar 1-Klik ETH via MetaMask / Promo') },
+          { step: '3', label: tr('Plan & Credits Activate Instantly', 'Paket & Kredit Langsung Aktif') },
+          { step: '4', label: tr('Track Usage in Credit Ledger', 'Pantau Riwayat di Mutasi Kredit') },
         ]}
       />
 
@@ -511,13 +514,17 @@ export default function BillingPage() {
       {isConnected && (
         <div className="bg-panel" style={{ border: '1px solid var(--color-border)', borderRadius: '8px', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
           <div style={{ fontSize: '12px', color: 'var(--color-muted)' }}>
-            <strong style={{ color: 'var(--color-foreground)' }}>On-Chain Base Payment Verifier:</strong> Di Testnet (`testnet.pndigi.site`), Anda dapat mengaktifkan tier apa pun secara instan (1-klik). Di Mainnet (`pndigi.site`), tempel `txHash` pembayaran Base L2 Anda di sini untuk verifikasi on-chain otomatis:
+            <strong style={{ color: 'var(--color-foreground)' }}>On-Chain Base Payment Verifier:</strong>{' '}
+            {tr(
+              'On Testnet (testnet.pndigi.site), activate any tier with 1 click. On Mainnet (pndigi.site), paste your Base L2 payment txHash here for instant on-chain verification:',
+              'Di Testnet (testnet.pndigi.site), Anda dapat mengaktifkan tier apa pun secara instan (1-klik). Di Mainnet (pndigi.site), tempel txHash pembayaran Base L2 Anda di sini untuk verifikasi on-chain otomatis:'
+            )}
           </div>
           <input
             type="text"
             value={txHashInput}
             onChange={(e) => setTxHashInput(e.target.value)}
-            placeholder="Opsional Mainnet: 0x... (Base Payment TxHash)"
+            placeholder={tr('Optional Mainnet: 0x... (Base Payment TxHash)', 'Opsional Mainnet: 0x... (Base Payment TxHash)')}
             style={{
               flex: '1 1 280px',
               padding: '7px 10px',
@@ -536,10 +543,11 @@ export default function BillingPage() {
         <div
           className="bg-panel"
           style={{
-            borderColor: paymentFeedback.includes('⚠️') || paymentFeedback.includes('🔒') ? '#FF9100' : 'var(--color-accent)',
-            color: paymentFeedback.includes('⚠️') || paymentFeedback.includes('🔒') ? '#FFD600' : 'var(--color-accent)',
+            borderColor: paymentFeedback.includes('Notice:') || paymentFeedback.includes('Auth:') ? 'var(--color-badge-warning-border)' : 'var(--color-badge-success-border)',
+            backgroundColor: paymentFeedback.includes('Notice:') || paymentFeedback.includes('Auth:') ? 'var(--color-badge-warning-bg)' : 'var(--color-badge-success-bg)',
+            color: paymentFeedback.includes('Notice:') || paymentFeedback.includes('Auth:') ? 'var(--color-badge-warning-text)' : 'var(--color-badge-success-text)',
             padding: '12px 16px',
-            borderRadius: '6px',
+            borderRadius: '12px',
             fontSize: '12px',
             fontWeight: 800,
             borderWidth: '1px',
@@ -568,8 +576,8 @@ export default function BillingPage() {
               key={plan.id}
               className="bg-panel"
               style={{
-                border: isActive ? '2px solid #FFC400' : '1px solid var(--color-border)',
-                borderRadius: '8px',
+                border: isActive ? '2px solid var(--color-accent-emerald)' : '1px solid var(--color-border)',
+                borderRadius: '20px',
                 padding: '24px',
                 display: 'flex',
                 flexDirection: 'column',
@@ -578,7 +586,7 @@ export default function BillingPage() {
               }}
             >
               {isActive && (
-                <span style={{ position: 'absolute', top: '12px', right: '12px', backgroundColor: '#FFC400', color: '#000000', padding: '4px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 900 }}>
+                <span style={{ position: 'absolute', top: '12px', right: '12px', backgroundColor: 'var(--color-accent-emerald)', color: '#0C1500', padding: '4px 9px', borderRadius: '999px', fontSize: '10px', fontWeight: 900 }}>
                   ACTIVE PLAN
                 </span>
               )}
@@ -589,11 +597,11 @@ export default function BillingPage() {
                   {hasDiscount && (
                     <span
                       style={{
-                        backgroundColor: 'rgba(16, 185, 129, 0.16)',
-                        color: '#00E676',
-                        border: '1px solid #00E676',
-                        padding: '2px 7px',
-                        borderRadius: '4px',
+                        backgroundColor: 'var(--color-badge-success-bg)',
+                        color: 'var(--color-badge-success-text)',
+                        border: '1px solid var(--color-badge-success-border)',
+                        padding: '2px 8px',
+                        borderRadius: '999px',
                         fontSize: '10px',
                         fontWeight: 900,
                         fontFamily: 'var(--font-mono)',
@@ -603,9 +611,9 @@ export default function BillingPage() {
                     </span>
                   )}
                 </div>
-                <div style={{ fontSize: '24px', fontWeight: 900, color: 'var(--color-accent)', marginBottom: '4px', fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
+                <div className="tabular-nums" style={{ fontSize: '28px', fontWeight: 900, color: 'var(--color-foreground)', marginBottom: '4px', letterSpacing: '-0.03em', display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
                   {hasDiscount && (
-                    <span style={{ fontSize: '14px', color: '#94A3B8', textDecoration: 'line-through', fontWeight: 600 }}>
+                    <span style={{ fontSize: '14px', color: 'var(--color-muted)', textDecoration: 'line-through', fontWeight: 600 }}>
                       ${origPrice}
                     </span>
                   )}
@@ -614,9 +622,9 @@ export default function BillingPage() {
                   </span>
                 </div>
                 {plan.priceEth && (
-                  <div style={{ fontSize: '11px', color: '#38BDF8', marginBottom: '14px', fontFamily: 'var(--font-mono)' }}>
+                  <div className="text-muted tabular-nums" style={{ fontSize: '11px', marginBottom: '14px', fontFamily: 'var(--font-mono)' }}>
                     {hasDiscount && plan.originalPriceEth && (
-                      <span style={{ color: '#64748B', textDecoration: 'line-through', marginRight: '6px' }}>
+                      <span style={{ opacity: 0.65, textDecoration: 'line-through', marginRight: '6px' }}>
                         {plan.originalPriceEth} ETH
                       </span>
                     )}
@@ -625,29 +633,30 @@ export default function BillingPage() {
                 )}
 
                 <div className="flex-col gap-sm text-muted" style={{ fontSize: '12px', marginBottom: '20px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontFamily: 'var(--font-mono)' }}>
-                    <CheckCircle2 size={14} style={{ color: 'var(--color-accent)' }} /> {plan.monthlyCredits.toLocaleString()} Monthly Credits
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontFamily: 'var(--font-mono)', color: 'var(--color-foreground)', fontWeight: 700 }}>
+                    <CheckCircle2 size={14} style={{ color: 'var(--color-accent-emerald)' }} /> {plan.monthlyCredits.toLocaleString()} Monthly Credits
                   </div>
                   {plan.capacities && (
                     <div
                       style={{
                         marginTop: '4px',
-                        padding: '8px 10px',
-                        borderRadius: '6px',
+                        padding: '10px 12px',
+                        borderRadius: '12px',
                         border: '1px solid var(--color-border)',
-                        background: 'rgba(15, 23, 42, 0.04)',
+                        background: 'var(--color-surface-inset)',
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '4px',
                         fontSize: '11px',
                         fontFamily: 'var(--font-mono)',
+                        color: 'var(--color-foreground)',
                       }}
                     >
-                      <div>🚀 Bankr BYOK Vault: <strong>{plan.capacities.maxBankrKeys}</strong> key(s)</div>
+                      <div>Bankr BYOK Vault: <strong>{plan.capacities.maxBankrKeys}</strong> key(s)</div>
                       <div>
-                        ⚡ Binance CEX Vault: <strong>{plan.capacities.maxBinanceAccounts}</strong> akun ({plan.capacities.allowMainnetBinance ? 'Testnet + Mainnet' : 'Testnet Only'})
+                        Binance CEX Vault: <strong>{plan.capacities.maxBinanceAccounts}</strong> akun ({plan.capacities.allowMainnetBinance ? 'Testnet + Mainnet' : 'Testnet Only'})
                       </div>
-                      <div>🛡️ Max Order Cap: <strong>${plan.capacities.maxOrderValueUsd.toLocaleString()}</strong></div>
+                      <div>Max Order Cap: <strong>${plan.capacities.maxOrderValueUsd.toLocaleString()}</strong></div>
                     </div>
                   )}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -676,7 +685,7 @@ export default function BillingPage() {
                     setPaymentFeedback(null);
                     const res = await connectMetaMask();
                     if (!res.success && res.error) {
-                      setPaymentFeedback(`⚠️ ${res.error}`);
+                      setPaymentFeedback(`Notice: ${res.error}`);
                     }
                   }}
                   disabled={isConnecting}
@@ -710,7 +719,7 @@ export default function BillingPage() {
                       onClick={() => handlePayWithMetaMask(plan)}
                       disabled={isProcessing !== null}
                       className="btn-secondary"
-                      style={{ width: '100%', justifyContent: 'center', fontSize: '11px', padding: '7px 10px', borderColor: '#38BDF8', color: '#38BDF8' }}
+                      style={{ width: '100%', justifyContent: 'center', fontSize: '11px', padding: '7px 10px', borderColor: 'var(--color-accent-info)', color: 'var(--color-accent-info)' }}
                     >
                       <Zap size={13} /> 1-Click Pay {plan.priceEth} ETH via MetaMask
                     </button>
@@ -724,46 +733,46 @@ export default function BillingPage() {
 
       {/* Platform Business Fee & Credit Burn Transparency Matrix */}
       <div className="bg-panel" style={{ border: '1px solid rgba(56, 189, 248, 0.35)', borderRadius: '8px', padding: '20px' }}>
-        <h3 style={{ fontSize: '15px', fontWeight: 900, color: '#38BDF8', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <h3 style={{ fontSize: '15px', fontWeight: 900, color: 'var(--color-accent-info)', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Scale size={17} /> Kenapa RTrader AI vs Bot Bursa Biasa &amp; Transparansi Biaya
         </h3>
         <div className="grid-3" style={{ gap: '12px', marginBottom: '12px' }}>
           <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '12px', borderRadius: '6px' }}>
-            <div style={{ color: '#34D399', fontWeight: 800, fontSize: '12px' }}>Multi-Signal AI vs Grid Kaku</div>
+            <div style={{ color: 'var(--color-text-positive)', fontWeight: 800, fontSize: '12px' }}>Multi-Signal AI vs Grid Kaku</div>
             <div className="text-muted" style={{ fontSize: '11px', marginTop: '4px' }}>
               Bot bawaan bursa hanya memakai grid/DCA kaku. RTrader menggabungkan Scout 6-Chain, sentimen, on-chain risk, dan BYOK LLM.
             </div>
           </div>
-          <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '12px', borderRadius: '6px' }}>
-            <div style={{ color: '#38BDF8', fontWeight: 800, fontSize: '12px' }}>Omnichain CEX + DEX 0x v2</div>
+          <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '14px', borderRadius: '14px', boxShadow: 'none' }}>
+            <div style={{ color: 'var(--color-foreground)', fontWeight: 800, fontSize: '12px' }}>Omnichain CEX + DEX 0x v2</div>
             <div className="text-muted" style={{ fontSize: '11px', marginTop: '4px' }}>
               1 dashboard untuk Binance, Bybit V5, 6 jaringan DEX EVM (0x v2), Launchpad Bankr, dan proteksi Kill-Switch lintas akun.
             </div>
           </div>
-          <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '12px', borderRadius: '6px' }}>
-            <div style={{ color: '#C084FC', fontWeight: 800, fontSize: '12px' }}>100% Non-Custodial &amp; Soft-Freeze</div>
+          <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '14px', borderRadius: '14px', boxShadow: 'none' }}>
+            <div style={{ color: 'var(--color-foreground)', fontWeight: 800, fontSize: '12px' }}>100% Non-Custodial &amp; Soft-Freeze</div>
             <div className="text-muted" style={{ fontSize: '11px', marginTop: '4px' }}>
               Zero private key di server; API key dienkripsi AES-256-GCM dan tidak pernah terhapus saat downgrade paket.
             </div>
           </div>
         </div>
         <div className="grid-3" style={{ gap: '12px' }}>
-          <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '14px', borderRadius: '6px' }}>
-            <div style={{ color: 'var(--color-accent)', fontWeight: 800, fontSize: '12px' }}>Bonding Curve Swap Fee (1.00%)</div>
+          <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '14px', borderRadius: '14px', boxShadow: 'none' }}>
+            <div style={{ color: 'var(--color-accent-emerald)', fontWeight: 800, fontSize: '12px' }}>Bonding Curve Swap Fee (1.00%)</div>
             <div style={{ fontSize: '16px', fontWeight: 900, color: 'var(--color-foreground)', margin: '6px 0', fontFamily: 'var(--font-mono)' }}>
               0.50% Treasury / 0.50% Creator
             </div>
             <div className="text-muted" style={{ fontSize: '11px' }}>Dibagi otomatis on-chain di BondingCurveLaunchpad.sol tanpa biaya tersembunyi.</div>
           </div>
-          <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '14px', borderRadius: '6px' }}>
-            <div style={{ color: '#00E5FF', fontWeight: 800, fontSize: '12px' }}>Graduation Target &amp; LP Lock</div>
+          <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '14px', borderRadius: '14px', boxShadow: 'none' }}>
+            <div style={{ color: 'var(--color-foreground)', fontWeight: 800, fontSize: '12px' }}>Graduation Target &amp; LP Lock</div>
             <div style={{ fontSize: '16px', fontWeight: 900, color: 'var(--color-foreground)', margin: '6px 0', fontFamily: 'var(--font-mono)' }}>
               $69,000 Standard / $2,500 Degen
             </div>
             <div className="text-muted" style={{ fontSize: '11px' }}>Otomatis bermigrasi ke Uniswap v3 / Aerodrome Pool dengan LP timelock 180 hari.</div>
           </div>
-          <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '14px', borderRadius: '6px' }}>
-            <div style={{ color: '#C084FC', fontWeight: 800, fontSize: '12px' }}>Metered Credit Consumption</div>
+          <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '14px', borderRadius: '14px', boxShadow: 'none' }}>
+            <div style={{ color: 'var(--color-foreground)', fontWeight: 800, fontSize: '12px' }}>Metered Credit Consumption</div>
             <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--color-foreground)', margin: '6px 0', fontFamily: 'var(--font-mono)' }}>
               Scrape/Studio: {studioCostCr} cr · 5-Agent Desk: {deskCostCr} cr · Launch: {launchCostCr} cr
             </div>
@@ -824,7 +833,7 @@ export default function BillingPage() {
                         <td style={{ padding: '8px 10px', color: 'var(--color-muted)' }}>
                           {new Date(entry.createdAt).toLocaleString()}
                         </td>
-                        <td style={{ padding: '8px 10px', fontWeight: 800, color: isCredit ? 'var(--color-accent)' : '#38BDF8' }}>
+                        <td style={{ padding: '8px 10px', fontWeight: 800, color: isCredit ? 'var(--color-accent)' : 'var(--color-accent-info)' }}>
                           {entry.type}
                         </td>
                         <td style={{ padding: '8px 10px', color: 'var(--color-foreground)', fontFamily: 'var(--font-sans)' }}>
@@ -838,7 +847,7 @@ export default function BillingPage() {
                             padding: '8px 10px',
                             textAlign: 'right',
                             fontWeight: 900,
-                            color: isCredit ? '#00E676' : '#FF5252',
+                            color: isCredit ? 'var(--color-text-positive)' : 'var(--color-destructive)',
                           }}
                         >
                           {isCredit ? `+${entry.amount.toLocaleString()}` : entry.amount.toLocaleString()} cr
@@ -883,14 +892,14 @@ export default function BillingPage() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
           <div>
             <h3 style={{ fontSize: '15px', fontWeight: 800, color: 'var(--color-foreground)', margin: '0 0 4px 0' }}>
-              🔐 Connected Multi-Account API Vaults (BYOK &amp; Non-Custodial)
+              Connected Multi-Account API Vaults (BYOK &amp; Non-Custodial)
             </h3>
             <p className="text-muted" style={{ margin: 0, fontSize: '12px' }}>
               Kelola banyak API Key terenkripsi AES-256-GCM per akun tanpa pernah menyimpan private key dompet Anda di server.
             </p>
           </div>
           {vaultSummary && (
-            <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: '#38BDF8', fontWeight: 700 }}>
+            <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--color-accent-info)', fontWeight: 700 }}>
               Live Telemetry · Tier {vaultSummary.planId} · Webhooks {vaultSummary.vaults.webhook.active}/{vaultSummary.vaults.webhook.maxAllowed}
             </span>
           )}
@@ -910,7 +919,7 @@ export default function BillingPage() {
                       padding: '2px 6px',
                       borderRadius: '4px',
                       background: 'rgba(16, 185, 129, 0.14)',
-                      color: '#34D399',
+                      color: 'var(--color-text-positive)',
                     }}
                   >
                     {c.active} / {c.maxAllowed} aktif
@@ -935,9 +944,9 @@ export default function BillingPage() {
             };
             return (
               <>
-                <div style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+                <div style={{ padding: '12px', borderRadius: '12px', border: '1px solid var(--color-border)' }}>
                   <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--color-foreground)', marginBottom: '4px' }}>
-                    🚀 Bankr Launchpad Vault (CREATOR+)
+                    Bankr Launchpad Vault (CREATOR+)
                   </div>
                   {renderCounter(vaultSummary?.vaults.bankr)}
                   <p className="text-muted" style={{ fontSize: '11px', margin: '0 0 10px 0', lineHeight: 1.45 }}>
@@ -947,9 +956,9 @@ export default function BillingPage() {
                     Kelola di /launchpad →
                   </a>
                 </div>
-                <div style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+                <div style={{ padding: '12px', borderRadius: '12px', border: '1px solid var(--color-border)' }}>
                   <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--color-foreground)', marginBottom: '4px' }}>
-                    ⚡ Binance CEX Multi-Account (TRADER / AGENT)
+                    Binance CEX Multi-Account (TRADER / AGENT)
                   </div>
                   {renderCounter(vaultSummary?.vaults.binance)}
                   <p className="text-muted" style={{ fontSize: '11px', margin: '0 0 10px 0', lineHeight: 1.45 }}>
@@ -959,9 +968,9 @@ export default function BillingPage() {
                     Kelola di /trading →
                   </a>
                 </div>
-                <div style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+                <div style={{ padding: '12px', borderRadius: '12px', border: '1px solid var(--color-border)' }}>
                   <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--color-foreground)', marginBottom: '4px' }}>
-                    🟠 Bybit V5 CEX Vault (TRADER / AGENT)
+                    Bybit V5 CEX Vault (TRADER / AGENT)
                   </div>
                   {renderCounter(vaultSummary?.vaults.bybit)}
                   <p className="text-muted" style={{ fontSize: '11px', margin: '0 0 10px 0', lineHeight: 1.45 }}>
@@ -973,7 +982,7 @@ export default function BillingPage() {
                 </div>
                 <div style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
                   <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--color-foreground)', marginBottom: '4px' }}>
-                    🧠 BYOK LLM Vault (TRADER / AGENT)
+                    BYOK LLM Vault (TRADER / AGENT)
                   </div>
                   {renderCounter(vaultSummary?.vaults.byokLlm)}
                   <p className="text-muted" style={{ fontSize: '11px', margin: '0 0 10px 0', lineHeight: 1.45 }}>
@@ -1002,7 +1011,7 @@ export default function BillingPage() {
       {activeBillingTab === 'admin' && (hasCapability('MANAGE_BILLING_PLANS') || userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN' || userRole === 'BILLING_ADMIN') && (
         <div className="bg-panel" style={{ border: '1px solid #FF9100', borderRadius: '8px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div>
-            <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#FFD600', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 800, color: 'var(--color-foreground)', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <ShieldAlert size={18} /> Pengaturan Diskon &amp; Promo Paket (Admin)
             </h3>
             <p className="text-muted" style={{ margin: 0, fontSize: '12px' }}>
@@ -1104,9 +1113,9 @@ export default function BillingPage() {
                 borderRadius: '6px',
                 fontSize: '12px',
                 fontWeight: 800,
-                backgroundColor: discountFeedback.includes('✅') ? 'rgba(16, 185, 129, 0.14)' : 'rgba(245, 158, 11, 0.14)',
-                color: discountFeedback.includes('✅') ? '#6EE7B7' : '#FDE047',
-                border: `1px solid ${discountFeedback.includes('✅') ? 'rgba(16, 185, 129, 0.35)' : 'rgba(245, 158, 11, 0.35)'}`,
+                backgroundColor: discountFeedback.includes('OK:') ? 'var(--color-badge-success-bg)' : 'var(--color-badge-warning-bg)',
+                color: discountFeedback.includes('OK:') ? 'var(--color-badge-success-text)' : 'var(--color-badge-warning-text)',
+                border: `1px solid ${discountFeedback.includes('OK:') ? 'var(--color-badge-success-border)' : 'var(--color-badge-warning-border)'}`,
               }}
             >
               {discountFeedback}
@@ -1115,8 +1124,8 @@ export default function BillingPage() {
 
           {/* Dynamic Credit Burn & Risk Gate Configurator */}
           <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '16px' }}>
-            <h4 style={{ fontSize: '14px', fontWeight: 900, color: '#38BDF8', margin: '0 0 8px 0' }}>
-              ⚙️ Dynamic Credit Burn Costs, Risk Gate Limits &amp; Treasury Receiver
+            <h4 style={{ fontSize: '14px', fontWeight: 900, color: 'var(--color-accent-info)', margin: '0 0 8px 0' }}>
+              Dynamic Credit Burn Costs, Risk Gate Limits &amp; Treasury Receiver
             </h4>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px', marginBottom: '12px' }}>
               <div className="flex-col gap-xs">
@@ -1246,7 +1255,7 @@ export default function BillingPage() {
               </button>
             </div>
             {configFeedback && (
-              <div style={{ marginTop: '10px', padding: '10px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: 800, backgroundColor: configFeedback.includes('✅') ? 'rgba(16, 185, 129, 0.14)' : 'rgba(245, 158, 11, 0.14)', color: configFeedback.includes('✅') ? '#6EE7B7' : '#FDE047', border: `1px solid ${configFeedback.includes('✅') ? 'rgba(16, 185, 129, 0.35)' : 'rgba(245, 158, 11, 0.35)'}` }}>
+              <div style={{ marginTop: '10px', padding: '10px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: 800, backgroundColor: configFeedback.includes('OK:') ? 'rgba(16, 185, 129, 0.14)' : 'rgba(245, 158, 11, 0.14)', color: configFeedback.includes('OK:') ? 'var(--color-text-positive)' : 'var(--color-accent-amber)', border: `1px solid ${configFeedback.includes('OK:') ? 'rgba(16, 185, 129, 0.35)' : 'rgba(245, 158, 11, 0.35)'}` }}>
                 {configFeedback}
               </div>
             )}
@@ -1256,7 +1265,7 @@ export default function BillingPage() {
 
           <div className="grid-4">
             <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '16px', borderRadius: '6px' }}>
-              <div style={{ color: '#00E5FF', fontWeight: 800, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}><TrendingUp size={14} /> Active Billing Plans</div>
+              <div style={{ color: 'var(--color-accent-info)', fontWeight: 800, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}><TrendingUp size={14} /> Active Billing Plans</div>
               <div style={{ fontSize: '18px', fontWeight: 900, color: 'var(--color-foreground)', margin: '8px 0', fontFamily: 'var(--font-mono)' }}>4 Tiers (SSOT)</div>
               <div className="text-muted" style={{ fontSize: '11px' }}>FREE · CREATOR · TRADER · AGENT</div>
             </div>
@@ -1266,12 +1275,12 @@ export default function BillingPage() {
               <div className="text-muted" style={{ fontSize: '11px' }}>Base &amp; Ethereum Receipt Verifier</div>
             </div>
             <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '16px', borderRadius: '6px' }}>
-              <div style={{ color: '#D500F9', fontWeight: 800, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}><Zap size={14} /> Double-Entry Ledger</div>
+              <div style={{ color: 'var(--color-accent-purple)', fontWeight: 800, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}><Zap size={14} /> Double-Entry Ledger</div>
               <div style={{ fontSize: '18px', fontWeight: 900, color: 'var(--color-foreground)', margin: '8px 0', fontFamily: 'var(--font-mono)' }}>ledger_entries</div>
               <div className="text-muted" style={{ fontSize: '11px' }}>PostgreSQL 18 Transactional SSOT</div>
             </div>
             <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '16px', borderRadius: '6px' }}>
-              <div style={{ color: '#FFC400', fontWeight: 800, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}><Banknote size={14} /> Custody Policy</div>
+              <div style={{ color: 'var(--color-accent-amber)', fontWeight: 800, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}><Banknote size={14} /> Custody Policy</div>
               <div style={{ fontSize: '18px', fontWeight: 900, color: 'var(--color-accent)', margin: '8px 0', fontFamily: 'var(--font-mono)' }}>100% NON-CUSTODIAL</div>
               <div className="text-muted" style={{ fontSize: '11px' }}>Zero Private Keys in Vercel</div>
             </div>

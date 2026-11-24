@@ -75,17 +75,17 @@ export function UserRiskPolicyPanel({ isConnected }: UserRiskPolicyPanelProps) {
       });
       const json = await res.json();
       if (!res.ok || !json?.success) {
-        setFeedback(`⚠️ ${json?.error || 'Gagal menyimpan batas risiko'}`);
+        setFeedback(`Notice: ${json?.error || 'Gagal menyimpan batas risiko'}`);
       } else {
         const eff = json.data.effectiveLimits;
         setMaxOrder(eff.maxOrderValueUsd);
         setMaxDailyLoss(eff.maxDailyLossUsd);
         setMaxSlippage(eff.maxSlippagePct);
         setAllowedSymbolsText(Array.isArray(eff.allowedSymbols) ? eff.allowedSymbols.join(', ') : '');
-        setFeedback(`✅ Batas risiko aktif: Max Order $${eff.maxOrderValueUsd} · Daily Loss $${eff.maxDailyLossUsd} · Slippage ${eff.maxSlippagePct}%`);
+        setFeedback(`OK: Batas risiko aktif: Max Order $${eff.maxOrderValueUsd} · Daily Loss $${eff.maxDailyLossUsd} · Slippage ${eff.maxSlippagePct}%`);
       }
     } catch (err: any) {
-      setFeedback(`⚠️ ${err?.message || 'Network error'}`);
+      setFeedback(`Notice: ${err?.message || 'Network error'}`);
     } finally {
       setSaving(false);
     }
@@ -103,7 +103,7 @@ export function UserRiskPolicyPanel({ isConnected }: UserRiskPolicyPanelProps) {
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <Sliders size={13} style={{ color: '#38BDF8' }} />
+          <Sliders size={13} style={{ color: 'var(--color-accent-info)' }} />
           <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--color-foreground)' }}>
             Personal Risk Guard ({planId})
           </span>
@@ -163,7 +163,7 @@ export function UserRiskPolicyPanel({ isConnected }: UserRiskPolicyPanelProps) {
             <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <div style={{ fontSize: '10px', color: 'var(--color-muted)' }}>
                 Plafon paket <strong>{planId}</strong>: Max Order ${ceiling.maxOrderValueUsd.toLocaleString()} · Daily Loss ${ceiling.maxDailyLossUsd.toLocaleString()} · Slippage {ceiling.maxSlippagePct}%.{' '}
-                <a href="/billing" style={{ color: '#38BDF8', textDecoration: 'underline' }}>Upgrade →</a>
+                <a href="/billing" style={{ color: 'var(--color-accent-info)', textDecoration: 'underline' }}>Upgrade →</a>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
                 <div>
@@ -228,7 +228,7 @@ export function UserRiskPolicyPanel({ isConnected }: UserRiskPolicyPanelProps) {
             </form>
           )}
           {feedback && (
-            <div style={{ marginTop: '6px', fontSize: '11px', color: feedback.startsWith('✅') ? '#10B981' : '#F59E0B' }}>
+            <div style={{ marginTop: '6px', fontSize: '11px', color: feedback.startsWith('OK:') ? '#10B981' : '#F59E0B' }}>
               {feedback}
             </div>
           )}

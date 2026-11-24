@@ -59,7 +59,7 @@ export function CreatorStudioPanel({
       });
       refreshSession().catch(() => {});
       setStatusMsg(
-        `✅ Identitas $${json.data.identity.ticker} ("${json.data.identity.name}") siap (${json.data.provider}) dan otomatis terisi ke form draft.`
+        `OK: Identitas $${json.data.identity.ticker} ("${json.data.identity.name}") siap (${json.data.provider}) dan otomatis terisi ke form draft.`
       );
     } catch (err: any) {
       setErrorMsg(`Koneksi gagal: ${err?.message || 'Unknown error'}`);
@@ -106,8 +106,8 @@ export function CreatorStudioPanel({
       refreshSession().catch(() => {});
       setStatusMsg(
         json.data.uploadedToIpfs
-          ? `✅ Logo dibuat & terunggah ke IPFS Pinata (${json.data.byteLength} bytes).`
-          : `✅ Logo preview siap (${json.data.byteLength} bytes, stateless fallback).`
+          ? `OK: Logo dibuat & terunggah ke IPFS Pinata (${json.data.byteLength} bytes).`
+          : `OK: Logo preview siap (${json.data.byteLength} bytes, stateless fallback).`
       );
     } catch (err: any) {
       setErrorMsg(`Koneksi gagal: ${err?.message || 'Unknown error'}`);
@@ -148,7 +148,7 @@ export function CreatorStudioPanel({
         return;
       }
       setGrowthPack(json.data);
-      setStatusMsg(`🚀 Growth Launch Pack untuk $${symbol.toUpperCase()} (OG SVG 1200x630 + DexScreener + GeckoTerminal) siap.`);
+      setStatusMsg(`Growth Launch Pack untuk $${symbol.toUpperCase()} (OG SVG 1200x630 + DexScreener + GeckoTerminal) siap.`);
     } catch (err: any) {
       setErrorMsg(`Koneksi gagal: ${err?.message || 'Unknown error'}`);
     } finally {
@@ -167,10 +167,10 @@ export function CreatorStudioPanel({
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
-        <div style={{ fontSize: '13px', fontWeight: 900, color: '#38BDF8', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div style={{ fontSize: '13px', fontWeight: 900, color: 'var(--color-accent-info)', display: 'flex', alignItems: 'center', gap: '6px' }}>
           <Sparkles size={15} /> AI Token Studio &amp; Marketing Kit
         </div>
-        <span style={{ fontSize: '10px', color: '#6EE7B7', fontFamily: 'var(--font-mono)' }}>
+        <span style={{ fontSize: '10px', color: 'var(--color-text-positive)', fontFamily: 'var(--font-mono)' }}>
           Biaya: 1 Kredit per Aksi
         </span>
       </div>
@@ -233,7 +233,7 @@ export function CreatorStudioPanel({
           className="btn-secondary"
           disabled={busy !== null}
           onClick={handleGenerateGrowthPack}
-          style={{ fontSize: '11px', padding: '7px 12px', display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#C084FC', borderColor: 'rgba(168, 85, 247, 0.4)' }}
+          style={{ fontSize: '11px', padding: '7px 12px', display: 'inline-flex', alignItems: 'center', gap: '5px', color: 'var(--color-accent-purple)', borderColor: 'rgba(168, 85, 247, 0.4)' }}
         >
           <Share2 size={13} /> {busy === 'growth' ? 'Building...' : 'Build Growth Pack'}
         </button>
@@ -259,7 +259,7 @@ export function CreatorStudioPanel({
                   description: generatedIdentity?.description,
                   imageUrl: ipfsMetadataUrl || undefined,
                 });
-                setStatusMsg('✅ Aset & CID IPFS berhasil diterapkan ke Launch Token Draft Wizard.');
+                setStatusMsg('OK: Aset & CID IPFS berhasil diterapkan ke Launch Token Draft Wizard.');
               }}
               style={{ fontSize: '11px', padding: '6px 10px' }}
             >
@@ -267,7 +267,7 @@ export function CreatorStudioPanel({
             </button>
           )}
           {ipfsMetadataUrl && (
-            <a href={ipfsMetadataUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: '11px', color: '#38BDF8', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            <a href={ipfsMetadataUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: '11px', color: 'var(--color-accent-info)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
               IPFS Metadata <ExternalLink size={11} />
             </a>
           )}
@@ -278,13 +278,13 @@ export function CreatorStudioPanel({
                 alt="OG Social Card Preview"
                 style={{ height: '56px', borderRadius: '6px', border: '1px solid var(--color-border)' }}
               />
-              <a href={growthPack.dexScreener.updatePortalUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: '11px', color: '#6EE7B7', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+              <a href={growthPack.dexScreener.updatePortalUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: '11px', color: 'var(--color-text-positive)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
                 DexScreener <ExternalLink size={11} />
               </a>
-              <a href={growthPack.geckoTerminal.tokenUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: '11px', color: '#FDE047', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+              <a href={growthPack.geckoTerminal.tokenUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: '11px', color: 'var(--color-accent-amber)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
                 GeckoTerminal <ExternalLink size={11} />
               </a>
-              <a href={growthPack.explorerUpdateUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: '11px', color: '#38BDF8', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+              <a href={growthPack.explorerUpdateUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: '11px', color: 'var(--color-accent-info)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
                 Explorer Update <ExternalLink size={11} />
               </a>
             </div>
@@ -293,7 +293,7 @@ export function CreatorStudioPanel({
       )}
 
       {statusMsg && (
-        <div style={{ fontSize: '11px', color: '#6EE7B7', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div style={{ fontSize: '11px', color: 'var(--color-text-positive)', display: 'flex', alignItems: 'center', gap: '6px' }}>
           <CheckCircle2 size={13} /> <span>{statusMsg}</span>
         </div>
       )}

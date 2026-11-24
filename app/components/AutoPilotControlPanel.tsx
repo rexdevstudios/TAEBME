@@ -109,15 +109,15 @@ export function AutoPilotControlPanel({ isConnected }: AutoPilotControlPanelProp
       });
       const json = await res.json();
       if (!res.ok || !json?.success) {
-        setFeedback(`⚠️ ${json?.error || `HTTP ${res.status}`}`);
+        setFeedback(`Notice: ${json?.error || `HTTP ${res.status}`}`);
         return;
       }
       setData((prev) => (prev ? { ...prev, config: json.data.config } : prev));
       setFeedback(
-        `✅ Auto-Pilot ${json.data.config.enabled ? 'AKTIF' : 'PAUSED'} tersimpan (${json.data.config.rail} · Max $${json.data.config.maxOrderUsd} · TP ${json.data.config.takeProfitPct}% / SL ${json.data.config.stopLossPct}%).`
+        `OK: Auto-Pilot ${json.data.config.enabled ? 'AKTIF' : 'PAUSED'} tersimpan (${json.data.config.rail} · Max $${json.data.config.maxOrderUsd} · TP ${json.data.config.takeProfitPct}% / SL ${json.data.config.stopLossPct}%).`
       );
     } catch (err: any) {
-      setFeedback(`⚠️ ${err?.message || 'Gagal menyimpan konfigurasi Auto-Pilot.'}`);
+      setFeedback(`Notice: ${err?.message || 'Gagal menyimpan konfigurasi Auto-Pilot.'}`);
     } finally {
       setSaving(false);
     }
@@ -135,12 +135,12 @@ export function AutoPilotControlPanel({ isConnected }: AutoPilotControlPanelProp
       });
       const json = await res.json();
       if (!res.ok || !json?.success) {
-        setFeedback(`⚠️ ${json?.error || `HTTP ${res.status}`}`);
+        setFeedback(`Notice: ${json?.error || `HTTP ${res.status}`}`);
         return;
       }
       setSimReport(json.data);
     } catch (err: any) {
-      setFeedback(`⚠️ ${err?.message || 'Gagal menjalankan simulasi siklus Auto-Pilot.'}`);
+      setFeedback(`Notice: ${err?.message || 'Gagal menjalankan simulasi siklus Auto-Pilot.'}`);
     } finally {
       setSimulating(false);
     }
@@ -160,7 +160,7 @@ export function AutoPilotControlPanel({ isConnected }: AutoPilotControlPanelProp
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
         <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: 'var(--color-foreground)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Bot size={18} style={{ color: '#38BDF8' }} /> AI Autonomous Trading Auto-Pilot (Auto-Buy &amp; TP/SL)
+          <Bot size={18} style={{ color: 'var(--color-accent-info)' }} /> AI Autonomous Trading Auto-Pilot (Auto-Buy &amp; TP/SL)
         </h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
           <span
@@ -170,7 +170,7 @@ export function AutoPilotControlPanel({ isConnected }: AutoPilotControlPanelProp
               padding: '3px 8px',
               borderRadius: '999px',
               background: 'rgba(56, 189, 248, 0.12)',
-              color: '#38BDF8',
+              color: 'var(--color-accent-info)',
               fontFamily: 'var(--font-mono)',
             }}
             title="Cloudflare Workers 24/7 Cron Scheduler (*/5 * * * *)"
@@ -184,7 +184,7 @@ export function AutoPilotControlPanel({ isConnected }: AutoPilotControlPanelProp
               padding: '3px 8px',
               borderRadius: '999px',
               background: data?.eligible ? 'rgba(16, 185, 129, 0.14)' : 'rgba(245, 158, 11, 0.14)',
-              color: data?.eligible ? '#34D399' : '#FBBF24',
+              color: data?.eligible ? 'var(--color-text-positive)' : '#FBBF24',
               fontFamily: 'var(--font-mono)',
             }}
           >
@@ -208,7 +208,7 @@ export function AutoPilotControlPanel({ isConnected }: AutoPilotControlPanelProp
           }}
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxWidth: '680px' }}>
-            <div style={{ fontSize: '13px', fontWeight: 800, color: '#FDE047', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--color-accent-amber)', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Lock size={14} /> Eksklusif Pro Terminal Trader (TRADER) &amp; AI Autonomous Desk (AGENT)
             </div>
             <div className="text-muted" style={{ fontSize: '12px' }}>
@@ -244,7 +244,7 @@ export function AutoPilotControlPanel({ isConnected }: AutoPilotControlPanelProp
                     setTrailingStopPct(preset.trailingStopPct);
                     setMinConfidenceScore(preset.minConfidenceScore);
                     setSymbolsText(preset.allowedSymbols.join(', '));
-                    setFeedback(`ℹ️ Preset "${preset.label}" diterapkan. Klik "Simpan Konfigurasi Auto-Pilot" untuk mengaktifkan.`);
+                    setFeedback(`Preset "${preset.label}" diterapkan. Klik "Simpan Konfigurasi Auto-Pilot" untuk mengaktifkan.`);
                   }}
                   className="btn-secondary"
                   style={{
@@ -444,12 +444,12 @@ export function AutoPilotControlPanel({ isConnected }: AutoPilotControlPanelProp
                 gap: '4px',
               }}
             >
-              <div style={{ fontWeight: 800, color: '#38BDF8' }}>
+              <div style={{ fontWeight: 800, color: 'var(--color-accent-info)' }}>
                 Dry-Run Cycle ({simReport.rail} · Kill-Switch: {simReport.killSwitchActive ? 'ACTIVE' : 'CLEAR'})
               </div>
               <div>
                 BUY Ready: <strong>{simReport.summary?.buyReadyCount ?? 0}</strong> · TP Sell:{' '}
-                <strong style={{ color: '#34D399' }}>{simReport.summary?.tpSellCount ?? 0}</strong> · Trail Stop:{' '}
+                <strong style={{ color: 'var(--color-text-positive)' }}>{simReport.summary?.tpSellCount ?? 0}</strong> · Trail Stop:{' '}
                 <strong style={{ color: '#FBBF24' }}>{simReport.summary?.trailingStopSellCount ?? 0}</strong> · SL Sell:{' '}
                 <strong style={{ color: '#F28B82' }}>{simReport.summary?.slSellCount ?? 0}</strong> · Skipped:{' '}
                 <strong>{simReport.summary?.skippedCount ?? 0}</strong>
@@ -459,12 +459,12 @@ export function AutoPilotControlPanel({ isConnected }: AutoPilotControlPanelProp
                 <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px solid rgba(148, 163, 184, 0.2)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <div style={{ fontSize: '10px', fontWeight: 800, color: '#94A3B8' }}>AI DECISION LOG (RAMAH PEMULA):</div>
                   {(simReport.exitActions || []).slice(0, 4).map((ex: any, idx: number) => (
-                    <div key={`ex-${idx}`} style={{ fontSize: '11px', color: ex.action === 'HOLD' ? '#CBD5E1' : '#FDE047' }}>
+                    <div key={`ex-${idx}`} style={{ fontSize: '11px', color: ex.action === 'HOLD' ? '#CBD5E1' : 'var(--color-accent-amber)' }}>
                       • [{ex.action}] {ex.reason || `${ex.symbol} (PnL ${ex.pnlPct}%)`}
                     </div>
                   ))}
                   {(simReport.entryActions || []).slice(0, 5).map((en: any, idx: number) => (
-                    <div key={`en-${idx}`} style={{ fontSize: '11px', color: en.approved ? '#6EE7B7' : '#CBD5E1' }}>
+                    <div key={`en-${idx}`} style={{ fontSize: '11px', color: en.approved ? 'var(--color-text-positive)' : '#CBD5E1' }}>
                       • [{en.decision}] {en.reason || `${en.symbol} (Skor ${en.confidenceScore})`}
                     </div>
                   ))}
@@ -474,7 +474,7 @@ export function AutoPilotControlPanel({ isConnected }: AutoPilotControlPanelProp
           )}
 
           {feedback && (
-            <div style={{ fontSize: '11px', fontWeight: 700, color: feedback.startsWith('✅') ? '#34D399' : '#FBBF24' }}>
+            <div style={{ fontSize: '11px', fontWeight: 700, color: feedback.startsWith('OK:') ? 'var(--color-text-positive)' : '#FBBF24' }}>
               {feedback}
             </div>
           )}

@@ -63,16 +63,16 @@ export function UserWebhookVaultPanel({ isConnected }: UserWebhookVaultPanelProp
       });
       const json = await res.json();
       if (!res.ok || !json?.success) {
-        setFeedback(`⚠️ ${json?.error || 'Gagal menyimpan Webhook URL'}`);
+        setFeedback(`Notice: ${json?.error || 'Gagal menyimpan Webhook URL'}`);
       } else {
         setLabel('');
         setWebhookUrl('');
         setShowAdd(false);
-        setFeedback(`✅ Webhook "${json.data.label}" tersimpan (SSRF-Safe HTTPS · AES-256-GCM).`);
+        setFeedback(`OK: Webhook "${json.data.label}" tersimpan (SSRF-Safe HTTPS · AES-256-GCM).`);
         await loadWebhooks();
       }
     } catch (err: any) {
-      setFeedback(`⚠️ ${err?.message || 'Network error'}`);
+      setFeedback(`Notice: ${err?.message || 'Network error'}`);
     } finally {
       setSaving(false);
     }
@@ -89,15 +89,15 @@ export function UserWebhookVaultPanel({ isConnected }: UserWebhookVaultPanelProp
       });
       const json = await res.json();
       if (!res.ok || !json?.success) {
-        setFeedback(`⚠️ Test Ping "${item.label}" gagal: ${json?.error || `HTTP ${res.status}`}`);
+        setFeedback(`Notice: Test Ping "${item.label}" gagal: ${json?.error || `HTTP ${res.status}`}`);
       } else if (json.data?.connected) {
-        setFeedback(`✅ Test Alert terkirim ke "${item.label}" (HTTP ${json.data.statusCode || 200} · ${json.data.latencyMs}ms).`);
+        setFeedback(`OK: Test Alert terkirim ke "${item.label}" (HTTP ${json.data.statusCode || 200} · ${json.data.latencyMs}ms).`);
         await loadWebhooks();
       } else {
-        setFeedback(`⚠️ Endpoint "${item.label}" menolak ping: ${json.data?.error || 'Delivery failed'} (${json.data?.latencyMs ?? 0}ms).`);
+        setFeedback(`Notice: Endpoint "${item.label}" menolak ping: ${json.data?.error || 'Delivery failed'} (${json.data?.latencyMs ?? 0}ms).`);
       }
     } catch (err: any) {
-      setFeedback(`⚠️ ${err?.message || 'Network error'}`);
+      setFeedback(`Notice: ${err?.message || 'Network error'}`);
     } finally {
       setPingingId(null);
     }
@@ -123,7 +123,7 @@ export function UserWebhookVaultPanel({ isConnected }: UserWebhookVaultPanelProp
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
         <div>
           <h3 style={{ fontSize: '15px', fontWeight: 800, color: 'var(--color-foreground)', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Bell size={16} style={{ color: '#38BDF8' }} /> Outbound Alert Webhooks ({hooks.length}/{maxKeys})
+            <Bell size={16} style={{ color: 'var(--color-accent-info)' }} /> Outbound Alert Webhooks ({hooks.length}/{maxKeys})
             <span
               style={{
                 fontSize: '9px',
@@ -251,7 +251,7 @@ export function UserWebhookVaultPanel({ isConnected }: UserWebhookVaultPanelProp
       )}
 
       {feedback && (
-        <div style={{ fontSize: '11px', color: feedback.startsWith('✅') ? '#10B981' : '#F59E0B' }}>
+        <div style={{ fontSize: '11px', color: feedback.startsWith('OK:') ? '#10B981' : '#F59E0B' }}>
           {feedback}
         </div>
       )}

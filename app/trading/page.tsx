@@ -150,12 +150,12 @@ function CandlestickChart({ candles }: { candles: Candle[] }) {
       >
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
           <span>O: <strong style={{ color: '#E3E3E3' }}>{formatPx(activeCandle.open)}</strong></span>
-          <span>H: <strong style={{ color: '#34D399' }}>{formatPx(activeCandle.high)}</strong></span>
+          <span>H: <strong style={{ color: 'var(--color-text-positive)' }}>{formatPx(activeCandle.high)}</strong></span>
           <span>L: <strong style={{ color: '#F28B82' }}>{formatPx(activeCandle.low)}</strong></span>
-          <span>C: <strong style={{ color: isBullActive ? '#34D399' : '#F28B82' }}>{formatPx(activeCandle.close)}</strong></span>
+          <span>C: <strong style={{ color: isBullActive ? 'var(--color-text-positive)' : '#F28B82' }}>{formatPx(activeCandle.close)}</strong></span>
           <span>Vol: <strong style={{ color: '#8AB4F8' }}>{Math.round(activeCandle.volume).toLocaleString()}</strong></span>
         </div>
-        <span style={{ color: isBullActive ? '#34D399' : '#F28B82', fontWeight: 700 }}>
+        <span style={{ color: isBullActive ? 'var(--color-text-positive)' : '#F28B82', fontWeight: 700 }}>
           {changePct >= 0 ? `+${changePct.toFixed(2)}%` : `${changePct.toFixed(2)}%`} · {new Date(activeCandle.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </span>
       </div>
@@ -190,7 +190,7 @@ function CandlestickChart({ candles }: { candles: Candle[] }) {
         {/* Candles + Interactive Hover Hitboxes */}
         {candles.map((c, i) => {
           const isBull = c.close >= c.open;
-          const color = isBull ? '#34D399' : '#F28B82';
+          const color = isBull ? 'var(--color-text-positive)' : '#F28B82';
           const x = padLeft + i * candleWidth + candleWidth / 2;
 
           const yHigh = toY(c.high);
@@ -410,7 +410,7 @@ export default function TradingPage() {
 
   const handleApproveProposal = async () => {
     if (!isConnected) {
-      setActionFeedback('🔒 SIWE Session Required: Please connect your wallet to approve trade intents.');
+      setActionFeedback('Auth: SIWE Session Required: Please connect your wallet to approve trade intents.');
       return;
     }
 
@@ -462,21 +462,21 @@ export default function TradingPage() {
             : '';
         setActionFeedback(
           executionMode === 'DEX_NON_CUSTODIAL'
-            ? `✅ [DEX NON-CUSTODIAL] Intent ${intentId} lolos Risk Gate & MEV Guard (${execStatus}${feePctText}). ${
+            ? `OK: [DEX NON-CUSTODIAL] Intent ${intentId} lolos Risk Gate & MEV Guard (${execStatus}${feePctText}). ${
                 json.data?.zeroXSwap?.available
                   ? 'Calldata 0x v2 siap — klik tombol "Sign & Swap via MetaMask" di bawah.'
                   : 'Siap ditandatangani di dompet Web3.'
               }`
             : executionMode === 'CEX_SINGLE_SHOT'
-            ? `✅ [CEX ${resolvedVenue} SINGLE-SHOT] Intent ${intentId} (${execStatus}) lolos Risk Gate.`
-            : `✅ [PAPER TRADING SIMULATION] Proposal APPROVED & Intent ${intentId} (${execStatus}) lolos Risk Gate! Simulasi 100% bebas risiko modal.`
+            ? `OK: [CEX ${resolvedVenue} SINGLE-SHOT] Intent ${intentId} (${execStatus}) lolos Risk Gate.`
+            : `OK: [PAPER TRADING SIMULATION] Proposal APPROVED & Intent ${intentId} (${execStatus}) lolos Risk Gate! Simulasi 100% bebas risiko modal.`
         );
       } else {
         const errMsg = typeof json.error === 'string' ? json.error : json.error?.message || 'Policy violation';
-        setActionFeedback(`❌ Risk Gate Rejected: ${errMsg}`);
+        setActionFeedback(`Error: Risk Gate Rejected: ${errMsg}`);
       }
     } catch (err) {
-      setActionFeedback(`⚠️ Connection error during approval: ${(err as Error).message}`);
+      setActionFeedback(`Notice: Connection error during approval: ${(err as Error).message}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -485,7 +485,7 @@ export default function TradingPage() {
   const handleRejectProposal = () => {
     setProposalStatus('REJECTED');
     setDexSwapPayload(null);
-    setActionFeedback('⛔ Proposal REJECTED by user.');
+    setActionFeedback('Proposal REJECTED by user.');
   };
 
   const handleApproveZeroXErc20 = async () => {
@@ -499,7 +499,7 @@ export default function TradingPage() {
       const targetChain = dexSwapPayload.chainId || dexChainId;
       const netCheck = await ensureEvmNetwork(targetChain);
       if (!netCheck.success) {
-        setActionFeedback(`⚠️ ${netCheck.error || 'Harap beralih ke jaringan EVM yang dipilih di MetaMask.'}`);
+        setActionFeedback(`Notice: ${netCheck.error || 'Harap beralih ke jaringan EVM yang dipilih di MetaMask.'}`);
         return;
       }
       const approveTxSpec = buildErc20ApproveTransaction({
@@ -516,14 +516,14 @@ export default function TradingPage() {
       setDexTxHash(tx.hash);
       const chainLabel = EVM_DEX_CHAINS[targetChain]?.name || `Chain ${targetChain}`;
       setActionFeedback(
-        `📡 Transaksi ERC-20 Approve terkirim di ${chainLabel} (${tx.hash.slice(0, 12)}...). Menunggu konfirmasi...`
+        `Transaksi ERC-20 Approve terkirim di ${chainLabel} (${tx.hash.slice(0, 12)}...). Menunggu konfirmasi...`
       );
       await tx.wait(1);
       setActionFeedback(
-        `✅ ERC-20 Allowance (0x AllowanceHolder) terkonfirmasi di ${chainLabel}! Klik "Approve Proposal" ulang untuk refresh calldata swap.`
+        `OK: ERC-20 Allowance (0x AllowanceHolder) terkonfirmasi di ${chainLabel}! Klik "Approve Proposal" ulang untuk refresh calldata swap.`
       );
     } catch (err: any) {
-      setActionFeedback(`⚠️ MetaMask ERC-20 Approve dibatalkan / gagal: ${normalizeWeb3Error(err)}`);
+      setActionFeedback(`Notice: MetaMask ERC-20 Approve dibatalkan / gagal: ${normalizeWeb3Error(err)}`);
     } finally {
       setDexApprovingErc20(false);
     }
@@ -536,7 +536,7 @@ export default function TradingPage() {
       const targetChain = dexSwapPayload.chainId || dexChainId;
       const netCheck = await ensureEvmNetwork(targetChain);
       if (!netCheck.success) {
-        setActionFeedback(`⚠️ ${netCheck.error || 'Harap beralih ke jaringan EVM yang dipilih di MetaMask.'}`);
+        setActionFeedback(`Notice: ${netCheck.error || 'Harap beralih ke jaringan EVM yang dipilih di MetaMask.'}`);
         return;
       }
       const signer = await getBrowserSigner();
@@ -547,7 +547,7 @@ export default function TradingPage() {
       });
       setDexTxHash(tx.hash);
       const chainLabel = EVM_DEX_CHAINS[targetChain]?.name || `Chain ${targetChain}`;
-      setActionFeedback(`📡 Transaksi 0x Swap v2 terkirim di ${chainLabel} (${tx.hash.slice(0, 12)}...). Menunggu konfirmasi...`);
+      setActionFeedback(`Transaksi 0x Swap v2 terkirim di ${chainLabel} (${tx.hash.slice(0, 12)}...). Menunggu konfirmasi...`);
       await tx.wait(1);
       if (lastApprovedIntentId) {
         await fetch('/api/trade-intents', {
@@ -562,9 +562,9 @@ export default function TradingPage() {
         }).catch(() => {});
         setHistoryRefreshTick((n) => n + 1);
       }
-      setActionFeedback(`✅ 0x Swap v2 terkonfirmasi on-chain di ${chainLabel}! Tx: ${tx.hash}`);
+      setActionFeedback(`OK: 0x Swap v2 terkonfirmasi on-chain di ${chainLabel}! Tx: ${tx.hash}`);
     } catch (err: any) {
-      setActionFeedback(`⚠️ MetaMask Swap dibatalkan / gagal: ${normalizeWeb3Error(err)}`);
+      setActionFeedback(`Notice: MetaMask Swap dibatalkan / gagal: ${normalizeWeb3Error(err)}`);
     } finally {
       setDexSigning(false);
     }
@@ -726,13 +726,13 @@ export default function TradingPage() {
               </div>
               <div className="bg-panel" style={{ padding: '12px', borderRadius: '6px', border: '1px solid var(--color-border)' }}>
                 <span className="text-muted" style={{ fontSize: '10px', fontWeight: 700, display: 'block', marginBottom: '4px' }}>MARKET REGIME</span>
-                <span style={{ color: '#FFD600', fontSize: '14px', fontWeight: 900 }}>
+                <span style={{ color: 'var(--color-accent-amber)', fontSize: '14px', fontWeight: 900 }}>
                   {tradingAnalysis?.regime.regime || 'RANGE_BOUND'}
                 </span>
               </div>
               <div className="bg-panel" style={{ padding: '12px', borderRadius: '6px', border: '1px solid var(--color-border)' }}>
                 <span className="text-muted" style={{ fontSize: '10px', fontWeight: 700, display: 'block', marginBottom: '4px' }}>RSI (14-PERIOD)</span>
-                <span style={{ color: tradingAnalysis?.rsiZone === 'OVERSOLD' ? 'var(--color-accent)' : tradingAnalysis?.rsiZone === 'OVERBOUGHT' ? 'var(--color-destructive)' : '#00E5FF', fontSize: '14px', fontWeight: 900, fontFamily: 'var(--font-mono)' }}>
+                <span style={{ color: tradingAnalysis?.rsiZone === 'OVERSOLD' ? 'var(--color-accent)' : tradingAnalysis?.rsiZone === 'OVERBOUGHT' ? 'var(--color-destructive)' : 'var(--color-accent-info)', fontSize: '14px', fontWeight: 900, fontFamily: 'var(--font-mono)' }}>
                   {tradingAnalysis?.rsiCurrent !== null && tradingAnalysis?.rsiCurrent !== undefined ? `${tradingAnalysis.rsiCurrent} (${tradingAnalysis.rsiZone})` : '48.2 (NEUTRAL)'}
                 </span>
               </div>
@@ -754,7 +754,7 @@ export default function TradingPage() {
                 </h3>
                 {tradingAnalysis.tradingPaused && (
                   <span className="badge badge-admin">
-                    ⛔ TRADING PAUSED BY ALERT ENGINE
+                    TRADING PAUSED BY ALERT ENGINE
                   </span>
                 )}
               </div>
@@ -784,7 +784,7 @@ export default function TradingPage() {
         <div className="flex-col gap-md">
           {/* AI Intelligence Signal Overlay Panel */}
           <div className="bg-panel" style={{ padding: '16px', borderRadius: '8px' }}>
-            <h3 style={{ fontSize: '14px', fontWeight: 800, margin: '0 0 12px 0', color: '#D500F9', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h3 style={{ fontSize: '14px', fontWeight: 800, margin: '0 0 12px 0', color: 'var(--color-accent-purple)', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <BrainCircuit size={16} /> AI Feature Engine Signal
             </h3>
 
@@ -846,12 +846,12 @@ export default function TradingPage() {
                     backgroundColor: q > 10 ? 'rgba(239, 68, 68, 0.1)' : 'transparent',
                   }}
                 >
-                  <span>${p.toLocaleString()} {q > 10 ? '🐳' : ''}</span>
+                  <span>${p.toLocaleString()} {q > 10 ? '' : ''}</span>
                   <span>{q.toFixed(2)} {symbol.replace('USDT', '')}</span>
                 </div>
               )) || (
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--color-destructive)', fontSize: '12px', padding: '4px 8px' }}>
-                  <span>$65,405.00 🐳</span>
+                  <span>$65,405.00 </span>
                   <span>15.00 BTC</span>
                 </div>
               )}
@@ -876,12 +876,12 @@ export default function TradingPage() {
                     backgroundColor: q > 10 ? 'rgba(16, 185, 129, 0.1)' : 'transparent',
                   }}
                 >
-                  <span>${p.toLocaleString()} {q > 10 ? '🐳' : ''}</span>
+                  <span>${p.toLocaleString()} {q > 10 ? '' : ''}</span>
                   <span>{q.toFixed(2)} {symbol.replace('USDT', '')}</span>
                 </div>
               )) || (
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--color-accent)', fontSize: '12px', padding: '4px 8px' }}>
-                  <span>$65,400.00 🐳</span>
+                  <span>$65,400.00 </span>
                   <span>12.80 BTC</span>
                 </div>
               )}
@@ -889,9 +889,9 @@ export default function TradingPage() {
           </div>
 
           {/* Proposal-Only Action Gate */}
-          <div className="bg-panel" style={{ padding: '16px', borderRadius: '8px', border: (userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN') ? '1px solid #FFD600' : '1px solid var(--color-accent)' }}>
+          <div className="bg-panel" style={{ padding: '16px', borderRadius: '8px', border: (userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN') ? '1px solid var(--color-accent-amber)' : '1px solid var(--color-accent)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <h3 style={{ fontSize: '14px', fontWeight: 800, margin: 0, color: (userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN') ? '#FFD600' : 'var(--color-accent)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h3 style={{ fontSize: '14px', fontWeight: 800, margin: 0, color: (userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN') ? 'var(--color-accent-amber)' : 'var(--color-accent)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <ShieldAlert size={16} /> Proposal Gate
               </h3>
               {(userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN') && (
@@ -906,7 +906,7 @@ export default function TradingPage() {
                 {linkedAgentHandoff && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                     <span>
-                      🤖 Agent Handoff: <strong>{linkedAgentHandoff.agent || 'AUTO'}</strong>
+                      Agent Handoff: <strong>{linkedAgentHandoff.agent || 'AUTO'}</strong>
                       {linkedAgentHandoff.rail ? ` · ${linkedAgentHandoff.rail}` : ''}
                       {linkedAgentHandoff.chainId ? ` · Chain ${linkedAgentHandoff.chainId}` : ''}
                     </span>
@@ -954,11 +954,11 @@ export default function TradingPage() {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', borderRadius: '6px', background: 'rgba(148, 163, 184, 0.06)', border: '1px solid var(--color-border)', marginBottom: '8px', fontSize: '11px' }}>
-              <span className="text-muted">🛡️ Personal Risk Guard Aktif</span>
+              <span className="text-muted">Personal Risk Guard Aktif</span>
               <button
                 type="button"
                 onClick={() => setActiveTradingTab('vault')}
-                style={{ background: 'none', border: 'none', color: '#F0B90B', fontWeight: 700, cursor: 'pointer', fontSize: '11px', padding: 0 }}
+                style={{ background: 'none', border: 'none', color: 'var(--color-accent-amber)', fontWeight: 700, cursor: 'pointer', fontSize: '11px', padding: 0 }}
               >
                 Atur Risk &amp; API Key →
               </button>
@@ -1006,9 +1006,9 @@ export default function TradingPage() {
                           borderRadius: '999px',
                           cursor: 'pointer',
                           fontFamily: 'var(--font-mono)',
-                          border: isSelected ? '1px solid #34D399' : '1px solid rgba(148, 163, 184, 0.25)',
+                          border: isSelected ? '1px solid var(--color-text-positive)' : '1px solid rgba(148, 163, 184, 0.25)',
                           backgroundColor: isSelected ? 'rgba(16, 185, 129, 0.2)' : 'rgba(15, 23, 42, 0.6)',
-                          color: isSelected ? '#6EE7B7' : '#CBD5E1',
+                          color: isSelected ? 'var(--color-text-positive)' : '#CBD5E1',
                         }}
                         title={`${preset.name} (${preset.address})`}
                       >
@@ -1139,7 +1139,7 @@ export default function TradingPage() {
                   fontSize: '12px',
                   marginBottom: '16px',
                   border: '1px solid var(--color-border)',
-                  color: actionFeedback.includes('✅') ? 'var(--color-accent)' : actionFeedback.includes('❌') ? 'var(--color-destructive)' : actionFeedback.includes('🔒') ? '#FFD600' : 'var(--color-foreground)',
+                  color: actionFeedback.includes('OK:') ? 'var(--color-accent)' : actionFeedback.includes('Error:') ? 'var(--color-destructive)' : actionFeedback.includes('Auth:') ? 'var(--color-accent-amber)' : 'var(--color-foreground)',
                 }}
               >
                 {actionFeedback}
@@ -1149,7 +1149,7 @@ export default function TradingPage() {
                       href={getEvmExplorerTxUrl(dexSwapPayload?.chainId || dexChainId, dexTxHash)}
                       target="_blank"
                       rel="noreferrer"
-                      style={{ color: '#38BDF8', fontSize: '11px', textDecoration: 'underline' }}
+                      style={{ color: 'var(--color-accent-info)', fontSize: '11px', textDecoration: 'underline' }}
                     >
                       Lihat di Block Explorer →
                     </a>
@@ -1172,8 +1172,8 @@ export default function TradingPage() {
                   gap: '8px',
                 }}
               >
-                <div style={{ fontSize: '11px', fontWeight: 800, color: '#34D399' }}>
-                  ⚡ 0x Swap API v2 {dexSwapPayload?.available ? 'Calldata Ready' : 'ERC-20 Allowance Required'} (Chain {dexSwapPayload?.chainId || dexChainId})
+                <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-text-positive)' }}>
+                  0x Swap API v2 {dexSwapPayload?.available ? 'Calldata Ready' : 'ERC-20 Allowance Required'} (Chain {dexSwapPayload?.chainId || dexChainId})
                 </div>
                 {dexSwapPayload?.available && dexSwapPayload.buyAmount && (() => {
                   const outSummary = formatDexQuoteOutputSummary({
@@ -1186,7 +1186,7 @@ export default function TradingPage() {
                   return (
                     <div style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: '#E2E8F0', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                       <div>
-                        Est. Receive: <strong style={{ color: '#6EE7B7' }}>~{outSummary.estimatedOutFormatted} {outSummary.buyTokenSymbol}</strong>
+                        Est. Receive: <strong style={{ color: 'var(--color-text-positive)' }}>~{outSummary.estimatedOutFormatted} {outSummary.buyTokenSymbol}</strong>
                         {' '}· Min: {outSummary.minOutFormatted} {outSummary.buyTokenSymbol}
                       </div>
                       {Array.isArray(dexSwapPayload.routeSources) && dexSwapPayload.routeSources.length > 0 && (
@@ -1210,7 +1210,7 @@ export default function TradingPage() {
                       onClick={handleApproveZeroXErc20}
                       disabled={dexApprovingErc20 || dexSigning}
                       className="btn-secondary"
-                      style={{ width: '100%', justifyContent: 'center', fontSize: '11px', padding: '7px 10px', borderColor: 'rgba(250, 204, 21, 0.45)', color: '#FDE047' }}
+                      style={{ width: '100%', justifyContent: 'center', fontSize: '11px', padding: '7px 10px', borderColor: 'rgba(250, 204, 21, 0.45)', color: 'var(--color-accent-amber)' }}
                     >
                       {dexApprovingErc20 ? 'Menunggu MetaMask Approve...' : 'Step 1: Approve ERC-20 Allowance via MetaMask'}
                     </button>
@@ -1225,7 +1225,7 @@ export default function TradingPage() {
                     style={{ width: '100%', justifyContent: 'center', fontSize: '12px', padding: '8px 12px' }}
                   >
                     {dexTokenSafety?.hardBlocked
-                      ? '🛡️ Swap Diblokir (Honeypot / Tax >20%)'
+                      ? 'Swap Diblokir (Honeypot / Tax >20%)'
                       : dexSigning
                       ? 'Menunggu MetaMask...'
                       : 'Sign & Swap via MetaMask (0x v2)'}
@@ -1275,7 +1275,7 @@ export default function TradingPage() {
                       fontWeight: 700,
                     }}
                   >
-                    🛡️ PRE-TRADE HARD-BLOCK AKTIF: GoPlus On-Chain Guard mendeteksi Honeypot atau Pajak &gt;20%. Eksekusi DEX dikunci otomatis demi keamanan dana Anda.
+                    PRE-TRADE HARD-BLOCK AKTIF: GoPlus On-Chain Guard mendeteksi Honeypot atau Pajak &gt;20%. Eksekusi DEX dikunci otomatis demi keamanan dana Anda.
                   </div>
                 )}
                 <div className="flex-row gap-sm">
@@ -1299,7 +1299,7 @@ export default function TradingPage() {
                     aria-label="Approve trade proposal and submit as trade intent"
                   >
                     {executionMode === 'DEX_NON_CUSTODIAL' && dexTokenSafety?.hardBlocked
-                      ? '🛡️ Diblokir (Honeypot)'
+                      ? 'Diblokir (Honeypot)'
                       : isSubmitting
                       ? 'Processing...'
                       : proposalStatus === 'APPROVED'

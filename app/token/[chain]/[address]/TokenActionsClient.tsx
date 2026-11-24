@@ -56,12 +56,12 @@ export default function TokenActionsClient({
     setOnChainSwapMsg(null);
     const contractCfg = getContractConfiguration(launchpadContractAddress);
     if (!contractCfg.isConfigured || !contractCfg.contractAddress) {
-      setOnChainSwapMsg(`⚠️ ${contractCfg.message}`);
+      setOnChainSwapMsg(`Notice: ${contractCfg.message}`);
       return;
     }
     const ethVal = parseFloat(swapAmount);
     if (!Number.isFinite(ethVal) || ethVal <= 0) {
-      setOnChainSwapMsg('⚠️ Masukkan jumlah ETH yang valid (> 0).');
+      setOnChainSwapMsg('Notice: Masukkan jumlah ETH yang valid (> 0).');
       return;
     }
 
@@ -70,7 +70,7 @@ export default function TokenActionsClient({
       const targetHex = chain === 'robinhood' || chain === 'robinhood-mainnet' ? '0x1237' : '0x2105';
       const netCheck = await ensureBaseNetwork(targetHex);
       if (!netCheck.success) {
-        setOnChainSwapMsg(`⚠️ ${netCheck.error || 'Harap beralih ke jaringan yang sesuai di MetaMask.'}`);
+        setOnChainSwapMsg(`Notice: ${netCheck.error || 'Harap beralih ke jaringan yang sesuai di MetaMask.'}`);
         return;
       }
 
@@ -81,7 +81,7 @@ export default function TokenActionsClient({
 
       let tx;
       if (referralWallet.trim() && ethers.isAddress(referralWallet.trim())) {
-        setOnChainSwapMsg('⏳ Menunggu konfirmasi MetaMask (buyTokensWithReferral — 0.25% KOL Rebate)...');
+        setOnChainSwapMsg('Menunggu konfirmasi MetaMask (buyTokensWithReferral — 0.25% KOL Rebate)...');
         tx = await contract.buyTokensWithReferral(
           ethers.getAddress(contractAddress),
           tokenAmtWei,
@@ -89,15 +89,15 @@ export default function TokenActionsClient({
           { value: valueWei }
         );
       } else {
-        setOnChainSwapMsg('⏳ Menunggu konfirmasi MetaMask (buyTokens pada BondingCurveLaunchpad.sol)...');
+        setOnChainSwapMsg('Menunggu konfirmasi MetaMask (buyTokens pada BondingCurveLaunchpad.sol)...');
         tx = await contract.buyTokens(ethers.getAddress(contractAddress), tokenAmtWei, { value: valueWei });
       }
 
-      setOnChainSwapMsg(`📡 Transaksi terkirim (${tx.hash.slice(0, 12)}...). Menunggu konfirmasi blok...`);
+      setOnChainSwapMsg(`Transaksi terkirim (${tx.hash.slice(0, 12)}...). Menunggu konfirmasi blok...`);
       await tx.wait(1);
-      setOnChainSwapMsg(`✅ Pembelian Bonding Curve berhasil! TxHash: ${tx.hash}`);
+      setOnChainSwapMsg(`OK: Pembelian Bonding Curve berhasil! TxHash: ${tx.hash}`);
     } catch (err: any) {
-      setOnChainSwapMsg(`⚠️ Gagal membeli di Bonding Curve: ${normalizeWeb3Error(err)}`);
+      setOnChainSwapMsg(`Notice: Gagal membeli di Bonding Curve: ${normalizeWeb3Error(err)}`);
     } finally {
       setIsBuyingOnChain(false);
     }
@@ -256,7 +256,7 @@ export default function TokenActionsClient({
         </div>
 
         {walletNotice && (
-          <p style={{ marginTop: '8px', fontSize: '11px', fontFamily: 'monospace', color: '#38BDF8' }}>
+          <p style={{ marginTop: '8px', fontSize: '11px', fontFamily: 'monospace', color: 'var(--color-accent-info)' }}>
             {walletNotice}
           </p>
         )}
@@ -287,7 +287,7 @@ export default function TokenActionsClient({
             className="badge"
             style={{
               backgroundColor: isGraduated ? 'rgba(56, 189, 248, 0.15)' : 'rgba(34, 197, 94, 0.1)',
-              color: isGraduated ? '#38BDF8' : '#22C55E',
+              color: isGraduated ? 'var(--color-accent-info)' : '#22C55E',
               border: `1px solid ${isGraduated ? 'rgba(56, 189, 248, 0.35)' : 'rgba(34, 197, 94, 0.3)'}`,
               fontSize: '11px',
               display: 'inline-flex',
@@ -296,7 +296,7 @@ export default function TokenActionsClient({
             }}
           >
             <Zap size={12} />
-            {isGraduated ? '🎓 GRADUATED TO DEX' : isSolana ? 'SOLANA ENGINE' : 'DOPPLER SETTLER'}
+            {isGraduated ? 'GRADUATED TO DEX' : isSolana ? 'SOLANA ENGINE' : 'DOPPLER SETTLER'}
           </span>
         </div>
 
@@ -546,7 +546,7 @@ export default function TokenActionsClient({
           <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px dashed #334155' }}>
             <div style={{ fontSize: '11px', color: '#94A3B8', marginBottom: '6px', display: 'flex', justifyContent: 'space-between' }}>
               <span>Direct BondingCurveLaunchpad.sol Settlement</span>
-              <span style={{ color: '#38BDF8', fontFamily: 'monospace' }}>0.25% KOL Referral Rebate</span>
+              <span style={{ color: 'var(--color-accent-info)', fontFamily: 'monospace' }}>0.25% KOL Referral Rebate</span>
             </div>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               <input
@@ -574,8 +574,8 @@ export default function TokenActionsClient({
                   padding: '7px 12px',
                   fontSize: '11px',
                   fontWeight: 700,
-                  borderColor: '#38BDF8',
-                  color: '#38BDF8',
+                  borderColor: 'var(--color-accent-info)',
+                  color: 'var(--color-accent-info)',
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '5px',
@@ -594,9 +594,9 @@ export default function TokenActionsClient({
                   borderRadius: '6px',
                   fontSize: '11px',
                   fontFamily: 'monospace',
-                  backgroundColor: onChainSwapMsg.includes('✅') ? 'rgba(16, 185, 129, 0.12)' : 'rgba(245, 158, 11, 0.12)',
-                  color: onChainSwapMsg.includes('✅') ? '#6EE7B7' : '#FDE047',
-                  border: `1px solid ${onChainSwapMsg.includes('✅') ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`,
+                  backgroundColor: onChainSwapMsg.includes('OK:') ? 'rgba(16, 185, 129, 0.12)' : 'rgba(245, 158, 11, 0.12)',
+                  color: onChainSwapMsg.includes('OK:') ? 'var(--color-text-positive)' : 'var(--color-accent-amber)',
+                  border: `1px solid ${onChainSwapMsg.includes('OK:') ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`,
                   wordBreak: 'break-all',
                 }}
               >

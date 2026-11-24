@@ -9,6 +9,10 @@
   --color-cex-gold: #FAFAFA; /* Crisp Monochrome Primary CTA */
   --color-cex-gold-hover: #E4E4E7;
   --color-accent-emerald: #10B981;
+  --color-text-positive: #34D399;
+  --color-accent-info: #38BDF8;
+  --color-accent-amber: #F59E0B;
+  --color-accent-purple: #A78BFA;
   --color-background: #09090B; /* Matte Obsidian Canvas */
   --color-foreground: #FAFAFA;
   --color-muted: #A1A1AA;
@@ -60,7 +64,11 @@
   --color-on-primary: #0C1500;
   --color-secondary: rgba(12, 21, 0, 0.06);
   --color-accent: #00C805;
-  --color-accent-emerald: #00C805;
+  --color-accent-emerald: #008A04;
+  --color-text-positive: #008A04;
+  --color-accent-info: #0369A1;
+  --color-accent-amber: #B45309;
+  --color-accent-purple: #6D28D9;
   --color-background: #F5F5F7;
   --color-foreground: #0C1500;
   --color-muted: rgba(12, 21, 0, 0.72);
@@ -493,9 +501,9 @@ a {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
-  padding: 10px 18px;
+  flex-wrap: nowrap;
+  gap: 8px;
+  padding: 8px 14px;
   background-color: rgba(17, 17, 19, 0.9);
   backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--color-border);

@@ -107,19 +107,16 @@ export default function HeaderNav() {
   return (
     <header className="header-nav">
       {/* Brand & Network Indicator */}
-      <div className="flex-row items-center gap-md">
-        <Link href="/" className="poolnet-brand" style={{ fontSize: '18px', fontWeight: 900, letterSpacing: '-0.5px' }}>
+      <div className="flex-row items-center" style={{ gap: '8px', flexShrink: 0 }}>
+        <Link href="/" className="poolnet-brand" style={{ fontSize: '16px', fontWeight: 900, letterSpacing: '-0.5px', whiteSpace: 'nowrap' }}>
           POOLNET
         </Link>
-        <span className="badge" style={{ backgroundColor: 'var(--color-badge-neutral-bg)', border: '1px solid var(--color-badge-neutral-border)', color: 'var(--color-badge-neutral-text)', fontSize: '11px', padding: '2px 7px' }}>
-          v2.5
-        </span>
         <div
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '6px',
-            padding: '3px 9px',
+            gap: '5px',
+            padding: '3px 7px',
             borderRadius: '9999px',
             backgroundColor: selectedChainHex === '0x14a34'
               ? 'var(--color-badge-info-bg)'
@@ -198,7 +195,7 @@ export default function HeaderNav() {
       </div>
 
       {/* Dynamic Navigation Links */}
-      <nav className="nav-links" style={{ gap: '4px' }}>
+      <nav className="nav-links" style={{ gap: '2px' }}>
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.href);
@@ -210,17 +207,17 @@ export default function HeaderNav() {
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '6px',
-                padding: '7px 12px',
+                gap: '5px',
+                padding: '6px 8px',
                 borderRadius: '8px',
-                fontSize: '12px',
+                fontSize: '11.5px',
                 fontWeight: active ? 800 : 600,
                 whiteSpace: 'nowrap',
                 border: '1px solid transparent',
                 transition: 'all 150ms ease',
               }}
             >
-              <Icon size={14} style={{ verticalAlign: 'middle', flexShrink: 0 }} />
+              <Icon size={13} style={{ verticalAlign: 'middle', flexShrink: 0 }} />
               <span>{item.label}</span>
             </Link>
           );
@@ -228,13 +225,13 @@ export default function HeaderNav() {
       </nav>
 
       {/* Account & Session Controls */}
-      <div className="flex-row items-center gap-sm">
+      <div className="flex-row items-center" style={{ gap: '6px', flexShrink: 0 }}>
         <button
           type="button"
           onClick={toggleLocale}
           className="btn-secondary"
           style={{
-            padding: '6px 9px',
+            padding: '5px 8px',
             borderRadius: '9999px',
             display: 'inline-flex',
             alignItems: 'center',
@@ -246,7 +243,7 @@ export default function HeaderNav() {
           title={t('nav.switchLang')}
           aria-label={t('nav.switchLang')}
         >
-          <Globe size={13} />
+          <Globe size={12} />
           <span>{locale.toUpperCase()}</span>
         </button>
         <button
@@ -254,7 +251,7 @@ export default function HeaderNav() {
           onClick={toggleTheme}
           className="btn-secondary"
           style={{
-            padding: '6px 8px',
+            padding: '5px 7px',
             borderRadius: '9999px',
             display: 'inline-flex',
             alignItems: 'center',
@@ -264,24 +261,14 @@ export default function HeaderNav() {
           title={theme === 'dark' ? t('nav.switchThemeLight') : t('nav.switchThemeDark')}
           aria-label={theme === 'dark' ? t('nav.switchThemeLight') : t('nav.switchThemeDark')}
         >
-          {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+          {theme === 'dark' ? <Sun size={13} /> : <Moon size={13} />}
         </button>
         {isConnected ? (
           <>
             {userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN' || userRole === 'LAUNCH_ADMIN' || userRole === 'RISK_ADMIN' || userRole === 'BILLING_ADMIN' ? (
-              <span className="badge badge-admin" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }} title={`Active RBAC Role: ${userRole}`}>
-                <ShieldAlert size={12} />
+              <span className="badge badge-admin" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 7px', fontSize: '10.5px' }} title={`Active RBAC Role: ${userRole}`}>
+                <ShieldAlert size={11} />
                 {userRole === 'SUPER_ADMIN' || userRole === 'SYSTEM_ADMIN' ? 'ADMIN' : userRole.replace('_ADMIN', '')}
-              </span>
-            ) : userRole === 'CREATOR' ? (
-              <span className="badge badge-creator" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                <Rocket size={12} />
-                CREATOR
-              </span>
-            ) : userRole === 'TRADER' ? (
-              <span className="badge badge-trader" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                <Zap size={12} />
-                TRADER
               </span>
             ) : null}
 
@@ -293,12 +280,14 @@ export default function HeaderNav() {
                 backgroundColor: 'var(--color-badge-neutral-bg)',
                 color: 'var(--color-badge-neutral-text)',
                 fontSize: '11px',
+                padding: '4px 8px',
                 textDecoration: 'none',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '5px',
+                gap: '4px',
+                whiteSpace: 'nowrap',
               }}
-              title={`Active Subscription Tier: ${planId || 'FREE'} · Available Credits: ${credits.toLocaleString()}`}
+              title={`Role: ${userRole || 'TRADER'} · Tier: ${planId || 'FREE'} · Credits: ${credits.toLocaleString()}`}
             >
               <span style={{ color: 'var(--color-badge-warning-text)', fontWeight: 900 }}>{planId || 'FREE'}</span>
               <span>·</span>
@@ -310,11 +299,11 @@ export default function HeaderNav() {
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '5px',
-                padding: '5px 9px',
+                padding: '4px 8px',
                 borderRadius: '6px',
                 border: '1px solid var(--color-border)',
                 backgroundColor: 'var(--color-primary)',
-                fontSize: '12px',
+                fontSize: '11px',
                 fontWeight: 600,
                 whiteSpace: 'nowrap',
                 color: 'var(--color-foreground)',
@@ -328,15 +317,15 @@ export default function HeaderNav() {
               onClick={() => disconnectWallet()}
               className="btn-secondary"
               style={{
-                padding: '6px 10px',
-                fontSize: '12px',
+                padding: '5px 8px',
+                fontSize: '11px',
                 color: 'var(--color-destructive)',
                 borderColor: 'rgba(239, 68, 68, 0.3)',
               }}
               title="Disconnect Wallet"
               aria-label="Disconnect Wallet"
             >
-              <LogOut size={14} />
+              <LogOut size={13} />
             </button>
           </>
         ) : (
@@ -350,12 +339,13 @@ export default function HeaderNav() {
             disabled={isConnecting}
             className="btn-primary"
             style={{
-              padding: '8px 16px',
-              fontSize: '13px',
+              padding: '6px 12px',
+              fontSize: '12px',
               borderRadius: '6px',
+              whiteSpace: 'nowrap',
             }}
           >
-            <Wallet size={15} />
+            <Wallet size={14} />
             <span>{isConnecting ? 'Signing SIWE...' : 'Connect Wallet'}</span>
           </button>
         )}

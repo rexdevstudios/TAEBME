@@ -68,13 +68,13 @@ export function TokenSafetyBadgeCard({
           padding: '8px 10px',
           borderRadius: '6px',
           border: '1px solid var(--color-border)',
-          background: 'rgba(15, 23, 42, 0.45)',
+          background: 'var(--color-surface-subtle)',
           fontSize: '11px',
           color: 'var(--color-muted)',
           fontFamily: 'var(--font-mono)',
         }}
       >
-        🛡️ Memindai keamanan kontrak &amp; deteksi insider (GoPlus On-Chain Guard)...
+        Memindai keamanan kontrak &amp; deteksi insider (GoPlus On-Chain Guard)...
       </div>
     );
   }
@@ -83,7 +83,7 @@ export function TokenSafetyBadgeCard({
 
   const palette =
     data.riskLevel === 'LOW'
-      ? { border: 'rgba(16, 185, 129, 0.4)', bg: 'rgba(16, 185, 129, 0.08)', color: '#34D399' }
+      ? { border: 'rgba(16, 185, 129, 0.4)', bg: 'rgba(16, 185, 129, 0.08)', color: 'var(--color-text-positive)' }
       : data.riskLevel === 'MEDIUM'
       ? { border: 'rgba(245, 158, 11, 0.4)', bg: 'rgba(245, 158, 11, 0.08)', color: '#FBBF24' }
       : { border: 'rgba(239, 68, 68, 0.5)', bg: 'rgba(239, 68, 68, 0.1)', color: '#F87171' };
@@ -122,7 +122,7 @@ export function TokenSafetyBadgeCard({
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(105px, 1fr))', gap: '6px', fontSize: '10px' }}>
         <div>
           <span className="text-muted">Honeypot:</span>{' '}
-          <strong style={{ color: data.isHoneypot ? '#F87171' : '#34D399' }}>
+          <strong style={{ color: data.isHoneypot ? '#F87171' : 'var(--color-text-positive)' }}>
             {data.isHoneypot ? 'YA (BAHAYA)' : 'AMAN'}
           </strong>
         </div>
@@ -134,13 +134,13 @@ export function TokenSafetyBadgeCard({
         </div>
         <div>
           <span className="text-muted">Top-10 Holder:</span>{' '}
-          <strong style={{ color: data.top10HolderPct >= 45 ? '#FBBF24' : '#34D399' }}>
+          <strong style={{ color: data.top10HolderPct >= 45 ? '#FBBF24' : 'var(--color-text-positive)' }}>
             {data.top10HolderPct}%
           </strong>
         </div>
         <div>
           <span className="text-muted">Cluster Insider:</span>{' '}
-          <strong style={{ color: data.suspectedClusterCount >= 3 ? '#F87171' : '#34D399' }}>
+          <strong style={{ color: data.suspectedClusterCount >= 3 ? '#F87171' : 'var(--color-text-positive)' }}>
             {data.suspectedClusterCount >= 3 ? `${data.suspectedClusterCount} Wallet Kembar` : 'Bersih'}
           </strong>
         </div>

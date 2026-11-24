@@ -61,7 +61,7 @@ export function BybitKeyVaultPanel({
     e.preventDefault();
     if (!label.trim() || !apiKey.trim() || !secretKey.trim()) return;
     if (!confirmNoWithdraw) {
-      setFeedback('⚠️ Harap konfirmasi bahwa izin Withdrawals NONAKTIF pada API Key Bybit Anda.');
+      setFeedback('Notice: Harap konfirmasi bahwa izin Withdrawals NONAKTIF pada API Key Bybit Anda.');
       return;
     }
     setSaving(true);
@@ -80,17 +80,17 @@ export function BybitKeyVaultPanel({
       });
       const json = await res.json();
       if (!res.ok || !json?.success) {
-        setFeedback(`⚠️ ${json?.error || 'Gagal menyimpan API Key Bybit'}`);
+        setFeedback(`Notice: ${json?.error || 'Gagal menyimpan API Key Bybit'}`);
       } else {
         setLabel('');
         setApiKey('');
         setSecretKey('');
         setShowAdd(false);
-        setFeedback(`✅ Akun Bybit "${json.data.label}" (${json.data.maskedKey}) dienkripsi AES-256-GCM.`);
+        setFeedback(`OK: Akun Bybit "${json.data.label}" (${json.data.maskedKey}) dienkripsi AES-256-GCM.`);
         await loadKeys();
       }
     } catch (err: any) {
-      setFeedback(`⚠️ ${err?.message || 'Network error'}`);
+      setFeedback(`Notice: ${err?.message || 'Network error'}`);
     } finally {
       setSaving(false);
     }
@@ -107,20 +107,20 @@ export function BybitKeyVaultPanel({
       });
       const json = await res.json();
       if (!res.ok || !json?.success) {
-        setFeedback(`⚠️ Ping Bybit "${item.label}" gagal: ${json?.error || `HTTP ${res.status}`}`);
+        setFeedback(`Notice: Ping Bybit "${item.label}" gagal: ${json?.error || `HTTP ${res.status}`}`);
       } else if (json.data?.connected) {
         const warn = json.data?.canWithdraw
-          ? ' ⚠️ PERINGATAN: Withdraw aktif di Bybit — segera nonaktifkan!'
+          ? ' Notice: PERINGATAN: Withdraw aktif di Bybit — segera nonaktifkan!'
           : ' · No-Withdrawal Verified';
         setFeedback(
-          `✅ Bybit "${item.label}" (${json.data.environment}) terhubung (${json.data.latencyMs}ms · canTrade=${json.data.canTrade}${warn})`
+          `OK: Bybit "${item.label}" (${json.data.environment}) terhubung (${json.data.latencyMs}ms · canTrade=${json.data.canTrade}${warn})`
         );
         await loadKeys();
       } else {
-        setFeedback(`⚠️ Bybit "${item.label}" ditolak: ${json.data?.error || 'Auth failed'} (${json.data?.latencyMs ?? 0}ms).`);
+        setFeedback(`Notice: Bybit "${item.label}" ditolak: ${json.data?.error || 'Auth failed'} (${json.data?.latencyMs ?? 0}ms).`);
       }
     } catch (err: any) {
-      setFeedback(`⚠️ ${err?.message || 'Network error'}`);
+      setFeedback(`Notice: ${err?.message || 'Network error'}`);
     } finally {
       setPingingId(null);
     }
@@ -267,7 +267,7 @@ export function BybitKeyVaultPanel({
                     }}
                   >
                     <strong>{k.label}</strong>
-                    <span style={{ fontSize: '9px', fontWeight: 800, color: k.chainScope === 'mainnet' ? '#F59E0B' : '#38BDF8' }}>
+                    <span style={{ fontSize: '9px', fontWeight: 800, color: k.chainScope === 'mainnet' ? '#F59E0B' : 'var(--color-accent-info)' }}>
                       {(k.chainScope || 'testnet').toUpperCase()}
                     </span>
                     {k.quotaStatus === 'FROZEN_MAINNET_LOCKED' && (
@@ -307,7 +307,7 @@ export function BybitKeyVaultPanel({
       )}
 
       {feedback && (
-        <div style={{ fontSize: '11px', color: feedback.startsWith('✅') ? '#10B981' : '#F59E0B' }}>
+        <div style={{ fontSize: '11px', color: feedback.startsWith('OK:') ? '#10B981' : '#F59E0B' }}>
           {feedback}
         </div>
       )}

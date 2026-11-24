@@ -34,7 +34,7 @@ export type LaunchModeType = 'BONDING_CURVE' | 'FAIR_LAUNCH' | 'WHITELIST_PRIVAT
 
 export default function LaunchpadPage() {
   const { isConnected, userRole, entitlements, walletAddress, connectMetaMask, isConnecting, refreshSession, switchNetwork, hasCapability, planId, credits } = useAuth();
-  const { t } = useLocale();
+  const { t, tr } = useLocale();
   const [connectError, setConnectError] = useState<string | null>(null);
   const [selectedBankrKeyId, setSelectedBankrKeyId] = useState<string>('PLATFORM_DEFAULT');
   const [selectedBatchBankrKeyIds, setSelectedBatchBankrKeyIds] = useState<string[]>([]);
@@ -195,11 +195,11 @@ export default function LaunchpadPage() {
       if (!res.ok || !json.success) {
         const errorMsg = json.error?.message || 'Gagal membuat draft launchpad';
         if (res.status === 403) {
-          setDraftError('🛡️ Akses Ditolak (403 Forbidden): Akun Anda memerlukan hak akses CREATOR atau ADMIN untuk membuat draft launchpad.');
+          setDraftError('Akses Ditolak (403 Forbidden): Akun Anda memerlukan hak akses CREATOR atau ADMIN untuk membuat draft launchpad.');
         } else if (res.status === 401) {
-          setDraftError('⚠️ Autentikasi Diperlukan (401 Unauthorized): Harap masuk via MetaMask SIWE terlebih dahulu.');
+          setDraftError('Notice: Autentikasi Diperlukan (401 Unauthorized): Harap masuk via MetaMask SIWE terlebih dahulu.');
         } else {
-          setDraftError(`❌ Gagal: ${errorMsg}`);
+          setDraftError(`Error: Gagal: ${errorMsg}`);
         }
         return;
       }
@@ -255,7 +255,7 @@ export default function LaunchpadPage() {
       const json = await res.json();
       if (!res.ok || !json.success) {
         const errMsg = typeof json.error === 'string' ? json.error : json.error?.message || 'Bankr deploy failed';
-        setOnChainFeedback(`❌ Bankr Deploy (${res.status}): ${errMsg}`);
+        setOnChainFeedback(`Error: Bankr Deploy (${res.status}): ${errMsg}`);
         return;
       }
       const d = json.data || {};
@@ -263,7 +263,7 @@ export default function LaunchpadPage() {
         refreshSession().catch(() => {});
         fetchActiveTokens();
         setOnChainFeedback(
-          `✅ Bankr Fleet Batch (${simulateOnly ? 'SIMULATED' : 'DEPLOYED'}): Berhasil ${d.succeededCount}/${d.totalRequested} akun di ${selectedChain.toUpperCase()} · -${d.creditsBurned ?? 0} Credits`
+          `OK: Bankr Fleet Batch (${simulateOnly ? 'SIMULATED' : 'DEPLOYED'}): Berhasil ${d.succeededCount}/${d.totalRequested} akun di ${selectedChain.toUpperCase()} · -${d.creditsBurned ?? 0} Credits`
         );
         return;
       }
@@ -273,10 +273,10 @@ export default function LaunchpadPage() {
       fetchActiveTokens();
       const keyBadge = d.keySource === 'BYOK_VAULT' ? ` [BYOK: ${d.usedKeyLabel || d.usedKeyMasked}]` : ' [Platform Key]';
       setOnChainFeedback(
-        `✅ Bankr ${d.status?.toUpperCase() || 'DEPLOYED'}${keyBadge}: $${d.tokenSymbol || tokenSymbol} on ${selectedChain.toUpperCase()} (${d.tokenAddress || 'Simulated CA'}) · -${d.creditsBurned ?? 50} Credits`
+        `OK: Bankr ${d.status?.toUpperCase() || 'DEPLOYED'}${keyBadge}: $${d.tokenSymbol || tokenSymbol} on ${selectedChain.toUpperCase()} (${d.tokenAddress || 'Simulated CA'}) · -${d.creditsBurned ?? 50} Credits`
       );
     } catch (err: any) {
-      setOnChainFeedback(`❌ Bankr Deploy Error: ${err?.message || 'Network error'}`);
+      setOnChainFeedback(`Error: Bankr Deploy Error: ${err?.message || 'Network error'}`);
     } finally {
       setIsBankrDeploying(false);
     }
@@ -288,14 +288,14 @@ export default function LaunchpadPage() {
     setOnChainFeedback(null);
     try {
       if (!walletAddress) {
-        setOnChainFeedback('⚠️ Silakan hubungkan dompet Web3 MetaMask terlebih dahulu.');
+        setOnChainFeedback('Notice: Silakan hubungkan dompet Web3 MetaMask terlebih dahulu.');
         return;
       }
 
       // 1. Access Control Invariant Check (onlyOwner in BondingCurveLaunchpad.sol)
       if (userRole !== 'SYSTEM_ADMIN' && userRole !== 'SUPER_ADMIN') {
         setOnChainFeedback(
-          '🛡️ Akses Terbatas: Pendaftaran token launchpad on-chain memerlukan hak otorisasi Platform Admin / Contract Owner. Draft Anda telah disimpan di SSOT untuk diproses oleh controller.'
+          'Akses Terbatas: Pendaftaran token launchpad on-chain memerlukan hak otorisasi Platform Admin / Contract Owner. Draft Anda telah disimpan di SSOT untuk diproses oleh controller.'
         );
         return;
       }
@@ -303,14 +303,14 @@ export default function LaunchpadPage() {
       // 2. Contract Configuration Verification Gate (Rule 6)
       const contractConfig = getContractConfiguration(ssotFactoryAddress);
       if (!contractConfig.isConfigured || !contractConfig.contractAddress) {
-        setOnChainFeedback(`❌ ${contractConfig.message}`);
+        setOnChainFeedback(`Error: ${contractConfig.message}`);
         return;
       }
 
       // 3. Multi-Chain Network Switching & Validation (Rule 8 — fail closed on unsupported live chains)
       if (selectedChain === 'arbitrum' || selectedChain === 'arc') {
         setOnChainFeedback(
-          `⛔ Pendaftaran langsung on-chain untuk ${selectedChain.toUpperCase()} belum aktif di BondingCurveLaunchpad.sol. Gunakan Base L2 atau Robinhood Chain L2.`
+          `Pendaftaran langsung on-chain untuk ${selectedChain.toUpperCase()} belum aktif di BondingCurveLaunchpad.sol. Gunakan Base L2 atau Robinhood Chain L2.`
         );
         return;
       }
@@ -318,7 +318,7 @@ export default function LaunchpadPage() {
       const trimmedTokenAddr = onChainTokenAddress.trim();
       if (!trimmedTokenAddr || !ethers.isAddress(trimmedTokenAddr)) {
         setOnChainFeedback(
-          '⚠️ Masukkan alamat kontrak token ERC-20 yang sudah ter-deploy (0x...) sebelum mendaftarkan ke BondingCurveLaunchpad.'
+          'Notice: Masukkan alamat kontrak token ERC-20 yang sudah ter-deploy (0x...) sebelum mendaftarkan ke BondingCurveLaunchpad.'
         );
         return;
       }
@@ -331,7 +331,7 @@ export default function LaunchpadPage() {
 
       const networkCheck = await ensureBaseNetwork(targetChainHex);
       if (!networkCheck.success) {
-        setOnChainFeedback(`❌ ${networkCheck.error || `Harap beralih ke jaringan ${chainName}`}`);
+        setOnChainFeedback(`Error: ${networkCheck.error || `Harap beralih ke jaringan ${chainName}`}`);
         return;
       }
 
@@ -348,7 +348,7 @@ export default function LaunchpadPage() {
       const modeInt = modeMap[draftMode] ?? 1;
 
       // 5. Real Contract Call via MetaMask Signer
-      setOnChainFeedback(`⏳ Menyiapkan pendaftaran token on-chain di ${chainName}...`);
+      setOnChainFeedback(`Menyiapkan pendaftaran token on-chain di ${chainName}...`);
       const signer = await getBrowserSigner();
       const contract = getLaunchpadContract(signer, ssotFactoryAddress);
 
@@ -359,7 +359,7 @@ export default function LaunchpadPage() {
       const maxPerWalletPct = 100n;
       const merkleRoot = draftResult.merkleRoot || ethers.ZeroHash;
 
-      setOnChainFeedback('⏳ Menunggu tanda tangan transaksi pendaftaran di MetaMask...');
+      setOnChainFeedback('Menunggu tanda tangan transaksi pendaftaran di MetaMask...');
       const tx = await contract.registerTokenLaunch(
         verifiedTokenAddress,
         draftResult.name,
@@ -372,7 +372,7 @@ export default function LaunchpadPage() {
         merkleRoot
       );
 
-      setOnChainFeedback(`📡 Transaksi terkirim: ${tx.hash}. Menunggu konfirmasi blok ${chainName}...`);
+      setOnChainFeedback(`Transaksi terkirim: ${tx.hash}. Menunggu konfirmasi blok ${chainName}...`);
       const receipt = await tx.wait(1);
 
       if (receipt && receipt.status === 1) {
@@ -396,7 +396,7 @@ export default function LaunchpadPage() {
           if (!pubRes.ok) {
             const pubErr = await pubRes.json().catch(() => ({}));
             setOnChainFeedback(
-              `✅ Token $${draftTicker} terdaftar on-chain (Hash: ${tx.hash}), tetapi sinkronisasi SSOT gagal: ${pubErr?.error?.message || `HTTP ${pubRes.status}`}`
+              `OK: Token $${draftTicker} terdaftar on-chain (Hash: ${tx.hash}), tetapi sinkronisasi SSOT gagal: ${pubErr?.error?.message || `HTTP ${pubRes.status}`}`
             );
             return;
           }
@@ -405,19 +405,19 @@ export default function LaunchpadPage() {
           refreshSession().catch(() => {});
         } catch (pubCatchErr: any) {
           setOnChainFeedback(
-            `✅ Token $${draftTicker} terdaftar on-chain (Hash: ${tx.hash}), tetapi sinkronisasi SSOT gagal: ${pubCatchErr?.message || 'Network error'}`
+            `OK: Token $${draftTicker} terdaftar on-chain (Hash: ${tx.hash}), tetapi sinkronisasi SSOT gagal: ${pubCatchErr?.message || 'Network error'}`
           );
           return;
         }
 
         setOnChainFeedback(
-          `✅ Token $${draftTicker} BERHASIL DIDAFTARKAN ON-CHAIN! Blok #${receipt.blockNumber}. Hash: ${tx.hash} — Lihat di ${explorerName}: ${explorerLink}`
+          `OK: Token $${draftTicker} BERHASIL DIDAFTARKAN ON-CHAIN! Blok #${receipt.blockNumber}. Hash: ${tx.hash} — Lihat di ${explorerName}: ${explorerLink}`
         );
       } else {
-        setOnChainFeedback(`❌ Transaksi gagal dieksekusi di blockchain ${chainName}.`);
+        setOnChainFeedback(`Error: Transaksi gagal dieksekusi di blockchain ${chainName}.`);
       }
     } catch (err: any) {
-      setOnChainFeedback(`❌ Gagal pendaftaran on-chain: ${normalizeWeb3Error(err)}`);
+      setOnChainFeedback(`Error: Gagal pendaftaran on-chain: ${normalizeWeb3Error(err)}`);
     } finally {
       setIsRegisteringOnChain(false);
     }
@@ -435,7 +435,7 @@ export default function LaunchpadPage() {
             POOLNET CEX-Grade Token Launchpad · 0% Tax · Gas-Sponsored Base L2
           </div>
           <h1 style={{ fontSize: '22px', fontWeight: 900, margin: '0 0 4px 0', color: 'var(--color-foreground)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Rocket size={20} style={{ color: '#F0B90B' }} /> {t('launchpad.title')}
+            <Rocket size={20} style={{ color: 'var(--color-accent-amber)' }} /> {t('launchpad.title')}
           </h1>
           <p className="text-muted" style={{ margin: 0, fontSize: '12px' }}>
             {t('launchpad.subtitle')}
@@ -579,7 +579,7 @@ export default function LaunchpadPage() {
                 gap: '3px',
               }}
             >
-              <strong style={{ color: '#10B981' }}>✅ Aset Creator Studio Terhubung ke Wizard</strong>
+              <strong style={{ color: '#10B981' }}>OK: Aset Creator Studio Terhubung ke Wizard</strong>
               {tokenImageUrl && (
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--color-muted)', wordBreak: 'break-all' }}>
                   IPFS Image: {tokenImageUrl}
@@ -640,7 +640,7 @@ export default function LaunchpadPage() {
                   type="button"
                   onClick={() => setMode('WHITELIST_PRIVATE')}
                   className={mode === 'WHITELIST_PRIVATE' ? 'btn-primary' : 'btn-secondary'}
-                  style={{ padding: '10px 6px', justifyContent: 'center', fontSize: '11px', border: mode === 'WHITELIST_PRIVATE' ? '1px solid #D500F9' : undefined }}
+                  style={{ padding: '10px 6px', justifyContent: 'center', fontSize: '11px', border: mode === 'WHITELIST_PRIVATE' ? '1px solid var(--color-accent-purple)' : undefined }}
                 >
                   <Users size={14} className="inline mr-1" /> Angel Whitelist
                 </button>
@@ -665,8 +665,8 @@ export default function LaunchpadPage() {
 
             {/* Dynamic Mode-Specific Settings */}
             {mode === 'WHITELIST_PRIVATE' && (
-              <div className="flex-col gap-xs" style={{ backgroundColor: '#1A0826', border: '1px solid #D500F9', padding: '12px', borderRadius: '6px' }}>
-                <label style={{ color: '#E040FB', fontSize: '11px', fontWeight: 800 }}>👑 Angel Investor Whitelist Addresses (Merkle Proofs)</label>
+              <div className="flex-col gap-xs" style={{ backgroundColor: 'var(--color-badge-purple-bg)', border: '1px solid var(--color-accent-purple)', padding: '12px', borderRadius: '6px' }}>
+                <label style={{ color: '#E040FB', fontSize: '11px', fontWeight: 800 }}>Angel Investor Whitelist Addresses (Merkle Proofs)</label>
                 <textarea
                   placeholder="0x123...abc, 0x456...def (Comma-separated investor wallets)"
                   value={whitelistWallets}
@@ -679,8 +679,8 @@ export default function LaunchpadPage() {
             )}
 
             {mode === 'FIXED_PRICE' && (
-              <div className="flex-col gap-xs" style={{ backgroundColor: '#071A2E', border: '1px solid #00E5FF', padding: '12px', borderRadius: '6px' }}>
-                <label style={{ color: '#00E5FF', fontSize: '11px', fontWeight: 800 }}>🏷️ Fixed Price Per Token (in ETH)</label>
+              <div className="flex-col gap-xs" style={{ backgroundColor: 'var(--color-badge-info-bg)', border: '1px solid var(--color-accent-info)', padding: '12px', borderRadius: '6px' }}>
+                <label style={{ color: 'var(--color-accent-info)', fontSize: '11px', fontWeight: 800 }}>Fixed Price Per Token (in ETH)</label>
                 <input
                   type="text"
                   value={fixedPriceEth}
@@ -692,8 +692,8 @@ export default function LaunchpadPage() {
             )}
 
             {mode === 'COMMUNITY_PRELAUNCH' && (
-              <div className="flex-col gap-xs" style={{ backgroundColor: '#041E15', border: '1px solid var(--color-accent)', padding: '12px', borderRadius: '6px' }}>
-                <label style={{ color: 'var(--color-accent)', fontSize: '11px', fontWeight: 800 }}>🤝 Target Funding Goal (in ETH)</label>
+              <div className="flex-col gap-xs" style={{ backgroundColor: 'var(--color-badge-success-bg)', border: '1px solid var(--color-accent)', padding: '12px', borderRadius: '6px' }}>
+                <label style={{ color: 'var(--color-accent)', fontSize: '11px', fontWeight: 800 }}>Target Funding Goal (in ETH)</label>
                 <input
                   type="text"
                   value={fundingGoalEth}
@@ -712,7 +712,7 @@ export default function LaunchpadPage() {
                   Target Blockchain & Gas Relayer
                 </label>
                 <span style={{ fontSize: '10px', color: selectedChain === 'base' ? 'var(--color-accent)' : '#FFAB00', fontWeight: 700 }}>
-                  {selectedChain === 'base' ? '⚡ 100% Gas Sponsored by Bankr' : '⚠️ Gas Sponsorship Policy Active'}
+                  {selectedChain === 'base' ? '100% Gas Sponsored by Bankr' : 'Notice: Gas Sponsorship Policy Active'}
                 </span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(115px, 1fr))', gap: '8px' }}>
@@ -723,7 +723,7 @@ export default function LaunchpadPage() {
                   style={{ padding: '8px 4px', justifyContent: 'center', fontSize: '11px', flexDirection: 'column', gap: '2px' }}
                 >
                   <span style={{ fontWeight: 800 }}>Base L2</span>
-                  <span style={{ fontSize: '9px', color: 'var(--color-accent)' }}>✅ Ready (Sponsored)</span>
+                  <span style={{ fontSize: '9px', color: 'var(--color-accent)' }}>OK: Ready (Sponsored)</span>
                 </button>
                 <button
                   type="button"
@@ -732,7 +732,7 @@ export default function LaunchpadPage() {
                   style={{ padding: '8px 4px', justifyContent: 'center', fontSize: '11px', flexDirection: 'column', gap: '2px' }}
                 >
                   <span style={{ fontWeight: 800 }}>Robinhood</span>
-                  <span style={{ fontSize: '9px', color: '#FF5252' }}>⛔ Blocked in Live</span>
+                  <span style={{ fontSize: '9px', color: 'var(--color-destructive)' }}>Blocked in Live</span>
                 </button>
                 <button
                   type="button"
@@ -741,7 +741,7 @@ export default function LaunchpadPage() {
                   style={{ padding: '8px 4px', justifyContent: 'center', fontSize: '11px', flexDirection: 'column', gap: '2px' }}
                 >
                   <span style={{ fontWeight: 800 }}>Arbitrum</span>
-                  <span style={{ fontSize: '9px', color: '#FF5252' }}>⛔ Blocked in Live</span>
+                  <span style={{ fontSize: '9px', color: 'var(--color-destructive)' }}>Blocked in Live</span>
                 </button>
                 <button
                   type="button"
@@ -750,23 +750,23 @@ export default function LaunchpadPage() {
                   style={{ padding: '8px 4px', justifyContent: 'center', fontSize: '11px', flexDirection: 'column', gap: '2px' }}
                 >
                   <span style={{ fontWeight: 800 }}>Arc Network</span>
-                  <span style={{ fontSize: '9px', color: '#00E5FF' }}>⚡ ArcPad Ready</span>
+                  <span style={{ fontSize: '9px', color: 'var(--color-accent-info)' }}>ArcPad Ready</span>
                 </button>
               </div>
 
               {selectedChain === 'robinhood' && (
-                <div style={{ backgroundColor: '#2A0808', border: '1px solid #FF5252', padding: '8px 10px', borderRadius: '4px', fontSize: '11px', color: '#FF8A80' }}>
-                  ℹ️ <strong>Subsidi Gas Khusus Base L2:</strong> Deploy gratis tanpa gas saat ini khusus di Base L2. Untuk Robinhood L2, silakan gunakan Mode Simulasi atau deploy memakai dompet Anda sendiri.
+                <div style={{ backgroundColor: 'rgba(217, 45, 32, 0.1)', border: '1px solid var(--color-destructive)', padding: '8px 10px', borderRadius: '4px', fontSize: '11px', color: '#FF8A80' }}>
+                  <strong>Subsidi Gas Khusus Base L2:</strong> Deploy gratis tanpa gas saat ini khusus di Base L2. Untuk Robinhood L2, silakan gunakan Mode Simulasi atau deploy memakai dompet Anda sendiri.
                 </div>
               )}
               {selectedChain === 'arbitrum' && (
-                <div style={{ backgroundColor: '#2A0808', border: '1px solid #FF5252', padding: '8px 10px', borderRadius: '4px', fontSize: '11px', color: '#FF8A80' }}>
-                  ℹ️ <strong>Subsidi Gas Khusus Base L2:</strong> Untuk Arbitrum, saat ini tersedia dalam Mode Simulasi atau deploy memakai dompet Anda sendiri.
+                <div style={{ backgroundColor: 'rgba(217, 45, 32, 0.1)', border: '1px solid var(--color-destructive)', padding: '8px 10px', borderRadius: '4px', fontSize: '11px', color: '#FF8A80' }}>
+                  <strong>Subsidi Gas Khusus Base L2:</strong> Untuk Arbitrum, saat ini tersedia dalam Mode Simulasi atau deploy memakai dompet Anda sendiri.
                 </div>
               )}
               {selectedChain === 'arc' && (
                 <div style={{ backgroundColor: 'var(--color-badge-info-bg)', border: '1px solid var(--color-badge-info-border)', padding: '8px 10px', borderRadius: '6px', fontSize: '11px', color: 'var(--color-badge-info-text)' }}>
-                  ⚡ <strong>Arc Network:</strong> Siap untuk peluncuran simulasi maupun kontrak native Arc Network.
+                  <strong>Arc Network:</strong> Siap untuk peluncuran simulasi maupun kontrak native Arc Network.
                 </div>
               )}
             </div>
@@ -779,7 +779,7 @@ export default function LaunchpadPage() {
               style={{ width: '100%', justifyContent: 'space-between', padding: '8px 12px', fontSize: '11px', color: 'var(--color-foreground)' }}
             >
               <span>
-                ⚙️ Pengaturan Lanjutan (Pairing: {poolPairing} · {isDegenMode ? 'Degen $2.5k' : 'Standard $69k'} · Royalty: {billingConfig.creatorFeePct}% · Deploy: -{billingConfig.launchCostCr} cr)
+                Pengaturan Lanjutan (Pairing: {poolPairing} · {isDegenMode ? 'Degen $2.5k' : 'Standard $69k'} · Royalty: {billingConfig.creatorFeePct}% · Deploy: -{billingConfig.launchCostCr} cr)
               </span>
               <span>{showAdvancedOptions ? '▲ Sembunyikan' : '▼ Ubah'}</span>
             </button>
@@ -797,8 +797,7 @@ export default function LaunchpadPage() {
                     className={poolPairing === 'WETH' ? 'btn-primary' : 'btn-secondary'}
                     style={{ flex: 1, padding: '8px 4px', fontSize: '10px', justifyContent: 'center' }}
                   >
-                    WETH ✅
-                  </button>
+                    WETH OK: </button>
                   <button
                     type="button"
                     onClick={() => setPoolPairing('MORE_TOKENS')}
@@ -815,8 +814,7 @@ export default function LaunchpadPage() {
                     style={{ flex: 1, padding: '8px 4px', fontSize: '10px', justifyContent: 'center', opacity: 0.35, cursor: 'not-allowed' }}
                     title="Stocks belum memiliki mapping contract tokenized-stock di backend."
                   >
-                    Stocks ⛔
-                  </button>
+                    Stocks                   </button>
                 </div>
                 {poolPairing === 'MORE_TOKENS' && (
                   <span style={{ fontSize: '10px', color: 'var(--color-accent)' }}>
@@ -840,7 +838,7 @@ export default function LaunchpadPage() {
                     border: isDegenMode ? '1px solid var(--color-accent)' : undefined,
                   }}
                 >
-                  <span>🔥 Degen Mode</span>
+                  <span>Degen Mode</span>
                   <span style={{ fontSize: '10px', fontWeight: 800 }}>
                     {isDegenMode ? 'ON ($2.5k Mcap)' : 'OFF ($69k)'}
                   </span>
@@ -858,7 +856,7 @@ export default function LaunchpadPage() {
                   Creator Vesting (Local Launchpad Contract)
                 </label>
                 <span style={{ fontSize: '10px', color: 'var(--color-badge-warning-text)', fontWeight: 700 }}>
-                  ℹ️ Smart contract lokal
+                  Smart contract lokal
                 </span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
@@ -949,7 +947,7 @@ export default function LaunchpadPage() {
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
                 <span style={{ fontWeight: 800, color: 'var(--color-foreground)' }}>
-                  ⚡ Sinkronisasi Paket &amp; Biaya Peluncuran (/billing)
+                  Sinkronisasi Paket &amp; Biaya Peluncuran (/billing)
                 </span>
                 <a
                   href="/billing"
@@ -1007,16 +1005,31 @@ export default function LaunchpadPage() {
               }}
             >
               <div>
-                <strong style={{ color: '#38BDF8' }}>1. Angel Deal Room:</strong>{' '}
-                <span className="text-muted">Mode Whitelist Merkle Proof agar investor/KOL awal bisa beli sebelum publik (anti-sniper).</span>
+                <strong style={{ color: 'var(--color-accent-info)' }}>1. Angel Deal Room:</strong>{' '}
+                <span className="text-muted">
+                  {tr(
+                    'Merkle Proof whitelist mode so early investors/KOLs can buy before public launch (anti-sniper).',
+                    'Mode Whitelist Merkle Proof agar investor/KOL awal bisa beli sebelum publik (anti-sniper).'
+                  )}
+                </span>
               </div>
               <div>
-                <strong style={{ color: '#34D399' }}>2. Bankr Fee Recipient:</strong>{' '}
-                <span className="text-muted">Royalti swap mengikuti protokol Bankr; Anda bebas tentukan penerima (0x / X / Farcaster / ENS).</span>
+                <strong style={{ color: 'var(--color-text-positive)' }}>2. Bankr Fee Recipient:</strong>{' '}
+                <span className="text-muted">
+                  {tr(
+                    'Swap royalties follow the Bankr protocol; freely specify the recipient (0x / X / Farcaster / ENS).',
+                    'Royalti swap mengikuti protokol Bankr; Anda bebas tentukan penerima (0x / X / Farcaster / ENS).'
+                  )}
+                </span>
               </div>
               <div>
-                <strong style={{ color: '#C084FC' }}>3. Multi-Account Fleet:</strong>{' '}
-                <span className="text-muted">Paket CREATOR (15 key) &amp; AGENT (25 key) dapat mencentang hingga 5 akun Bankr untuk batch deploy.</span>
+                <strong style={{ color: 'var(--color-accent-purple)' }}>3. Multi-Account Fleet:</strong>{' '}
+                <span className="text-muted">
+                  {tr(
+                    'CREATOR (15 keys) & AGENT (25 keys) plans can select up to 5 Bankr accounts for batch deployment.',
+                    'Paket CREATOR (15 key) & AGENT (25 key) dapat mencentang hingga 5 akun Bankr untuk batch deploy.'
+                  )}
+                </span>
               </div>
             </div>
 
@@ -1073,7 +1086,7 @@ export default function LaunchpadPage() {
                   className="btn-primary"
                   style={{ padding: '14px', justifyContent: 'center', marginTop: '8px' }}
                 >
-                  {isCreating ? 'Validating Risk Passport...' : '🚀 Create Launch Draft'}
+                  {isCreating ? 'Validating Risk Passport...' : 'Create Launch Draft'}
                 </button>
               </>
             )}
@@ -1102,7 +1115,7 @@ export default function LaunchpadPage() {
                 LIVE TOKEN CARD PREVIEW
               </div>
               <div style={{ fontSize: '16px', fontWeight: 900, color: 'var(--color-foreground)' }}>
-                {tokenName.trim() || 'Nama Token Anda'}{' '}
+                {tokenName.trim() || tr('Your Token Name', 'Nama Token Anda')}{' '}
                 <span style={{ color: 'var(--color-accent)', fontFamily: 'var(--font-mono)' }}>
                   ${(tokenSymbol.trim() || 'TICKER').toUpperCase()}
                 </span>
@@ -1117,14 +1130,14 @@ export default function LaunchpadPage() {
           </div>
 
           <h2 style={{ color: 'var(--color-foreground)', marginTop: 0, fontSize: '16px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-            <ShieldAlert size={18} /> Skor Keamanan &amp; Ringkasan Draft
+            <ShieldAlert size={18} /> {tr('Security Score & Draft Summary', 'Skor Keamanan & Ringkasan Draft')}
           </h2>
 
           {draftResult ? (
             <div className="bg-panel" style={{ padding: '16px', borderRadius: '6px', border: '1px solid var(--color-border)', fontSize: '12px', fontFamily: 'var(--font-mono)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                 <span className="text-muted">Draft ID:</span>
-                <span style={{ color: '#00E5FF', fontWeight: 800 }}>{draftResult.id || draftResult.draftId}</span>
+                <span style={{ color: 'var(--color-accent-info)', fontWeight: 800 }}>{draftResult.id || draftResult.draftId}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                 <span className="text-muted">Token:</span>
@@ -1132,7 +1145,7 @@ export default function LaunchpadPage() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                 <span className="text-muted">Launch Mode:</span>
-                <span style={{ color: '#D500F9', fontWeight: 800 }}>{draftResult.launchMode || draftResult.mode}</span>
+                <span style={{ color: 'var(--color-accent-purple)', fontWeight: 800 }}>{draftResult.launchMode || draftResult.mode}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                 <span className="text-muted">Creator Wallet:</span>
@@ -1156,15 +1169,15 @@ export default function LaunchpadPage() {
                       };
                       const res = await switchNetwork(hexMap[selectedChain] || '0x2105');
                       if (res.success) {
-                        setOnChainFeedback(`✅ Jaringan MetaMask berhasil berpindah ke ${selectedChain.toUpperCase()}.`);
+                        setOnChainFeedback(`OK: Jaringan MetaMask berhasil berpindah ke ${selectedChain.toUpperCase()}.`);
                       } else if (res.error) {
-                        setOnChainFeedback(`⚠️ ${res.error}`);
+                        setOnChainFeedback(`Notice: ${res.error}`);
                       }
                     }}
                     className="btn-secondary"
-                    style={{ padding: '2px 7px', fontSize: '10px', borderColor: '#38BDF8', color: '#38BDF8' }}
+                    style={{ padding: '2px 7px', fontSize: '10px', borderColor: 'var(--color-accent-info)', color: 'var(--color-accent-info)' }}
                   >
-                    ⚡ Switch MetaMask
+                    Switch MetaMask
                   </button>
                 </span>
               </div>
@@ -1214,15 +1227,15 @@ export default function LaunchpadPage() {
                       style={{ padding: '10px', fontSize: '12px', justifyContent: 'center' }}
                     >
                       {isRegisteringOnChain
-                        ? `⏳ Memproses di Blockchain ${selectedChain === 'robinhood' ? 'Robinhood L2' : 'Base'}...`
+                        ? `Memproses di Blockchain ${selectedChain === 'robinhood' ? 'Robinhood L2' : 'Base'}...`
                         : publishedTxHash
-                        ? '✅ Terdaftar On-Chain'
-                        : '⚡ Register Token Launch On-Chain'}
+                        ? 'OK: Terdaftar On-Chain'
+                        : 'Register Token Launch On-Chain'}
                     </button>
                   </div>
                 ) : (
                   <div style={{ fontSize: '11px', color: 'var(--color-muted)', lineHeight: '1.5' }}>
-                    ℹ️ Fungsi on-chain langsung (<code>registerTokenLaunch</code>) diproteksi modifier <code>onlyOwner</code>. Sebagai <strong>Creator</strong>, Anda dapat langsung menggunakan jalur <strong>Bankr Gas-Sponsored Pipeline</strong> di bawah:
+                    Fungsi on-chain langsung (<code>registerTokenLaunch</code>) diproteksi modifier <code>onlyOwner</code>. Sebagai <strong>Creator</strong>, Anda dapat langsung menggunakan jalur <strong>Bankr Gas-Sponsored Pipeline</strong> di bawah:
                   </div>
                 )}
 
@@ -1239,8 +1252,8 @@ export default function LaunchpadPage() {
                       color: '#E0F2FE',
                     }}
                   >
-                    <strong>🚀 Multi-Account Fleet Preview:</strong> {selectedBatchBankrKeyIds.length} akun Bankr dipilih · Estimasi total biaya:{' '}
-                    <strong style={{ color: '#FDE047' }}>{billingConfig.launchCostCr * selectedBatchBankrKeyIds.length} cr</strong>{' '}
+                    <strong>Multi-Account Fleet Preview:</strong> {selectedBatchBankrKeyIds.length} akun Bankr dipilih · Estimasi total biaya:{' '}
+                    <strong style={{ color: 'var(--color-accent-amber)' }}>{billingConfig.launchCostCr * selectedBatchBankrKeyIds.length} cr</strong>{' '}
                     ({billingConfig.launchCostCr} cr × {selectedBatchBankrKeyIds.length}). Disarankan jalankan <strong>Simulate</strong> dahulu sebelum Live Deploy.
                   </div>
                 )}
@@ -1254,10 +1267,10 @@ export default function LaunchpadPage() {
                     style={{ flex: 1, padding: '8px 10px', fontSize: '11px', justifyContent: 'center', borderColor: 'var(--color-badge-info-border)', color: 'var(--color-badge-info-text)' }}
                   >
                     {isBankrDeploying
-                      ? '⏳ Running Bankr...'
+                      ? 'Running Bankr...'
                       : selectedBatchBankrKeyIds.length > 1
-                      ? `🧪 Simulate Fleet (${selectedBatchBankrKeyIds.length} akun · -${billingConfig.launchCostCr * selectedBatchBankrKeyIds.length} cr)`
-                      : `🧪 Simulate Bankr Launch (-${billingConfig.launchCostCr} cr)`}
+                      ? `Simulate Fleet (${selectedBatchBankrKeyIds.length} akun · -${billingConfig.launchCostCr * selectedBatchBankrKeyIds.length} cr)`
+                      : `Simulate Bankr Launch (-${billingConfig.launchCostCr} cr)`}
                   </button>
                   <button
                     type="button"
@@ -1267,10 +1280,10 @@ export default function LaunchpadPage() {
                     style={{ flex: 1, padding: '8px 10px', fontSize: '11px', justifyContent: 'center' }}
                   >
                     {isBankrDeploying
-                      ? '⏳ Deploying...'
+                      ? 'Deploying...'
                       : selectedBatchBankrKeyIds.length > 1
-                      ? `⚡ Fleet Deploy ${selectedBatchBankrKeyIds.length} Akun (-${billingConfig.launchCostCr * selectedBatchBankrKeyIds.length} cr)`
-                      : `⚡ Bankr Deploy ${selectedChain.toUpperCase()} (-${billingConfig.launchCostCr} cr)`}
+                      ? `Fleet Deploy ${selectedBatchBankrKeyIds.length} Akun (-${billingConfig.launchCostCr * selectedBatchBankrKeyIds.length} cr)`
+                      : `Bankr Deploy ${selectedChain.toUpperCase()} (-${billingConfig.launchCostCr} cr)`}
                   </button>
                 </div>
 
@@ -1281,9 +1294,9 @@ export default function LaunchpadPage() {
                       padding: '8px 12px',
                       borderRadius: '4px',
                       fontSize: '11px',
-                      backgroundColor: onChainFeedback.startsWith('✅') ? '#041E15' : '#2A0808',
-                      color: onChainFeedback.startsWith('✅') ? 'var(--color-accent)' : '#FF5252',
-                      border: `1px solid ${onChainFeedback.startsWith('✅') ? 'var(--color-accent)' : '#FF5252'}`,
+                      backgroundColor: onChainFeedback.startsWith('OK:') ? 'var(--color-badge-success-bg)' : 'rgba(217, 45, 32, 0.1)',
+                      color: onChainFeedback.startsWith('OK:') ? 'var(--color-accent)' : 'var(--color-destructive)',
+                      border: `1px solid ${onChainFeedback.startsWith('OK:') ? 'var(--color-accent)' : 'var(--color-destructive)'}`,
                       wordBreak: 'break-all',
                     }}
                   >
@@ -1538,15 +1551,15 @@ export default function LaunchpadPage() {
                           </span>
                           {token.isGraduated ? (
                             <span style={{ fontSize: '9px', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', backgroundColor: 'var(--color-badge-success-bg)', color: 'var(--color-badge-success-text)' }}>
-                              🎓 GRAD
+                              GRAD
                             </span>
                           ) : isHot ? (
                             <span style={{ fontSize: '9px', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', backgroundColor: 'var(--color-badge-warning-bg)', color: 'var(--color-badge-warning-text)' }}>
-                              🔥 HOT
+                              HOT
                             </span>
                           ) : isNew ? (
                             <span style={{ fontSize: '9px', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', backgroundColor: 'var(--color-badge-purple-bg)', color: 'var(--color-badge-purple-text)' }}>
-                              ✨ NEW
+                              NEW
                             </span>
                           ) : null}
                         </div>
@@ -1637,7 +1650,7 @@ export default function LaunchpadPage() {
                       }}
                       title="Diamond Hands HODL Loyalty"
                     >
-                      💎 HODL
+                      HODL
                     </a>
                     <a
                       href={`/kol?launchId=${token.launchId || ''}&tab=MARKET`}
@@ -1653,7 +1666,7 @@ export default function LaunchpadPage() {
                       }}
                       title="Liquid Staking Vault"
                     >
-                      🥩 Staking
+                      Staking
                     </a>
                     <a
                       href={`/kol?launchId=${token.launchId || ''}&tab=MARKET`}
@@ -1669,7 +1682,7 @@ export default function LaunchpadPage() {
                       }}
                       title="Viral Community & X Raid"
                     >
-                      🚀 Raid
+                      Raid
                     </a>
                   </div>
 
@@ -1710,14 +1723,14 @@ export default function LaunchpadPage() {
                     </a>
                     <a
                       href={buildSocialShareUrl('x', {
-                        text: `🚀 $${token.ticker || 'TOKEN'} (${token.name || 'Launch'}) live di POOLNET Launchpad (0% Tax · GoPlus Verified)!`,
+                        text: `$${token.ticker || 'TOKEN'} (${token.name || 'Launch'}) live di POOLNET Launchpad (0% Tax · GoPlus Verified)!`,
                         url: `https://pndigi.site${portalUrl}`,
                         refWallet: walletAddress,
                       })}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="btn-secondary"
-                      style={{ flex: '1 1 18%', padding: '6px 2px', textAlign: 'center', fontSize: '11px', justifyContent: 'center', borderColor: 'rgba(240, 185, 11, 0.35)', color: '#FCD34D' }}
+                      style={{ flex: '1 1 18%', padding: '6px 2px', textAlign: 'center', fontSize: '11px', justifyContent: 'center', borderColor: 'rgba(240, 185, 11, 0.35)', color: 'var(--color-accent-amber)' }}
                       title="Bagikan ke X (Twitter) dengan link referral 0.25%"
                     >
                       Share X
@@ -1765,12 +1778,12 @@ export default function LaunchpadPage() {
       {/* TAB 4 (Admin Only): Launchpad Governance & Merkle Snapshot Console */}
       {launchpadTab === 'ADMIN' && (userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN') && (
         <div className="bg-panel" style={{ border: '1px solid #FF9100', borderRadius: '8px', padding: '24px' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#FFD600', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: 900, color: 'var(--color-accent-amber)', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <ShieldAlert size={18} /> System Admin: Launchpad Bonding Curve & Liquidity Governance
           </h3>
           <div className="grid-3">
             <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '16px', borderRadius: '6px' }}>
-              <div style={{ color: '#00E5FF', fontWeight: 800, fontSize: '12px' }}>Graduation Target</div>
+              <div style={{ color: 'var(--color-accent-info)', fontWeight: 800, fontSize: '12px' }}>Graduation Target</div>
               <div style={{ fontSize: '18px', fontWeight: 900, color: 'var(--color-foreground)', margin: '8px 0', fontFamily: 'var(--font-mono)' }}>$69,000 Market Cap</div>
               <div className="text-muted" style={{ fontSize: '11px' }}>Auto-migrates to Uniswap v3 Pool</div>
             </div>

@@ -22,14 +22,14 @@ export function SessionAllowancePanel({ isConnected }: SessionAllowancePanelProp
   const handleValidateAllowance = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isConnected) {
-      setResultMsg('🔒 Hubungkan dompet MetaMask terlebih dahulu.');
+      setResultMsg('Auth: Hubungkan dompet MetaMask terlebih dahulu.');
       return;
     }
     const actions: Array<'SWAP_DEX' | 'MINT_NFT'> = [];
     if (allowSwap) actions.push('SWAP_DEX');
     if (allowMint) actions.push('MINT_NFT');
     if (actions.length === 0) {
-      setResultMsg('⚠️ Pilih minimal satu izin aksi (SWAP_DEX atau MINT_NFT).');
+      setResultMsg('Notice: Pilih minimal satu izin aksi (SWAP_DEX atau MINT_NFT).');
       return;
     }
 
@@ -54,15 +54,15 @@ export function SessionAllowancePanel({ isConnected }: SessionAllowancePanelProp
       });
       const json = await res.json();
       if (!res.ok || !json?.success) {
-        setResultMsg(`⚠️ ${json?.error || `HTTP ${res.status}`}`);
+        setResultMsg(`Notice: ${json?.error || `HTTP ${res.status}`}`);
         return;
       }
       const d = json.data;
       setResultMsg(
-        `✅ Spec ${d.standard} tervalidasi (Tier ${d.planId} · Cap $${d.effectiveDailySpendCapUsd}/hari · Berlaku s/d ${new Date(d.expiresAtIso).toLocaleDateString()} · 0% Custody).`
+        `OK: Spec ${d.standard} tervalidasi (Tier ${d.planId} · Cap $${d.effectiveDailySpendCapUsd}/hari · Berlaku s/d ${new Date(d.expiresAtIso).toLocaleDateString()} · 0% Custody).`
       );
     } catch (err: any) {
-      setResultMsg(`⚠️ ${err?.message || 'Network error'}`);
+      setResultMsg(`Notice: ${err?.message || 'Network error'}`);
     } finally {
       setSubmitting(false);
     }
@@ -82,7 +82,7 @@ export function SessionAllowancePanel({ isConnected }: SessionAllowancePanelProp
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          <KeyRound size={15} color="#38BDF8" />
+          <KeyRound size={15} color="var(--color-accent-info)" />
           <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--color-foreground)' }}>
             ERC-7715 Non-Custodial Session Allowance (Semi-Auto DEX Guard)
           </span>
@@ -93,7 +93,7 @@ export function SessionAllowancePanel({ isConnected }: SessionAllowancePanelProp
               padding: '2px 6px',
               borderRadius: '4px',
               background: 'rgba(16, 185, 129, 0.14)',
-              color: '#34D399',
+              color: 'var(--color-text-positive)',
             }}
           >
             <ShieldCheck size={10} style={{ display: 'inline', marginRight: '3px', verticalAlign: 'middle' }} />
@@ -202,7 +202,7 @@ export function SessionAllowancePanel({ isConnected }: SessionAllowancePanelProp
       )}
 
       {resultMsg && (
-        <div style={{ fontSize: '11px', color: resultMsg.startsWith('✅') ? '#34D399' : '#FBBF24' }}>
+        <div style={{ fontSize: '11px', color: resultMsg.startsWith('OK:') ? 'var(--color-text-positive)' : '#FBBF24' }}>
           {resultMsg}
         </div>
       )}

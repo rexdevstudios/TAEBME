@@ -22,7 +22,7 @@ interface OverviewData {
 
 export default function OverviewPage() {
   const { isConnected, userRole, planId, credits, walletAddress, connectMetaMask, isConnecting, refreshSession } = useAuth();
-  const { t } = useLocale();
+  const { t, tr } = useLocale();
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [activeLaunches, setActiveLaunches] = useState<any[]>([]);
   const [gameFiProfile, setGameFiProfile] = useState<{
@@ -144,9 +144,9 @@ export default function OverviewPage() {
   };
 
   const handleRefreshTelemetryAndAudit = async () => {
-    setAdminFeedback('⏳ Memuat ulang telemetry live & audit_logs dari PostgreSQL SSOT...');
+    setAdminFeedback('Memuat ulang telemetry live & audit_logs dari PostgreSQL SSOT...');
     await Promise.all([fetchOverview(), fetchAuditLogs(auditFilter)]);
-    setAdminFeedback('✅ Live telemetry & Governance Audit Logs berhasil disinkronkan.');
+    setAdminFeedback('OK: Live telemetry & Governance Audit Logs berhasil disinkronkan.');
   };
 
   const handleCompleteQuest = async (questId: string) => {
@@ -161,7 +161,7 @@ export default function OverviewPage() {
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
-        setQuestFeedback(`⚠️ Quest (${questId}): ${json.error || 'Syarat quest belum terpenuhi'}`);
+        setQuestFeedback(`Notice: Quest (${questId}): ${json.error || 'Syarat quest belum terpenuhi'}`);
         return;
       }
       if (json.profile) {
@@ -172,10 +172,10 @@ export default function OverviewPage() {
         refreshSession().catch(() => {});
       }
       setQuestFeedback(
-        `✅ Quest "${questId}" selesai! +${json.completion?.xpGranted ?? 100} XP${crBonus > 0 ? ` & +${crBonus} Credits` : ''} ditambahkan ke akun Anda.`
+        `OK: Quest "${questId}" selesai! +${json.completion?.xpGranted ?? 100} XP${crBonus > 0 ? ` & +${crBonus} Credits` : ''} ditambahkan ke akun Anda.`
       );
     } catch (err: any) {
-      setQuestFeedback(`⚠️ Gagal memverifikasi quest: ${err?.message || 'Network error'}`);
+      setQuestFeedback(`Notice: Gagal memverifikasi quest: ${err?.message || 'Network error'}`);
     } finally {
       setQuestLoading(null);
     }
@@ -194,12 +194,12 @@ export default function OverviewPage() {
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
-        setQuestFeedback(`ℹ️ Mint Voucher (${tier}): ${json.error || 'Signer / koleksi NFT belum dikonfigurasi pada environment ini.'}`);
+        setQuestFeedback(`Mint Voucher (${tier}): ${json.error || 'Signer / koleksi NFT belum dikonfigurasi pada environment ini.'}`);
         return;
       }
-      setQuestFeedback(`✅ EIP-712 Mint Voucher (${tier}) diterbitkan! Contract: ${json.voucher?.contractAddress || 'Verified'} · Nonce: ${json.voucher?.nonce || '—'}`);
+      setQuestFeedback(`OK: EIP-712 Mint Voucher (${tier}) diterbitkan! Contract: ${json.voucher?.contractAddress || 'Verified'} · Nonce: ${json.voucher?.nonce || '—'}`);
     } catch (err: any) {
-      setQuestFeedback(`⚠️ Gagal meminta Mint Voucher: ${err?.message || 'Network error'}`);
+      setQuestFeedback(`Notice: Gagal meminta Mint Voucher: ${err?.message || 'Network error'}`);
     } finally {
       setVoucherLoading(false);
     }
@@ -241,9 +241,9 @@ export default function OverviewPage() {
             margin: '0 auto',
           }}>
             {[
-              { n: '1', title: 'Connect Wallet', desc: 'Sign-In with Ethereum (EIP-4361 SIWE) for non-custodial authentication.', color: '#00E5FF' },
+              { n: '1', title: 'Connect Wallet', desc: 'Sign-In with Ethereum (EIP-4361 SIWE) for non-custodial authentication.', color: 'var(--color-accent-info)' },
               { n: '2', title: 'Launch / Pick Pool', desc: 'Create your token on a bonding curve, or explore existing KOL deal rooms.', color: '#22C55E' },
-              { n: '3', title: 'Trade & Graduate', desc: 'Buy tokens on the curve. At 24 ETH, liquidity auto-migrates to Aerodrome DEX.', color: '#D500F9' },
+              { n: '3', title: 'Trade & Graduate', desc: 'Buy tokens on the curve. At 24 ETH, liquidity auto-migrates to Aerodrome DEX.', color: 'var(--color-accent-purple)' },
             ].map(step => (
               <div key={step.n} className="glass-panel" style={{ padding: '28px 24px' }}>
                 <div style={{
@@ -300,7 +300,7 @@ export default function OverviewPage() {
         {/* CEX Launchpad Market Pulse Ticker Strip */}
         <div className="cex-ticker-strip tabular-nums">
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', fontSize: '12px' }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 800, color: '#F0B90B' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 800, color: 'var(--color-accent-amber)' }}>
               <Rocket size={14} /> POOLNET LAUNCHPAD
             </span>
             <span style={{ color: 'var(--color-muted)' }}>
@@ -310,7 +310,7 @@ export default function OverviewPage() {
               Trading Tax: <strong style={{ color: '#10B981' }}>0% Buy/Sell</strong>
             </span>
             <span style={{ color: 'var(--color-muted)' }}>
-              Gas Relayer: <strong style={{ color: '#38BDF8' }}>Base L2 Sponsored</strong>
+              Gas Relayer: <strong style={{ color: 'var(--color-accent-info)' }}>Base L2 Sponsored</strong>
             </span>
             <span style={{ color: 'var(--color-muted)' }}>
               Anti-Honeypot: <strong style={{ color: '#10B981' }}>GoPlus Live ($0)</strong>
@@ -318,10 +318,10 @@ export default function OverviewPage() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px', fontFamily: 'var(--font-mono)' }}>
             <span style={{ color: 'var(--color-muted)' }}>
-              Tier: <strong style={{ color: '#F0B90B' }}>{activeTier}</strong>
+              Tier: <strong style={{ color: 'var(--color-accent-amber)' }}>{activeTier}</strong>
             </span>
             <span style={{ color: 'var(--color-muted)' }}>
-              Credits: <strong style={{ color: '#38BDF8' }}>{credits.toLocaleString()} cr</strong>
+              Credits: <strong style={{ color: 'var(--color-accent-info)' }}>{credits.toLocaleString()} cr</strong>
             </span>
           </div>
         </div>
@@ -351,49 +351,61 @@ export default function OverviewPage() {
 
         {/* 4 Role-Based Quick-Start Action Cards */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
-          <a href="/launchpad" className="cex-role-card" style={{ borderTop: '2px solid #F0B90B' }}>
+          <a href="/launchpad" className="cex-role-card" style={{ borderTop: '2px solid var(--color-accent-amber)' }}>
             <div>
-              <div style={{ fontWeight: 900, color: '#FCD34D', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '6px' }}>
+              <div style={{ fontWeight: 900, color: 'var(--color-accent-amber)', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '6px' }}>
                 <Rocket size={16} /> 1. Launchpad &amp; Pools
               </div>
               <div className="text-muted" style={{ fontSize: '12px', lineHeight: 1.5 }}>
-                Jelajahi token live, buat token baru 0% tax, AI Brand Studio, &amp; Bankr Multi-Account Fleet.
+                {tr(
+                  'Explore live tokens, deploy 0% tax tokens, AI Brand Studio, and Bankr Multi-Account Fleet.',
+                  'Jelajahi token live, buat token baru 0% tax, AI Brand Studio, & Bankr Multi-Account Fleet.'
+                )}
               </div>
             </div>
-            <span style={{ fontSize: '11px', fontWeight: 800, color: '#F0B90B' }}>Buka Launchpad →</span>
+            <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-accent-amber)' }}>{tr('Open Launchpad →', 'Buka Launchpad →')}</span>
           </a>
           <a href="/trading" className="cex-role-card" style={{ borderTop: '2px solid #10B981' }}>
             <div>
-              <div style={{ fontWeight: 900, color: '#34D399', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '6px' }}>
+              <div style={{ fontWeight: 900, color: 'var(--color-text-positive)', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '6px' }}>
                 <Network size={16} /> 2. Spot &amp; DEX Terminal
               </div>
               <div className="text-muted" style={{ fontSize: '12px', lineHeight: 1.5 }}>
-                Trade 6-chain DEX (0x v2) atau Binance/Bybit Spot dengan Chart &amp; GoPlus Anti-Honeypot Guard.
+                {tr(
+                  'Trade 6-chain DEX (0x v2) or Binance/Bybit Spot with live charts and GoPlus Anti-Honeypot Guard.',
+                  'Trade 6-chain DEX (0x v2) atau Binance/Bybit Spot dengan Chart & GoPlus Anti-Honeypot Guard.'
+                )}
               </div>
             </div>
-            <span style={{ fontSize: '11px', fontWeight: 800, color: '#10B981' }}>Mulai Trading →</span>
+            <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-text-positive)' }}>{tr('Start Trading →', 'Mulai Trading →')}</span>
           </a>
-          <a href="/agent" className="cex-role-card" style={{ borderTop: '2px solid #38BDF8' }}>
+          <a href="/agent" className="cex-role-card" style={{ borderTop: '2px solid var(--color-accent-info)' }}>
             <div>
-              <div style={{ fontWeight: 900, color: '#38BDF8', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '6px' }}>
+              <div style={{ fontWeight: 900, color: 'var(--color-accent-info)', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '6px' }}>
                 <BrainCircuit size={16} /> 3. AI Auto-Pilot 24/7
               </div>
               <div className="text-muted" style={{ fontSize: '12px', lineHeight: 1.5 }}>
-                Jalankan 5-Agent Desk &amp; Auto-Pilot TP/SL + Trailing Stop otomatis dengan alert Telegram.
+                {tr(
+                  'Run the 5-Agent Desk and automated TP/SL + Trailing Stop with instant Telegram alerts.',
+                  'Jalankan 5-Agent Desk & Auto-Pilot TP/SL + Trailing Stop otomatis dengan alert Telegram.'
+                )}
               </div>
             </div>
-            <span style={{ fontSize: '11px', fontWeight: 800, color: '#38BDF8' }}>Atur AI Bot →</span>
+            <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-accent-info)' }}>{tr('Configure AI Bot →', 'Atur AI Bot →')}</span>
           </a>
           <a href="/kol" className="cex-role-card" style={{ borderTop: '2px solid #A855F7' }}>
             <div>
-              <div style={{ fontWeight: 900, color: '#D8B4FE', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '6px' }}>
+              <div style={{ fontWeight: 900, color: 'var(--color-accent-purple)', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '6px' }}>
                 <Award size={16} /> 4. Earn &amp; KOL Hub
               </div>
               <div className="text-muted" style={{ fontSize: '12px', lineHeight: 1.5 }}>
-                Verifikasi Passport X/Farcaster/World ID, ikuti kampanye bounty, &amp; raih 0.25% referral fee.
+                {tr(
+                  'Verify X/Farcaster/World ID Passport, join bounty campaigns, and earn 0.25% referral fees.',
+                  'Verifikasi Passport X/Farcaster/World ID, ikuti kampanye bounty, & raih 0.25% referral fee.'
+                )}
               </div>
             </div>
-            <span style={{ fontSize: '11px', fontWeight: 800, color: '#C084FC' }}>Lihat Campaign →</span>
+            <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-accent-purple)' }}>{tr('View Campaigns →', 'Lihat Campaign →')}</span>
           </a>
         </div>
 
@@ -401,55 +413,55 @@ export default function OverviewPage() {
         <div className="grid-3">
           <div className="card">
             <h3 style={{ margin: '0 0 14px 0', fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <ShieldAlert size={18} className="text-accent" /> Security &amp; Risk Guardrails
+              <ShieldAlert size={18} className="text-accent" /> {tr('Security & Risk Guardrails', 'Keamanan & Batas Risiko')}
             </h3>
             <ul style={{ paddingLeft: '18px', color: 'var(--color-foreground)', margin: 0, fontSize: '13px' }} className="flex-col gap-sm">
-              <li>Sesi Dompet: <span className="text-accent">Aktif &amp; Aman</span></li>
-              <li>Dompet: <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--color-accent)' }}>{walletAddress ? `${walletAddress.slice(0, 8)}...${walletAddress.slice(-4)}` : '—'}</span></li>
-              <li>Batas Order Maks: <span>$10,000 <span style={{ color: '#94A3B8', fontSize: '11px' }}>(Risk Guard)</span></span></li>
-              <li>Batas Slippage Maks: <span>3.0% <span style={{ color: '#94A3B8', fontSize: '11px' }}>(Otomatis)</span></span></li>
+              <li>{tr('Wallet Session:', 'Sesi Dompet:')} <span className="text-accent">{tr('Active & Verified', 'Aktif & Aman')}</span></li>
+              <li>{tr('Wallet:', 'Dompet:')} <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--color-accent)' }}>{walletAddress ? `${walletAddress.slice(0, 8)}...${walletAddress.slice(-4)}` : '—'}</span></li>
+              <li>{tr('Max Order Limit:', 'Batas Order Maks:')} <span>$10,000 <span style={{ color: 'var(--color-muted)', fontSize: '11px' }}>(Risk Guard)</span></span></li>
+              <li>{tr('Max Slippage Cap:', 'Batas Slippage Maks:')} <span>3.0% <span style={{ color: 'var(--color-muted)', fontSize: '11px' }}>({tr('Auto', 'Otomatis')})</span></span></li>
             </ul>
           </div>
 
           <div className="card">
-            <h3 style={{ margin: '0 0 14px 0', fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px', color: '#FFC400' }}>
-              <Zap size={18} /> Active Tier &amp; Fee Structure
+            <h3 style={{ margin: '0 0 14px 0', fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-accent-amber)' }}>
+              <Zap size={18} /> {tr('Active Tier & Fee Structure', 'Paket Aktif & Struktur Biaya')}
             </h3>
             <ul style={{ paddingLeft: '18px', color: 'var(--color-foreground)', margin: 0, fontSize: '13px' }} className="flex-col gap-sm">
-              <li>Current Plan: <strong style={{ color: '#FFC400' }}>{activeTier}</strong> ({credits.toLocaleString()} cr)</li>
-              <li>Bonding Curve Fee: <strong>0.50% Treasury / 0.50% Creator</strong></li>
-              <li>Metered Burn: <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>1 cr Scrape · 5 cr Desk · 50 cr Launch</span></li>
+              <li>{tr('Current Plan:', 'Paket Aktif:')} <strong style={{ color: 'var(--color-accent-amber)' }}>{activeTier}</strong> ({credits.toLocaleString()} cr)</li>
+              <li>{tr('Bonding Curve Fee:', 'Biaya Bonding Curve:')} <strong>0.50% Treasury / 0.50% Creator</strong></li>
+              <li>{tr('Metered Burn:', 'Konsumsi Kredit:')} <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>1 cr Scrape · 5 cr Desk · 50 cr Launch</span></li>
             </ul>
             <a href="/billing" className="text-accent" style={{ textDecoration: 'underline', fontSize: '12px', marginTop: '10px', display: 'inline-block' }}>
-              Manage Subscription &amp; Credits →
+              {tr('Manage Subscription & Credits →', 'Kelola Paket & Kredit →')}
             </a>
           </div>
 
           <div className="card">
             <h3 style={{ margin: '0 0 14px 0', fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Activity size={18} className="text-accent" /> Live Ecosystem Activity
+              <Activity size={18} className="text-accent" /> {tr('Live Ecosystem Activity', 'Aktivitas Ekosistem Live')}
             </h3>
             {activeLaunches.length > 0 ? (
               <div className="flex-col gap-xs" style={{ fontSize: '12px' }}>
                 <div style={{ color: 'var(--color-foreground)', fontWeight: 700 }}>
-                  {activeLaunches.length} Token Aktif:
+                  {activeLaunches.length} {tr('Active Tokens:', 'Token Aktif:')}
                 </div>
                 {activeLaunches.slice(0, 3).map((t: any, idx: number) => (
-                  <div key={t.launchId || idx} style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', color: '#CBD5E1' }}>
+                  <div key={t.launchId || idx} style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', color: 'var(--color-foreground)' }}>
                     <span>${t.ticker || 'TOKEN'} ({t.name || 'Launch'})</span>
-                    <a href={`/trading?token=${t.contractAddress || ''}`} style={{ color: '#38BDF8' }}>Trade →</a>
+                    <a href={`/trading?token=${t.contractAddress || ''}`} style={{ color: 'var(--color-accent-info)' }}>{tr('Trade →', 'Trade →')}</a>
                   </div>
                 ))}
                 <a href="/launchpad" className="text-accent" style={{ textDecoration: 'underline', fontSize: '12px', marginTop: '6px', display: 'inline-block' }}>
-                  Explore All Launches →
+                  {tr('Explore All Launches →', 'Lihat Semua Launch →')}
                 </a>
               </div>
             ) : (
               <div className="flex-col gap-sm text-muted" style={{ fontSize: '12px' }}>
-                <p style={{ margin: 0 }}>Siap menjalankan 5-Agent Trading Desk atau meluncurkan token pertama Anda.</p>
+                <p style={{ margin: 0 }}>{tr('Ready to run the 5-Agent Trading Desk or deploy your first token.', 'Siap menjalankan 5-Agent Trading Desk atau meluncurkan token pertama Anda.')}</p>
                 <div style={{ display: 'flex', gap: '12px', marginTop: '6px' }}>
-                  <a href="/agent" className="text-accent" style={{ textDecoration: 'underline' }}>Run 5-Agent Desk →</a>
-                  <a href="/launchpad" style={{ color: '#38BDF8', textDecoration: 'underline' }}>Open Launchpad →</a>
+                  <a href="/agent" className="text-accent" style={{ textDecoration: 'underline' }}>{tr('Run 5-Agent Desk →', 'Jalankan 5-Agent Desk →')}</a>
+                  <a href="/launchpad" style={{ color: 'var(--color-accent-info)', textDecoration: 'underline' }}>{tr('Open Launchpad →', 'Buka Launchpad →')}</a>
                 </div>
               </div>
             )}
@@ -478,40 +490,40 @@ export default function OverviewPage() {
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: completedSteps === 3 ? 0 : '10px' }}>
-                <div style={{ fontSize: '13px', fontWeight: 800, color: completedSteps === 3 ? '#34D399' : '#38BDF8' }}>
+                <div style={{ fontSize: '13px', fontWeight: 800, color: completedSteps === 3 ? 'var(--color-text-positive)' : 'var(--color-accent-info)' }}>
                   {completedSteps === 3
-                    ? 'Onboarding Pemula Selesai (3/3) — Akun Anda siap untuk Trading, AI Desk & Launchpad.'
-                    : `Panduan Cepat 3 Menit untuk Pemula (${completedSteps}/3 Selesai)`}
+                    ? tr('Quick-Start Onboarding Complete (3/3) — Ready for Trading, AI Desk & Launchpad.', 'Onboarding Pemula Selesai (3/3) — Akun Anda siap untuk Trading, AI Desk & Launchpad.')
+                    : tr(`3-Minute Quick-Start Guide (${completedSteps}/3 Completed)`, `Panduan Cepat 3 Menit untuk Pemula (${completedSteps}/3 Selesai)`)}
                 </div>
                 <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--color-muted)' }}>
-                  100% Non-Custodial · GoPlus Anti-Insider Aktif
+                  {tr('100% Non-Custodial · GoPlus Anti-Insider Active', '100% Non-Custodial · GoPlus Anti-Insider Aktif')}
                 </span>
               </div>
               {completedSteps < 3 && (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '10px', fontSize: '12px' }}>
                   <div className="bg-panel" style={{ padding: '10px', borderRadius: '6px', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
-                    <div style={{ fontWeight: 800, color: '#34D399', marginBottom: '4px' }}>✓ 1. Hubungkan Dompet SIWE</div>
-                    <div className="text-muted" style={{ fontSize: '11px' }}>Dompet aktif tanpa kustodi. Klaim +100 XP di kartu GameFi di bawah.</div>
+                    <div style={{ fontWeight: 800, color: 'var(--color-text-positive)', marginBottom: '4px' }}>{tr('✓ 1. Connect SIWE Wallet', '✓ 1. Hubungkan Dompet SIWE')}</div>
+                    <div className="text-muted" style={{ fontSize: '11px' }}>{tr('Non-custodial wallet active. Claim +100 XP in the GameFi card below.', 'Dompet aktif tanpa kustodi. Klaim +100 XP di kartu GameFi di bawah.')}</div>
                   </div>
                   <div className="bg-panel" style={{ padding: '10px', borderRadius: '6px', border: `1px solid ${step2Done ? 'rgba(16, 185, 129, 0.3)' : 'var(--color-border)'}` }}>
-                    <div style={{ fontWeight: 800, color: step2Done ? '#34D399' : 'var(--color-foreground)', marginBottom: '4px' }}>
-                      {step2Done ? '✓' : '2.'} Coba 1 Paper Trade / Scan Token
+                    <div style={{ fontWeight: 800, color: step2Done ? 'var(--color-text-positive)' : 'var(--color-foreground)', marginBottom: '4px' }}>
+                      {step2Done ? '✓' : '2.'} {tr('Run 1 Paper Trade / Token Scan', 'Coba 1 Paper Trade / Scan Token')}
                     </div>
-                    <div className="text-muted" style={{ fontSize: '11px', marginBottom: '6px' }}>Uji terminal bebas risiko + GoPlus Anti-Insider Guard (+500 XP).</div>
+                    <div className="text-muted" style={{ fontSize: '11px', marginBottom: '6px' }}>{tr('Test the risk-free terminal + GoPlus Anti-Insider Guard (+500 XP).', 'Uji terminal bebas risiko + GoPlus Anti-Insider Guard (+500 XP).')}</div>
                     {!step2Done && (
-                      <a href="/trading" style={{ color: '#38BDF8', fontSize: '11px', fontWeight: 700, textDecoration: 'underline' }}>
-                        Buka Terminal /trading →
+                      <a href="/trading" style={{ color: 'var(--color-accent-info)', fontSize: '11px', fontWeight: 700, textDecoration: 'underline' }}>
+                        {tr('Open /trading Terminal →', 'Buka Terminal /trading →')}
                       </a>
                     )}
                   </div>
                   <div className="bg-panel" style={{ padding: '10px', borderRadius: '6px', border: `1px solid ${step3Done ? 'rgba(16, 185, 129, 0.3)' : 'var(--color-border)'}` }}>
-                    <div style={{ fontWeight: 800, color: step3Done ? '#34D399' : 'var(--color-foreground)', marginBottom: '4px' }}>
-                      {step3Done ? '✓' : '3.'} Aktifkan AI Preset / KOL / Launch
+                    <div style={{ fontWeight: 800, color: step3Done ? 'var(--color-text-positive)' : 'var(--color-foreground)', marginBottom: '4px' }}>
+                      {step3Done ? '✓' : '3.'} {tr('Activate AI Preset / KOL / Launch', 'Aktifkan AI Preset / KOL / Launch')}
                     </div>
-                    <div className="text-muted" style={{ fontSize: '11px', marginBottom: '6px' }}>Pilih preset Auto-Pilot pemula atau luncurkan token gasless.</div>
+                    <div className="text-muted" style={{ fontSize: '11px', marginBottom: '6px' }}>{tr('Pick an Auto-Pilot preset or deploy a gasless token on Base.', 'Pilih preset Auto-Pilot pemula atau luncurkan token gasless.')}</div>
                     <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                      <a href="/agent" style={{ color: '#38BDF8', fontSize: '11px', fontWeight: 700, textDecoration: 'underline' }}>AI Desk →</a>
-                      <a href="/launchpad" style={{ color: '#C084FC', fontSize: '11px', fontWeight: 700, textDecoration: 'underline' }}>Launchpad →</a>
+                      <a href="/agent" style={{ color: 'var(--color-accent-info)', fontSize: '11px', fontWeight: 700, textDecoration: 'underline' }}>AI Desk →</a>
+                      <a href="/launchpad" style={{ color: 'var(--color-accent-purple)', fontSize: '11px', fontWeight: 700, textDecoration: 'underline' }}>Launchpad →</a>
                     </div>
                   </div>
                 </div>
@@ -528,7 +540,10 @@ export default function OverviewPage() {
                 <Award size={17} style={{ color: 'var(--color-accent-emerald)' }} /> GameFi Trader Pass &amp; On-Chain Quest Progression
               </h3>
               <p className="text-muted" style={{ margin: '2px 0 0 0', fontSize: '12px' }}>
-                Selesaikan Daily Check-In &amp; misi akun untuk memperoleh XP, Bonus Kredit, dan membuka Trader Pass NFT (BRONZE → SILVER 250 XP → GOLD 500 XP).
+                {tr(
+                  'Complete Daily Check-In and account missions to earn XP, Bonus Credits, and unlock Trader Pass NFTs (BRONZE → SILVER 250 XP → GOLD 500 XP).',
+                  'Selesaikan Daily Check-In & misi akun untuk memperoleh XP, Bonus Kredit, dan membuka Trader Pass NFT (BRONZE → SILVER 250 XP → GOLD 500 XP).'
+                )}
               </p>
             </div>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
@@ -549,7 +564,7 @@ export default function OverviewPage() {
                   className="btn-secondary"
                   style={{ padding: '4px 10px', fontSize: '11px' }}
                 >
-                  {voucherLoading ? 'Verifying...' : `Request ${gameFiProfile?.passTier || 'BRONZE'} NFT Voucher`}
+                  {voucherLoading ? tr('Verifying...', 'Memverifikasi...') : `Request ${gameFiProfile?.passTier || 'BRONZE'} NFT Voucher`}
                 </button>
               ) : (
                 <span
@@ -562,9 +577,9 @@ export default function OverviewPage() {
                     fontSize: '11px',
                     fontWeight: 700,
                   }}
-                  title="XP & bonus Credits aktif dan tercatat di PostgreSQL SSOT. Minting on-chain NFT menunggu aktivasi isolated signer."
+                  title={tr('XP & bonus Credits are active and persisted in PostgreSQL SSOT. On-chain NFT minting awaits isolated signer activation.', 'XP & bonus Credits aktif dan tercatat di PostgreSQL SSOT. Minting on-chain NFT menunggu aktivasi isolated signer.')}
                 >
-                  NFT Mint: Segera Hadir (XP &amp; Credits Aktif)
+                  {tr('NFT Mint: Coming Soon (XP & Credits Active)', 'NFT Mint: Segera Hadir (XP & Credits Aktif)')}
                 </span>
               )}
             </div>
@@ -579,7 +594,7 @@ export default function OverviewPage() {
             return (
               <div style={{ marginBottom: '12px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--color-muted)', marginBottom: '4px' }}>
-                  <span>Progress menuju {nextLabel}</span>
+                  <span>{tr(`Progress to ${nextLabel}`, `Progress menuju ${nextLabel}`)}</span>
                   <span>{xpVal} / {nextTarget} XP ({pct}%)</span>
                 </div>
                 <div style={{ width: '100%', height: '7px', borderRadius: '999px', backgroundColor: 'var(--color-surface-inset)', overflow: 'hidden' }}>
@@ -590,17 +605,17 @@ export default function OverviewPage() {
           })()}
 
           {questFeedback && (
-            <div style={{ marginBottom: '12px', padding: '8px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 700, backgroundColor: questFeedback.includes('✅') ? 'var(--color-badge-success-bg)' : 'var(--color-badge-warning-bg)', color: questFeedback.includes('✅') ? 'var(--color-badge-success-text)' : 'var(--color-badge-warning-text)', border: `1px solid ${questFeedback.includes('✅') ? 'var(--color-badge-success-border)' : 'var(--color-badge-warning-border)'}` }}>
+            <div style={{ marginBottom: '12px', padding: '8px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 700, backgroundColor: questFeedback.includes('OK:') ? 'var(--color-badge-success-bg)' : 'var(--color-badge-warning-bg)', color: questFeedback.includes('OK:') ? 'var(--color-badge-success-text)' : 'var(--color-badge-warning-text)', border: `1px solid ${questFeedback.includes('OK:') ? 'var(--color-badge-success-border)' : 'var(--color-badge-warning-border)'}` }}>
               {questFeedback}
             </div>
           )}
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
             {[
-              { id: 'daily_checkin', badge: 'DAILY UTC', title: 'Daily Check-In', xp: '+25 XP · +5 cr', desc: 'Klaim bonus harian 1× per hari (reset otomatis 00:00 UTC).', actionHref: null, actionLabel: null },
-              { id: 'connect_siwe', badge: 'ONE-TIME', title: '1. Non-Custodial SIWE Login', xp: '+100 XP · +10 cr', desc: 'Verifikasi sesi dompet EIP-4361 SIWE aktif.', actionHref: null, actionLabel: null },
-              { id: 'verify_sybil', badge: 'ONE-TIME', title: '2. Anti-Sybil Social Passport', xp: '+250 XP · +25 cr', desc: 'Verifikasi profil KOL / World ID / Farcaster di KOL Hub.', actionHref: '/kol', actionLabel: 'Lengkapi di KOL Hub →' },
-              { id: 'first_trade_or_launch', badge: 'ONE-TIME', title: '3. First Trade or Token Launch', xp: '+500 XP · +50 cr', desc: 'Buat 1 trade intent di Terminal/5-Agent Desk atau launch token.', actionHref: '/trading', actionLabel: 'Buat 1 Trade di /trading →' },
+              { id: 'daily_checkin', badge: 'DAILY UTC', title: 'Daily Check-In', xp: '+25 XP · +5 cr', desc: tr('Claim daily bonus once per day (auto-resets at 00:00 UTC).', 'Klaim bonus harian 1× per hari (reset otomatis 00:00 UTC).'), actionHref: null, actionLabel: null },
+              { id: 'connect_siwe', badge: 'ONE-TIME', title: '1. Non-Custodial SIWE Login', xp: '+100 XP · +10 cr', desc: tr('Active EIP-4361 SIWE wallet session verified.', 'Verifikasi sesi dompet EIP-4361 SIWE aktif.'), actionHref: null, actionLabel: null },
+              { id: 'verify_sybil', badge: 'ONE-TIME', title: '2. Anti-Sybil Social Passport', xp: '+250 XP · +25 cr', desc: tr('Verify KOL profile / World ID / Farcaster in KOL Hub.', 'Verifikasi profil KOL / World ID / Farcaster di KOL Hub.'), actionHref: '/kol', actionLabel: tr('Complete in KOL Hub →', 'Lengkapi di KOL Hub →') },
+              { id: 'first_trade_or_launch', badge: 'ONE-TIME', title: '3. First Trade or Token Launch', xp: '+500 XP · +50 cr', desc: tr('Create 1 trade intent in Terminal/5-Agent Desk or launch a token.', 'Buat 1 trade intent di Terminal/5-Agent Desk atau launch token.'), actionHref: '/trading', actionLabel: tr('Make 1 Trade in /trading →', 'Buat 1 Trade di /trading →') },
             ].map((q) => {
               const isDone =
                 q.id === 'daily_checkin'
@@ -690,7 +705,7 @@ export default function OverviewPage() {
       <div className="grid-2" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
         <div className="bg-panel" style={{ padding: '16px', borderRadius: '8px' }}>
           <div className="text-muted" style={{ fontSize: '11px', fontWeight: 'bold', marginBottom: '8px' }}>CONTROL PLANE & EDGE</div>
-          <div style={{ fontSize: '18px', fontWeight: 800, color: '#00E5FF' }}>
+          <div style={{ fontSize: '18px', fontWeight: 800, color: 'var(--color-accent-info)' }}>
             {overview?.controlPlane || 'Vercel / Next.js 14'}
           </div>
           <div className="text-muted" style={{ fontSize: '11px', marginTop: '8px' }}>Stateless Edge Middleware (6 Sec Headers)</div>
@@ -706,7 +721,7 @@ export default function OverviewPage() {
 
         <div className="bg-panel" style={{ padding: '16px', borderRadius: '8px' }}>
           <div className="text-muted" style={{ fontSize: '11px', fontWeight: 'bold', marginBottom: '8px' }}>EPHEMERAL SIDECAR</div>
-          <div style={{ fontSize: '18px', fontWeight: 800, color: '#FFD600' }}>
+          <div style={{ fontSize: '18px', fontWeight: 800, color: 'var(--color-accent-amber)' }}>
             {overview?.ephemeralSidecar || 'UPSTASH_REDIS_ACTIVE'}
           </div>
           <div className="text-muted" style={{ fontSize: '11px', marginTop: '8px' }}>REST Sidecar • Zero-Blocking Fail-Open</div>
@@ -714,7 +729,7 @@ export default function OverviewPage() {
 
         <div className="bg-panel" style={{ padding: '16px', borderRadius: '8px' }}>
           <div className="text-muted" style={{ fontSize: '11px', fontWeight: 'bold', marginBottom: '8px' }}>TELEMETRY LOGGER</div>
-          <div style={{ fontSize: '18px', fontWeight: 800, color: '#D500F9' }}>
+          <div style={{ fontSize: '18px', fontWeight: 800, color: 'var(--color-accent-purple)' }}>
             {overview?.telemetryObservability || 'ACTIVE (Ring Buffer)'}
           </div>
           <div className="text-muted" style={{ fontSize: '11px', marginTop: '8px' }}>Non-Blocking Metric & Audit Buffer</div>
@@ -724,7 +739,7 @@ export default function OverviewPage() {
       {/* SYSTEM ADMIN EXCLUSIVE CONTROL CONSOLE */}
       <div className="bg-panel" style={{ borderRadius: '8px', padding: '24px', border: '1px solid #FF9100' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-          <h2 style={{ fontSize: '18px', fontWeight: 900, margin: 0, color: '#FFD600' }}>
+          <h2 style={{ fontSize: '18px', fontWeight: 900, margin: 0, color: 'var(--color-accent-amber)' }}>
             Emergency Master Console
           </h2>
           <span className="badge badge-admin" style={{ border: '1px solid var(--color-badge-warning-border)', color: 'var(--color-badge-warning-text)', backgroundColor: 'var(--color-badge-warning-bg)' }}>
@@ -733,7 +748,7 @@ export default function OverviewPage() {
         </div>
 
         {adminFeedback && (
-          <div className={adminFeedback.includes('🚨') ? 'badge badge-admin' : 'badge badge-trader'} style={{ display: 'block', padding: '12px', marginBottom: '24px', fontSize: '14px' }}>
+          <div className={adminFeedback.includes('Alert:') ? 'badge badge-admin' : 'badge badge-trader'} style={{ display: 'block', padding: '12px', marginBottom: '24px', fontSize: '14px' }}>
             {adminFeedback}
           </div>
         )}
@@ -778,7 +793,7 @@ export default function OverviewPage() {
 
           {/* 2. Binance AES-256 Vault Status */}
           <div className="bg-panel" style={{ padding: '16px', borderRadius: '6px' }}>
-            <div style={{ color: '#00E5FF', fontSize: '12px', fontWeight: 800, marginBottom: '8px' }}><Lock size={14} className="inline mr-1" style={{display:'inline', marginRight:'4px', verticalAlign:'text-bottom'}}/> BINANCE AES-256 VAULT</div>
+            <div style={{ color: 'var(--color-accent-info)', fontSize: '12px', fontWeight: 800, marginBottom: '8px' }}><Lock size={14} className="inline mr-1" style={{display:'inline', marginRight:'4px', verticalAlign:'text-bottom'}}/> BINANCE AES-256 VAULT</div>
             <div className="flex-col gap-sm" style={{ fontSize: '12px', color: 'var(--color-foreground)' }}>
               <div>Encryption: <strong style={{ color: 'var(--color-accent)' }}>AES-256-GCM</strong></div>
               <div>Withdrawal Check: <strong style={{ color: 'var(--color-destructive)' }}>STRICTLY REJECTED</strong></div>
@@ -788,10 +803,10 @@ export default function OverviewPage() {
 
           {/* 3. Live Telemetry & Governance Audit Sync */}
           <div className="bg-panel" style={{ padding: '16px', borderRadius: '6px' }}>
-            <div style={{ color: '#D500F9', fontSize: '12px', fontWeight: 800, marginBottom: '8px' }}><Server size={14} className="inline mr-1" style={{display:'inline', marginRight:'4px', verticalAlign:'text-bottom'}}/> TELEMETRY &amp; AUDIT SSOT</div>
+            <div style={{ color: 'var(--color-accent-purple)', fontSize: '12px', fontWeight: 800, marginBottom: '8px' }}><Server size={14} className="inline mr-1" style={{display:'inline', marginRight:'4px', verticalAlign:'text-bottom'}}/> TELEMETRY &amp; AUDIT SSOT</div>
             <div className="flex-col gap-sm" style={{ fontSize: '12px', color: 'var(--color-foreground)', marginBottom: '16px' }}>
               <div>Redis Sidecar: <strong style={{ color: 'var(--color-accent)' }}>ONLINE (REST)</strong></div>
-              <div>Governance Logs: <strong style={{ color: '#00E5FF' }}>{auditLogs.length} Recent Entries</strong></div>
+              <div>Governance Logs: <strong style={{ color: 'var(--color-accent-info)' }}>{auditLogs.length} Recent Entries</strong></div>
             </div>
             <button
               type="button"
@@ -810,7 +825,7 @@ export default function OverviewPage() {
         <div className="bg-panel" style={{ padding: '16px', borderRadius: '6px', marginBottom: '16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
             <div style={{ color: '#8AB4F8', fontSize: '12px', fontWeight: 800 }}>
-              📜 Riwayat Aktivitas Admin
+              Riwayat Aktivitas Admin
             </div>
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
               {(['ALL', 'BILLING', 'KILL_SWITCH', 'LAUNCH', 'SNAPSHOT'] as const).map((f) => (
@@ -851,8 +866,8 @@ export default function OverviewPage() {
                       <td style={{ padding: '6px 8px', color: 'var(--color-muted)', whiteSpace: 'nowrap' }}>
                         {new Date(log.createdAt).toLocaleString()}
                       </td>
-                      <td style={{ padding: '6px 8px', fontWeight: 800, color: '#FFD600' }}>{log.action}</td>
-                      <td style={{ padding: '6px 8px', color: '#38BDF8' }}>
+                      <td style={{ padding: '6px 8px', fontWeight: 800, color: 'var(--color-accent-amber)' }}>{log.action}</td>
+                      <td style={{ padding: '6px 8px', color: 'var(--color-accent-info)' }}>
                         {log.actorId.length > 16 ? `${log.actorId.slice(0, 8)}...${log.actorId.slice(-4)}` : log.actorId}
                       </td>
                       <td style={{ padding: '6px 8px', color: 'var(--color-muted)' }}>
@@ -871,8 +886,8 @@ export default function OverviewPage() {
 
         {/* RBAC Matrix Inspector (Synced 100% with packages/auth/rbac-middleware.ts) */}
         <div className="bg-panel" style={{ padding: '16px', borderRadius: '6px' }}>
-          <div style={{ color: '#FFD600', fontSize: '12px', fontWeight: 800, marginBottom: '12px' }}>
-            🛡️ RBAC Domain Capabilities Matrix (8 Roles × 13 Capabilities)
+          <div style={{ color: 'var(--color-accent-amber)', fontSize: '12px', fontWeight: 800, marginBottom: '12px' }}>
+            RBAC Domain Capabilities Matrix (8 Roles × 13 Capabilities)
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(165px, 1fr))', gap: '8px', fontSize: '11px' }}>
             {[
@@ -893,7 +908,7 @@ export default function OverviewPage() {
               <div key={item.cap} className="bg-panel" style={{ padding: '8px', borderRadius: '4px' }}>
                 <div style={{ fontWeight: 800, color: 'var(--color-foreground)' }}>{item.cap}</div>
                 <div className="text-muted">{item.roles}</div>
-                {item.dual && <span style={{ color: 'var(--color-destructive)', fontWeight: 800, fontSize: '10px' }}>⚠ DUAL-CONTROL</span>}
+                {item.dual && <span style={{ color: 'var(--color-destructive)', fontWeight: 800, fontSize: '10px' }}>DUAL-CONTROL</span>}
               </div>
             ))}
           </div>
@@ -906,7 +921,7 @@ export default function OverviewPage() {
           <h3 style={{ fontSize: '18px', fontWeight: 800, margin: 0 }}>
             Active Domain Subsystems
           </h3>
-          <span style={{ fontSize: '12px', color: '#00E5FF', fontWeight: 'bold' }}>100% Boundary Isolation Verified</span>
+          <span style={{ fontSize: '12px', color: 'var(--color-accent-info)', fontWeight: 'bold' }}>100% Boundary Isolation Verified</span>
         </div>
 
         <div className="grid-3" style={{ marginBottom: '24px' }}>

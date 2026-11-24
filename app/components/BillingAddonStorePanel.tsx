@@ -57,16 +57,16 @@ export function BillingAddonStorePanel({ isConnected, onPurchased }: BillingAddo
       });
       const json = await res.json();
       if (!res.ok || !json?.success) {
-        setFeedback(`⚠️ ${json?.error || 'Gagal membeli slot add-on'}`);
+        setFeedback(`Notice: ${json?.error || 'Gagal membeli slot add-on'}`);
       } else {
         setFeedback(
-          `✅ Berhasil! +${json.data.slotsAdded} slot permanen ditambahkan (-${json.data.creditsCharged} Credits · Sisa: ${json.data.remainingCredits} Cr).`
+          `OK: Berhasil! +${json.data.slotsAdded} slot permanen ditambahkan (-${json.data.creditsCharged} Credits · Sisa: ${json.data.remainingCredits} Cr).`
         );
         await loadAddons();
         onPurchased?.();
       }
     } catch (err: any) {
-      setFeedback(`⚠️ ${err?.message || 'Network error'}`);
+      setFeedback(`Notice: ${err?.message || 'Network error'}`);
     } finally {
       setBuyingType(null);
     }
@@ -87,7 +87,7 @@ export function BillingAddonStorePanel({ isConnected, onPurchased }: BillingAddo
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
         <div>
           <h3 style={{ fontSize: '15px', fontWeight: 800, color: 'var(--color-foreground)', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <PlusCircle size={16} style={{ color: '#38BDF8' }} /> Permanent Capacity Add-Ons (Anti-Hangus)
+            <PlusCircle size={16} style={{ color: 'var(--color-accent-info)' }} /> Permanent Capacity Add-Ons (Anti-Hangus)
           </h3>
           <p className="text-muted" style={{ margin: 0, fontSize: '12px' }}>
             Tambah slot permanen untuk API Key Bankr atau Binance CEX memakai saldo Credits Anda. Slot add-on tidak hangus meski paket bulanan berakhir.
@@ -155,7 +155,7 @@ export function BillingAddonStorePanel({ isConnected, onPurchased }: BillingAddo
       </div>
 
       {feedback && (
-        <div style={{ fontSize: '12px', color: feedback.startsWith('✅') ? '#10B981' : '#F59E0B' }}>
+        <div style={{ fontSize: '12px', color: feedback.startsWith('OK:') ? '#10B981' : '#F59E0B' }}>
           {feedback}
         </div>
       )}

@@ -108,7 +108,7 @@ export function AdminMerkleSnapshotPanel({
         setMerkleRoot(json.data.merkleRoot);
       }
       setStatusMessage(
-        `✅ Snapshot DRAFT dibuat (${json.data.snapshotId}) — ${json.data.recipientCount} penerima, total ${json.data.totalRewardTokens} token.`
+        `OK: Snapshot DRAFT dibuat (${json.data.snapshotId}) — ${json.data.recipientCount} penerima, total ${json.data.totalRewardTokens} token.`
       );
     } catch (err: any) {
       setErrorMessage(`Koneksi gagal: ${err?.message || 'Tidak dapat menghubungi server'}`);
@@ -144,7 +144,7 @@ export function AdminMerkleSnapshotPanel({
       setRecipientCount(json.data.totalRecipients ?? recipientCount);
       setTotalRewardTokens(json.data.totalRewardTokens ?? totalRewardTokens);
       setStatusMessage(
-        `🔒 Snapshot FINALIZED! Merkle Root: ${json.data.merkleRoot} (Depth ${json.data.treeDepth}, ${json.data.totalRecipients} penerima). Siap dipublikasikan on-chain.`
+        `Auth: Snapshot FINALIZED! Merkle Root: ${json.data.merkleRoot} (Depth ${json.data.treeDepth}, ${json.data.totalRecipients} penerima). Siap dipublikasikan on-chain.`
       );
     } catch (err: any) {
       setErrorMessage(`Koneksi gagal: ${err?.message || 'Tidak dapat menghubungi server'}`);
@@ -169,7 +169,7 @@ export function AdminMerkleSnapshotPanel({
     setSnapshotStatus(json.data.status || 'PUBLISHED');
     setPublishedTxHash(json.data.publicationTxHash || txHash);
     setStatusMessage(
-      `🚀 Snapshot PUBLISHED & terverifikasi on-chain! Tx: ${txHash} (Block #${json.data.confirmedBlockNumber ?? 'confirmed'}).`
+      `Snapshot PUBLISHED & terverifikasi on-chain! Tx: ${txHash} (Block #${json.data.confirmedBlockNumber ?? 'confirmed'}).`
     );
     return true;
   };
@@ -279,7 +279,7 @@ export function AdminMerkleSnapshotPanel({
 
       setQueuedIntentId(json.data.intentId);
       setStatusMessage(
-        `📨 Publication Intent (${json.data.intentId}) berstatus ${json.data.status} telah masuk antrean Execution Plane Worker.`
+        `Publication Intent (${json.data.intentId}) berstatus ${json.data.status} telah masuk antrean Execution Plane Worker.`
       );
     } catch (err: any) {
       setErrorMessage(`Koneksi gagal: ${err?.message || 'Tidak dapat menghubungi server'}`);
@@ -299,7 +299,7 @@ export function AdminMerkleSnapshotPanel({
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' }}>
-        <h3 style={{ fontSize: '15px', fontWeight: 900, color: '#00E5FF', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <h3 style={{ fontSize: '15px', fontWeight: 900, color: 'var(--color-accent-info)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Layers size={17} /> Bounty Merkle Snapshot Console (RBAC: MANAGE_SNAPSHOTS)
         </h3>
         <span
@@ -309,7 +309,7 @@ export function AdminMerkleSnapshotPanel({
             padding: '3px 8px',
             borderRadius: '4px',
             backgroundColor: 'rgba(16, 185, 129, 0.14)',
-            color: '#6EE7B7',
+            color: 'var(--color-text-positive)',
             border: '1px solid rgba(16, 185, 129, 0.3)',
             fontFamily: 'var(--font-mono)',
           }}
@@ -487,7 +487,7 @@ export function AdminMerkleSnapshotPanel({
             alignItems: 'center',
             gap: '6px',
             borderColor: 'rgba(255, 214, 0, 0.5)',
-            color: '#FFD600',
+            color: 'var(--color-accent-amber)',
           }}
         >
           <Lock size={13} />
@@ -517,7 +517,7 @@ export function AdminMerkleSnapshotPanel({
             alignItems: 'center',
             gap: '6px',
             borderColor: 'rgba(168, 85, 247, 0.45)',
-            color: '#C084FC',
+            color: 'var(--color-accent-purple)',
           }}
         >
           {busyAction === 'intent' ? 'Mengirim ke Worker...' : '3B. Queue Publish Intent (Execution Plane)'}
@@ -574,7 +574,7 @@ export function AdminMerkleSnapshotPanel({
               href={getExplorerUrl(publishedTxHash, '0x2105', 'tx')}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ color: '#38BDF8', textDecoration: 'underline' }}
+              style={{ color: 'var(--color-accent-info)', textDecoration: 'underline' }}
             >
               View Published Tx ↗
             </a>
@@ -589,7 +589,7 @@ export function AdminMerkleSnapshotPanel({
             borderRadius: '6px',
             backgroundColor: 'rgba(16, 185, 129, 0.12)',
             border: '1px solid rgba(16, 185, 129, 0.35)',
-            color: '#6EE7B7',
+            color: 'var(--color-text-positive)',
             fontSize: '12px',
             display: 'flex',
             alignItems: 'center',

@@ -13,6 +13,7 @@ interface LocaleContextValue {
   setLocale: (next: AppLocale) => void;
   toggleLocale: () => void;
   t: (key: string) => string;
+  tr: (enText: string, idText: string) => string;
 }
 
 const LocaleContext = createContext<LocaleContextValue>({
@@ -20,6 +21,7 @@ const LocaleContext = createContext<LocaleContextValue>({
   setLocale: () => {},
   toggleLocale: () => {},
   t: (key) => translateKey('en', key),
+  tr: (enText) => enText,
 });
 
 export function LocaleProvider({ children }: { children: React.ReactNode }) {
@@ -47,9 +49,10 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
   };
 
   const t = (key: string) => translateKey(locale, key);
+  const tr = (enText: string, idText: string) => (locale === 'id' ? idText : enText);
 
   return (
-    <LocaleContext.Provider value={{ locale, setLocale, toggleLocale, t }}>
+    <LocaleContext.Provider value={{ locale, setLocale, toggleLocale, t, tr }}>
       {children}
     </LocaleContext.Provider>
   );

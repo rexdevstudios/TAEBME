@@ -173,12 +173,12 @@ export default function KolHubPage() {
       const json = await res.json();
       if (json.success) {
         setKolProfile(json.data);
-        alert('✅ Profil KOL & On-Chain Trust Passport (GoPlus + RPC) berhasil diperbarui!');
+        alert('OK: Profil KOL & On-Chain Trust Passport (GoPlus + RPC) berhasil diperbarui!');
       } else {
-        alert(`❌ Gagal: ${json.error?.message || 'Error'}`);
+        alert(`Error: Gagal: ${json.error?.message || 'Error'}`);
       }
     } catch (err) {
-      alert(`⚠️ Error: ${(err as Error).message}`);
+      alert(`Notice: Error: ${(err as Error).message}`);
     } finally {
       setIsRegistering(false);
     }
@@ -227,13 +227,13 @@ export default function KolHubPage() {
         }
       }
       if (results.length > 0) {
-        setWeb3Feedback(`ℹ️ Hasil Verifikasi Web3: ${results.join(' • ')}`);
+        setWeb3Feedback(`Hasil Verifikasi Web3: ${results.join(' • ')}`);
         fetchProfile(walletAddress);
       } else {
-        setWeb3Feedback('⚠️ Silakan masukkan Farcaster username atau Lens handle.');
+        setWeb3Feedback('Notice: Silakan masukkan Farcaster username atau Lens handle.');
       }
     } catch (err: any) {
-      setWeb3Feedback(`❌ Gagal memverifikasi identitas Web3: ${err?.message || 'Network error'}`);
+      setWeb3Feedback(`Error: Gagal memverifikasi identitas Web3: ${err?.message || 'Network error'}`);
     } finally {
       setIsVerifyingWeb3(false);
     }
@@ -247,7 +247,7 @@ export default function KolHubPage() {
     const isStake = campTitle.includes('stake') || campTitle.includes('staking') || campTitle.includes('yield');
 
     if (!isHold && !isStake && !tweetProofUrl) {
-      setVerificationFeedback('⚠️ Silakan masukkan URL bukti tweet terlebih dahulu.');
+      setVerificationFeedback('Notice: Silakan masukkan URL bukti tweet terlebih dahulu.');
       return;
     }
 
@@ -256,7 +256,7 @@ export default function KolHubPage() {
 
     try {
       if (!walletAddress) {
-        setVerificationFeedback('⚠️ Silakan hubungkan dompet Web3 terlebih dahulu.');
+        setVerificationFeedback('Notice: Silakan hubungkan dompet Web3 terlebih dahulu.');
         return;
       }
 
@@ -283,24 +283,24 @@ export default function KolHubPage() {
       if (json.success) {
         if (isHold) {
           const bal = json.data?.onChainBalance ? ` (Saldo On-Chain: ${json.data.onChainBalance})` : '';
-          setVerificationFeedback(`🎉 SALDO HODL TERVERIFIKASI ON-CHAIN! Dompet Anda memenuhi syarat pembagian reward Diamond Hands.${bal}`);
+          setVerificationFeedback(`SALDO HODL TERVERIFIKASI ON-CHAIN! Dompet Anda memenuhi syarat pembagian reward Diamond Hands.${bal}`);
         } else if (isStake) {
-          setVerificationFeedback('🎉 STAKING VAULT AKTIF! Posisi liquid staking Anda tercatat dan memenuhi syarat yield.');
+          setVerificationFeedback('STAKING VAULT AKTIF! Posisi liquid staking Anda tercatat dan memenuhi syarat yield.');
         } else {
-          setVerificationFeedback('🎉 TWEET TERVERIFIKASI! Bukti lolos audit AI & validasi hashtag otomatis.');
+          setVerificationFeedback('TWEET TERVERIFIKASI! Bukti lolos audit AI & validasi hashtag otomatis.');
         }
         if (json.data?.qualityAudit) {
           setAiAuditResult(json.data.qualityAudit);
         }
         checkMerkleProof();
       } else {
-        setVerificationFeedback(`❌ Verifikasi Ditolak: ${json.error?.message || 'Syarat kampanye belum terpenuhi'}`);
+        setVerificationFeedback(`Error: Verifikasi Ditolak: ${json.error?.message || 'Syarat kampanye belum terpenuhi'}`);
         if (json.data?.qualityAudit) {
           setAiAuditResult(json.data.qualityAudit);
         }
       }
     } catch (err) {
-      setVerificationFeedback(`⚠️ Error verifikasi: ${(err as Error).message}`);
+      setVerificationFeedback(`Notice: Error verifikasi: ${(err as Error).message}`);
     } finally {
       setIsVerifyingProof(false);
     }
@@ -325,7 +325,7 @@ export default function KolHubPage() {
     setClaimFeedback(null);
     try {
       if (!walletAddress) {
-        setClaimFeedback('⚠️ Silakan hubungkan dompet Web3 MetaMask terlebih dahulu.');
+        setClaimFeedback('Notice: Silakan hubungkan dompet Web3 MetaMask terlebih dahulu.');
         return;
       }
 
@@ -344,10 +344,10 @@ export default function KolHubPage() {
         const sponsorJson = await sponsorRes.json();
         if (sponsorJson.success && sponsorJson.data) {
           setClaimFeedback(
-            `⚡ SIMULATION HARNESS: Paymaster EIP-191 sponsor signature valid (Sponsor: ${sponsorJson.data.sponsorAddress}). On-chain ERC-4337 bundler relay belum terhubung di jaringan ini.`
+            `SIMULATION HARNESS: Paymaster EIP-191 sponsor signature valid (Sponsor: ${sponsorJson.data.sponsorAddress}). On-chain ERC-4337 bundler relay belum terhubung di jaringan ini.`
           );
         } else {
-          setClaimFeedback(`❌ Gagal sponsor paymaster: ${sponsorJson.error?.message || 'Error'}`);
+          setClaimFeedback(`Error: Gagal sponsor paymaster: ${sponsorJson.error?.message || 'Error'}`);
         }
         return;
       }
@@ -355,7 +355,7 @@ export default function KolHubPage() {
       // 1. Contract Address Verification Gate (Rule 6 & Section 9)
       const contractConfig = getContractConfiguration();
       if (!contractConfig.isConfigured || !contractConfig.contractAddress) {
-        setClaimFeedback(`❌ ${contractConfig.message} Transaksi on-chain dinonaktifkan demi keamanan.`);
+        setClaimFeedback(`Error: ${contractConfig.message} Transaksi on-chain dinonaktifkan demi keamanan.`);
         return;
       }
 
@@ -371,7 +371,7 @@ export default function KolHubPage() {
 
       const networkCheck = await ensureBaseNetwork(targetChainHex);
       if (!networkCheck.success) {
-        setClaimFeedback(`❌ ${networkCheck.error || `Harap beralih ke jaringan ${chainName}`}`);
+        setClaimFeedback(`Error: ${networkCheck.error || `Harap beralih ke jaringan ${chainName}`}`);
         return;
       }
 
@@ -382,12 +382,12 @@ export default function KolHubPage() {
         !merkleProofData.merkleProof ||
         merkleProofData.merkleProof.length === 0
       ) {
-        setClaimFeedback('❌ Alamat dompet ini tidak memiliki alokasi bounty terverifikasi pada Merkle Tree kampanye.');
+        setClaimFeedback('Error: Alamat dompet ini tidak memiliki alokasi bounty terverifikasi pada Merkle Tree kampanye.');
         return;
       }
 
       // 4. Real Web3 Transaction via MetaMask Signer
-      setClaimFeedback('⏳ Menunggu konfirmasi transaksi di MetaMask...');
+      setClaimFeedback('Menunggu konfirmasi transaksi di MetaMask...');
       const signer = await getBrowserSigner();
       const contract = getLaunchpadContract(signer);
 
@@ -402,13 +402,13 @@ export default function KolHubPage() {
         merkleProofData.merkleProof
       );
 
-      setClaimFeedback(`📡 Transaksi terkirim ke mempool: ${tx.hash}. Menunggu konfirmasi blok ${chainName}...`);
+      setClaimFeedback(`Transaksi terkirim ke mempool: ${tx.hash}. Menunggu konfirmasi blok ${chainName}...`);
       const receipt = await tx.wait(1);
 
       if (receipt && receipt.status === 1) {
         const explorerLink = getExplorerUrl(tx.hash, targetChainHex, 'tx');
         setClaimFeedback(
-          `✅ REWARD BERHASIL DIKLAIM ON-CHAIN! Blok #${receipt.blockNumber}. Hash: ${tx.hash} — Lihat di ${explorerName}: ${explorerLink}`
+          `OK: REWARD BERHASIL DIKLAIM ON-CHAIN! Blok #${receipt.blockNumber}. Hash: ${tx.hash} — Lihat di ${explorerName}: ${explorerLink}`
         );
 
         // Call settlement API to synchronize off-chain SSOT state and audit logs
@@ -427,22 +427,22 @@ export default function KolHubPage() {
             if (!settleRes.ok) {
               const settleErr = await settleRes.json().catch(() => ({}));
               setClaimFeedback(
-                `✅ Klaim on-chain berhasil (Hash: ${tx.hash}), tetapi sinkronisasi SSOT perlu retry: ${settleErr?.error || `HTTP ${settleRes.status}`}`
+                `OK: Klaim on-chain berhasil (Hash: ${tx.hash}), tetapi sinkronisasi SSOT perlu retry: ${settleErr?.error || `HTTP ${settleRes.status}`}`
               );
             }
             // Refresh proof and eligibility status
             checkMerkleProof();
           } catch (settleCatchErr: any) {
             setClaimFeedback(
-              `✅ Klaim on-chain berhasil (Hash: ${tx.hash}), tetapi sinkronisasi SSOT gagal: ${settleCatchErr?.message || 'Network error'}`
+              `OK: Klaim on-chain berhasil (Hash: ${tx.hash}), tetapi sinkronisasi SSOT gagal: ${settleCatchErr?.message || 'Network error'}`
             );
           }
         }
       } else {
-        setClaimFeedback(`❌ Transaksi gagal dieksekusi di blockchain ${chainName}.`);
+        setClaimFeedback(`Error: Transaksi gagal dieksekusi di blockchain ${chainName}.`);
       }
     } catch (err: any) {
-      setClaimFeedback(`❌ Gagal klaim on-chain: ${normalizeWeb3Error(err)}`);
+      setClaimFeedback(`Error: Gagal klaim on-chain: ${normalizeWeb3Error(err)}`);
     } finally {
       setIsClaimingOnChain(false);
     }
@@ -465,14 +465,14 @@ export default function KolHubPage() {
       });
       const json = await res.json();
       if (json.success) {
-        setCreatorFeedback('🚀 KAMPANYE BOUNTY DIBUAT! Alokasi token telah dicadangkan.');
+        setCreatorFeedback('KAMPANYE BOUNTY DIBUAT! Alokasi token telah dicadangkan.');
         fetchCampaigns();
         setNewTitle('');
       } else {
-        setCreatorFeedback(`❌ Gagal: ${json.error?.message}`);
+        setCreatorFeedback(`Error: Gagal: ${json.error?.message}`);
       }
     } catch (err) {
-      setCreatorFeedback(`⚠️ Error: ${(err as Error).message}`);
+      setCreatorFeedback(`Notice: Error: ${(err as Error).message}`);
     }
   };
 
@@ -581,7 +581,7 @@ export default function KolHubPage() {
         <div className="grid-3" style={{ gridTemplateColumns: '1fr 1fr', marginTop: '24px', gap: '24px' }}>
           <div className="bg-panel" style={{ padding: '24px', borderRadius: '12px' }}>
             <h3 style={{ fontSize: '18px', fontWeight: 800, marginTop: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '18px', fontWeight: 900, color: 'var(--color-accent, #00E676)' }}>𝕏</span> Tautkan Akun Twitter / X
+              <span style={{ fontSize: '18px', fontWeight: 900, color: 'var(--color-accent, var(--color-text-positive))' }}>𝕏</span> Tautkan Akun Twitter / X
             </h3>
             <p className="text-muted" style={{ fontSize: '13px' }}>
               Daftarkan handle media sosial Anda untuk mengevaluasi On-Chain Wallet Guard Trust Score (GoPlus + RPC) dan memenuhi syarat bounty.
@@ -668,7 +668,7 @@ export default function KolHubPage() {
                   <span>{isVerifyingWeb3 ? 'Menghubungkan Web3 Graph...' : 'Tautkan Farcaster & Lens'}</span>
                 </button>
                 {web3Feedback && (
-                  <span style={{ fontSize: '11px', color: 'var(--color-accent, #00E676)', marginTop: '4px' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--color-accent, var(--color-text-positive))', marginTop: '4px' }}>
                     {web3Feedback}
                   </span>
                 )}
@@ -693,8 +693,8 @@ export default function KolHubPage() {
                   fontSize: '24px',
                   fontWeight: 900,
                   backgroundColor: tier === 'GOLD' ? 'rgba(234,179,8,0.15)' : 'rgba(59,130,246,0.15)',
-                  color: tier === 'GOLD' ? '#EAB308' : '#60A5FA',
-                  border: `2px solid ${tier === 'GOLD' ? '#EAB308' : '#60A5FA'}`,
+                  color: tier === 'GOLD' ? '#EAB308' : 'var(--color-accent-info)',
+                  border: `2px solid ${tier === 'GOLD' ? '#EAB308' : 'var(--color-accent-info)'}`,
                 }}
               >
                 {trustScore}
@@ -718,23 +718,23 @@ export default function KolHubPage() {
                 {/* Web3 Native Badges — only shown when verified data exists */}
                 <div style={{ marginTop: '8px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                   {kolProfile?.farcasterUsername && (
-                    <span className="badge" style={{ backgroundColor: 'rgba(139,92,246,0.15)', color: '#A78BFA', border: '1px solid rgba(139,92,246,0.3)', fontSize: '10px' }}>
-                      🟣 FC: @{kolProfile.farcasterUsername}
+                    <span className="badge" style={{ backgroundColor: 'rgba(139,92,246,0.15)', color: 'var(--color-accent-purple)', border: '1px solid rgba(139,92,246,0.3)', fontSize: '10px' }}>
+                      FC: @{kolProfile.farcasterUsername}
                     </span>
                   )}
                   {kolProfile?.lensHandle && (
-                    <span className="badge" style={{ backgroundColor: 'rgba(16,185,129,0.15)', color: '#34D399', border: '1px solid rgba(16,185,129,0.3)', fontSize: '10px' }}>
-                      🌿 Lens: {kolProfile.lensHandle}
+                    <span className="badge" style={{ backgroundColor: 'rgba(16,185,129,0.15)', color: 'var(--color-text-positive)', border: '1px solid rgba(16,185,129,0.3)', fontSize: '10px' }}>
+                      Lens: {kolProfile.lensHandle}
                     </span>
                   )}
                   {kolProfile?.paymasterEligible && (
-                    <span className="badge" style={{ backgroundColor: 'rgba(255,214,0,0.15)', color: '#FFD600', border: '1px solid rgba(255,214,0,0.3)', fontSize: '10px' }}>
-                      ⚡ Paymaster Eligible
+                    <span className="badge" style={{ backgroundColor: 'rgba(255,214,0,0.15)', color: 'var(--color-accent-amber)', border: '1px solid rgba(255,214,0,0.3)', fontSize: '10px' }}>
+                      Paymaster Eligible
                     </span>
                   )}
                   {kolProfile?.farcasterUsername && (
-                    <span className="badge" style={{ backgroundColor: 'rgba(56,189,248,0.15)', color: '#38BDF8', border: '1px solid rgba(56,189,248,0.3)', fontSize: '10px' }}>
-                      ⚡ {boosterMultiplier.toFixed(2)}x Yield Booster ({(boosterMultiplier * 4.2).toFixed(2)}% APY)
+                    <span className="badge" style={{ backgroundColor: 'rgba(56,189,248,0.15)', color: 'var(--color-accent-info)', border: '1px solid rgba(56,189,248,0.3)', fontSize: '10px' }}>
+                      {boosterMultiplier.toFixed(2)}x Yield Booster ({(boosterMultiplier * 4.2).toFixed(2)}% APY)
                     </span>
                   )}
                 </div>
@@ -781,13 +781,13 @@ export default function KolHubPage() {
                   borderRadius: '8px',
                   marginBottom: '16px',
                   fontSize: '12px',
-                  color: '#38BDF8',
+                  color: 'var(--color-accent-info)',
                   flexWrap: 'wrap',
                   gap: '8px',
                 }}
               >
                 <span>
-                  🎯 Memfilter kampanye untuk token ID: <code style={{ color: 'var(--color-foreground)' }}>{activeLaunchFilter.slice(0, 8)}...</code>
+                  Memfilter kampanye untuk token ID: <code style={{ color: 'var(--color-foreground)' }}>{activeLaunchFilter.slice(0, 8)}...</code>
                 </span>
                 <button
                   type="button"
@@ -819,7 +819,7 @@ export default function KolHubPage() {
                 className={campaignTypeFilter === 'SHARE' ? 'btn-primary' : 'btn-secondary'}
                 style={{ padding: '6px 14px', fontSize: '12px', borderRadius: '20px' }}
               >
-                📢 Share & Raid
+                Share & Raid
               </button>
               <button
                 type="button"
@@ -827,7 +827,7 @@ export default function KolHubPage() {
                 className={campaignTypeFilter === 'HOLD' ? 'btn-primary' : 'btn-secondary'}
                 style={{ padding: '6px 14px', fontSize: '12px', borderRadius: '20px' }}
               >
-                💎 HODL Loyalty
+                HODL Loyalty
               </button>
               <button
                 type="button"
@@ -835,7 +835,7 @@ export default function KolHubPage() {
                 className={campaignTypeFilter === 'STAKE' ? 'btn-primary' : 'btn-secondary'}
                 style={{ padding: '6px 14px', fontSize: '12px', borderRadius: '20px' }}
               >
-                🥩 Liquid Staking
+                Liquid Staking
               </button>
             </div>
 
@@ -855,15 +855,15 @@ export default function KolHubPage() {
                           </span>
                           {isStake ? (
                             <span className="badge" style={{ backgroundColor: 'rgba(34, 197, 94, 0.15)', color: '#86EFAC', border: '1px solid rgba(34, 197, 94, 0.3)', fontSize: '10px' }}>
-                              🥩 Liquid Staking (4.2% APY)
+                              Liquid Staking (4.2% APY)
                             </span>
                           ) : isHold ? (
-                            <span className="badge" style={{ backgroundColor: 'rgba(168, 85, 247, 0.15)', color: '#C084FC', border: '1px solid rgba(168, 85, 247, 0.3)', fontSize: '10px' }}>
-                              💎 HODL Loyalty
+                            <span className="badge" style={{ backgroundColor: 'rgba(168, 85, 247, 0.15)', color: 'var(--color-accent-purple)', border: '1px solid rgba(168, 85, 247, 0.3)', fontSize: '10px' }}>
+                              HODL Loyalty
                             </span>
                           ) : (
-                            <span className="badge" style={{ backgroundColor: 'rgba(56, 189, 248, 0.15)', color: '#38BDF8', border: '1px solid rgba(56, 189, 248, 0.3)', fontSize: '10px' }}>
-                              📢 Share & Raid
+                            <span className="badge" style={{ backgroundColor: 'rgba(56, 189, 248, 0.15)', color: 'var(--color-accent-info)', border: '1px solid rgba(56, 189, 248, 0.3)', fontSize: '10px' }}>
+                              Share & Raid
                             </span>
                           )}
                         </div>
@@ -879,14 +879,14 @@ export default function KolHubPage() {
                         ) : isHold ? (
                           <span>Pegang token minimal di wallet tanpa menjual selama periode kampanye.</span>
                         ) : (
-                          <span>Wajib menyertakan hashtag resmi: <strong style={{ color: '#60A5FA' }}>{c.requiredHashtag}</strong></span>
+                          <span>Wajib menyertakan hashtag resmi: <strong style={{ color: 'var(--color-accent-info)' }}>{c.requiredHashtag}</strong></span>
                         )}
                       </p>
 
                       {c.requiresHumanityProof && (
                         <div style={{ marginTop: '8px' }}>
-                          <span className="badge" style={{ backgroundColor: 'rgba(168, 85, 247, 0.15)', color: '#C084FC', border: '1px solid rgba(168, 85, 247, 0.3)', fontSize: '10px' }}>
-                            🛡️ Sybil-Proof (World ID / Gitcoin)
+                          <span className="badge" style={{ backgroundColor: 'rgba(168, 85, 247, 0.15)', color: 'var(--color-accent-purple)', border: '1px solid rgba(168, 85, 247, 0.3)', fontSize: '10px' }}>
+                            Sybil-Proof (World ID / Gitcoin)
                           </span>
                         </div>
                       )}
@@ -991,12 +991,12 @@ export default function KolHubPage() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '12px' }}>
                       <span className="text-muted">Dompet Peserta:</span>
                       <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: '#F8FAFC' }}>
-                        {walletAddress ? `${walletAddress.slice(0, 8)}...${walletAddress.slice(-6)}` : '⚠️ Belum Terhubung'}
+                        {walletAddress ? `${walletAddress.slice(0, 8)}...${walletAddress.slice(-6)}` : 'Notice: Belum Terhubung'}
                       </span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '12px' }}>
                       <span className="text-muted">Syarat Minimum HODL:</span>
-                      <span style={{ fontWeight: 700, color: '#C084FC' }}>10,000+ Tokens (Zero-Sell Period)</span>
+                      <span style={{ fontWeight: 700, color: 'var(--color-accent-purple)' }}>10,000+ Tokens (Zero-Sell Period)</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
                       <span className="text-muted">Alokasi Reward Klaim:</span>
@@ -1032,7 +1032,7 @@ export default function KolHubPage() {
                 ) : (
                   <div>
                     <label className="text-muted" style={{ fontSize: '12px', display: 'block', marginBottom: '6px' }}>
-                      URL Bukti Tweet (X.com) — Wajib sertakan tagar: <strong style={{ color: '#60A5FA' }}>{selectedCamp?.requiredHashtag || '#Crypto'}</strong>
+                      URL Bukti Tweet (X.com) — Wajib sertakan tagar: <strong style={{ color: 'var(--color-accent-info)' }}>{selectedCamp?.requiredHashtag || '#Crypto'}</strong>
                     </label>
                     <input
                       type="url"
@@ -1051,10 +1051,10 @@ export default function KolHubPage() {
                     {isVerifyingProof
                       ? 'Memverifikasi...'
                       : isHold
-                      ? '💎 Verifikasi Saldo On-Chain'
+                      ? 'Verifikasi Saldo On-Chain'
                       : isStake
-                      ? '🥩 Stake & Aktifkan Vault'
-                      : '🚀 Verifikasi Tweet & Audit AI'}
+                      ? 'Stake & Aktifkan Vault'
+                      : 'Verifikasi Tweet & Audit AI'}
                   </span>
                 </button>
               </form>
@@ -1094,7 +1094,7 @@ export default function KolHubPage() {
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span className="text-muted">Anti-Bot & Spam Filter:</span>
                   <span style={{ color: aiAuditResult.isSpamOrBot ? '#EF4444' : '#10B981', fontWeight: 700 }}>
-                    {aiAuditResult.isSpamOrBot ? '🚨 BOT / SPAM' : '✓ LOLOS FILTER'}
+                    {aiAuditResult.isSpamOrBot ? 'Alert: BOT / SPAM' : '✓ LOLOS FILTER'}
                   </span>
                 </div>
               </div>
@@ -1114,9 +1114,9 @@ export default function KolHubPage() {
               <span className="text-muted" style={{ fontSize: '12px', display: 'block' }}>Status Kelayakan Dompet:</span>
               <strong style={{ fontSize: '16px', color: merkleProofData?.isClaimed ? '#3B82F6' : merkleProofData?.isEligible ? '#10B981' : '#F59E0B' }}>
                 {merkleProofData?.isClaimed
-                  ? '🎉 Sudah Diklaim On-Chain (Settled)'
+                  ? 'Sudah Diklaim On-Chain (Settled)'
                   : merkleProofData?.isEligible
-                  ? '✅ Terdaftar di Merkle Tree'
+                  ? 'OK: Terdaftar di Merkle Tree'
                   : 'Belum Ada Klaim Terverifikasi'}
               </strong>
 
@@ -1177,10 +1177,10 @@ export default function KolHubPage() {
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Zap size={18} color="var(--color-accent, #00E676)" />
+                <Zap size={18} color="var(--color-accent, var(--color-text-positive))" />
                 <div>
-                  <div style={{ fontWeight: 800, fontSize: '12px', color: 'var(--color-accent, #00E676)' }}>
-                    ⚡ ERC-4337 Gasless Claim (Simulation Harness)
+                  <div style={{ fontWeight: 800, fontSize: '12px', color: 'var(--color-accent, var(--color-text-positive))' }}>
+                    ERC-4337 Gasless Claim (Simulation Harness)
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--color-muted)' }}>
                     Preview tanda tangan Paymaster EIP-191 — matikan toggle ini untuk klaim langsung on-chain via MetaMask.
@@ -1214,8 +1214,8 @@ export default function KolHubPage() {
                       return '1,000';
                     })();
                     if (isClaimingOnChain) return 'Memproses On-Chain...';
-                    if (merkleProofData?.isClaimed) return '✅ Reward Sudah Diklaim';
-                    if (isGaslessClaim) return `⚡ Simulasi Klaim ${formattedReward} Token (Gasless)`;
+                    if (merkleProofData?.isClaimed) return 'OK: Reward Sudah Diklaim';
+                    if (isGaslessClaim) return `Simulasi Klaim ${formattedReward} Token (Gasless)`;
                     if (merkleProofData?.chain?.toLowerCase().includes('robinhood') || campTitle.includes('noir')) {
                       return `Klaim ${formattedReward} Token Reward (Robinhood L2)`;
                     }
@@ -1258,17 +1258,17 @@ export default function KolHubPage() {
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Sparkles size={18} color="#FFD600" />
+                <Sparkles size={18} color="var(--color-accent-amber)" />
                 <div>
-                  <div style={{ fontWeight: 800, fontSize: '13px', color: '#FFD600' }}>
-                    🌾 DeFi Liquid Staking Yield (180-Day Lockup)
+                  <div style={{ fontWeight: 800, fontSize: '13px', color: 'var(--color-accent-amber)' }}>
+                    DeFi Liquid Staking Yield (180-Day Lockup)
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--color-muted)' }}>
                     Alirkan likuiditas 24 ETH yang terkunci ke stETH pool (4.2% APY) untuk yield komunitas.
                   </div>
                 </div>
               </div>
-              <span style={{ fontWeight: 800, color: 'var(--color-accent, #00E676)', fontSize: '12px' }}>
+              <span style={{ fontWeight: 800, color: 'var(--color-accent, var(--color-text-positive))', fontSize: '12px' }}>
                 AKTIF (4.2% APY)
               </span>
             </div>
@@ -1286,10 +1286,10 @@ export default function KolHubPage() {
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Clock size={18} color="var(--color-accent, #00E676)" />
+                <Clock size={18} color="var(--color-accent, var(--color-text-positive))" />
                 <div>
-                  <div style={{ fontWeight: 800, fontSize: '13px', color: 'var(--color-accent, #00E676)' }}>
-                    🤖 Auto-Compound Keeper: 7-Day Cycle
+                  <div style={{ fontWeight: 800, fontSize: '13px', color: 'var(--color-accent, var(--color-text-positive))' }}>
+                    Auto-Compound Keeper: 7-Day Cycle
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--color-muted)' }}>
                     Yield dipanen otomatis tiap 7 hari oleh Chainlink Automation / Gelato Keeper tanpa gas admin.
@@ -1373,8 +1373,8 @@ export default function KolHubPage() {
               }}
             >
               <div>
-                <div style={{ fontWeight: 700, fontSize: '12px', color: '#C084FC' }}>
-                  🛡️ Sybil Resistance (World ID & Gitcoin Passport)
+                <div style={{ fontWeight: 700, fontSize: '12px', color: 'var(--color-accent-purple)' }}>
+                  Sybil Resistance (World ID & Gitcoin Passport)
                 </div>
                 <div style={{ fontSize: '11px', color: 'var(--color-muted)' }}>
                   Wajibkan Proof-of-Humanity ZK-proof untuk mencegah bot multi-akun.

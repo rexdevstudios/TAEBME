@@ -172,7 +172,7 @@ export default function LoginPage() {
                 {isConnecting ? 'Waiting for Signature...' : hasMetaMask ? 'Sign-In with MetaMask (SIWE)' : 'Connect Web3 Wallet'}
               </button>
               <div className="text-muted" style={{ fontSize: '12px', marginTop: '12px', textAlign: 'center' }}>
-                {hasMetaMask ? '✓ MetaMask detected. Click above to authenticate.' : 'ℹ️ MetaMask extension not detected. You can use manual input below.'}
+                {hasMetaMask ? '✓ MetaMask detected. Click above to authenticate.' : 'MetaMask extension not detected. You can use manual input below.'}
               </div>
             </div>
 

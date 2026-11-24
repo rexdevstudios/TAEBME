@@ -207,7 +207,7 @@ export function LandingHeroMotion({
             <br />
             <span
               style={{
-                background: 'linear-gradient(135deg, #4285F4 0%, #9B72CB 55%, #34D399 100%)',
+                background: 'linear-gradient(135deg, #4285F4 0%, #9B72CB 55%, var(--color-text-positive) 100%)',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
                 backgroundClip: 'text',
@@ -294,7 +294,7 @@ export function LandingHeroMotion({
                 <linearGradient id="curveStroke" x1="0%" y1="0%" x2="100%" y2="0%">
                   <stop offset="0%" stopColor="#4285F4" />
                   <stop offset="55%" stopColor="#9B72CB" />
-                  <stop offset="100%" stopColor="#34D399" />
+                  <stop offset="100%" stopColor="var(--color-text-positive)" />
                 </linearGradient>
                 <linearGradient id="curveArea" x1="0%" y1="0%" x2="0%" y2="100%">
                   <stop offset="0%" stopColor="#4285F4" stopOpacity="0.22" />
@@ -322,8 +322,8 @@ export function LandingHeroMotion({
               <text x="12" y="114" fill="var(--color-muted)" fontSize="10" fontFamily="monospace">Fair Launch (0% Tax)</text>
               <circle cx="480" cy="48" r="4" fill="#9B72CB" />
               <text x="435" y="114" fill="var(--color-muted)" fontSize="10" fontFamily="monospace">24 ETH Target</text>
-              <circle cx="708" cy="12" r="4.5" fill="#34D399" />
-              <text x="595" y="114" fill="#34D399" fontSize="10" fontWeight="700" fontFamily="monospace">Auto DEX LP Lock</text>
+              <circle cx="708" cy="12" r="4.5" fill="var(--color-text-positive)" />
+              <text x="595" y="114" fill="var(--color-text-positive)" fontSize="10" fontWeight="700" fontFamily="monospace">Auto DEX LP Lock</text>
             </svg>
           </div>
         </div>
@@ -380,7 +380,7 @@ export function LandingHeroMotion({
         >
           {[
             { icon: <Zap size={26} style={{ color: '#4285F4' }} />, stat: '0%', label: 'Modal Likuiditas Awal' },
-            { icon: <Activity size={26} style={{ color: '#34D399' }} />, stat: 'Auto', label: 'Migrasi Likuiditas DEX' },
+            { icon: <Activity size={26} style={{ color: 'var(--color-text-positive)' }} />, stat: 'Auto', label: 'Migrasi Likuiditas DEX' },
             { icon: <ShieldAlert size={26} style={{ color: '#9B72CB' }} />, stat: 'Anti-Sybil', label: 'Verifikasi KOL & Bounty' },
             { icon: <Lock size={26} style={{ color: '#F59E0B' }} />, stat: '100%', label: 'Non-Custodial Wallet' },
           ].map((item, i) => (
@@ -445,7 +445,7 @@ export function LandingHeroMotion({
 
           <div className="bento-card bento-anim spotlight-card" onMouseMove={handleCardMouseMove}>
             <div style={{ marginBottom: '14px' }}>
-              <Award size={30} style={{ color: '#34D399' }} />
+              <Award size={30} style={{ color: 'var(--color-text-positive)' }} />
             </div>
             <h3 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 10px 0', color: 'var(--color-foreground)' }}>
               KOL Hub &amp; Angel Deal Room
@@ -464,7 +464,7 @@ export function LandingHeroMotion({
                     fontWeight: 600,
                     background: 'rgba(52, 211, 153, 0.1)',
                     border: '1px solid rgba(52, 211, 153, 0.25)',
-                    color: '#34D399',
+                    color: 'var(--color-text-positive)',
                   }}
                 >
                   {p}
@@ -490,7 +490,7 @@ export function LandingHeroMotion({
                 borderRadius: '10px',
                 padding: '10px 14px',
                 fontSize: '12px',
-                color: '#C084FC',
+                color: 'var(--color-accent-purple)',
                 fontWeight: 600,
               }}
             >
