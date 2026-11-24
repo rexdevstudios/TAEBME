@@ -100,14 +100,23 @@ export default function LaunchpadPage() {
     return counts;
   }, [activeTokens]);
 
-  const filteredTokens = useMemo(
-    () =>
-      filterAndSortLaunchTokens(activeTokens, {
-        search: tokenSearch,
-        chain: chainFilter,
-        sort: sortMode,
-      }),
-    [activeTokens, tokenSearch, chainFilter, sortMode]
+  const [statusFilter, setStatusFilter] = useState<'all' | 'curve' | 'graduated'>('all');
+  const [visiblePoolCount, setVisiblePoolCount] = useState<number>(12);
+
+  const filteredTokens = useMemo(() => {
+    const base = filterAndSortLaunchTokens(activeTokens, {
+      search: tokenSearch,
+      chain: chainFilter,
+      sort: sortMode,
+    });
+    if (statusFilter === 'graduated') return base.filter((t) => Boolean(t.isGraduated));
+    if (statusFilter === 'curve') return base.filter((t) => !Boolean(t.isGraduated));
+    return base;
+  }, [activeTokens, tokenSearch, chainFilter, sortMode, statusFilter]);
+
+  const visibleTokens = useMemo(
+    () => filteredTokens.slice(0, visiblePoolCount),
+    [filteredTokens, visiblePoolCount]
   );
 
   // 4 Launchpad Alignment Dimensions (Chain, Pairing, Degen Mode, Vesting)
@@ -1483,6 +1492,33 @@ export default function LaunchpadPage() {
               </button>
             )}
           </div>
+
+          {/* Graduation Status Filter Pills (Phase DC: 100+ tokens/day scalability) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '11px', color: 'var(--color-muted)', fontWeight: 700, marginRight: '4px' }}>
+              Status:
+            </span>
+            {(
+              [
+                { id: 'all', label: tr('All', 'Semua') },
+                { id: 'curve', label: tr('Bonding Curve', 'Bonding Curve') },
+                { id: 'graduated', label: tr('Graduated DEX', 'Graduated DEX') },
+              ] as const
+            ).map((st) => (
+              <button
+                key={st.id}
+                type="button"
+                onClick={() => {
+                  setStatusFilter(st.id);
+                  setVisiblePoolCount(12);
+                }}
+                className="filter-pill"
+                data-active={statusFilter === st.id ? 'true' : 'false'}
+              >
+                {st.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {isLoadingTokens && activeTokens.length === 0 ? (
@@ -1492,8 +1528,9 @@ export default function LaunchpadPage() {
             ))}
           </div>
         ) : filteredTokens.length > 0 ? (
+          <>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: '16px' }}>
-            {filteredTokens.map((token: any) => {
+            {visibleTokens.map((token: any) => {
               const raised = Number(token.raisedAmount || 0);
               const target = Number(token.graduationThreshold || 69000);
               const progressPct = computeGraduationProgressPct(token);
@@ -1772,6 +1809,22 @@ export default function LaunchpadPage() {
               );
             })}
           </div>
+          {filteredTokens.length > visiblePoolCount && (
+            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px' }}>
+              <button
+                type="button"
+                onClick={() => setVisiblePoolCount((c) => c + 12)}
+                className="btn-secondary"
+                style={{ padding: '8px 18px', fontSize: '12px', fontWeight: 700 }}
+              >
+                {tr(
+                  `Load More (${visibleTokens.length} / ${filteredTokens.length})`,
+                  `Muat Lebih Banyak (${visibleTokens.length} / ${filteredTokens.length})`
+                )}
+              </button>
+            </div>
+          )}
+          </>
         ) : (
           <div style={{ textAlign: 'center', padding: '28px 16px', color: 'var(--color-muted)', fontSize: '12px' }}>
             {activeTokens.length > 0 ? (

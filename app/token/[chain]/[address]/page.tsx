@@ -36,7 +36,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   if (!norm.isValid) {
     return {
-      title: `Invalid Token Identifier | RTrader Portal`,
+      title: `Invalid Token Identifier | POOLNET Portal`,
       description: `The provided token address or chain is invalid.`,
     };
   }
@@ -46,10 +46,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const name = tokenLaunch?.name || `${chainName} Token`;
 
   return {
-    title: `$${ticker} (${name}) — Verified Token Portal | RTrader`,
+    title: `$${ticker} (${name}) — Verified Token Portal | POOLNET`,
     description: `${name} ($${ticker}) on ${chainName}. 0% Tax, Autonomous Bonding Curve, Live DexScreener Telemetry.`,
     openGraph: {
-      title: `$${ticker} (${name}) — Verified Protocol`,
+      title: `$${ticker} (${name}) — Verified POOLNET Protocol`,
       description: `Explore live charts, security audit, and 1-click swap for $${ticker} on ${chainName}.`,
       images: [tokenLaunch?.imageUrl || '/token-default.svg'],
     },
