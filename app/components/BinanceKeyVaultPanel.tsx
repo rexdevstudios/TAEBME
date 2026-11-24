@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { KeyRound, ShieldCheck, Plus, Trash2, CheckCircle2, Lock, AlertTriangle, Activity } from 'lucide-react';
+import { useLocale } from '../context/LocaleContext';
 
 export interface BinanceAccountMetaItem {
   id: string;
@@ -30,6 +31,7 @@ export function BinanceKeyVaultPanel({
   selectedCredentialId,
   onSelectCredentialId,
 }: BinanceKeyVaultPanelProps) {
+  const { tr } = useLocale();
   const [accounts, setAccounts] = useState<BinanceAccountMetaItem[]>([]);
   const [maxAccounts, setMaxAccounts] = useState<number>(10);
   const [planId, setPlanId] = useState<string>('FREE');
@@ -233,7 +235,7 @@ export function BinanceKeyVaultPanel({
             className="btn-secondary"
             style={{ padding: '4px 8px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
           >
-            <Plus size={12} /> {showAddForm ? 'Tutup' : 'Tambah Akun'}
+            <Plus size={12} /> {showAddForm ? tr('Close', 'Tutup') : tr('Add Account', 'Tambah Akun')}
           </button>
         )}
       </div>
@@ -250,13 +252,14 @@ export function BinanceKeyVaultPanel({
       >
         <ShieldCheck size={13} style={{ color: '#10B981', flexShrink: 0 }} />
         <span>
-          AES-256-GCM Write-Only · <strong>No-Withdrawal Guard</strong> (izin tarik dana ditolak keras, private key dompet dilarang).
+          AES-256-GCM Write-Only · <strong>No-Withdrawal Guard</strong>{' '}
+          {tr('(withdrawal permissions hard-rejected; wallet private keys forbidden).', '(izin tarik dana ditolak keras, private key dompet dilarang).')}
         </span>
       </div>
 
       {!isConnected ? (
         <div style={{ fontSize: '11px', color: 'var(--color-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <Lock size={12} /> Hubungkan wallet (SIWE) untuk mengelola beberapa akun API Binance Anda.
+          <Lock size={12} /> {tr('Connect wallet (SIWE) to manage your multi-account Binance API keys.', 'Hubungkan wallet (SIWE) untuk mengelola beberapa akun API Binance Anda.')}
         </div>
       ) : (
         <>

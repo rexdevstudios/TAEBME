@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { PlusCircle, ShieldCheck, Lock } from 'lucide-react';
+import { useLocale } from '../context/LocaleContext';
 
 interface AddonItem {
   type: 'ADDON_BANKR_SLOTS' | 'ADDON_BINANCE_SLOTS';
@@ -18,6 +19,7 @@ interface BillingAddonStorePanelProps {
 }
 
 export function BillingAddonStorePanel({ isConnected, onPurchased }: BillingAddonStorePanelProps) {
+  const { tr } = useLocale();
   const [catalog, setCatalog] = useState<AddonItem[]>([]);
   const [addonSlots, setAddonSlots] = useState({ bankrExtraSlots: 0, binanceExtraSlots: 0 });
   const [effectiveCap, setEffectiveCap] = useState<{ maxBankrKeys: number; maxBinanceAccounts: number; planId: string } | null>(null);
@@ -87,23 +89,26 @@ export function BillingAddonStorePanel({ isConnected, onPurchased }: BillingAddo
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
         <div>
           <h3 style={{ fontSize: '15px', fontWeight: 800, color: 'var(--color-foreground)', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <PlusCircle size={16} style={{ color: 'var(--color-accent-info)' }} /> Permanent Capacity Add-Ons (Anti-Hangus)
+            <PlusCircle size={16} style={{ color: 'var(--color-accent-info)' }} /> {tr('Permanent Capacity Add-Ons (Never Expire)', 'Permanent Capacity Add-Ons (Anti-Hangus)')}
           </h3>
           <p className="text-muted" style={{ margin: 0, fontSize: '12px' }}>
-            Tambah slot permanen untuk API Key Bankr atau Binance CEX memakai saldo Credits Anda. Slot add-on tidak hangus meski paket bulanan berakhir.
+            {tr(
+              'Add permanent Bankr or Binance CEX API key slots using your Credits balance. Add-on slots never expire even if your monthly plan lapses.',
+              'Tambah slot permanen untuk API Key Bankr atau Binance CEX memakai saldo Credits Anda. Slot add-on tidak hangus meski paket bulanan berakhir.'
+            )}
           </p>
         </div>
         {isConnected && effectiveCap && (
           <div style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--color-muted)' }}>
-            Total Aktif ({effectiveCap.planId}): <strong>{effectiveCap.maxBankrKeys} Bankr</strong> (+{addonSlots.bankrExtraSlots}) ·{' '}
-            <strong>{effectiveCap.maxBinanceAccounts} Binance</strong> (+{addonSlots.binanceExtraSlots}) · Saldo: <strong>{creditBalance} Cr</strong>
+            {tr('Active Total', 'Total Aktif')} ({effectiveCap.planId}): <strong>{effectiveCap.maxBankrKeys} Bankr</strong> (+{addonSlots.bankrExtraSlots}) ·{' '}
+            <strong>{effectiveCap.maxBinanceAccounts} Binance</strong> (+{addonSlots.binanceExtraSlots}) · {tr('Balance:', 'Saldo:')} <strong>{creditBalance} Cr</strong>
           </div>
         )}
       </div>
 
       {!isConnected ? (
         <div style={{ fontSize: '12px', color: 'var(--color-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <Lock size={13} /> Hubungkan wallet (SIWE) untuk membeli Permanent Slot Add-On menggunakan Credits Anda.
+          <Lock size={13} /> {tr('Connect wallet (SIWE) to purchase Permanent Slot Add-Ons with your Credits.', 'Hubungkan wallet (SIWE) untuk membeli Permanent Slot Add-On menggunakan Credits Anda.')}
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>

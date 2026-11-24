@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { KeyRound, ShieldCheck, Plus, Trash2, Lock, Activity, AlertTriangle } from 'lucide-react';
+import { useLocale } from '../context/LocaleContext';
 
 interface BybitKeyItem {
   id: string;
@@ -24,6 +25,7 @@ export function BybitKeyVaultPanel({
   selectedKeyId = 'DEFAULT',
   onSelectKeyId,
 }: BybitKeyVaultPanelProps) {
+  const { tr } = useLocale();
   const [keys, setKeys] = useState<BybitKeyItem[]>([]);
   const [maxKeys, setMaxKeys] = useState<number>(1);
   const [planId, setPlanId] = useState<string>('FREE');
@@ -172,14 +174,14 @@ export function BybitKeyVaultPanel({
             className="btn-secondary"
             style={{ padding: '4px 8px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
           >
-            <Plus size={12} /> {showAdd ? 'Tutup' : 'Tambah Bybit Key'}
+            <Plus size={12} /> {showAdd ? tr('Close', 'Tutup') : tr('Add Bybit Key', 'Tambah Bybit Key')}
           </button>
         )}
       </div>
 
       {!isConnected ? (
         <div style={{ fontSize: '11px', color: 'var(--color-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <Lock size={12} /> Hubungkan wallet (SIWE) untuk menyimpan &amp; memverifikasi API Key Bybit V5 (Testnet / Mainnet).
+          <Lock size={12} /> {tr('Connect wallet (SIWE) to store & verify Bybit V5 API keys (Testnet / Mainnet).', 'Hubungkan wallet (SIWE) untuk menyimpan & memverifikasi API Key Bybit V5 (Testnet / Mainnet).')}
         </div>
       ) : (
         <>

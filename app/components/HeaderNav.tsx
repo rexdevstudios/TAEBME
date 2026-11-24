@@ -414,6 +414,24 @@ export default function HeaderNav() {
         )}
       </div>
       </header>
+
+      {/* Phase CV: Mobile Bottom Navigation Bar (< 768px native fintech feel) */}
+      <nav className="pons-mobile-bottom-nav" aria-label="Mobile Bottom Navigation">
+        {[navItems[0], navItems[1], navItems[2], navItems[3], navItems[6]].map((item) => {
+          const Icon = item.icon;
+          const active = isActive(item.href);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`pons-mobile-bottom-link ${active ? 'active' : ''}`}
+            >
+              <Icon size={18} />
+              <span>{item.label}</span>
+            </Link>
+          );
+        })}
+      </nav>
     </>
   );
 }
