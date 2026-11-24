@@ -21,6 +21,11 @@ import {
   formatTelegramTokenSafetyReply,
   formatTelegramWalletRiskReply,
 } from '@packages/notifications/webhook-dispatcher';
+import {
+  GENESIS_SBT_SUPPLY_CAP,
+  formatWeeklyGenesisDigestMessage,
+} from '@packages/billing/genesis-sbt';
+import { PROP_CHALLENGE_RULES } from '@packages/trading/prop-challenge';
 
 export const dynamic = 'force-dynamic';
 
@@ -75,21 +80,59 @@ export async function POST(req: NextRequest) {
     }
 
     const parts = text.split(/\s+/);
-    const cmd = parts[0].toLowerCase();
-    let reply = 'POOLNET Launchpad & AI Scanner Bot.\nCommands:\n/start · /status · /tokens\n/safety <0xContract> [chainId]\n/wallet <0xAddress>';
+    const cmd = parts[0].toLowerCase().split('@')[0];
+    let reply =
+      'POOLNET Launchpad & AI Scanner Bot.\nCommands:\n' +
+      '/start · /status · /genesis · /prop · /tokens · /chatid\n' +
+      '/safety <0xContract> [chainId]\n' +
+      '/wallet <0xAddress>';
 
     if (cmd === '/start' || cmd === '/status') {
       reply =
         'POOLNET SocialFi & Launchpad is OPERATIONAL on Vercel + Neon PostgreSQL SSOT.\n' +
-        'Commands:\n• /tokens — Live launches\n• /safety <0xContract> [8453] — Anti-Honeypot & Insider Scan ($0)\n• /wallet <0xAddress> — Wallet Risk Audit ($0)\n' +
-        'Visit https://pndigi.site/launchpad';
+        'Commands:\n' +
+        '• /genesis — Live Free-Mint Genesis SBT & Referral Leaderboard\n' +
+        '• /prop — POOLNET Prop Trading Cup Rules & Verified Traders\n' +
+        '• /tokens — Live launches\n' +
+        '• /safety <0xContract> [8453] — Anti-Honeypot & Insider Scan ($0)\n' +
+        '• /wallet <0xAddress> — Wallet Risk Audit ($0)\n' +
+        '• /chatid — Show current Telegram Chat ID (Admin/Partner helper)\n' +
+        'Visit https://pndigi.site';
+    } else if (cmd === '/genesis') {
+      const [genesisState, propState] = await Promise.all([
+        defaultBillingDbAdapter.getGenesisSbtState().catch(() => ({ totalMinted: 0, userPass: null, leaderboard: [] })),
+        defaultBillingDbAdapter.getPropChallengeState().catch(() => ({ totalChallenges: 0, verifiedTradersCount: 0, leaderboard: [], activeChallenge: null })),
+      ]);
+      reply = formatWeeklyGenesisDigestMessage({
+        totalMinted: genesisState.totalMinted,
+        supplyCap: GENESIS_SBT_SUPPLY_CAP,
+        leaderboard: genesisState.leaderboard,
+        verifiedPropTraders: propState.verifiedTradersCount,
+        siteOrigin: 'https://pndigi.site',
+      });
+    } else if (cmd === '/prop') {
+      const propState = await defaultBillingDbAdapter
+        .getPropChallengeState()
+        .catch(() => ({ totalChallenges: 0, verifiedTradersCount: 0, leaderboard: [], activeChallenge: null }));
+      reply =
+        `POOLNET Proof-of-Skill Prop Trading Cup\n` +
+        `• Virtual Equity: $${PROP_CHALLENGE_RULES.startingEquityUsd.toLocaleString()}\n` +
+        `• Profit Target: +${PROP_CHALLENGE_RULES.profitTargetPct}% (min ${PROP_CHALLENGE_RULES.minTradingDays} trading days)\n` +
+        `• Risk Limits: Max ${PROP_CHALLENGE_RULES.maxDailyLossPct}% daily loss · ${PROP_CHALLENGE_RULES.maxTotalDrawdownPct}% total drawdown\n` +
+        `• Entry: ${PROP_CHALLENGE_RULES.entryFeeCredits} cr or ${PROP_CHALLENGE_RULES.entryFeeEth} ETH · Pass Reward: +${PROP_CHALLENGE_RULES.passRewardCredits} cr\n` +
+        `• Active/Total Entries: ${propState.totalChallenges} · Verified Traders: ${propState.verifiedTradersCount}\n` +
+        `Enter now: https://pndigi.site/prop`;
+    } else if (cmd === '/chatid') {
+      const chatType = String(message?.chat?.type || 'unknown');
+      const chatTitle = message?.chat?.title ? ` (${String(message.chat.title)})` : '';
+      reply = `Telegram Chat ID: ${chatId}\nType: ${chatType}${chatTitle}\nUse this ID for TELEGRAM_DIGEST_CHAT_ID or White-Label B2B Partner config in /billing Admin Tab.`;
     } else if (cmd === '/tokens') {
       const launches = await defaultDraftDbAdapter.getActiveTokenLaunches().catch(() => []);
       if (launches.length === 0) {
         reply = 'No active token launches registered yet.';
       } else {
         const lines = launches.slice(0, 5).map((t: any) => `- $${t.ticker || 'TOKEN'} (${t.name || 'Launch'}) [${t.chain || 'base'}]`);
-        reply = `Active RTrader Launches (${launches.length}):\n${lines.join('\n')}`;
+        reply = `Active POOLNET Launches (${launches.length}):\n${lines.join('\n')}`;
       }
     } else if (cmd === '/safety') {
       const targetAddr = (parts[1] || '').trim();
