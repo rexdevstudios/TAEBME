@@ -11,6 +11,7 @@ import { CustomAgentBuilderPanel } from '../components/CustomAgentBuilderPanel';
 import { ByokLlmVaultPanel, type SelectedLlmProvider } from '../components/ByokLlmVaultPanel';
 import { AutonomousAgentTerminalCard } from '../components/AutonomousAgentTerminalCard';
 import { SessionAllowancePanel } from '../components/SessionAllowancePanel';
+import { MultiRailAgentExecutionPanel } from '../components/MultiRailAgentExecutionPanel';
 import { AutoPilotControlPanel } from '../components/AutoPilotControlPanel';
 import { SignalMarketplacePanel } from '../components/SignalMarketplacePanel';
 import type { CustomAgentProfile } from '@packages/agent/skill-registry';
@@ -404,6 +405,8 @@ export default function AgentPage() {
           <UserRiskPolicyPanel isConnected={isConnected} />
 
           <SessionAllowancePanel isConnected={isConnected} />
+
+          <MultiRailAgentExecutionPanel isConnected={isConnected} />
 
       {/* Admin Feature Weight Configurator (Exclusive to SUPER_ADMIN / SYSTEM_ADMIN / MANAGE_BILLING_PLANS) */}
       {(hasCapability('MANAGE_BILLING_PLANS') || userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN') && (

@@ -393,6 +393,16 @@ async function runFullTestnetUsecase() {
     });
     assert(partnersPostRes.status === 403, `Non-admin AGENT wallet strictly rejected on POST /api/admin/partners (HTTP ${partnersPostRes.status})`);
 
+    const genesisSnapRes = await fetch(`${BASE_URL}/api/admin/genesis-snapshot`, { headers: authHeaders() });
+    assert(genesisSnapRes.status === 403, `Non-admin AGENT wallet strictly rejected on GET /api/admin/genesis-snapshot (HTTP ${genesisSnapRes.status})`);
+
+    const bankrLeakRes = await fetch(`${BASE_URL}/api/agent/bankr-prompt`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ prompt: `swap using private key 0x${'ab'.repeat(32)}` }),
+    });
+    assert(bankrLeakRes.status === 400, `POST /api/agent/bankr-prompt strictly blocked private-key leakage (HTTP ${bankrLeakRes.status})`);
+
     for (const kid of createdKeyIds) {
       const delRes = await fetch(`${BASE_URL}/api/user/provider-keys?keyId=${encodeURIComponent(kid)}`, {
         method: 'DELETE',
