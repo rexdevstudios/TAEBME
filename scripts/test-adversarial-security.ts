@@ -39,20 +39,22 @@ async function loginBurnerWallet(wallet: ReturnType<typeof Wallet.createRandom>)
   const chRes = await fetch(`${BASE_URL}/api/auth/challenge`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ walletAddress: wallet.address, chainId: 84532 }),
+    body: JSON.stringify({ walletAddress: wallet.address }),
   });
   const chJson: any = await chRes.json();
-  const sig = await wallet.signMessage(chJson.message);
+  const { nonce, messageToSign } = chJson?.data || {};
+  const sig = await wallet.signMessage(messageToSign);
   const verRes = await fetch(`${BASE_URL}/api/auth/verify`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ walletAddress: wallet.address, message: chJson.message, signature: sig }),
+    body: JSON.stringify({ walletAddress: wallet.address, nonce, message: messageToSign, signature: sig }),
   });
   const verJson: any = await verRes.json();
-  if (!verRes.ok || !verJson?.token) {
+  const token = String(verJson?.data?.sessionToken || '');
+  if (!verRes.ok || !token) {
     throw new Error(`SIWE login failed for ${wallet.address}: ${verRes.status}`);
   }
-  return verJson.token;
+  return token;
 }
 
 async function main() {
@@ -73,15 +75,16 @@ async function main() {
     const chRes = await fetch(`${BASE_URL}/api/auth/challenge`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ walletAddress: victim.address, chainId: 84532 }),
+      body: JSON.stringify({ walletAddress: victim.address }),
     });
     const chJson: any = await chRes.json();
+    const { nonce: vNonce, messageToSign: vMsg } = chJson?.data || {};
     // Attacker signs Victim's challenge with Attacker's private key
-    const forgedSig = await attacker.signMessage(chJson.message);
+    const forgedSig = await attacker.signMessage(vMsg);
     const forgeRes = await fetch(`${BASE_URL}/api/auth/verify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ walletAddress: victim.address, message: chJson.message, signature: forgedSig }),
+      body: JSON.stringify({ walletAddress: victim.address, nonce: vNonce, message: vMsg, signature: forgedSig }),
     });
     assert(forgeRes.status === 401 || forgeRes.status === 403, `SIWE forged signature rejected (HTTP ${forgeRes.status})`);
 
