@@ -47,6 +47,12 @@ interface TransparencyPayload {
     totalClaims: number;
     verifiedClaims: number;
   };
+  community?: {
+    genesisPioneersMinted: number;
+    genesisSupplyCap: number;
+    activeFeaturedBoosts: number;
+    marketplacePresetsCount: number;
+  };
   activity: {
     totalLaunches: number;
     graduatedLaunches: number;
@@ -452,6 +458,18 @@ export default function TransparencyPage() {
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span className="text-muted">Active Paid Tiers</span>
                 <span style={{ fontWeight: 700 }}>{data?.activity.activePaidSubscriptions ?? 0}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span className="text-muted">Genesis Pioneers</span>
+                <span style={{ fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
+                  {(data?.community?.genesisPioneersMinted ?? 0).toLocaleString()} / {(data?.community?.genesisSupplyCap ?? 10000).toLocaleString()}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span className="text-muted">Featured Boosts / Presets</span>
+                <span style={{ fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
+                  {data?.community?.activeFeaturedBoosts ?? 0} / {data?.community?.marketplacePresetsCount ?? 0}
+                </span>
               </div>
             </div>
           </div>

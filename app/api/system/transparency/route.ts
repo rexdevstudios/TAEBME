@@ -22,7 +22,7 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-const CACHE_KEY = 'system:transparency:v3';
+const CACHE_KEY = 'system:transparency:v4';
 const CACHE_TTL_SEC = 60;
 
 async function fetchPublicEthBalance(address: string, isTestnet: boolean): Promise<number> {
@@ -290,6 +290,12 @@ export async function GET() {
     const monthly = buildMonthlyTransparencyRows(monthlyBuckets, dexSwapFeeBps);
     const normalizedBountyTokens = normalizeWeiOrHumanTokens(totalBountyAllocated);
 
+    const [genesisState, activeBoostsList, marketplaceList] = await Promise.all([
+      defaultBillingDbAdapter.getGenesisSbtState().catch(() => ({ totalMinted: 0, userPass: null, leaderboard: [] })),
+      defaultBillingDbAdapter.getActiveFeaturedBoosts().catch(() => []),
+      defaultBillingDbAdapter.getMarketplacePresets().catch(() => []),
+    ]);
+
     const payload = {
       environment: appEnv,
       network: isTestnet ? 'Base Sepolia' : 'Base Mainnet',
@@ -307,6 +313,12 @@ export async function GET() {
         totalAllocatedTokens: normalizedBountyTokens,
         totalClaims: totalBountyClaims,
         verifiedClaims: verifiedBountyClaims,
+      },
+      community: {
+        genesisPioneersMinted: genesisState.totalMinted,
+        genesisSupplyCap: 10_000,
+        activeFeaturedBoosts: activeBoostsList.length,
+        marketplacePresetsCount: marketplaceList.length,
       },
       activity: {
         totalLaunches,

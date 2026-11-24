@@ -358,6 +358,13 @@ async function runFullTestnetUsecase() {
       `GET /api/system/transparency returned public live fee & escrow metrics (HTTP 200)`
     );
 
+    const propRes = await fetch(`${BASE_URL}/api/prop/challenge`);
+    const propJson: any = await propRes.json();
+    assert(
+      propRes.status === 200 && propJson?.success === true && propJson?.data?.rules?.profitTargetPct === 8,
+      `GET /api/prop/challenge returned Proof-of-Skill Prop Challenge rules & leaderboard (HTTP 200)`
+    );
+
     // =========================================================================
     // STAGE 8: RBAC Admin Fail-Closed + Cleanup + Logout Invalidation
     // =========================================================================

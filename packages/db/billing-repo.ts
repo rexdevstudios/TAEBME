@@ -26,6 +26,12 @@ import {
   type GenesisSbtMintRecord,
 } from '../billing/genesis-sbt';
 import {
+  PROP_CHALLENGE_RULES,
+  evaluatePropChallengeMetrics,
+  type PropChallengeRecord,
+  type PropTradeSample,
+} from '../trading/prop-challenge';
+import {
   PlanId,
   BillingDbAdapter,
   UserRiskPolicy,
@@ -1212,6 +1218,245 @@ export class PostgresBillingDbAdapter implements BillingDbAdapter {
       totalMinted: nextRecords.length,
       leaderboard: computeGenesisReferralLeaderboard(nextRecords, 10),
     };
+  }
+
+  private inMemoryPropChallenges: PropChallengeRecord[] = [];
+  private inMemoryPropTxHashes: Set<string> = new Set();
+
+  async getPropChallengeState(walletAddress?: string): Promise<{
+    totalChallenges: number;
+    verifiedTradersCount: number;
+    leaderboard: PropChallengeRecord[];
+    activeChallenge: PropChallengeRecord | null;
+  }> {
+    let records = [...this.inMemoryPropChallenges];
+    const pool = this.resolveDeps()?.getDbPool() || null;
+    if (pool) {
+      try {
+        const res = await pool.query(`SELECT features FROM plans WHERE id = 'FREE' LIMIT 1`);
+        if (res.rows.length > 0) {
+          const feat =
+            typeof res.rows[0].features === 'string'
+              ? JSON.parse(res.rows[0].features)
+              : res.rows[0].features || {};
+          if (Array.isArray(feat.propChallenges)) {
+            records = feat.propChallenges as PropChallengeRecord[];
+          }
+        }
+      } catch (err: any) {
+        console.warn('[PostgresBillingDbAdapter] getPropChallengeState warning:', err?.message);
+      }
+    }
+
+    const passed = records
+      .filter((r) => r.status === 'PASSED')
+      .sort((a, b) => b.pnlPct - a.pnlPct);
+    const normWallet = (walletAddress || '').trim().toLowerCase();
+    const activeChallenge = normWallet
+      ? records.find(
+          (r) => r.walletAddress.trim().toLowerCase() === normWallet && r.status === 'ACTIVE'
+        ) ||
+        records.find((r) => r.walletAddress.trim().toLowerCase() === normWallet) ||
+        null
+      : null;
+
+    return {
+      totalChallenges: records.length,
+      verifiedTradersCount: passed.length,
+      leaderboard: passed.slice(0, 20),
+      activeChallenge,
+    };
+  }
+
+  async startPropChallenge(params: {
+    walletAddress: string;
+    paymentMode: 'CREDITS' | 'ETH';
+    paymentRef: string;
+  }): Promise<{
+    ok: boolean;
+    code?: 'ACTIVE_CHALLENGE_EXISTS' | 'INSUFFICIENT_CREDITS' | 'REPLAY_TX_HASH';
+    error?: string;
+    challenge?: PropChallengeRecord;
+  }> {
+    const normWallet = params.walletAddress.trim().toLowerCase();
+    const normRef = params.paymentRef.trim().toLowerCase();
+    const pool = this.resolveDeps()?.getDbPool() || null;
+
+    let existing: PropChallengeRecord[] = [...this.inMemoryPropChallenges];
+    let redeemedTxs: string[] = Array.from(this.inMemoryPropTxHashes);
+
+    if (pool) {
+      try {
+        const res = await pool.query(`SELECT features FROM plans WHERE id = 'FREE' LIMIT 1`);
+        if (res.rows.length > 0) {
+          const feat =
+            typeof res.rows[0].features === 'string'
+              ? JSON.parse(res.rows[0].features)
+              : res.rows[0].features || {};
+          if (Array.isArray(feat.propChallenges)) existing = feat.propChallenges;
+          if (Array.isArray(feat.propTxHashes)) redeemedTxs = feat.propTxHashes;
+        }
+      } catch (err: any) {
+        console.warn('[PostgresBillingDbAdapter] startPropChallenge load warning:', err?.message);
+      }
+    }
+
+    if (
+      existing.some(
+        (r) => r.walletAddress.trim().toLowerCase() === normWallet && r.status === 'ACTIVE'
+      )
+    ) {
+      return {
+        ok: false,
+        code: 'ACTIVE_CHALLENGE_EXISTS',
+        error: 'ACTIVE_CHALLENGE_EXISTS: You already have an active Prop Challenge.',
+      };
+    }
+
+    if (params.paymentMode === 'ETH' && redeemedTxs.some((t) => String(t).toLowerCase() === normRef)) {
+      return {
+        ok: false,
+        code: 'REPLAY_TX_HASH',
+        error: 'REPLAY_TX_HASH: This transaction hash was already used to start a challenge.',
+      };
+    }
+
+    if (params.paymentMode === 'CREDITS') {
+      const balance = await this.getUserCreditBalance(params.walletAddress);
+      if (balance < PROP_CHALLENGE_RULES.entryFeeCredits) {
+        return {
+          ok: false,
+          code: 'INSUFFICIENT_CREDITS',
+          error: `INSUFFICIENT_CREDITS: Required ${PROP_CHALLENGE_RULES.entryFeeCredits} cr, available ${balance} cr.`,
+        };
+      }
+      await this.recordLedgerEntry({
+        userId: params.walletAddress,
+        amount: -PROP_CHALLENGE_RULES.entryFeeCredits,
+        currency: 'CREDITS',
+        type: 'PROP_CHALLENGE_ENTRY',
+        referenceId: params.paymentRef,
+        description: `Web3 Proof-of-Skill Prop Challenge entry (${PROP_CHALLENGE_RULES.entryFeeCredits} cr)`,
+      });
+    }
+
+    const nowMs = Date.now();
+    const challenge: PropChallengeRecord = {
+      id: `prop-${crypto.randomUUID().slice(0, 12)}`,
+      walletAddress: params.walletAddress.trim(),
+      status: 'ACTIVE',
+      paymentMode: params.paymentMode,
+      paymentRef: params.paymentRef.trim(),
+      startingEquityUsd: PROP_CHALLENGE_RULES.startingEquityUsd,
+      currentEquityUsd: PROP_CHALLENGE_RULES.startingEquityUsd,
+      pnlPct: 0,
+      maxDrawdownPct: 0,
+      worstDailyLossPct: 0,
+      tradingDaysCount: 0,
+      startedAt: new Date(nowMs).toISOString(),
+      expiresAt: new Date(nowMs + PROP_CHALLENGE_RULES.maxDurationDays * 86_400_000).toISOString(),
+    };
+
+    const nextRecords = [challenge, ...existing].slice(0, 500);
+    const nextTxs =
+      params.paymentMode === 'ETH' ? [normRef, ...redeemedTxs].slice(0, 500) : redeemedTxs;
+
+    if (pool) {
+      try {
+        const patch = JSON.stringify({
+          propChallenges: nextRecords,
+          propTxHashes: nextTxs,
+        });
+        await pool.query(
+          `INSERT INTO plans (id, name, base_price_cents, monthly_credits, features)
+           VALUES ('FREE', 'FREE Tier', 0, 100, $1::jsonb)
+           ON CONFLICT (id) DO UPDATE SET
+             features = COALESCE(plans.features, '{}'::jsonb) || $1::jsonb`,
+          [patch]
+        );
+      } catch (err: any) {
+        console.warn('[PostgresBillingDbAdapter] startPropChallenge save warning:', err?.message);
+      }
+    }
+
+    this.inMemoryPropChallenges = nextRecords;
+    if (params.paymentMode === 'ETH') this.inMemoryPropTxHashes.add(normRef);
+    return { ok: true, challenge };
+  }
+
+  async evaluatePropChallenge(
+    walletAddress: string,
+    trades: readonly PropTradeSample[],
+    nowMs: number = Date.now()
+  ): Promise<{ ok: boolean; error?: string; challenge?: PropChallengeRecord }> {
+    const normWallet = walletAddress.trim().toLowerCase();
+    const pool = this.resolveDeps()?.getDbPool() || null;
+    let existing: PropChallengeRecord[] = [...this.inMemoryPropChallenges];
+
+    if (pool) {
+      try {
+        const res = await pool.query(`SELECT features FROM plans WHERE id = 'FREE' LIMIT 1`);
+        if (res.rows.length > 0) {
+          const feat =
+            typeof res.rows[0].features === 'string'
+              ? JSON.parse(res.rows[0].features)
+              : res.rows[0].features || {};
+          if (Array.isArray(feat.propChallenges)) existing = feat.propChallenges;
+        }
+      } catch (err: any) {
+        console.warn('[PostgresBillingDbAdapter] evaluatePropChallenge load warning:', err?.message);
+      }
+    }
+
+    const idx = existing.findIndex(
+      (r) => r.walletAddress.trim().toLowerCase() === normWallet && r.status === 'ACTIVE'
+    );
+    if (idx < 0) {
+      return { ok: false, error: 'NO_ACTIVE_CHALLENGE' };
+    }
+
+    const current = existing[idx];
+    const outcome = evaluatePropChallengeMetrics({
+      startingEquityUsd: current.startingEquityUsd,
+      trades,
+      expiresAt: current.expiresAt,
+      nowMs,
+    });
+
+    const updated: PropChallengeRecord = {
+      ...current,
+      ...outcome,
+      evaluatedAt: new Date(nowMs).toISOString(),
+    };
+
+    const nextRecords = [...existing];
+    nextRecords[idx] = updated;
+
+    if (pool) {
+      try {
+        const patch = JSON.stringify({ propChallenges: nextRecords });
+        await pool.query(
+          `UPDATE plans SET features = COALESCE(features, '{}'::jsonb) || $1::jsonb WHERE id = 'FREE'`,
+          [patch]
+        );
+      } catch (err: any) {
+        console.warn('[PostgresBillingDbAdapter] evaluatePropChallenge save warning:', err?.message);
+      }
+    }
+    this.inMemoryPropChallenges = nextRecords;
+
+    if (updated.status === 'PASSED') {
+      await this.recordLedgerEntry({
+        userId: updated.walletAddress,
+        amount: PROP_CHALLENGE_RULES.passRewardCredits,
+        currency: 'CREDITS',
+        type: 'PROP_CHALLENGE_PASS_REWARD',
+        referenceId: `prop-pass:${updated.id}`,
+        description: `Verified Trader Prop Challenge passed (+${PROP_CHALLENGE_RULES.passRewardCredits} cr)`,
+      });
+    }
+
+    return { ok: true, challenge: updated };
   }
 
   async createAuditLog(_actorId: string, _action: string, _entityId?: string, _reason?: string): Promise<void> {

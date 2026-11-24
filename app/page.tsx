@@ -249,6 +249,11 @@ export default function OverviewPage() {
           onConnectMetaMask={handleGuestConnect}
         />
 
+        {/* ── PUBLIC FREE-MINT GENESIS PIONEER SBT & REFERRAL LEADERBOARD (Phase DG) ── */}
+        <section style={{ maxWidth: '1040px', width: '100%', margin: '0 auto', padding: '0 var(--space-md) var(--space-xl) var(--space-md)' }}>
+          <GenesisSbtCard />
+        </section>
+
         {/* ── 3-STEP ONBOARDING WALKTHROUGH ── */}
         <section style={{
           padding: 'var(--space-2xl) 0 var(--space-3xl) 0',
