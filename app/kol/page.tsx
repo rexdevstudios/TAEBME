@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useLocale } from '../context/LocaleContext';
 import { PageWorkflowBanner } from '../components/PageWorkflowBanner';
 import { WalletRiskBadgeCard } from '../components/WalletRiskBadgeCard';
 import {
@@ -48,6 +49,7 @@ interface BountyCampaignView {
 
 export default function KolHubPage() {
   const { walletAddress, isConnected, entitlements } = useAuth();
+  const { t } = useLocale();
 
   const [activeTab, setActiveTab] = useState<'PASSPORT' | 'MARKET' | 'CLAIM' | 'CREATOR'>('PASSPORT');
   const [twitterHandle, setTwitterHandle] = useState('');
@@ -498,10 +500,10 @@ export default function KolHubPage() {
               </span>
             </div>
             <h1 style={{ fontSize: '22px', fontWeight: 900, margin: 0, letterSpacing: '-0.3px', color: 'var(--color-foreground)' }}>
-              Earn, KOL Hub &amp; Marketing Bounties
+              {t('kol.title')}
             </h1>
             <p className="text-muted" style={{ margin: '4px 0 0 0', fontSize: '13px' }}>
-              Verifikasi Passport sosial Anda, selesaikan misi kampanye token, dan klaim alokasi reward secara instan &amp; on-chain.
+              {t('kol.subtitle')}
             </p>
           </div>
           <button
@@ -509,7 +511,7 @@ export default function KolHubPage() {
             onClick={() => setActiveTab('MARKET')}
             className="cex-btn-gold"
           >
-            <Coins size={15} /> Jelajahi Bounties
+            <Coins size={15} /> {t('kol.ctaExplore')}
           </button>
         </div>
       </div>
@@ -524,7 +526,7 @@ export default function KolHubPage() {
           className={`cex-tab-btn ${activeTab === 'PASSPORT' ? 'active' : ''}`}
           style={{ flex: '1 1 150px' }}
         >
-          <Award size={15} /> KOL Passport
+          <Award size={15} /> {t('kol.tabPassport')}
         </button>
         <button
           type="button"
@@ -534,7 +536,7 @@ export default function KolHubPage() {
           className={`cex-tab-btn ${activeTab === 'MARKET' ? 'active' : ''}`}
           style={{ flex: '1 1 150px' }}
         >
-          <Coins size={15} /> Active Bounties
+          <Coins size={15} /> {t('kol.tabMarket')}
         </button>
         <button
           type="button"
@@ -544,7 +546,7 @@ export default function KolHubPage() {
           className={`cex-tab-btn ${activeTab === 'CLAIM' ? 'active' : ''}`}
           style={{ flex: '1 1 150px' }}
         >
-          <Share2 size={15} /> Submit &amp; Claim
+          <Share2 size={15} /> {t('kol.tabClaim')}
         </button>
         <button
           type="button"
@@ -554,7 +556,7 @@ export default function KolHubPage() {
           className={`cex-tab-btn ${activeTab === 'CREATOR' ? 'active' : ''}`}
           style={{ flex: '1 1 150px' }}
         >
-          <Flame size={15} /> Creator Escrow
+          <Flame size={15} /> {t('kol.tabCreator')}
         </button>
       </div>
 

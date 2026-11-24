@@ -75,7 +75,7 @@ export const CEX_UI_ROUTE_CONTRACTS: readonly UiRouteSmokeContract[] = [
     label: 'Account, Plans & Telegram Alerts',
     requiresTabList: true,
     minTabs: 3,
-    requiredMarkers: ['Paket Layanan', 'Paket &amp; Harga'],
+    requiredMarkers: ['Plans, Credits', 'Plans &amp; Pricing'],
   },
 ] as const;
 

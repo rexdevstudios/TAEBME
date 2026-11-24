@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useLocale } from '../context/LocaleContext';
 import { Activity, ShieldAlert, BarChart3, Clock, AlertTriangle, Lightbulb, Wallet, BrainCircuit, ActivitySquare, Lock } from 'lucide-react';
 import { NutritionLabelCard } from '../components/NutritionLabelCard';
 import { TokenSafetyBadgeCard } from '../components/TokenSafetyBadgeCard';
@@ -248,6 +249,7 @@ function CandlestickChart({ candles }: { candles: Candle[] }) {
 
 export default function TradingPage() {
   const { isConnected, userRole, planId, entitlements, chainId, connectMetaMask, isConnecting } = useAuth();
+  const { t } = useLocale();
   const [connectError, setConnectError] = useState<string | null>(null);
   const [symbol, setSymbol] = useState('BTCUSDT');
   const [interval, setInterval] = useState('1h');
@@ -576,10 +578,10 @@ export default function TradingPage() {
       <div className="cex-hero-banner cex-hero-emerald" style={{ padding: '14px 18px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
           <h1 style={{ fontSize: '19px', fontWeight: 900, margin: 0, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-foreground)' }}>
-            <ActivitySquare size={19} style={{ color: '#10B981' }} /> Spot &amp; DEX Trading Terminal
+            <ActivitySquare size={19} style={{ color: '#10B981' }} /> {t('trading.title')}
           </h1>
           <span className="text-muted" style={{ fontSize: '12px' }}>
-            6-Chain 0x v2 DEX · Binance/Bybit Spot · GoPlus Anti-Honeypot Guard
+            {t('trading.subtitle')}
           </span>
         </div>
         <div className="flex-row gap-sm items-center">
@@ -612,9 +614,9 @@ export default function TradingPage() {
       <div role="tablist" aria-label="Navigasi Halaman Trading" className="cex-tab-bar">
         {(
           [
-            { id: 'trade', label: 'Trade Terminal', hint: 'Chart · DEX 0x v2 · CEX Order', icon: ActivitySquare },
-            { id: 'history', label: 'Riwayat & Portfolio Recap', hint: 'KPI · Explorer · CSV', icon: BarChart3 },
-            { id: 'vault', label: 'API Vault & Risk Guard', hint: 'Binance · Bybit · Risk Cap', icon: Lock },
+            { id: 'trade', label: t('trading.tabTrade'), hint: 'Chart · DEX 0x v2 · CEX Order', icon: ActivitySquare },
+            { id: 'history', label: t('trading.tabHistory'), hint: 'KPI · Explorer · CSV', icon: BarChart3 },
+            { id: 'vault', label: t('trading.tabVault'), hint: 'Binance · Bybit · Risk Cap', icon: Lock },
           ] as const
         ).map((tab) => {
           const active = activeTradingTab === tab.id;

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useLocale } from '../context/LocaleContext';
 import { Rocket, ShieldAlert, FileText, CheckCircle2, AlertTriangle, TrendingUp, Scale, Wallet, Users, Tag, Sparkles, Coins, Zap, Search, Copy, Check } from 'lucide-react';
 import { NutritionLabelCard } from '../components/NutritionLabelCard';
 import { WalletRiskBadgeCard } from '../components/WalletRiskBadgeCard';
@@ -33,6 +34,7 @@ export type LaunchModeType = 'BONDING_CURVE' | 'FAIR_LAUNCH' | 'WHITELIST_PRIVAT
 
 export default function LaunchpadPage() {
   const { isConnected, userRole, entitlements, walletAddress, connectMetaMask, isConnecting, refreshSession, switchNetwork, hasCapability, planId, credits } = useAuth();
+  const { t } = useLocale();
   const [connectError, setConnectError] = useState<string | null>(null);
   const [selectedBankrKeyId, setSelectedBankrKeyId] = useState<string>('PLATFORM_DEFAULT');
   const [selectedBatchBankrKeyIds, setSelectedBatchBankrKeyIds] = useState<string[]>([]);
@@ -433,10 +435,10 @@ export default function LaunchpadPage() {
             POOLNET CEX-Grade Token Launchpad · 0% Tax · Gas-Sponsored Base L2
           </div>
           <h1 style={{ fontSize: '22px', fontWeight: 900, margin: '0 0 4px 0', color: 'var(--color-foreground)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Rocket size={20} style={{ color: '#F0B90B' }} /> Token Launchpad &amp; Live Bonding Pools
+            <Rocket size={20} style={{ color: '#F0B90B' }} /> {t('launchpad.title')}
           </h1>
           <p className="text-muted" style={{ margin: 0, fontSize: '12px' }}>
-            Jelajahi pool token aktif, luncurkan token baru dengan Bankr Fleet, atau bangun aset brand via AI Studio — semua terverifikasi GoPlus Anti-Insider ($0).
+            {t('launchpad.subtitle')}
           </p>
         </div>
         <div className="flex-row gap-sm items-center" style={{ flexWrap: 'wrap' }}>
@@ -445,7 +447,7 @@ export default function LaunchpadPage() {
             onClick={() => setLaunchpadTab('CREATE')}
             className="cex-btn-gold"
           >
-            <Rocket size={15} /> Launch Token Baru
+            <Rocket size={15} /> {t('launchpad.ctaCreate')}
           </button>
           <button
             type="button"
@@ -464,7 +466,7 @@ export default function LaunchpadPage() {
               gap: '6px',
             }}
           >
-            <Users size={14} /> Angel Deal Room
+            <Users size={14} /> {t('launchpad.ctaAngel')}
           </button>
         </div>
       </div>
@@ -478,7 +480,7 @@ export default function LaunchpadPage() {
           onClick={() => setLaunchpadTab('POOLS')}
           className={`cex-tab-btn ${launchpadTab === 'POOLS' ? 'active' : ''}`}
         >
-          <TrendingUp size={14} /> Live Pools <span className="cex-tab-count">{activeTokens.length}</span>
+          <TrendingUp size={14} /> {t('launchpad.tabPools')} <span className="cex-tab-count">{activeTokens.length}</span>
         </button>
         <button
           type="button"
@@ -487,7 +489,7 @@ export default function LaunchpadPage() {
           onClick={() => setLaunchpadTab('CREATE')}
           className={`cex-tab-btn ${launchpadTab === 'CREATE' ? 'active' : ''}`}
         >
-          <Rocket size={14} /> Launch Token &amp; Bankr Fleet
+          <Rocket size={14} /> {t('launchpad.tabCreate')}
         </button>
         <button
           type="button"
@@ -496,7 +498,7 @@ export default function LaunchpadPage() {
           onClick={() => setLaunchpadTab('STUDIO')}
           className={`cex-tab-btn ${launchpadTab === 'STUDIO' ? 'active' : ''}`}
         >
-          <Sparkles size={14} /> AI Brand Studio
+          <Sparkles size={14} /> {t('launchpad.tabStudio')}
         </button>
         {isLaunchpadAdmin && (
           <button
@@ -506,7 +508,7 @@ export default function LaunchpadPage() {
             onClick={() => setLaunchpadTab('ADMIN')}
             className={`cex-tab-btn ${launchpadTab === 'ADMIN' ? 'active' : ''}`}
           >
-            <ShieldAlert size={14} /> Admin Governance
+            <ShieldAlert size={14} /> {t('launchpad.tabAdmin')}
           </button>
         )}
       </div>

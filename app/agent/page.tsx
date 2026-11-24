@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useLocale } from '../context/LocaleContext';
 import { Bot, ShieldAlert, Settings2, FileCode2, Target, BrainCircuit, Activity, BarChart3, Wallet } from 'lucide-react';
 import { FiveAgentDeskPanel } from '../components/FiveAgentDeskPanel';
 import { PageWorkflowBanner } from '../components/PageWorkflowBanner';
@@ -15,6 +16,7 @@ import type { CustomAgentProfile } from '@packages/agent/skill-registry';
 
 export default function AgentPage() {
   const { isConnected, userRole, hasCapability, entitlements, connectMetaMask, isConnecting, refreshSession } = useAuth();
+  const { t } = useLocale();
   const [connectError, setConnectError] = useState<string | null>(null);
   const [symbol, setSymbol] = useState('BTCUSDT');
   const [action, setAction] = useState<'BUY' | 'SELL'>('BUY');
@@ -141,10 +143,10 @@ export default function AgentPage() {
             24/7 Autonomous AI Trading · Trailing Stop-Loss · GoPlus Anti-Insider
           </div>
           <h1 style={{ fontSize: '20px', fontWeight: 900, margin: '0 0 4px 0', color: 'var(--color-foreground)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Bot size={20} style={{ color: 'var(--color-badge-info-text)' }} /> AI Auto-Pilot &amp; 5-Agent Desk
+            <Bot size={20} style={{ color: 'var(--color-badge-info-text)' }} /> {t('agent.title')}
           </h1>
           <p className="text-muted" style={{ margin: 0, fontSize: '12px' }}>
-            Analisis peluang beli/jual berbasis data pasar live, likuiditas DEX, dan sentimen — 100% Non-Custodial dengan Risk Gate deterministik.
+            {t('agent.subtitle')}
           </p>
         </div>
         <div className="flex-row gap-sm items-center">
@@ -163,9 +165,9 @@ export default function AgentPage() {
       <div role="tablist" aria-label="Navigasi Ruang Kerja AI Agent" className="cex-tab-bar">
         {(
           [
-            { id: 'autopilot', label: 'Auto-Pilot 24/7 & Sinyal', hint: 'Mudah · Pemula', icon: Bot },
-            { id: 'analyst', label: '5-Agent Analyst Desk', hint: 'Scanner · Analyst · Risk', icon: BrainCircuit },
-            { id: 'pro', label: 'Pro Vault & Session', hint: 'BYOK LLM · ERC-7715', icon: Settings2 },
+            { id: 'autopilot', label: t('agent.tabAutoPilot'), hint: '24/7 TP/SL · Trailing SL', icon: Bot },
+            { id: 'analyst', label: t('agent.tabAnalyst'), hint: 'Scanner · Analyst · Risk', icon: BrainCircuit },
+            { id: 'pro', label: t('agent.tabPro'), hint: 'BYOK LLM · ERC-7715', icon: Settings2 },
           ] as const
         ).map((tab) => {
           const active = activeAgentTab === tab.id;

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useLocale } from '../context/LocaleContext';
 import { CreditCard, CheckCircle2, ShieldAlert, Zap, TrendingUp, Wallet, Banknote, Scale, History, RefreshCw } from 'lucide-react';
 import { ethers } from 'ethers';
 import { ensureBaseNetwork, getBrowserSigner, normalizeWeb3Error, resolveBrowserEthereumProvider } from '@packages/launchpad/web3-provider';
@@ -75,6 +76,7 @@ interface Plan {
 
 export default function BillingPage() {
   const { isConnected, userRole, hasCapability, planId, credits, connectMetaMask, isConnecting, refreshSession } = useAuth();
+  const { t } = useLocale();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [activePlanId, setActivePlanId] = useState<string>('FREE');
@@ -431,10 +433,10 @@ export default function BillingPage() {
             Account · Plans · API Vaults · Telegram Alerts
           </div>
           <h1 style={{ fontSize: '20px', fontWeight: 900, margin: '0 0 4px 0', color: 'var(--color-foreground)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <CreditCard size={20} style={{ color: '#F0B90B' }} /> Paket Layanan, Kredit &amp; Pengaturan Akun
+            <CreditCard size={20} style={{ color: '#F0B90B' }} /> {t('billing.title')}
           </h1>
           <p className="text-muted" style={{ margin: 0, fontSize: '12px' }}>
-            Kelola paket langganan, Add-On kuota, Webhook Telegram/Discord, dan audit mutasi kredit dalam satu tempat yang rapi.
+            {t('billing.subtitle')}
           </p>
         </div>
         <div className="flex-row gap-sm items-center tabular-nums">
@@ -460,11 +462,11 @@ export default function BillingPage() {
       <div role="tablist" aria-label="Navigasi Halaman Billing dan Vault" className="cex-tab-bar">
         {(
           [
-            { id: 'plans', label: 'Paket & Harga', hint: 'FREE · CREATOR · TRADER · AGENT', icon: CreditCard },
-            { id: 'vaults', label: 'Add-On, API & Telegram Alert', hint: 'Vault · Webhook · Provider', icon: Zap },
-            { id: 'history', label: 'Mutasi Kredit & Keamanan', hint: 'Ledger & Explorer Log', icon: History },
+            { id: 'plans', label: t('billing.tabPlans'), hint: 'FREE · CREATOR · TRADER · AGENT', icon: CreditCard },
+            { id: 'vaults', label: t('billing.tabVaults'), hint: 'Vault · Webhook · Provider', icon: Zap },
+            { id: 'history', label: t('billing.tabHistory'), hint: 'Ledger & Explorer Log', icon: History },
             ...((hasCapability('MANAGE_BILLING_PLANS') || userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN' || userRole === 'BILLING_ADMIN')
-              ? [{ id: 'admin' as const, label: 'Admin Ops Console', hint: 'Promo · Risk · Kill-Switch', icon: ShieldAlert }]
+              ? [{ id: 'admin' as const, label: t('billing.tabAdmin'), hint: 'Promo · Risk · Kill-Switch', icon: ShieldAlert }]
               : []),
           ] as const
         ).map((tab) => {

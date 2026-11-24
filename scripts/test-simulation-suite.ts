@@ -46,6 +46,7 @@ import {
   buildMonthlyTransparencyRows,
   normalizeWeiOrHumanTokens,
 } from '../packages/shared/transparency-metrics';
+import { I18N_DICTIONARY, translateKey } from '../packages/shared/i18n-dictionary';
 import {
   clearAutoPilotPeakPrice,
   computeDynamicSignalConfidence,
@@ -1164,6 +1165,20 @@ async function runSimulationSuite() {
       cnWeiNorm === 4_460_000 &&
       cnMonthly[0]?.monthLabel === 'Nov 2026',
     'Public transparency engine computes exact 1% curve USD split + 25bps DEX fee & 18-dec wei normalization'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 46: Full Multi-Language EN/ID Dictionary Parity (Phase CR)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 46: Multi-Language EN/ID Dictionary Parity & Resolution] ---');
+  const crEnKeys = Object.keys(I18N_DICTIONARY.en).length;
+  const crIdKeys = Object.keys(I18N_DICTIONARY.id).length;
+  assert(
+    crEnKeys === crIdKeys &&
+      crEnKeys >= 40 &&
+      translateKey('en', 'billing.tabPlans') === 'Plans & Pricing' &&
+      translateKey('id', 'billing.tabPlans') === 'Paket & Harga',
+    'Multi-language EN/ID dictionary maintains 100% key parity across all 7 core pages'
   );
 
   console.log('\n================================================================');
