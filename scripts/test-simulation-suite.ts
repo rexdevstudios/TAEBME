@@ -38,6 +38,10 @@ import {
   buildSocialShareUrl,
 } from '../packages/notifications/webhook-dispatcher';
 import {
+  CEX_UI_ROUTE_CONTRACTS,
+  auditRenderedPageHtml,
+} from '../packages/shared/ui-smoke-contract';
+import {
   clearAutoPilotPeakPrice,
   computeDynamicSignalConfidence,
   computeUpdatedPeakPrice,
@@ -1117,6 +1121,21 @@ async function runSimulationSuite() {
       ckWalletText.includes('TRUSTED') &&
       ckShareUrl.startsWith('https://x.com/intent/tweet?'),
     'Telegram /safety & /wallet formatters and X viral referral share URL operate deterministically'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 44: Automated CEX UI & Tab Navigation Smoke Contract (Phase CL)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 44: CEX UI & Tab Navigation Smoke Contract] ---');
+  const clLaunchpad = CEX_UI_ROUTE_CONTRACTS.find((c) => c.path === '/launchpad')!;
+  const clHealthy = auditRenderedPageHtml(
+    clLaunchpad,
+    `<html><head><meta name="viewport" content="width=device-width"></head><body><header class="header-nav">Overview Launchpad Trade AI Auto-Pilot Earn & KOL Account</header><main><h1>Token Launchpad</h1><div role="tablist"><button role="tab">Live Pools</button><button role="tab">Create</button><button role="tab">Studio</button></div></main></body></html>`
+  );
+  const clBroken = auditRenderedPageHtml(clLaunchpad, '<html><body>__next_error__</body></html>');
+  assert(
+    clHealthy.ok === true && clHealthy.tabCount === 3 && clBroken.ok === false,
+    'CEX UI smoke contract validates healthy tabbed pages & rejects Next.js fatal error boundaries'
   );
 
   console.log('\n================================================================');
