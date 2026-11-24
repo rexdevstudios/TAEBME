@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Award, Check, Copy, ShieldCheck, Users } from 'lucide-react';
+import { Award, Check, Copy, ExternalLink, ShieldCheck, Users } from 'lucide-react';
 import {
   GENESIS_SBT_PROTOCOL_FEE_ETH,
   GENESIS_SBT_PROTOCOL_FEE_WEI_HEX,
   GENESIS_SBT_SUPPLY_CAP,
   buildGenesisReferralUrl,
+  buildGenesisShareIntents,
   type GenesisReferralLeaderRow,
   type GenesisSbtMintRecord,
 } from '@packages/billing/genesis-sbt';
@@ -222,6 +223,34 @@ export function GenesisSbtCard() {
               {copied ? <Check size={13} /> : <Copy size={13} />}
               {copied ? tr('Referral Link Copied', 'Link Referral Disalin') : tr('Copy Referral Link (+50 cr/invite)', 'Salin Link Referral (+50 cr/undangan)')}
             </button>
+            {walletAddress && (() => {
+              const origin = typeof window !== 'undefined' ? window.location.origin : 'https://pndigi.site';
+              const intents = buildGenesisShareIntents(origin, walletAddress, userPass.serialNumber);
+              return (
+                <>
+                  <a
+                    href={intents.twitterIntentUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn-secondary"
+                    style={{ padding: '7px 12px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '5px', textDecoration: 'none' }}
+                  >
+                    <ExternalLink size={12} />
+                    {tr('Share on X', 'Bagikan di X')}
+                  </a>
+                  <a
+                    href={intents.telegramShareUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn-secondary"
+                    style={{ padding: '7px 12px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '5px', textDecoration: 'none' }}
+                  >
+                    <ExternalLink size={12} />
+                    {tr('Share on Telegram', 'Bagikan di Telegram')}
+                  </a>
+                </>
+              );
+            })()}
           </div>
         ) : (
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>

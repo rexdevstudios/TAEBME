@@ -72,6 +72,39 @@ export function buildGenesisReferralUrl(origin: string, walletAddress: string): 
   return `${cleanOrigin}/?ref=${encodeURIComponent(walletAddress.trim())}`;
 }
 
+export interface GenesisShareIntents {
+  referralUrl: string;
+  shareText: string;
+  twitterIntentUrl: string;
+  telegramShareUrl: string;
+}
+
+/**
+ * Pure deterministic viral social share URL builder for POOLNET Genesis Sprint (Phase DM).
+ */
+export function buildGenesisShareIntents(
+  origin: string,
+  walletAddress: string,
+  serialNumber?: number | null
+): GenesisShareIntents {
+  const referralUrl = buildGenesisReferralUrl(origin, walletAddress);
+  const badge =
+    typeof serialNumber === 'number' && serialNumber > 0
+      ? `Genesis Pioneer #${serialNumber}`
+      : 'Free-Mint Genesis Pioneer SBT';
+  const shareText = `Just claimed my ${badge} on POOLNET (10,000 cap on Base) — +200 Welcome Credits, AI Multi-Rail Trading, and GoPlus Anti-Honeypot Guard. Claim yours free:`;
+
+  const twitterIntentUrl = `https://x.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(referralUrl)}`;
+  const telegramShareUrl = `https://t.me/share/url?url=${encodeURIComponent(referralUrl)}&text=${encodeURIComponent(shareText)}`;
+
+  return {
+    referralUrl,
+    shareText,
+    twitterIntentUrl,
+    telegramShareUrl,
+  };
+}
+
 export type GenesisWhitelistTier = 'PIONEER' | 'AMBASSADOR' | 'WHALE_REFERRER';
 
 export interface GenesisWhitelistEntry {
