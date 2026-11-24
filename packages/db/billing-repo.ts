@@ -31,6 +31,7 @@ import {
   type PropChallengeRecord,
   type PropTradeSample,
 } from '../trading/prop-challenge';
+import type { WhiteLabelPartnerConfig } from '../billing/whitelabel-partner';
 import {
   PlanId,
   BillingDbAdapter,
@@ -1457,6 +1458,83 @@ export class PostgresBillingDbAdapter implements BillingDbAdapter {
     }
 
     return { ok: true, challenge: updated };
+  }
+
+  private inMemoryWhiteLabelPartners: WhiteLabelPartnerConfig[] = [];
+
+  async getWhiteLabelPartners(): Promise<WhiteLabelPartnerConfig[]> {
+    const pool = this.resolveDeps()?.getDbPool() || null;
+    if (pool) {
+      try {
+        const res = await pool.query(`SELECT features FROM plans WHERE id = 'FREE' LIMIT 1`);
+        if (res.rows.length > 0) {
+          const feat =
+            typeof res.rows[0].features === 'string'
+              ? JSON.parse(res.rows[0].features)
+              : res.rows[0].features || {};
+          if (Array.isArray(feat.whiteLabelPartners)) {
+            return feat.whiteLabelPartners as WhiteLabelPartnerConfig[];
+          }
+        }
+      } catch (err: any) {
+        console.warn('[PostgresBillingDbAdapter] getWhiteLabelPartners warning:', err?.message);
+      }
+    }
+    return [...this.inMemoryWhiteLabelPartners];
+  }
+
+  async upsertWhiteLabelPartner(
+    input: Omit<WhiteLabelPartnerConfig, 'createdAt' | 'updatedAt'>
+  ): Promise<WhiteLabelPartnerConfig> {
+    const existing = await this.getWhiteLabelPartners();
+    const nowIso = new Date().toISOString();
+    const prev = existing.find((p) => p.slug === input.slug);
+    const record: WhiteLabelPartnerConfig = {
+      ...input,
+      createdAt: prev?.createdAt || nowIso,
+      updatedAt: nowIso,
+    };
+    const next = [record, ...existing.filter((p) => p.slug !== input.slug)].slice(0, 100);
+
+    const pool = this.resolveDeps()?.getDbPool() || null;
+    if (pool) {
+      try {
+        const patch = JSON.stringify({ whiteLabelPartners: next });
+        await pool.query(
+          `INSERT INTO plans (id, name, base_price_cents, monthly_credits, features)
+           VALUES ('FREE', 'FREE Tier', 0, 100, $1::jsonb)
+           ON CONFLICT (id) DO UPDATE SET
+             features = COALESCE(plans.features, '{}'::jsonb) || $1::jsonb`,
+          [patch]
+        );
+      } catch (err: any) {
+        console.warn('[PostgresBillingDbAdapter] upsertWhiteLabelPartner warning:', err?.message);
+      }
+    }
+    this.inMemoryWhiteLabelPartners = next;
+    return record;
+  }
+
+  async deleteWhiteLabelPartner(slug: string): Promise<boolean> {
+    const clean = slug.trim().toLowerCase();
+    const existing = await this.getWhiteLabelPartners();
+    const next = existing.filter((p) => p.slug !== clean);
+    const deleted = next.length < existing.length;
+
+    const pool = this.resolveDeps()?.getDbPool() || null;
+    if (pool && deleted) {
+      try {
+        const patch = JSON.stringify({ whiteLabelPartners: next });
+        await pool.query(
+          `UPDATE plans SET features = COALESCE(features, '{}'::jsonb) || $1::jsonb WHERE id = 'FREE'`,
+          [patch]
+        );
+      } catch (err: any) {
+        console.warn('[PostgresBillingDbAdapter] deleteWhiteLabelPartner warning:', err?.message);
+      }
+    }
+    this.inMemoryWhiteLabelPartners = next;
+    return deleted;
   }
 
   async createAuditLog(_actorId: string, _action: string, _entityId?: string, _reason?: string): Promise<void> {

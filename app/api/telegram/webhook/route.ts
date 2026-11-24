@@ -10,7 +10,11 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { rateLimiter } from '@packages/auth/rate-limiter';
-import { defaultDraftDbAdapter } from '@packages/shared/db-pool';
+import { defaultDraftDbAdapter, defaultBillingDbAdapter } from '@packages/shared/db-pool';
+import {
+  appendWhiteLabelTelegramFooter,
+  resolvePartnerByTelegramChatId,
+} from '@packages/billing/whitelabel-partner';
 import { fetchOnChainTokenSecurity, isValidEvmAddress } from '@packages/intelligence/onchain-insider-guard';
 import { fetchFreeWalletProfile } from '@packages/intelligence/free-wallet-intelligence';
 import {
@@ -109,10 +113,15 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const delivered = await sendTelegramReply(chatId, reply);
+    // Phase DI: Automatic White-Label B2B Partner Branding per Telegram Group chatId
+    const partners = await defaultBillingDbAdapter.getWhiteLabelPartners().catch(() => []);
+    const matchedPartner = resolvePartnerByTelegramChatId(partners, chatId);
+    const finalReply = appendWhiteLabelTelegramFooter(reply, matchedPartner);
+
+    const delivered = await sendTelegramReply(chatId, finalReply);
     return NextResponse.json({
       success: true,
-      data: { handled: true, command: cmd, delivered, reply },
+      data: { handled: true, command: cmd, delivered, reply: finalReply, partnerSlug: matchedPartner?.slug || null },
       timestamp: new Date().toISOString(),
     });
   } catch (err: unknown) {

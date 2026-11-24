@@ -383,6 +383,16 @@ async function runFullTestnetUsecase() {
     });
     assert(killRes.status === 403, `Non-admin AGENT wallet strictly rejected on /api/admin/kill-switch (HTTP ${killRes.status})`);
 
+    const partnersGetRes = await fetch(`${BASE_URL}/api/admin/partners`);
+    assert(partnersGetRes.status === 200, `GET /api/admin/partners returned public B2B partner registry (HTTP 200)`);
+
+    const partnersPostRes = await fetch(`${BASE_URL}/api/admin/partners`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ slug: 'unauth-dao', brandName: 'Unauth', partnerTreasuryAddress: walletAddress }),
+    });
+    assert(partnersPostRes.status === 403, `Non-admin AGENT wallet strictly rejected on POST /api/admin/partners (HTTP ${partnersPostRes.status})`);
+
     for (const kid of createdKeyIds) {
       const delRes = await fetch(`${BASE_URL}/api/user/provider-keys?keyId=${encodeURIComponent(kid)}`, {
         method: 'DELETE',
