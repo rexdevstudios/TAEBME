@@ -18,6 +18,10 @@ import {
   useTokenWatchlist,
 } from '../components/TokenWatchlistBar';
 import { buildSocialShareUrl } from '@packages/notifications/webhook-dispatcher';
+import {
+  sortLaunchesWithFeaturedFirst,
+  type FeaturedBoostRecord,
+} from '@packages/billing/high-margin-revenue';
 import { ethers } from 'ethers';
 import {
   getContractConfiguration,
@@ -102,6 +106,15 @@ export default function LaunchpadPage() {
 
   const [statusFilter, setStatusFilter] = useState<'all' | 'curve' | 'graduated'>('all');
   const [visiblePoolCount, setVisiblePoolCount] = useState<number>(12);
+  const [featuredBoosts, setFeaturedBoosts] = useState<FeaturedBoostRecord[]>([]);
+  const [boostingAddress, setBoostingAddress] = useState<string | null>(null);
+  const [boostFeedback, setBoostFeedback] = useState<string | null>(null);
+  const [boostTreasuryWallet, setBoostTreasuryWallet] = useState<string>('0x0c9f4a82b5ae258e8e65ca40ac4f1abc455c34b6');
+
+  const featuredAddressSet = useMemo(
+    () => new Set(featuredBoosts.map((b) => b.contractAddress.trim().toLowerCase())),
+    [featuredBoosts]
+  );
 
   const filteredTokens = useMemo(() => {
     const base = filterAndSortLaunchTokens(activeTokens, {
@@ -109,10 +122,14 @@ export default function LaunchpadPage() {
       chain: chainFilter,
       sort: sortMode,
     });
-    if (statusFilter === 'graduated') return base.filter((t) => Boolean(t.isGraduated));
-    if (statusFilter === 'curve') return base.filter((t) => !Boolean(t.isGraduated));
-    return base;
-  }, [activeTokens, tokenSearch, chainFilter, sortMode, statusFilter]);
+    const byStatus =
+      statusFilter === 'graduated'
+        ? base.filter((t) => Boolean(t.isGraduated))
+        : statusFilter === 'curve'
+          ? base.filter((t) => !Boolean(t.isGraduated))
+          : base;
+    return sortLaunchesWithFeaturedFirst(byStatus, featuredBoosts);
+  }, [activeTokens, tokenSearch, chainFilter, sortMode, statusFilter, featuredBoosts]);
 
   const visibleTokens = useMemo(
     () => filteredTokens.slice(0, visiblePoolCount),
@@ -129,15 +146,73 @@ export default function LaunchpadPage() {
   const fetchActiveTokens = async () => {
     setIsLoadingTokens(true);
     try {
-      const res = await fetch('/api/launchpad/tokens');
+      const [res, boostRes] = await Promise.all([
+        fetch('/api/launchpad/tokens'),
+        fetch('/api/launchpad/featured-boost').catch(() => null),
+      ]);
       const json = await res.json();
       if (json.success && Array.isArray(json.data)) {
         setActiveTokens(json.data);
+      }
+      if (boostRes && boostRes.ok) {
+        const bJson = await boostRes.json().catch(() => null);
+        if (bJson?.success && Array.isArray(bJson?.data?.activeBoosts)) {
+          setFeaturedBoosts(bJson.data.activeBoosts);
+          if (bJson?.data?.treasuryWallet) setBoostTreasuryWallet(bJson.data.treasuryWallet);
+        }
       }
     } catch {
       // Graceful fallback
     } finally {
       setIsLoadingTokens(false);
+    }
+  };
+
+  const handleFeaturedBoost24h = async (contractAddress: string, chain: string) => {
+    if (!isConnected) {
+      setBoostFeedback('Auth: Hubungkan dompet MetaMask (SIWE) terlebih dahulu untuk mengaktifkan Featured Boost 24h.');
+      return;
+    }
+    setBoostingAddress(contractAddress);
+    setBoostFeedback(null);
+    try {
+      let txHash: string | undefined;
+      if (typeof window !== 'undefined' && window.location.hostname !== 'testnet.pndigi.site') {
+        const eth = (window as any).ethereum;
+        if (!eth) {
+          setBoostFeedback('Notice: MetaMask diperlukan untuk pembayaran on-chain Featured Boost 24h (0.005 ETH Base L2).');
+          return;
+        }
+        const accounts: string[] = await eth.request({ method: 'eth_requestAccounts' });
+        const from = accounts?.[0];
+        if (!from) {
+          setBoostFeedback('Notice: Dompet MetaMask belum terhubung.');
+          return;
+        }
+        // 0.005 ETH = 5000000000000000 wei = 0x11c37937e08000
+        txHash = await eth.request({
+          method: 'eth_sendTransaction',
+          params: [{ from, to: boostTreasuryWallet, value: '0x11c37937e08000', gas: '0x5208' }],
+        });
+      }
+      const res = await fetch('/api/launchpad/featured-boost', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contractAddress, chain: chain || 'base-mainnet', tierId: 'BOOST_24H', txHash }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        setBoostFeedback(`Notice: Gagal mengaktifkan Featured Boost: ${json.error || res.status}`);
+        return;
+      }
+      if (Array.isArray(json.data?.activeBoosts)) {
+        setFeaturedBoosts(json.data.activeBoosts);
+      }
+      setBoostFeedback(`OK: Featured Boost 24h aktif! Token disematkan di posisi teratas Live Pools.`);
+    } catch (err: any) {
+      setBoostFeedback(`Notice: Boost dibatalkan/gagal: ${err?.message || 'Error'}`);
+    } finally {
+      setBoostingAddress(null);
     }
   };
 
@@ -1440,6 +1515,22 @@ export default function LaunchpadPage() {
             onUnpin={(item) => toggleWatchlistPin({ symbol: item.symbol, name: item.name, chainId: item.chainId, address: item.address })}
           />
 
+          {boostFeedback && (
+            <div
+              style={{
+                padding: '8px 12px',
+                borderRadius: '8px',
+                fontSize: '12px',
+                fontWeight: 700,
+                backgroundColor: boostFeedback.startsWith('OK:') ? 'var(--color-badge-success-bg)' : 'var(--color-badge-warning-bg)',
+                color: boostFeedback.startsWith('OK:') ? 'var(--color-badge-success-text)' : 'var(--color-badge-warning-text)',
+                border: `1px solid ${boostFeedback.startsWith('OK:') ? 'var(--color-badge-success-border)' : 'var(--color-badge-warning-border)'}`,
+              }}
+            >
+              {boostFeedback}
+            </div>
+          )}
+
           {/* Chain Filter Pills */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '11px', color: 'var(--color-muted)', fontWeight: 700, marginRight: '4px' }}>
@@ -1594,10 +1685,15 @@ export default function LaunchpadPage() {
                           <span>{token.name}</span>
                           <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>↗</span>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px', flexWrap: 'wrap' }}>
                           <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, color: 'var(--color-accent)', fontSize: '12px' }}>
                             ${token.ticker}
                           </span>
+                          {featuredAddressSet.has((token.contractAddress || '').toLowerCase()) && (
+                            <span style={{ fontSize: '9px', fontWeight: 900, padding: '1px 6px', borderRadius: '4px', backgroundColor: 'var(--color-badge-success-bg)', color: 'var(--color-badge-success-text)', border: '1px solid var(--color-badge-success-border)' }}>
+                              FEATURED
+                            </span>
+                          )}
                           {token.isGraduated ? (
                             <span style={{ fontSize: '9px', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', backgroundColor: 'var(--color-badge-success-bg)', color: 'var(--color-badge-success-text)' }}>
                               GRAD
@@ -1614,17 +1710,29 @@ export default function LaunchpadPage() {
                         </div>
                       </div>
                     </a>
-                    <PinWatchlistButton
-                      pinned={isWatchlistItemPinned(8453, token.contractAddress || token.ticker)}
-                      onClick={() =>
-                        toggleWatchlistPin({
-                          symbol: token.ticker,
-                          name: token.name,
-                          chainId: 8453,
-                          address: token.contractAddress,
-                        })
-                      }
-                    />
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                      <button
+                        type="button"
+                        disabled={boostingAddress !== null}
+                        onClick={() => handleFeaturedBoost24h(token.contractAddress, token.chain)}
+                        className="btn-secondary"
+                        style={{ padding: '4px 7px', fontSize: '10px', fontWeight: 700 }}
+                        title={tr('Sponsor 24h Featured Boost (0.005 ETH Base L2)', 'Aktifkan Featured Boost 24 Jam (0.005 ETH Base L2)')}
+                      >
+                        {boostingAddress === token.contractAddress ? '...' : tr('Boost 24h', 'Boost 24j')}
+                      </button>
+                      <PinWatchlistButton
+                        pinned={isWatchlistItemPinned(8453, token.contractAddress || token.ticker)}
+                        onClick={() =>
+                          toggleWatchlistPin({
+                            symbol: token.ticker,
+                            name: token.name,
+                            chainId: 8453,
+                            address: token.contractAddress,
+                          })
+                        }
+                      />
+                    </div>
                     <span
                       style={{
                         padding: '2px 8px',

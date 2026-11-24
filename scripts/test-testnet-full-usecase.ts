@@ -226,6 +226,13 @@ async function runFullTestnetUsecase() {
       `GET /api/launchpad/draft isolated & returned creator's draft (count=${listDraftsJson?.data?.length ?? 0})`
     );
 
+    const boostGetRes = await fetch(`${BASE_URL}/api/launchpad/featured-boost`);
+    const boostGetJson: any = await boostGetRes.json();
+    assert(
+      boostGetRes.status === 200 && boostGetJson?.success === true && Array.isArray(boostGetJson?.data?.tiers),
+      `GET /api/launchpad/featured-boost returned public boost tiers & treasuryWallet (HTTP 200)`
+    );
+
     // =========================================================================
     // STAGE 5: Spot/Paper Trade, 6-Chain Live DEX 0x v2 & GoPlus Safety
     // =========================================================================

@@ -149,15 +149,38 @@ export default function OverviewPage() {
     setAdminFeedback('OK: Live telemetry & Governance Audit Logs berhasil disinkronkan.');
   };
 
-  const handleCompleteQuest = async (questId: string) => {
-    setQuestLoading(questId);
+  const handleCompleteQuest = async (questId: string, mode: 'FREE' | 'ONCHAIN_BOOSTED' = 'FREE') => {
+    setQuestLoading(mode === 'ONCHAIN_BOOSTED' ? `${questId}:boost` : questId);
     setQuestFeedback(null);
     try {
+      let txHash: string | undefined;
+      if (mode === 'ONCHAIN_BOOSTED' && typeof window !== 'undefined' && window.location.hostname !== 'testnet.pndigi.site') {
+        const eth = (window as any).ethereum;
+        if (!eth) {
+          setQuestFeedback('Notice: MetaMask tidak terdeteksi untuk On-Chain Boosted Check-In (0.00008 ETH Base L2).');
+          return;
+        }
+        const plansRes = await fetch('/api/billing/plans');
+        const plansJson = await plansRes.json().catch(() => null);
+        const treasury = plansJson?.data?.treasuryWallet || '0x0c9f4a82b5ae258e8e65ca40ac4f1abc455c34b6';
+        const accounts: string[] = await eth.request({ method: 'eth_requestAccounts' });
+        const from = accounts?.[0];
+        if (!from) {
+          setQuestFeedback('Notice: Dompet MetaMask belum terhubung.');
+          return;
+        }
+        // 0.00008 ETH = 80000000000000 wei = 0x48c273950000
+        txHash = await eth.request({
+          method: 'eth_sendTransaction',
+          params: [{ from, to: treasury, value: '0x48c273950000', gas: '0x5208' }],
+        });
+      }
+
       const res = await fetch('/api/gamefi/quests/complete', {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ questId }),
+        body: JSON.stringify({ questId, mode, txHash, chain: 'base-mainnet' }),
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
@@ -172,7 +195,7 @@ export default function OverviewPage() {
         refreshSession().catch(() => {});
       }
       setQuestFeedback(
-        `OK: Quest "${questId}" selesai! +${json.completion?.xpGranted ?? 100} XP${crBonus > 0 ? ` & +${crBonus} Credits` : ''} ditambahkan ke akun Anda.`
+        `OK: Quest "${questId}"${json.boosted ? ' (On-Chain Boosted)' : ''} selesai! +${json.completion?.xpGranted ?? 100} XP${crBonus > 0 ? ` & +${crBonus} Credits` : ''} ditambahkan ke akun Anda.`
       );
     } catch (err: any) {
       setQuestFeedback(`Notice: Gagal memverifikasi quest: ${err?.message || 'Network error'}`);
@@ -646,15 +669,39 @@ export default function OverviewPage() {
                       {q.actionLabel}
                     </a>
                   ) : (
-                    <button
-                      type="button"
-                      disabled={isDone || questLoading !== null}
-                      onClick={() => handleCompleteQuest(q.id)}
-                      className={isDone ? 'btn-secondary' : 'btn-primary'}
-                      style={{ width: '100%', justifyContent: 'center', padding: '7px 10px', fontSize: '11px', opacity: isDone ? 0.75 : 1 }}
-                    >
-                      {isDone ? (q.id === 'daily_checkin' ? 'Claimed Today (UTC)' : 'Completed') : questLoading === q.id ? 'Verifying...' : `Claim ${q.xp}`}
-                    </button>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <button
+                        type="button"
+                        disabled={isDone || questLoading !== null}
+                        onClick={() => handleCompleteQuest(q.id, 'FREE')}
+                        className={isDone ? 'btn-secondary' : 'btn-primary'}
+                        style={{ width: '100%', justifyContent: 'center', padding: '7px 10px', fontSize: '11px', opacity: isDone ? 0.75 : 1 }}
+                      >
+                        {isDone ? (q.id === 'daily_checkin' ? 'Claimed Today (UTC)' : 'Completed') : questLoading === q.id ? 'Verifying...' : `Claim ${q.xp}`}
+                      </button>
+                      {q.id === 'daily_checkin' && !isDone && (
+                        <button
+                          type="button"
+                          disabled={questLoading !== null}
+                          onClick={() => handleCompleteQuest('daily_checkin', 'ONCHAIN_BOOSTED')}
+                          className="btn-secondary"
+                          style={{
+                            width: '100%',
+                            justifyContent: 'center',
+                            padding: '6px 10px',
+                            fontSize: '10.5px',
+                            borderColor: 'var(--color-badge-success-border)',
+                            color: 'var(--color-badge-success-text)',
+                            backgroundColor: 'var(--color-badge-success-bg)',
+                          }}
+                          title={tr('Send 0.00008 ETH on Base L2 to Treasury for +15 Credits total', 'Kirim 0.00008 ETH di Base L2 ke Treasury untuk total +15 Credits')}
+                        >
+                          {questLoading === 'daily_checkin:boost'
+                            ? tr('Confirming On-Chain...', 'Mengonfirmasi On-Chain...')
+                            : tr('On-Chain Boost (+15 cr · 0.00008 ETH)', 'Boost On-Chain (+15 cr · 0.00008 ETH)')}
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               );

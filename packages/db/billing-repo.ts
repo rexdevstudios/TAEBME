@@ -10,6 +10,10 @@ import crypto from 'crypto';
 import type { Pool } from 'pg';
 import { compute24hRiskExposure } from '../trading/risk-gate';
 import {
+  filterActiveFeaturedBoosts,
+  type FeaturedBoostRecord,
+} from '../billing/high-margin-revenue';
+import {
   PlanId,
   BillingDbAdapter,
   UserRiskPolicy,
@@ -817,6 +821,97 @@ export class PostgresBillingDbAdapter implements BillingDbAdapter {
         console.warn('[PostgresBillingDbAdapter] updateUserSubscription warning:', err?.message);
       }
     }
+  }
+
+  private inMemoryFeaturedBoosts: FeaturedBoostRecord[] = [];
+  private inMemoryRedeemedBoostTxHashes: Set<string> = new Set();
+
+  async getActiveFeaturedBoosts(): Promise<FeaturedBoostRecord[]> {
+    const pool = this.resolveDeps()?.getDbPool() || null;
+    if (pool) {
+      try {
+        const res = await pool.query(`SELECT features FROM plans WHERE id = 'FREE' LIMIT 1`);
+        if (res.rows.length > 0) {
+          const feat =
+            typeof res.rows[0].features === 'string'
+              ? JSON.parse(res.rows[0].features)
+              : res.rows[0].features || {};
+          if (Array.isArray(feat.featuredBoosts)) {
+            return filterActiveFeaturedBoosts(feat.featuredBoosts as FeaturedBoostRecord[]);
+          }
+        }
+      } catch (err: any) {
+        console.warn('[PostgresBillingDbAdapter] getActiveFeaturedBoosts warning:', err?.message);
+      }
+    }
+    return filterActiveFeaturedBoosts(this.inMemoryFeaturedBoosts);
+  }
+
+  async recordFeaturedBoost(record: FeaturedBoostRecord): Promise<{
+    ok: boolean;
+    replay?: boolean;
+    activeBoosts: FeaturedBoostRecord[];
+  }> {
+    const normTx = record.txHash.trim().toLowerCase();
+    const pool = this.resolveDeps()?.getDbPool() || null;
+
+    if (pool) {
+      try {
+        const res = await pool.query(`SELECT features FROM plans WHERE id = 'FREE' LIMIT 1`);
+        const feat =
+          res.rows.length > 0
+            ? typeof res.rows[0].features === 'string'
+              ? JSON.parse(res.rows[0].features)
+              : res.rows[0].features || {}
+            : {};
+        const existingBoosts: FeaturedBoostRecord[] = Array.isArray(feat.featuredBoosts)
+          ? feat.featuredBoosts
+          : [];
+        const redeemedTxs: string[] = Array.isArray(feat.redeemedBoostTxHashes)
+          ? feat.redeemedBoostTxHashes
+          : [];
+
+        if (redeemedTxs.some((t) => String(t).toLowerCase() === normTx)) {
+          return {
+            ok: false,
+            replay: true,
+            activeBoosts: filterActiveFeaturedBoosts(existingBoosts),
+          };
+        }
+
+        const nextBoosts = filterActiveFeaturedBoosts([record, ...existingBoosts]);
+        const nextRedeemed = [normTx, ...redeemedTxs].slice(0, 500);
+        const patch = JSON.stringify({
+          featuredBoosts: nextBoosts,
+          redeemedBoostTxHashes: nextRedeemed,
+        });
+
+        await pool.query(
+          `INSERT INTO plans (id, name, base_price_cents, monthly_credits, features)
+           VALUES ('FREE', 'FREE Tier', 0, 100, $1::jsonb)
+           ON CONFLICT (id) DO UPDATE SET
+             features = COALESCE(plans.features, '{}'::jsonb) || $1::jsonb`,
+          [patch]
+        );
+
+        this.inMemoryFeaturedBoosts = nextBoosts;
+        this.inMemoryRedeemedBoostTxHashes.add(normTx);
+        return { ok: true, activeBoosts: nextBoosts };
+      } catch (err: any) {
+        console.warn('[PostgresBillingDbAdapter] recordFeaturedBoost warning:', err?.message);
+      }
+    }
+
+    if (this.inMemoryRedeemedBoostTxHashes.has(normTx)) {
+      return {
+        ok: false,
+        replay: true,
+        activeBoosts: filterActiveFeaturedBoosts(this.inMemoryFeaturedBoosts),
+      };
+    }
+    this.inMemoryRedeemedBoostTxHashes.add(normTx);
+    this.inMemoryFeaturedBoosts = filterActiveFeaturedBoosts([record, ...this.inMemoryFeaturedBoosts]);
+    return { ok: true, activeBoosts: this.inMemoryFeaturedBoosts };
   }
 
   async createAuditLog(_actorId: string, _action: string, _entityId?: string, _reason?: string): Promise<void> {
