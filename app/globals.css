@@ -1,41 +1,41 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
-  /* POOLNET CEX Pro Launchpad — Deep Obsidian & Gold-Amber Design System */
-  --color-primary: #131822;
-  --color-on-primary: #F8FAFC;
-  --color-secondary: #1A2130;
-  --color-accent: #38BDF8; /* Electric Cyan */
-  --color-cex-gold: #F0B90B; /* Signature CEX Launchpad Gold */
-  --color-cex-gold-hover: #FACC15;
+  /* POOLNET Swiss Fintech Minimalist — Matte Obsidian Dark Default */
+  --color-primary: #111113;
+  --color-on-primary: #FAFAFA;
+  --color-secondary: #18181B;
+  --color-accent: #10B981; /* Surgical Emerald */
+  --color-cex-gold: #FAFAFA; /* Crisp Monochrome Primary CTA */
+  --color-cex-gold-hover: #E4E4E7;
   --color-accent-emerald: #10B981;
-  --color-background: #0B0E14; /* Deep OLED Obsidian */
-  --color-foreground: #F1F5F9;
-  --color-muted: #94A3B8;
-  --color-muted-bg: #18202F;
-  --color-border: rgba(148, 163, 184, 0.14);
+  --color-background: #09090B; /* Matte Obsidian Canvas */
+  --color-foreground: #FAFAFA;
+  --color-muted: #A1A1AA;
+  --color-muted-bg: #18181B;
+  --color-border: rgba(255, 255, 255, 0.085);
   --color-destructive: #EF4444;
-  --color-ring: #F0B90B;
+  --color-ring: #FAFAFA;
 
-  /* Semantic Surface & Pill Tokens (CEX Obsidian Dark Default) */
-  --color-surface-elevated: #131822;
-  --color-surface-subtle: #0F141D;
-  --color-surface-inset: #1A2232;
-  --color-badge-info-bg: rgba(56, 189, 248, 0.13);
-  --color-badge-info-text: #38BDF8;
-  --color-badge-info-border: rgba(56, 189, 248, 0.34);
-  --color-badge-success-bg: rgba(16, 185, 129, 0.14);
+  /* Semantic Surface & Pill Tokens (Swiss Dark Minimalist) */
+  --color-surface-elevated: #111113;
+  --color-surface-subtle: #141417;
+  --color-surface-inset: #1C1C20;
+  --color-badge-info-bg: rgba(255, 255, 255, 0.06);
+  --color-badge-info-text: #E4E4E7;
+  --color-badge-info-border: rgba(255, 255, 255, 0.14);
+  --color-badge-success-bg: rgba(16, 185, 129, 0.12);
   --color-badge-success-text: #34D399;
-  --color-badge-success-border: rgba(16, 185, 129, 0.36);
-  --color-badge-warning-bg: rgba(240, 185, 11, 0.14);
-  --color-badge-warning-text: #FCD34D;
-  --color-badge-warning-border: rgba(240, 185, 11, 0.38);
-  --color-badge-purple-bg: rgba(168, 85, 247, 0.15);
-  --color-badge-purple-text: #D8B4FE;
-  --color-badge-purple-border: rgba(168, 85, 247, 0.38);
-  --color-badge-neutral-bg: #1A2232;
-  --color-badge-neutral-text: #CBD5E1;
-  --color-badge-neutral-border: rgba(148, 163, 184, 0.22);
+  --color-badge-success-border: rgba(16, 185, 129, 0.3);
+  --color-badge-warning-bg: rgba(255, 255, 255, 0.05);
+  --color-badge-warning-text: #E4E4E7;
+  --color-badge-warning-border: rgba(255, 255, 255, 0.14);
+  --color-badge-purple-bg: rgba(255, 255, 255, 0.06);
+  --color-badge-purple-text: #E4E4E7;
+  --color-badge-purple-border: rgba(255, 255, 255, 0.14);
+  --color-badge-neutral-bg: #18181B;
+  --color-badge-neutral-text: #D4D4D8;
+  --color-badge-neutral-border: rgba(255, 255, 255, 0.1);
 
   /* Spacing Variables */
   --space-xs: 4px;
@@ -46,12 +46,12 @@
   --space-2xl: 48px;
   --space-3xl: 64px;
 
-  /* Layered CEX Elevations */
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35);
-  --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.45);
-  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.55);
-  --shadow-xl: 0 20px 44px rgba(0, 0, 0, 0.65);
-  --shadow-neon: 0 4px 20px rgba(240, 185, 11, 0.18);
+  /* Subtle Institutional Elevations */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.65);
+  --shadow-xl: 0 20px 44px rgba(0, 0, 0, 0.75);
+  --shadow-neon: 0 2px 12px rgba(16, 185, 129, 0.16);
 }
 
 /* Swiss Fintech Minimalist Light Mode Theme (Clean White Cards on #F5F5F7 Soft Gray) */
@@ -930,53 +930,41 @@ a {
   flex-wrap: wrap;
   gap: 12px;
   padding: 10px 16px;
-  border-radius: 10px;
-  background: linear-gradient(90deg, rgba(19, 24, 34, 0.96), rgba(26, 33, 48, 0.92));
+  border-radius: 12px;
+  background: #111113;
   border: 1px solid var(--color-border);
   box-shadow: var(--shadow-sm);
 }
 
 [data-theme="light"] .cex-ticker-strip {
   background: #FFFFFF;
-  border-color: #DCE3EE;
+  border-color: rgba(15, 23, 42, 0.07);
 }
 
-.cex-hero-banner {
+.cex-hero-banner,
+.cex-hero-banner.cex-hero-emerald,
+.cex-hero-banner.cex-hero-cyan,
+.cex-hero-banner.cex-hero-purple {
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
   gap: 16px;
-  padding: 20px 22px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #131822 0%, #1A2130 68%, rgba(240, 185, 11, 0.1) 100%);
-  border: 1px solid rgba(240, 185, 11, 0.25);
+  padding: 20px 24px;
+  border-radius: 16px;
+  background: #111113;
+  border: 1px solid rgba(255, 255, 255, 0.085);
   color: var(--color-foreground);
   box-shadow: var(--shadow-sm);
 }
 
-.cex-hero-banner.cex-hero-emerald {
-  background: linear-gradient(135deg, #131822 0%, #1A2130 68%, rgba(16, 185, 129, 0.1) 100%);
-  border-color: rgba(16, 185, 129, 0.26);
-}
-
-.cex-hero-banner.cex-hero-cyan {
-  background: linear-gradient(135deg, #131822 0%, #1A2130 68%, rgba(56, 189, 248, 0.11) 100%);
-  border-color: rgba(56, 189, 248, 0.26);
-}
-
-.cex-hero-banner.cex-hero-purple {
-  background: linear-gradient(135deg, #131822 0%, #1A2130 68%, rgba(168, 85, 247, 0.11) 100%);
-  border-color: rgba(168, 85, 247, 0.26);
-}
-
 .cex-hero-eyebrow {
   font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.7px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
   text-transform: uppercase;
   margin-bottom: 4px;
-  color: #F0B90B;
+  color: #10B981;
 }
 
 [data-theme="light"] .cex-hero-banner,
@@ -995,10 +983,11 @@ a {
 }
 
 .nav-link-cex-active {
-  background: rgba(240, 185, 11, 0.14) !important;
-  color: #FCD34D !important;
-  border: 1px solid rgba(240, 185, 11, 0.35) !important;
-  font-weight: 800 !important;
+  background: #18181B !important;
+  color: #FAFAFA !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: inset 3px 0 0 #10B981;
+  font-weight: 700 !important;
 }
 
 [data-theme="light"] .nav-link-cex-active {
@@ -1091,35 +1080,35 @@ a {
 }
 
 .cex-tab-btn.active {
-  background: linear-gradient(135deg, rgba(240, 185, 11, 0.18), rgba(245, 158, 11, 0.09));
-  border-color: rgba(240, 185, 11, 0.45);
-  color: #FCD34D;
-  box-shadow: 0 2px 10px rgba(240, 185, 11, 0.12);
+  background: #1C1C20;
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #FAFAFA;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
 }
 
 [data-theme="light"] .cex-tab-btn.active {
-  background: #FEF7E0;
-  border-color: #F5C242;
-  color: #9A5B00;
+  background: #FFFFFF;
+  border-color: rgba(15, 23, 42, 0.08);
+  color: #09090B;
 }
 
 .cex-tab-count {
   font-size: 10px;
-  font-weight: 800;
+  font-weight: 700;
   padding: 1px 6px;
   border-radius: 999px;
-  background: rgba(148, 163, 184, 0.16);
-  color: var(--color-foreground);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-muted);
 }
 
 .cex-tab-btn.active .cex-tab-count {
-  background: rgba(240, 185, 11, 0.28);
-  color: #FEF08A;
+  background: rgba(16, 185, 129, 0.16);
+  color: #34D399;
 }
 
 [data-theme="light"] .cex-tab-btn.active .cex-tab-count {
-  background: #F5C242;
-  color: #1F1F1F;
+  background: #ECFDF5;
+  color: #15803D;
 }
 
 .cex-btn-gold {
@@ -1127,24 +1116,24 @@ a {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 10px 18px;
+  padding: 9px 16px;
   border-radius: 9px;
   border: none;
-  background: linear-gradient(135deg, #F0B90B 0%, #F59E0B 100%);
-  color: #0B0E14;
+  background: #FAFAFA;
+  color: #09090B;
   font-size: 13px;
-  font-weight: 800;
-  letter-spacing: 0.1px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   cursor: pointer;
   text-decoration: none;
-  transition: transform 160ms ease, box-shadow 180ms ease, filter 160ms ease;
-  box-shadow: 0 4px 16px rgba(240, 185, 11, 0.24);
+  transition: transform 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
 }
 
 .cex-btn-gold:hover {
-  filter: brightness(1.06);
+  background: #E4E4E7;
   transform: translateY(-1px);
-  box-shadow: 0 6px 22px rgba(240, 185, 11, 0.34);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.36);
 }
 
 .cex-btn-gold:disabled {

@@ -1,6 +1,7 @@
 import './globals.css';
 import HeaderNav from './components/HeaderNav';
 import { AuthProvider } from './context/AuthContext';
+import { LocaleProvider } from './context/LocaleContext';
 
 export const metadata = {
   title: 'PoolNet | Autonomous Social Liquidity & Bonding Curve on Base',
@@ -15,12 +16,14 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <AuthProvider>
-          <HeaderNav />
-          <main>
-            {children}
-          </main>
-        </AuthProvider>
+        <LocaleProvider>
+          <AuthProvider>
+            <HeaderNav />
+            <main>
+              {children}
+            </main>
+          </AuthProvider>
+        </LocaleProvider>
       </body>
     </html>
   );

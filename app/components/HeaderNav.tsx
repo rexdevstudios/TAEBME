@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '../context/AuthContext';
+import { useLocale } from '../context/LocaleContext';
 import {
   ShieldAlert,
   Zap,
@@ -18,6 +19,7 @@ import {
   Sun,
   Moon,
   BarChart3,
+  Globe,
 } from 'lucide-react';
 import { getNetworkLabel } from '../lib/classifyHostname';
 
@@ -38,6 +40,7 @@ export default function HeaderNav() {
 
   const [isSwitchingChain, setIsSwitchingChain] = React.useState(false);
   const [theme, setTheme] = React.useState<'dark' | 'light'>('dark');
+  const { locale, toggleLocale, t } = useLocale();
 
   React.useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -77,13 +80,13 @@ export default function HeaderNav() {
     : null;
 
   const navItems = [
-    { href: '/', label: 'Overview', icon: LayoutDashboard },
-    { href: '/launchpad', label: 'Launchpad', icon: Rocket },
-    { href: '/trading', label: 'Trade', icon: Network },
-    { href: '/agent', label: 'AI Auto-Pilot', icon: BrainCircuit },
-    { href: '/kol', label: 'Earn & KOL', icon: Award },
-    { href: '/transparency', label: 'Transparency', icon: BarChart3 },
-    { href: '/billing', label: 'Account', icon: CreditCard },
+    { href: '/', label: t('nav.overview'), icon: LayoutDashboard },
+    { href: '/launchpad', label: t('nav.launchpad'), icon: Rocket },
+    { href: '/trading', label: t('nav.trade'), icon: Network },
+    { href: '/agent', label: t('nav.agent'), icon: BrainCircuit },
+    { href: '/kol', label: t('nav.kol'), icon: Award },
+    { href: '/transparency', label: t('nav.transparency'), icon: BarChart3 },
+    { href: '/billing', label: t('nav.account'), icon: CreditCard },
   ];
 
   const isActive = (href: string) => {
@@ -228,6 +231,26 @@ export default function HeaderNav() {
       <div className="flex-row items-center gap-sm">
         <button
           type="button"
+          onClick={toggleLocale}
+          className="btn-secondary"
+          style={{
+            padding: '6px 9px',
+            borderRadius: '9999px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+            fontSize: '11px',
+            fontWeight: 700,
+            flexShrink: 0,
+          }}
+          title={t('nav.switchLang')}
+          aria-label={t('nav.switchLang')}
+        >
+          <Globe size={13} />
+          <span>{locale.toUpperCase()}</span>
+        </button>
+        <button
+          type="button"
           onClick={toggleTheme}
           className="btn-secondary"
           style={{
@@ -238,10 +261,10 @@ export default function HeaderNav() {
             justifyContent: 'center',
             flexShrink: 0,
           }}
-          title={theme === 'dark' ? 'Ganti ke Tema Terang (Light Mode)' : 'Ganti ke Tema Gelap (Dark Mode)'}
-          aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+          title={theme === 'dark' ? t('nav.switchThemeLight') : t('nav.switchThemeDark')}
+          aria-label={theme === 'dark' ? t('nav.switchThemeLight') : t('nav.switchThemeDark')}
         >
-          {theme === 'dark' ? <Sun size={14} color="#FDE047" /> : <Moon size={14} color="#1A73E8" />}
+          {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
         </button>
         {isConnected ? (
           <>

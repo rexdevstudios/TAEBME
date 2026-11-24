@@ -1341,7 +1341,7 @@ export default function LaunchpadPage() {
               style={{ padding: '6px 12px', fontSize: '11px' }}
               disabled={isLoadingTokens}
             >
-              {isLoadingTokens ? 'Memuat...' : '🔄 Refresh Daftar'}
+              {isLoadingTokens ? 'Memuat...' : 'Refresh Daftar'}
             </button>
           </div>
         </div>
@@ -1386,10 +1386,10 @@ export default function LaunchpadPage() {
             {/* Sort / Category Tabs */}
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
               {[
-                { id: 'trending' as LaunchpadSortMode, label: '🔥 Sedang Ramai' },
-                { id: 'newest' as LaunchpadSortMode, label: '🆕 Terbaru' },
-                { id: 'graduating' as LaunchpadSortMode, label: '🎓 Hampir Graduasi' },
-                { id: 'safest' as LaunchpadSortMode, label: '🛡️ Skor Aman' },
+                { id: 'trending' as LaunchpadSortMode, label: 'Sedang Ramai' },
+                { id: 'newest' as LaunchpadSortMode, label: 'Terbaru' },
+                { id: 'graduating' as LaunchpadSortMode, label: 'Hampir Graduasi' },
+                { id: 'safest' as LaunchpadSortMode, label: 'Skor Aman' },
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -1696,7 +1696,7 @@ export default function LaunchpadPage() {
                       className="cex-btn-gold"
                       style={{ flex: '1 1 20%', padding: '6px 4px', textAlign: 'center', fontSize: '11px', borderRadius: '6px', boxShadow: 'none' }}
                     >
-                      Trade ⚡
+                      Trade
                     </a>
                     <a
                       href={`/kol?launchId=${token.launchId || ''}&tab=MARKET`}
