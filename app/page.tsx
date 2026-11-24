@@ -521,24 +521,24 @@ export default function OverviewPage() {
         })()}
 
         {/* GameFi Trader Pass & Quest Progression Card */}
-        <div className="card" style={{ border: '1px solid rgba(168, 85, 247, 0.35)' }}>
+        <div className="card" style={{ border: '1px solid var(--color-border)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '12px' }}>
             <div>
-              <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 900, color: '#C084FC', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Award size={17} /> GameFi Trader Pass &amp; On-Chain Quest Progression
+              <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 900, color: 'var(--color-foreground)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Award size={17} style={{ color: 'var(--color-accent-emerald)' }} /> GameFi Trader Pass &amp; On-Chain Quest Progression
               </h3>
               <p className="text-muted" style={{ margin: '2px 0 0 0', fontSize: '12px' }}>
                 Selesaikan Daily Check-In &amp; misi akun untuk memperoleh XP, Bonus Kredit, dan membuka Trader Pass NFT (BRONZE → SILVER 250 XP → GOLD 500 XP).
               </p>
             </div>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
-              <span style={{ padding: '4px 10px', borderRadius: '6px', backgroundColor: 'rgba(168, 85, 247, 0.15)', color: '#E9D5FF', border: '1px solid rgba(168, 85, 247, 0.35)', fontWeight: 800 }}>
+              <span style={{ padding: '4px 10px', borderRadius: '999px', backgroundColor: 'var(--color-badge-purple-bg)', color: 'var(--color-badge-purple-text)', border: '1px solid var(--color-badge-purple-border)', fontWeight: 800 }}>
                 XP: {gameFiProfile?.xp ?? 0}
               </span>
-              <span style={{ padding: '4px 10px', borderRadius: '6px', backgroundColor: 'rgba(56, 189, 248, 0.15)', color: '#7DD3FC', border: '1px solid rgba(56, 189, 248, 0.35)', fontWeight: 800 }}>
+              <span style={{ padding: '4px 10px', borderRadius: '999px', backgroundColor: 'var(--color-badge-info-bg)', color: 'var(--color-badge-info-text)', border: '1px solid var(--color-badge-info-border)', fontWeight: 800 }}>
                 LEVEL: {gameFiProfile?.level ?? 1}
               </span>
-              <span style={{ padding: '4px 10px', borderRadius: '6px', backgroundColor: 'rgba(255, 196, 0, 0.15)', color: '#FDE047', border: '1px solid rgba(255, 196, 0, 0.35)', fontWeight: 800 }}>
+              <span style={{ padding: '4px 10px', borderRadius: '999px', backgroundColor: 'var(--color-badge-success-bg)', color: 'var(--color-badge-success-text)', border: '1px solid var(--color-badge-success-border)', fontWeight: 800 }}>
                 PASS: {gameFiProfile?.passTier || 'BRONZE'}
               </span>
               {gameFiProfile?.nftMintingStatus?.available ? (
@@ -547,7 +547,7 @@ export default function OverviewPage() {
                   onClick={handleRequestPassVoucher}
                   disabled={voucherLoading}
                   className="btn-secondary"
-                  style={{ padding: '4px 10px', fontSize: '11px', borderColor: '#C084FC', color: '#E9D5FF' }}
+                  style={{ padding: '4px 10px', fontSize: '11px' }}
                 >
                   {voucherLoading ? 'Verifying...' : `Request ${gameFiProfile?.passTier || 'BRONZE'} NFT Voucher`}
                 </button>
@@ -555,10 +555,10 @@ export default function OverviewPage() {
                 <span
                   style={{
                     padding: '4px 10px',
-                    borderRadius: '6px',
-                    backgroundColor: 'rgba(148, 163, 184, 0.12)',
-                    color: '#CBD5E1',
-                    border: '1px solid rgba(148, 163, 184, 0.3)',
+                    borderRadius: '999px',
+                    backgroundColor: 'var(--color-badge-neutral-bg)',
+                    color: 'var(--color-badge-neutral-text)',
+                    border: '1px solid var(--color-badge-neutral-border)',
                     fontSize: '11px',
                     fontWeight: 700,
                   }}
@@ -582,15 +582,15 @@ export default function OverviewPage() {
                   <span>Progress menuju {nextLabel}</span>
                   <span>{xpVal} / {nextTarget} XP ({pct}%)</span>
                 </div>
-                <div style={{ width: '100%', height: '6px', borderRadius: '999px', backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-                  <div style={{ width: `${pct}%`, height: '100%', background: 'linear-gradient(90deg, #A855F7 0%, #22C55E 100%)', transition: 'width 300ms ease' }} />
+                <div style={{ width: '100%', height: '7px', borderRadius: '999px', backgroundColor: 'var(--color-surface-inset)', overflow: 'hidden' }}>
+                  <div style={{ width: `${pct}%`, height: '100%', background: 'var(--color-accent-emerald)', transition: 'width 300ms ease' }} />
                 </div>
               </div>
             );
           })()}
 
           {questFeedback && (
-            <div style={{ marginBottom: '12px', padding: '8px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 700, backgroundColor: questFeedback.includes('✅') ? 'rgba(16, 185, 129, 0.12)' : 'rgba(245, 158, 11, 0.12)', color: questFeedback.includes('✅') ? '#6EE7B7' : '#FDE047', border: `1px solid ${questFeedback.includes('✅') ? 'rgba(16, 185, 129, 0.35)' : 'rgba(245, 158, 11, 0.35)'}` }}>
+            <div style={{ marginBottom: '12px', padding: '8px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 700, backgroundColor: questFeedback.includes('✅') ? 'var(--color-badge-success-bg)' : 'var(--color-badge-warning-bg)', color: questFeedback.includes('✅') ? 'var(--color-badge-success-text)' : 'var(--color-badge-warning-text)', border: `1px solid ${questFeedback.includes('✅') ? 'var(--color-badge-success-border)' : 'var(--color-badge-warning-border)'}` }}>
               {questFeedback}
             </div>
           )}
@@ -611,22 +611,22 @@ export default function OverviewPage() {
                   ? Boolean(gameFiProfile.questEligibility[q.id])
                   : true;
               return (
-                <div key={q.id} className="bg-panel" style={{ border: `1px solid ${isDone ? 'rgba(34, 197, 94, 0.3)' : 'var(--color-border)'}`, borderRadius: '6px', padding: '12px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '10px' }}>
+                <div key={q.id} className="bg-panel" style={{ border: `1px solid ${isDone ? 'var(--color-badge-success-border)' : 'var(--color-border)'}`, borderRadius: '12px', padding: '14px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '10px', boxShadow: 'none' }}>
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
                       <span style={{ fontWeight: 800, fontSize: '12px', color: 'var(--color-foreground)' }}>{q.title}</span>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', backgroundColor: q.badge === 'DAILY UTC' ? 'rgba(56, 189, 248, 0.15)' : 'rgba(168, 85, 247, 0.15)', color: q.badge === 'DAILY UTC' ? '#7DD3FC' : '#E9D5FF' }}>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', fontWeight: 800, padding: '2px 6px', borderRadius: '999px', backgroundColor: q.badge === 'DAILY UTC' ? 'var(--color-badge-success-bg)' : 'var(--color-badge-neutral-bg)', color: q.badge === 'DAILY UTC' ? 'var(--color-badge-success-text)' : 'var(--color-badge-neutral-text)', border: '1px solid var(--color-border)' }}>
                         {q.badge}
                       </span>
                     </div>
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 900, color: 'var(--color-accent)', marginBottom: '4px' }}>{q.xp}</div>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 900, color: 'var(--color-accent-emerald)', marginBottom: '4px' }}>{q.xp}</div>
                     <div className="text-muted" style={{ fontSize: '11px' }}>{q.desc}</div>
                   </div>
                   {!isDone && !isEligible && q.actionHref ? (
                     <a
                       href={q.actionHref}
                       className="btn-secondary"
-                      style={{ width: '100%', justifyContent: 'center', padding: '7px 10px', fontSize: '11px', textDecoration: 'none', textAlign: 'center', borderColor: 'rgba(250, 204, 21, 0.45)', color: '#FDE047' }}
+                      style={{ width: '100%', justifyContent: 'center', padding: '7px 10px', fontSize: '11px', textDecoration: 'none', textAlign: 'center' }}
                     >
                       {q.actionLabel}
                     </a>
@@ -638,7 +638,7 @@ export default function OverviewPage() {
                       className={isDone ? 'btn-secondary' : 'btn-primary'}
                       style={{ width: '100%', justifyContent: 'center', padding: '7px 10px', fontSize: '11px', opacity: isDone ? 0.75 : 1 }}
                     >
-                      {isDone ? (q.id === 'daily_checkin' ? '✓ Claimed Today (UTC)' : '✓ Completed') : questLoading === q.id ? 'Verifying...' : `Claim ${q.xp}`}
+                      {isDone ? (q.id === 'daily_checkin' ? 'Claimed Today (UTC)' : 'Completed') : questLoading === q.id ? 'Verifying...' : `Claim ${q.xp}`}
                     </button>
                   )}
                 </div>
