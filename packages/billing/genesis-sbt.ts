@@ -187,3 +187,55 @@ export function serializeGenesisSnapshotToCsv(records: readonly GenesisSbtMintRe
   );
   return [header, ...rows].join('\n');
 }
+
+export interface WeeklyGenesisDigestParams {
+  totalMinted: number;
+  supplyCap?: number;
+  leaderboard: readonly GenesisReferralLeaderRow[];
+  verifiedPropTraders?: number;
+  siteOrigin?: string;
+}
+
+function maskWalletShort(addr: string): string {
+  const clean = String(addr || '').trim();
+  if (clean.length < 12) return clean;
+  return `${clean.slice(0, 6)}...${clean.slice(-4)}`;
+}
+
+/**
+ * Pure deterministic Weekly Genesis Referral & Prop Cup Digest formatter (Phase DN).
+ */
+export function formatWeeklyGenesisDigestMessage(params: WeeklyGenesisDigestParams): string {
+  const cap = Math.max(1, Number(params.supplyCap ?? GENESIS_SBT_SUPPLY_CAP));
+  const minted = Math.max(0, Number(params.totalMinted ?? 0));
+  const pct = Math.min(100, Math.round((minted / cap) * 1000) / 10);
+  const statusLabel = minted >= cap ? 'SOLD OUT (CAP LOCKED)' : 'FREE MINT LIVE';
+  const origin = (params.siteOrigin || 'https://pndigi.site').replace(/\/+$/, '');
+  const propCount = Math.max(0, Number(params.verifiedPropTraders ?? 0));
+
+  const lines: string[] = [
+    `POOLNET Weekly Genesis Sprint Digest`,
+    `Status: ${statusLabel}`,
+    `Genesis Pioneers Minted: ${minted.toLocaleString()} / ${cap.toLocaleString()} (${pct}%)`,
+    `Verified Prop Cup Traders: ${propCount}`,
+    ``,
+    `Top Genesis Referrers:`,
+  ];
+
+  const top5 = (params.leaderboard || []).slice(0, 5);
+  if (top5.length === 0) {
+    lines.push(`- Be the first referrer to claim +50 Credits per verified mint.`);
+  } else {
+    top5.forEach((row, idx) => {
+      lines.push(
+        `${idx + 1}. ${maskWalletShort(row.walletAddress)} — ${row.referralsCount} invites (+${row.bonusCreditsEarned} cr)`
+      );
+    });
+  }
+
+  lines.push(``);
+  lines.push(`Claim Free Genesis SBT (+200 Credits): ${origin}`);
+  lines.push(`Live Transparency & Fee Proof: ${origin}/transparency`);
+
+  return lines.join('\n');
+}

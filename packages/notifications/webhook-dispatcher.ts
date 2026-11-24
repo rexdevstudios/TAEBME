@@ -14,7 +14,8 @@ export type AlertEventType =
   | 'HONEYPOT_HARD_BLOCKED'
   | 'DAILY_LOSS_WARNING'
   | 'TOKEN_DEPLOYED'
-  | 'KEY_FROZEN_OVER_QUOTA';
+  | 'KEY_FROZEN_OVER_QUOTA'
+  | 'GENESIS_WEEKLY_DIGEST';
 
 export interface OutboundAlertPayload {
   event: AlertEventType;
@@ -70,6 +71,7 @@ const EVENT_EMOJI: Record<AlertEventType, string> = {
   DAILY_LOSS_WARNING: '⚠️',
   TOKEN_DEPLOYED: '🚀',
   KEY_FROZEN_OVER_QUOTA: '🧊',
+  GENESIS_WEEKLY_DIGEST: '🏆',
 };
 
 /**
