@@ -20,6 +20,7 @@ const SAMPLE_VALID_LAUNCHPAD_HTML = `<!doctype html>
       <a href="/trading">Trade</a>
       <a href="/agent">AI Auto-Pilot</a>
       <a href="/kol">Earn &amp; KOL</a>
+      <a href="/transparency">Transparency</a>
       <a href="/billing">Account</a>
     </nav>
   </header>

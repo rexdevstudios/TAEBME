@@ -42,6 +42,10 @@ import {
   auditRenderedPageHtml,
 } from '../packages/shared/ui-smoke-contract';
 import {
+  computeFeeSplitBreakdown,
+  buildMonthlyTransparencyRows,
+} from '../packages/shared/transparency-metrics';
+import {
   clearAutoPilotPeakPrice,
   computeDynamicSignalConfidence,
   computeUpdatedPeakPrice,
@@ -1130,12 +1134,34 @@ async function runSimulationSuite() {
   const clLaunchpad = CEX_UI_ROUTE_CONTRACTS.find((c) => c.path === '/launchpad')!;
   const clHealthy = auditRenderedPageHtml(
     clLaunchpad,
-    `<html><head><meta name="viewport" content="width=device-width"></head><body><header class="header-nav">Overview Launchpad Trade AI Auto-Pilot Earn & KOL Account</header><main><h1>Token Launchpad</h1><div role="tablist"><button role="tab">Live Pools</button><button role="tab">Create</button><button role="tab">Studio</button></div></main></body></html>`
+    `<html><head><meta name="viewport" content="width=device-width"></head><body><header class="header-nav">Overview Launchpad Trade AI Auto-Pilot Earn & KOL Transparency Account</header><main><h1>Token Launchpad</h1><div role="tablist"><button role="tab">Live Pools</button><button role="tab">Create</button><button role="tab">Studio</button></div></main></body></html>`
   );
   const clBroken = auditRenderedPageHtml(clLaunchpad, '<html><body>__next_error__</body></html>');
   assert(
     clHealthy.ok === true && clHealthy.tabCount === 3 && clBroken.ok === false,
     'CEX UI smoke contract validates healthy tabbed pages & rejects Next.js fatal error boundaries'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 45: Public Transparency Fee Split & Monthly Analytics (Phase CN)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 45: Public Platform Transparency Fee Split & Monthly Analytics] ---');
+  const cnSplit = computeFeeSplitBreakdown({
+    totalTradeVolumeUsd: 100_000,
+    totalCurveRaisedEth: 10,
+    ethPriceUsd: 3000,
+    dexSwapFeeBps: 25,
+  });
+  const cnMonthly = buildMonthlyTransparencyRows([
+    { monthKey: '2026-10', tradeVolumeUsd: 20_000, curveRaisedEth: 2, launchesCount: 2, creditsBurned: 100 },
+    { monthKey: '2026-11', tradeVolumeUsd: 80_000, curveRaisedEth: 8, launchesCount: 5, creditsBurned: 400 },
+  ]);
+  assert(
+    cnSplit.totalEstimatedFeesUsd === 550 &&
+      cnSplit.creatorShareUsd === 150 &&
+      cnSplit.protocolShareUsd === 400 &&
+      cnMonthly[0]?.monthLabel === 'Nov 2026',
+    'Public transparency engine computes exact 1% curve split + 25bps DEX partner fee & monthly rows'
   );
 
   console.log('\n================================================================');

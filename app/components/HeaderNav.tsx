@@ -17,6 +17,7 @@ import {
   CreditCard,
   Sun,
   Moon,
+  BarChart3,
 } from 'lucide-react';
 import { getNetworkLabel } from '../lib/classifyHostname';
 
@@ -81,6 +82,7 @@ export default function HeaderNav() {
     { href: '/trading', label: 'Trade', icon: Network },
     { href: '/agent', label: 'AI Auto-Pilot', icon: BrainCircuit },
     { href: '/kol', label: 'Earn & KOL', icon: Award },
+    { href: '/transparency', label: 'Transparency', icon: BarChart3 },
     { href: '/billing', label: 'Account', icon: CreditCard },
   ];
 

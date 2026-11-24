@@ -23,6 +23,7 @@ export const CEX_CANONICAL_NAV_LABELS = [
   'Trade',
   'AI Auto-Pilot',
   'Earn &amp; KOL',
+  'Transparency',
   'Account',
 ] as const;
 
@@ -61,6 +62,13 @@ export const CEX_UI_ROUTE_CONTRACTS: readonly UiRouteSmokeContract[] = [
     requiresTabList: true,
     minTabs: 4,
     requiredMarkers: ['KOL Hub', 'Active Bounties'],
+  },
+  {
+    path: '/transparency',
+    label: 'Platform Transparency & On-Chain Revenue',
+    requiresTabList: false,
+    minTabs: 0,
+    requiredMarkers: ['Platform Transparency', 'Fees and revenue'],
   },
   {
     path: '/billing',
