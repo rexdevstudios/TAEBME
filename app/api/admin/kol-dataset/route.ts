@@ -9,15 +9,17 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireCapability } from '@packages/auth/session';
-import { getDbPool } from '@packages/shared/db-pool';
+import { defaultKolDbAdapter, getDbPool } from '@packages/shared/db-pool';
 import { TOP_LIQUID_CEX_PAIRS } from '@packages/shared/market-pairs';
 import {
   KOL_CONSENSUS_ARCHIVE_DOMAIN,
   buildCuratedKolDatasetSnapshot,
+  captureAndArchiveKolConsensusSnapshot,
   computeAntiManipulationKolConsensus,
   evaluateKolConsensusBacktest,
   fetchPublicSpotPricesForSymbols,
   loadVerifiedKolSignalsForSymbol,
+  serializeKolConsensusDatasetToBatchJsonl,
   serializeKolConsensusDatasetToCsv,
   type KolBacktestSummary,
   type KolConsensusArchiveEntry,
@@ -66,6 +68,21 @@ export async function GET(req: NextRequest) {
         headers: {
           'Content-Type': 'text/csv; charset=utf-8',
           'Content-Disposition': 'attachment; filename="poolnet-kol-ai-consensus-dataset.csv"',
+          'Cache-Control': 'no-store',
+        },
+      });
+    }
+
+    if (format === 'jsonl') {
+      const primaryModel = (process.env.BYTEDANCE_MODEL_ENDPOINT || 'dola-seed-2.0-mini')
+        .split(/[,;\s]+/)[0]
+        ?.trim();
+      const jsonl = serializeKolConsensusDatasetToBatchJsonl(snapshot, primaryModel);
+      return new NextResponse(jsonl, {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/x-ndjson; charset=utf-8',
+          'Content-Disposition': 'attachment; filename="poolnet-kol-batch-eval.jsonl"',
           'Cache-Control': 'no-store',
         },
       });
@@ -133,6 +150,64 @@ export async function GET(req: NextRequest) {
       {
         success: false,
         error: err?.message || 'KOL_DATASET_EXPORT_FAILED',
+        timestamp: new Date().toISOString(),
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    let session;
+    try {
+      session = await requireCapability(req, 'REVIEW_FLAGGED_TOKEN');
+    } catch (authErr: unknown) {
+      const msg = authErr instanceof Error ? authErr.message : String(authErr);
+      const isForbidden = msg.includes('RBAC_FORBIDDEN') || msg.includes('AUTH_ACCOUNT_');
+      return NextResponse.json(
+        {
+          success: false,
+          error: isForbidden ? `FORBIDDEN: ${msg}` : `UNAUTHORIZED: ${msg}`,
+          timestamp: new Date().toISOString(),
+        },
+        { status: isForbidden ? 403 : 401 }
+      );
+    }
+
+    const result = await captureAndArchiveKolConsensusSnapshot({
+      pool: getDbPool(),
+      symbols: TOP_LIQUID_CEX_PAIRS.map((p) => p.symbol),
+      dryRun: false,
+    });
+
+    await defaultKolDbAdapter.createAuditLog(
+      session.user.userId,
+      'ADMIN_KOL_DATASET_ARCHIVED',
+      result.archiveId || undefined,
+      `symbols=${result.snapshot.totalSymbols} active=${result.snapshot.activeConsensusSymbols} spotPrices=${result.spotPricesCaptured}`
+    );
+
+    return NextResponse.json(
+      {
+        success: true,
+        data: {
+          persisted: result.persisted,
+          archiveId: result.archiveId,
+          targetUrl: result.targetUrl,
+          totalSymbols: result.snapshot.totalSymbols,
+          activeConsensusSymbols: result.snapshot.activeConsensusSymbols,
+          spotPricesCaptured: result.spotPricesCaptured,
+        },
+        timestamp: result.snapshot.generatedAt,
+      },
+      { status: 201, headers: { 'Cache-Control': 'no-store' } }
+    );
+  } catch (err: any) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: err?.message || 'KOL_DATASET_ARCHIVE_FAILED',
         timestamp: new Date().toISOString(),
       },
       { status: 500 }

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { ShieldCheck, Download, FileJson, RefreshCw } from 'lucide-react';
+import { ShieldCheck, Download, FileJson, RefreshCw, Archive } from 'lucide-react';
 import { useLocale } from '../context/LocaleContext';
 
 interface AdminKolProfileRow {
@@ -41,8 +41,9 @@ export function AdminKolVerificationPanel() {
   const [queue, setQueue] = useState<KolQueueSummary | null>(null);
   const [backtest, setBacktest] = useState<KolBacktestTelemetry | null>(null);
   const [loading, setLoading] = useState(false);
+  const [archiving, setArchiving] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
-  const [downloading, setDownloading] = useState<'csv' | 'json' | null>(null);
+  const [downloading, setDownloading] = useState<'csv' | 'json' | 'jsonl' | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const loadQueue = async () => {
@@ -103,7 +104,34 @@ export function AdminKolVerificationPanel() {
     }
   };
 
-  const handleDownloadDataset = async (format: 'csv' | 'json') => {
+  const handleArchiveNow = async () => {
+    setArchiving(true);
+    setFeedback(null);
+    try {
+      const res = await fetch('/api/admin/kol-dataset', {
+        method: 'POST',
+        credentials: 'same-origin',
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json?.success) {
+        setFeedback(`Notice: ${json?.error || `HTTP ${res.status}`}`);
+        return;
+      }
+      setFeedback(
+        `OK: ${tr(
+          `Snapshot archived (${json.data?.spotPricesCaptured ?? 0} live spot prices recorded).`,
+          `Snapshot berhasil diarsipkan (${json.data?.spotPricesCaptured ?? 0} harga spot live terekam).`
+        )}`
+      );
+      await loadQueue();
+    } catch (err: any) {
+      setFeedback(`Notice: ${err?.message || 'Archive failed'}`);
+    } finally {
+      setArchiving(false);
+    }
+  };
+
+  const handleDownloadDataset = async (format: 'csv' | 'json' | 'jsonl') => {
     setDownloading(format);
     setFeedback(null);
     try {
@@ -122,7 +150,9 @@ export function AdminKolVerificationPanel() {
       a.download =
         format === 'csv'
           ? 'poolnet-kol-ai-consensus-dataset.csv'
-          : 'poolnet-kol-ai-consensus-dataset.json';
+          : format === 'jsonl'
+            ? 'poolnet-kol-batch-eval.jsonl'
+            : 'poolnet-kol-ai-consensus-dataset.json';
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -180,6 +210,26 @@ export function AdminKolVerificationPanel() {
           >
             <RefreshCw size={12} />
             {loading ? tr('Loading...', 'Memuat...') : tr('Refresh', 'Muat Ulang')}
+          </button>
+          <button
+            type="button"
+            onClick={handleArchiveNow}
+            disabled={archiving}
+            className="btn-secondary"
+            style={{ fontSize: '11px', padding: '5px 10px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+          >
+            <Archive size={12} />
+            {archiving ? tr('Archiving...', 'Mengarsipkan...') : tr('Archive Now', 'Arsipkan Sekarang')}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleDownloadDataset('jsonl')}
+            disabled={downloading !== null}
+            className="btn-secondary"
+            style={{ fontSize: '11px', padding: '5px 10px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+          >
+            <Download size={12} />
+            {downloading === 'jsonl' ? tr('Exporting...', 'Mengekspor...') : tr('Batch JSONL', 'Batch JSONL')}
           </button>
           <button
             type="button"

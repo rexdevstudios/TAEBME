@@ -127,9 +127,14 @@ describe('Phase DX: Scheduled KOL Consensus Archive Cron & Win-Rate Backtest', (
     const middleware = readFileSync(join(process.cwd(), 'middleware.ts'), 'utf8');
     const vercelJson = JSON.parse(readFileSync(join(process.cwd(), 'vercel.json'), 'utf8'));
 
+    const overlayLib = readFileSync(
+      join(process.cwd(), 'packages/intelligence/kol-chart-overlay.ts'),
+      'utf8'
+    );
     expect(cronRoute).toContain('CRON_SECRET');
-    expect(cronRoute).toContain('KOL_CONSENSUS_ARCHIVE_DOMAIN');
-    expect(cronRoute).toContain('scraped_documents');
+    expect(cronRoute).toContain('captureAndArchiveKolConsensusSnapshot');
+    expect(overlayLib).toContain('KOL_CONSENSUS_ARCHIVE_DOMAIN');
+    expect(overlayLib).toContain('scraped_documents');
     expect(KOL_CONSENSUS_ARCHIVE_DOMAIN).toBe('kol_consensus_archive');
 
     expect(middleware).toContain("'/api/cron/kol-consensus-archive'");

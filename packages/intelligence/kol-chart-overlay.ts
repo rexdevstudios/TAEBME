@@ -600,3 +600,124 @@ export async function fetchPublicSpotPricesForSymbols(
 
   return prices;
 }
+
+// ============================================================================
+// PHASE EB: SHARED SNAPSHOT ARCHIVER & BYTEPLUS BATCH INFERENCE JSONL EXPORTER
+// ============================================================================
+
+export interface ArchiveKolSnapshotResult {
+  dryRun: boolean;
+  persisted: boolean;
+  archiveId: string | null;
+  targetUrl: string;
+  snapshot: CuratedKolDatasetSnapshot;
+  spotPricesCaptured: number;
+}
+
+/**
+ * Shared SSOT archiver reused by both scheduled Cron (/api/cron/kol-consensus-archive)
+ * and Admin 1-Click Archive (POST /api/admin/kol-dataset). Zero SQL duplication.
+ */
+export async function captureAndArchiveKolConsensusSnapshot(params: {
+  pool: { query: (sql: string, values?: unknown[]) => Promise<{ rows: any[] }> } | null;
+  symbols: readonly string[];
+  dryRun?: boolean;
+}): Promise<ArchiveKolSnapshotResult> {
+  const dryRun = Boolean(params.dryRun);
+  const symbols = (params.symbols || []).map((s) => String(s).trim().toUpperCase()).filter(Boolean);
+
+  const [reports, spotPrices] = await Promise.all([
+    Promise.all(
+      symbols.map(async (symbol): Promise<KolConsensusReport> => {
+        const signals = await loadVerifiedKolSignalsForSymbol(params.pool, symbol);
+        return computeAntiManipulationKolConsensus({
+          tokenSymbol: symbol,
+          signals,
+          isHoneypot: false,
+        });
+      })
+    ),
+    fetchPublicSpotPricesForSymbols(symbols),
+  ]);
+
+  const nowIso = new Date().toISOString();
+  const snapshot = buildCuratedKolDatasetSnapshot({ reports, generatedAt: nowIso });
+  const targetUrl = `kol-consensus://archive/${nowIso}`;
+
+  let persisted = false;
+  let archiveId: string | null = null;
+
+  if (!dryRun && params.pool) {
+    const insertRes = await params.pool.query(
+      `INSERT INTO scraped_documents (target_url, domain, extracted_metadata, scraped_at)
+       VALUES ($1, $2, $3::jsonb, NOW())
+       RETURNING id`,
+      [targetUrl, KOL_CONSENSUS_ARCHIVE_DOMAIN, JSON.stringify({ snapshot, spotPrices })]
+    );
+    if (insertRes.rows.length > 0) {
+      persisted = true;
+      archiveId = String(insertRes.rows[0].id);
+    }
+  }
+
+  return {
+    dryRun,
+    persisted,
+    archiveId,
+    targetUrl,
+    snapshot,
+    spotPricesCaptured: Object.keys(spotPrices).length,
+  };
+}
+
+/**
+ * Pure deterministic BytePlus ModelArk Batch Inference JSONL serializer
+ * compatible with CreateBatchInferenceJob (OpenAI/ModelArk /api/v3/chat/completions schema).
+ * Contains zero PII, zero wallet addresses, and zero private keys.
+ */
+export function serializeKolConsensusDatasetToBatchJsonl(
+  snapshot: CuratedKolDatasetSnapshot,
+  modelId?: string
+): string {
+  const resolvedModel = (modelId || 'dola-seed-2.0-mini').trim() || 'dola-seed-2.0-mini';
+  const tsTag = String(snapshot.generatedAt || new Date().toISOString()).replace(/[^0-9A-Za-z]/g, '').slice(0, 14);
+
+  return (snapshot.rows || [])
+    .map((row, idx) => {
+      const sym = String(row.tokenSymbol || 'UNKNOWN').replace(/[^A-Z0-9/_-]/g, '').slice(0, 20);
+      const userPayload = JSON.stringify({
+        tokenSymbol: sym,
+        consensusScore: row.consensusScore,
+        verdict: row.verdict,
+        uniqueVerifiedKols: row.uniqueVerifiedKols,
+        skinInTheGameCount: row.skinInTheGameCount,
+        buySignals: row.buySignals,
+        sellSignals: row.sellSignals,
+        flags: row.flags,
+        guardrailsVersion: row.guardrailsVersion,
+      });
+
+      return JSON.stringify({
+        custom_id: `kol-eval-${sym}-${tsTag}-${idx + 1}`,
+        method: 'POST',
+        url: '/api/v3/chat/completions',
+        body: {
+          model: resolvedModel,
+          temperature: 0.2,
+          response_format: { type: 'json_object' },
+          messages: [
+            {
+              role: 'system',
+              content:
+                'You are an objective crypto signal evaluator. Given curated anti-manipulation KOL consensus metrics, return pure JSON with keys "bias" (BULLISH|BEARISH|NEUTRAL), "qualityScore" (0-100), and "riskNote" (max 160 chars). Advisory only.',
+            },
+            {
+              role: 'user',
+              content: `Evaluate this curated KOL consensus snapshot:\n${userPayload}`,
+            },
+          ],
+        },
+      });
+    })
+    .join('\n');
+}

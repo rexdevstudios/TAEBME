@@ -208,6 +208,7 @@ async function main() {
       ['GET', '/api/admin/kol-verification'],
       ['POST', '/api/admin/kol-verification'],
       ['GET', '/api/admin/kol-dataset'],
+      ['POST', '/api/admin/kol-dataset'],
     ];
     for (const [m, p] of adminChecks) {
       const r = await fetch(`${BASE_URL}${p}`, {
