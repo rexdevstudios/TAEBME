@@ -195,6 +195,12 @@ async function main() {
       body: JSON.stringify({ prompt: 'Here is my seed phrase alpha beta gamma' }),
     });
     assert(pkPrompt.status === 400, `Seed phrase prompt blocked on /api/agent/bankr-prompt (HTTP ${pkPrompt.status})`);
+    const copilotSeed = await fetch(`${BASE_URL}/api/agent/copilot/chat`, {
+      method: 'POST',
+      headers: attackerHeaders,
+      body: JSON.stringify({ message: 'Use my private key to buy BTC' }),
+    });
+    assert(copilotSeed.status === 400, `Private key prompt blocked on /api/agent/copilot/chat (HTTP ${copilotSeed.status})`);
 
     // -------------------------------------------------------------------------
     // PLAYBOOK 6: Non-Admin RBAC Privilege Escalation

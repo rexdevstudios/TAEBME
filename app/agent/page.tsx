@@ -14,6 +14,7 @@ import { SessionAllowancePanel } from '../components/SessionAllowancePanel';
 import { MultiRailAgentExecutionPanel } from '../components/MultiRailAgentExecutionPanel';
 import { AutoPilotControlPanel } from '../components/AutoPilotControlPanel';
 import { SignalMarketplacePanel } from '../components/SignalMarketplacePanel';
+import { AiCopilotChatPanel } from '../components/AiCopilotChatPanel';
 import type { CustomAgentProfile } from '@packages/agent/skill-registry';
 import { TOP_LIQUID_CEX_PAIRS } from '@packages/shared/market-pairs';
 
@@ -198,6 +199,7 @@ export default function AgentPage() {
       {/* TAB 1: Auto-Pilot & Sinyal (Beginner-Friendly Default) */}
       {activeAgentTab === 'autopilot' && (
         <div className="flex-col gap-lg">
+          <AiCopilotChatPanel isConnected={isConnected} />
           <AutoPilotControlPanel isConnected={isConnected} />
           <SignalMarketplacePanel isConnected={isConnected} />
           <AutonomousAgentTerminalCard isConnected={isConnected} />
