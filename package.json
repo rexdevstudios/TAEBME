@@ -41,6 +41,8 @@
     "verify:testnet:e2e": "bun run scripts/test-testnet-full-usecase.ts",
     "verify:adversarial": "bun run scripts/test-adversarial-security.ts",
     "verify:live:all": "bun run verify:blackbox:dual && bun run verify:ui:smoke",
+    "cf:deploy:cron": "cd workers/cloudflare-autopilot-cron && npx wrangler deploy",
+    "ops:setup:zero-vps": "pwsh -ExecutionPolicy Bypass -File scripts/setup-zero-vps-ops.ps1",
     "verify:all": "npx tsc -p tsconfig.vercel.json --noEmit && bun run verify:unit && bun run verify:whitebox && bun run verify:sim",
     "typecheck": "tsc --noEmit",
     "db:seed": "npx tsx scripts/seed-db.ts",
