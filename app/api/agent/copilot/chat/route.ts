@@ -16,8 +16,10 @@ import {
   defaultKillSwitchDbAdapter,
   defaultProviderKeyVaultAdapter,
   getDbPool,
+  getUser24hOwnedTransferUsd,
   listUserOwnedWallets,
 } from '@packages/shared/db-pool';
+import { computeEffectiveUserRiskLimits } from '@packages/billing/subscriptions-engine';
 import { TOP_LIQUID_CEX_PAIRS } from '@packages/shared/market-pairs';
 import { fetchAutoPilot24hTickers } from '@packages/agent/autopilot-market-feed';
 import {
@@ -200,18 +202,45 @@ export async function POST(req: NextRequest) {
     const symbols = TOP_LIQUID_CEX_PAIRS.map((p) => p.symbol);
     const pool = getDbPool();
 
-    const [tickers, kolSignals, accounts, deployerTokens, platformCfg, activeKillSwitches, newsHint] =
-      await Promise.all([
-        fetchAutoPilot24hTickers(symbols).catch(() => ({})),
-        loadVerifiedKolSignalsForSymbol(pool, parsed.symbol).catch(() => []),
-        loadUserConnectedAccounts(session.user.userId, session.walletAddress),
-        loadUserDeployerFees(session.user.userId),
-        defaultBillingDbAdapter.getPlatformFeeAndRiskConfig().catch(() => null),
-        defaultKillSwitchDbAdapter.getActiveKillSwitches().catch(() => []),
-        parsed.kind === 'NEWS_AND_KOL' || parsed.kind === 'GENERAL_MARKET'
-          ? fetchBytePlusInfoQuestCatalystHint(parsed.sanitizedMessage).catch(() => null)
-          : Promise.resolve(null),
-      ]);
+    const [
+      tickers,
+      kolSignals,
+      accounts,
+      deployerTokens,
+      platformCfg,
+      activeKillSwitches,
+      newsHint,
+      userPlanId,
+      userPolicy,
+      used24hTransferUsd,
+    ] = await Promise.all([
+      fetchAutoPilot24hTickers(symbols).catch(() => ({})),
+      loadVerifiedKolSignalsForSymbol(pool, parsed.symbol).catch(() => []),
+      loadUserConnectedAccounts(session.user.userId, session.walletAddress),
+      loadUserDeployerFees(session.user.userId),
+      defaultBillingDbAdapter.getPlatformFeeAndRiskConfig().catch(() => null),
+      defaultKillSwitchDbAdapter.getActiveKillSwitches().catch(() => []),
+      parsed.kind === 'NEWS_AND_KOL' || parsed.kind === 'GENERAL_MARKET'
+        ? fetchBytePlusInfoQuestCatalystHint(parsed.sanitizedMessage).catch(() => null)
+        : Promise.resolve(null),
+      defaultBillingDbAdapter.getUserPlan(session.walletAddress).catch(() => 'FREE' as const),
+      defaultBillingDbAdapter.getUserRiskPolicy(session.walletAddress).catch(() => null),
+      getUser24hOwnedTransferUsd(session.walletAddress).catch(() => 0),
+    ]);
+
+    const effectiveLimits = computeEffectiveUserRiskLimits({
+      planId: userPlanId,
+      userPolicy,
+      platformGlobalCap: platformCfg,
+    });
+    const dailyTransferCapUsd = Math.max(
+      effectiveLimits.maxDailyLossUsd,
+      Math.round(effectiveLimits.maxOrderValueUsd * 2 * 100) / 100
+    );
+    const transferRemainingUsd = Math.max(
+      0,
+      Math.round((dailyTransferCapUsd - used24hTransferUsd) * 100) / 100
+    );
 
     const kolConsensus = computeAntiManipulationKolConsensus({
       tokenSymbol: parsed.symbol,
@@ -281,9 +310,14 @@ export async function POST(req: NextRequest) {
           ownedWallets,
           railSummary,
           riskLimits: {
-            maxOrderValueUsd: platformCfg?.maxOrderValueUsd ?? 1000,
-            maxDailyLossUsd: platformCfg?.maxDailyLossUsd ?? 5000,
+            maxOrderValueUsd: effectiveLimits.maxOrderValueUsd,
+            maxDailyLossUsd: effectiveLimits.maxDailyLossUsd,
             killSwitchActive,
+            transferCap: {
+              used24hUsd: used24hTransferUsd,
+              dailyCapUsd: dailyTransferCapUsd,
+              remainingUsd: transferRemainingUsd,
+            },
           },
         },
         timestamp: new Date().toISOString(),

@@ -3,9 +3,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Bot, Mic, MicOff, Send, ShieldCheck, CheckSquare, Square, Trash2, ListOrdered, XCircle } from 'lucide-react';
 import { useLocale } from '../context/LocaleContext';
-import type {
-  CopilotActionDraft,
-  CopilotConnectedAccount,
+import {
+  buildDeployerFeeSweepPrompt,
+  type CopilotActionDraft,
+  type CopilotConnectedAccount,
 } from '@packages/agent/copilot-engine';
 
 const COPILOT_HISTORY_STORAGE_KEY = 'poolnet:copilot:history:v1';
@@ -33,14 +34,22 @@ interface CopilotMessage {
   id: string;
   role: 'user' | 'assistant';
   text: string;
+  intentKind?: string;
   provider?: string;
+  ownedWallets?: string[];
   liveHighlights?: {
     topMovers?: Array<{ symbol: string; lastPrice: number; priceChangePct24h: number }>;
+    deployerTokens?: Array<{ contractAddress: string; estimatedCreatorFee: number }>;
     kolConsensus?: { score: number; verdict: string; uniqueVerifiedKols: number };
   };
   actionDraft?: CopilotActionDraft | null;
   availableAccounts?: CopilotConnectedAccount[];
-  riskLimits?: { maxOrderValueUsd: number; maxDailyLossUsd: number; killSwitchActive: boolean };
+  riskLimits?: {
+    maxOrderValueUsd: number;
+    maxDailyLossUsd: number;
+    killSwitchActive: boolean;
+    transferCap?: { used24hUsd: number; dailyCapUsd: number; remainingUsd: number };
+  };
   confirmedResult?: { queuedOrDispatchedCount: number; totalExposureUsd: number; details: string[] };
 }
 
@@ -238,7 +247,9 @@ export function AiCopilotChatPanel({ isConnected }: AiCopilotChatPanelProps) {
           id: msgId,
           role: 'assistant',
           text: String(d.reply || ''),
+          intentKind: d.intentKind,
           provider: d.provider,
+          ownedWallets: Array.isArray(d.ownedWallets) ? d.ownedWallets : [],
           liveHighlights: d.liveHighlights,
           actionDraft: d.actionDraft || null,
           availableAccounts: compatibleAccounts,
@@ -550,6 +561,36 @@ export function AiCopilotChatPanel({ isConnected }: AiCopilotChatPanelProps) {
                           {mv.priceChangePct24h.toFixed(1)}%
                         </button>
                       ))}
+                      {(m.intentKind === 'DEPLOYER_FEES' ||
+                        (m.liveHighlights.deployerTokens && m.liveHighlights.deployerTokens.length > 0)) &&
+                        m.ownedWallets &&
+                        m.ownedWallets.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const estEth = (m.liveHighlights?.deployerTokens || []).reduce(
+                                (sum, t) => sum + Number(t.estimatedCreatorFee || 0),
+                                0
+                              );
+                              setInput(
+                                buildDeployerFeeSweepPrompt({
+                                  destinationWallet: m.ownedWallets![0],
+                                  locale,
+                                  estimatedEth: estEth > 0 ? estEth : undefined,
+                                })
+                              );
+                            }}
+                            className="btn-secondary"
+                            style={{
+                              fontSize: '10px',
+                              padding: '2px 8px',
+                              fontFamily: 'var(--font-mono)',
+                              color: 'var(--color-text-positive)',
+                            }}
+                          >
+                            {tr('Sweep Fees -> Verified Wallet', 'Sweep Fee -> Wallet Terverifikasi')}
+                          </button>
+                        )}
                     </div>
                   )}
 
@@ -573,6 +614,11 @@ export function AiCopilotChatPanel({ isConnected }: AiCopilotChatPanelProps) {
                           ? tr('VERIFIED OWNED WALLET · Transfer Confirmation', 'VERIFIED OWNED WALLET · Konfirmasi Transfer')
                           : tr('Multi-Account Execution Confirmation', 'Konfirmasi Eksekusi Multi-Akun')}
                       </span>
+                      {m.actionDraft.kind === 'TRANSFER_OWNED' && m.riskLimits?.transferCap && (
+                        <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--color-muted)' }}>
+                          24h Quota: ${m.riskLimits.transferCap.remainingUsd} / ${m.riskLimits.transferCap.dailyCapUsd}
+                        </span>
+                      )}
                       {(m.availableAccounts || []).length > 1 && (
                         <button
                           type="button"

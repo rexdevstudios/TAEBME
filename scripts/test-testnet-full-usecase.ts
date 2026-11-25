@@ -428,6 +428,11 @@ async function runFullTestnetUsecase() {
       `POST /api/agent/copilot/chat allowed verified sub-wallet TRANSFER_OWNED draft (HTTP ${ownedTransferRes.status})`
     );
 
+    assert(
+      Number(ownedTransferJson?.data?.riskLimits?.transferCap?.dailyCapUsd || 0) > 0,
+      `POST /api/agent/copilot/chat exposed per-user 24h rolling transferCap ($${ownedTransferJson?.data?.riskLimits?.transferCap?.dailyCapUsd})`
+    );
+
     await fetch(
       `${BASE_URL}/api/user/owned-wallets?address=${encodeURIComponent(subWallet.address)}`,
       { method: 'DELETE', headers: authHeaders() }

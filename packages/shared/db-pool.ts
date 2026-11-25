@@ -1229,6 +1229,40 @@ export async function unlinkOwnedSubWallet(params: {
   return { address: normSub, removed: true };
 }
 
+/**
+ * Reads cumulative 24h `TRANSFER_OWNED` USD volume from `public.audit_logs`
+ * using index `idx_audit_actor_date (actor_id, created_at DESC)` (Phase EH, Zero-Migration).
+ */
+export async function getUser24hOwnedTransferUsd(userIdentifier: string): Promise<number> {
+  const pool = getDbPool();
+  if (!pool) return 0;
+  try {
+    const validUserId = await ensureUserEntity(pool, userIdentifier);
+    const res = await pool.query(
+      `SELECT reason
+       FROM audit_logs
+       WHERE actor_id = $1
+         AND action = 'COPILOT_MULTI_ACCOUNT_CONFIRMED'
+         AND reason LIKE 'kind=TRANSFER_OWNED%'
+         AND created_at >= NOW() - INTERVAL '24 hours'
+       ORDER BY created_at DESC
+       LIMIT 200`,
+      [validUserId]
+    );
+    let total = 0;
+    for (const row of res.rows) {
+      const m = String(row.reason || '').match(/\btotalUsd=(\d+(?:\.\d+)?)\b/);
+      if (m?.[1]) {
+        const val = Number(m[1]);
+        if (Number.isFinite(val) && val > 0) total += val;
+      }
+    }
+    return Math.round(total * 100) / 100;
+  } catch {
+    return 0;
+  }
+}
+
 export function resetDbStateForTesting(): void {
   defaultBinanceExecutionDbAdapter.clearInMemoryState();
   defaultKillSwitchDbAdapter.clearKillSwitches();

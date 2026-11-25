@@ -142,6 +142,85 @@ export function validateOwnedWalletTransferPrompt(
   };
 }
 
+export interface DailyTransferCapCheck {
+  ok: boolean;
+  requestedUsd: number;
+  used24hUsd: number;
+  dailyCapUsd: number;
+  remainingUsd: number;
+  reason?: string;
+}
+
+/**
+ * Pure 24h rolling owned-transfer cap evaluator (Phase EH).
+ * Enforces cumulative 24h transfer ceiling derived from user's effective risk policy & tier.
+ */
+export function computeDailyTransferCapCheck(params: {
+  requestedUsd: number;
+  used24hUsd: number;
+  dailyCapUsd: number;
+}): DailyTransferCapCheck {
+  const requested = Math.max(0, Math.round((Number(params.requestedUsd) || 0) * 100) / 100);
+  const used = Math.max(0, Math.round((Number(params.used24hUsd) || 0) * 100) / 100);
+  const cap = Math.max(50, Math.round((Number(params.dailyCapUsd) || 500) * 100) / 100);
+  const remaining = Math.max(0, Math.round((cap - used) * 100) / 100);
+
+  if (used + requested > cap) {
+    return {
+      ok: false,
+      requestedUsd: requested,
+      used24hUsd: used,
+      dailyCapUsd: cap,
+      remainingUsd: remaining,
+      reason: `TRANSFER_DAILY_CAP_EXCEEDED: 24h transfer quota exceeded ($${used} used + $${requested} requested > $${cap} daily cap).`,
+    };
+  }
+
+  return {
+    ok: true,
+    requestedUsd: requested,
+    used24hUsd: used,
+    dailyCapUsd: cap,
+    remainingUsd: Math.max(0, Math.round((cap - used - requested) * 100) / 100),
+  };
+}
+
+/**
+ * Extracts cumulative USD transferred in the last 24h from immutable `audit_logs.reason` entries
+ * written by `COPILOT_MULTI_ACCOUNT_CONFIRMED` (`kind=TRANSFER_OWNED ... totalUsd=123.45`).
+ */
+export function parseTransferredUsdFromAuditReasons(reasons: readonly string[]): number {
+  let sum = 0;
+  for (const r of reasons || []) {
+    const str = String(r || '');
+    if (!str.includes('kind=TRANSFER_OWNED')) continue;
+    const m = str.match(/\btotalUsd=(\d+(?:\.\d+)?)\b/);
+    if (m?.[1]) {
+      const val = Number(m[1]);
+      if (Number.isFinite(val) && val > 0) sum += val;
+    }
+  }
+  return Math.round(sum * 100) / 100;
+}
+
+/**
+ * Builds a deterministic 1-click deployer fee treasury sweep prompt targeting a verified owned wallet.
+ */
+export function buildDeployerFeeSweepPrompt(params: {
+  destinationWallet: string;
+  locale: 'en' | 'id';
+  estimatedEth?: number;
+}): string {
+  const dest = String(params.destinationWallet || '').trim().toLowerCase();
+  const ethHint =
+    params.estimatedEth && params.estimatedEth > 0
+      ? ` (~${params.estimatedEth.toFixed(4)} ETH)`
+      : '';
+  return params.locale === 'id'
+    ? `Claim fee deployer launchpad saya${ethHint} lalu transfer $50 USDC ke ${dest}`
+    : `Claim my launchpad deployer fees${ethHint} and transfer $50 USDC to ${dest}`;
+}
+
 export interface ParsedCopilotIntent {
   valid: boolean;
   error?: string;

@@ -18,14 +18,17 @@ import {
   defaultKolDbAdapter,
   defaultProviderKeyVaultAdapter,
   getDbPool,
+  getUser24hOwnedTransferUsd,
   listUserOwnedWallets,
   saveTradeIntent,
 } from '@packages/shared/db-pool';
+import { computeEffectiveUserRiskLimits } from '@packages/billing/subscriptions-engine';
 import {
   submitBankrAgentPrompt,
   validateBankrAgentPromptInput,
 } from '@packages/launchpad/bankr-client';
 import {
+  computeDailyTransferCapCheck,
   computeMultiAccountExposureCheck,
   validateOwnedWalletTransferPrompt,
   type CopilotAccountRail,
@@ -119,16 +122,27 @@ export async function POST(req: NextRequest) {
       )
       .slice(0, 15);
 
-    const [platformCfg, entitlement] = await Promise.all([
+    const [platformCfg, entitlement, userPlanId, userPolicy, used24hTransferUsd] = await Promise.all([
       defaultBillingDbAdapter.getPlatformFeeAndRiskConfig().catch(() => null),
       defaultBillingDbAdapter.getUserEntitlement(auth.user.userId).catch(() => ({ planId: 'FREE', hasLiveTrading: false })),
+      defaultBillingDbAdapter.getUserPlan(auth.walletAddress).catch(() => 'FREE' as const),
+      defaultBillingDbAdapter.getUserRiskPolicy(auth.walletAddress).catch(() => null),
+      draft.kind === 'TRANSFER_OWNED'
+        ? getUser24hOwnedTransferUsd(auth.walletAddress).catch(() => 0)
+        : Promise.resolve(0),
     ]);
+
+    const effectiveLimits = computeEffectiveUserRiskLimits({
+      planId: userPlanId,
+      userPolicy,
+      platformGlobalCap: platformCfg,
+    });
 
     const exposure = computeMultiAccountExposureCheck({
       amountUsdPerAccount: Number(draft.amountUsd || 0),
       selectedCount: selected.length,
-      maxOrderValueUsd: platformCfg?.maxOrderValueUsd ?? 1000,
-      maxDailyLossUsd: platformCfg?.maxDailyLossUsd ?? 5000,
+      maxOrderValueUsd: effectiveLimits.maxOrderValueUsd,
+      maxDailyLossUsd: Math.max(effectiveLimits.maxDailyLossUsd, effectiveLimits.maxOrderValueUsd * 2),
     });
 
     if (!exposure.ok) {
@@ -136,6 +150,29 @@ export async function POST(req: NextRequest) {
         { success: false, error: `RISK_REJECTED: ${exposure.reason}`, data: { exposure }, timestamp: new Date().toISOString() },
         { status: 400 }
       );
+    }
+
+    if (draft.kind === 'TRANSFER_OWNED') {
+      const dailyCapUsd = Math.max(
+        effectiveLimits.maxDailyLossUsd,
+        Math.round(effectiveLimits.maxOrderValueUsd * 2 * 100) / 100
+      );
+      const capCheck = computeDailyTransferCapCheck({
+        requestedUsd: exposure.totalExposureUsd,
+        used24hUsd: used24hTransferUsd,
+        dailyCapUsd,
+      });
+      if (!capCheck.ok) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: capCheck.reason || 'TRANSFER_DAILY_CAP_EXCEEDED',
+            data: { exposure, transferCap: capCheck },
+            timestamp: new Date().toISOString(),
+          },
+          { status: 400 }
+        );
+      }
     }
 
     const pool = getDbPool();
