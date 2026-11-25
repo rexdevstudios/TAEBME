@@ -18,6 +18,31 @@ interface OpsSummaryData {
     activeWalletsCount: number;
     lastPulseAt: string | null;
   };
+  aiEngine?: {
+    configured: boolean;
+    primaryProvider: string;
+    fastPoolSize: number;
+    deepPoolSize: number;
+    imagePoolSize: number;
+    infoQuestEnabled: boolean;
+    geminiFallbackConfigured: boolean;
+  };
+  executionPlane?: {
+    workerOnline: boolean;
+    pendingExecutionCount: number;
+    lastExecutedAt: string | null;
+  };
+  preflight?: {
+    overallStatus: 'READY' | 'DEGRADED' | 'HALTED';
+    passedCount: number;
+    totalCount: number;
+    checks: Array<{
+      id: string;
+      label: string;
+      status: 'PASS' | 'WARN' | 'FAIL';
+      detail: string;
+    }>;
+  };
 }
 
 interface DualControlRequestItem {
@@ -445,6 +470,124 @@ export function AdminOpsHealthPanel() {
           </div>
         </div>
       </div>
+
+      {(data?.aiEngine || data?.executionPlane || data?.preflight) && (
+        <div
+          style={{
+            marginTop: '12px',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+            gap: '10px',
+          }}
+        >
+          {data?.executionPlane && (
+            <div
+              className="bg-panel"
+              style={{ border: '1px solid var(--color-border)', padding: '12px', borderRadius: '6px' }}
+            >
+              <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-accent-info)' }}>
+                Execution Plane (worker:binance)
+              </div>
+              <div
+                style={{
+                  fontSize: '14px',
+                  fontWeight: 900,
+                  margin: '5px 0',
+                  fontFamily: 'var(--font-mono)',
+                  color: data.executionPlane.workerOnline
+                    ? 'var(--color-text-positive)'
+                    : 'var(--color-accent-amber)',
+                }}
+              >
+                {data.executionPlane.workerOnline ? 'ONLINE (LOCK HELD)' : 'STANDBY'} ·{' '}
+                {data.executionPlane.pendingExecutionCount} PENDING
+              </div>
+              <div className="text-muted" style={{ fontSize: '10px', fontFamily: 'var(--font-mono)' }}>
+                Last Executed:{' '}
+                {data.executionPlane.lastExecutedAt
+                  ? new Date(data.executionPlane.lastExecutedAt).toLocaleString()
+                  : 'None yet'}
+              </div>
+            </div>
+          )}
+
+          {data?.aiEngine && (
+            <div
+              className="bg-panel"
+              style={{ border: '1px solid var(--color-border)', padding: '12px', borderRadius: '6px' }}
+            >
+              <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-accent-purple)' }}>
+                BytePlus ModelArk AI Engine
+              </div>
+              <div
+                style={{
+                  fontSize: '14px',
+                  fontWeight: 900,
+                  margin: '5px 0',
+                  fontFamily: 'var(--font-mono)',
+                  color: data.aiEngine.configured
+                    ? 'var(--color-text-positive)'
+                    : 'var(--color-accent-amber)',
+                }}
+              >
+                {data.aiEngine.configured ? 'ACTIVE' : 'FALLBACK'} ·{' '}
+                {data.aiEngine.primaryProvider.toUpperCase()}
+              </div>
+              <div className="text-muted" style={{ fontSize: '10px', fontFamily: 'var(--font-mono)' }}>
+                Fast:{data.aiEngine.fastPoolSize} · Deep:{data.aiEngine.deepPoolSize} · Img:
+                {data.aiEngine.imagePoolSize} · InfoQuest:{data.aiEngine.infoQuestEnabled ? 'ON' : 'OFF'}
+              </div>
+            </div>
+          )}
+
+          {data?.preflight && (
+            <div
+              className="bg-panel"
+              style={{ border: '1px solid var(--color-border)', padding: '12px', borderRadius: '6px' }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-foreground)' }}>
+                  Ops Preflight Readiness
+                </span>
+                <span
+                  style={{
+                    fontSize: '10px',
+                    fontWeight: 900,
+                    fontFamily: 'var(--font-mono)',
+                    color:
+                      data.preflight.overallStatus === 'READY'
+                        ? 'var(--color-text-positive)'
+                        : data.preflight.overallStatus === 'HALTED'
+                          ? '#F87171'
+                          : 'var(--color-accent-amber)',
+                  }}
+                >
+                  {data.preflight.overallStatus} ({data.preflight.passedCount}/{data.preflight.totalCount})
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', marginTop: '6px' }}>
+                {data.preflight.checks.map((c) => (
+                  <div
+                    key={c.id}
+                    style={{
+                      fontSize: '10px',
+                      fontFamily: 'var(--font-mono)',
+                      color:
+                        c.status === 'PASS'
+                          ? 'var(--color-text-positive)'
+                          : c.status === 'FAIL'
+                            ? '#F87171'
+                            : 'var(--color-accent-amber)',
+                    }}
+                  >
+                    [{c.status}] {c.label}: {c.detail}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div style={{ marginTop: '12px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '10px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>

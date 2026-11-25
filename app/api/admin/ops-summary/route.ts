@@ -12,6 +12,10 @@ import { getDbPool, defaultKillSwitchDbAdapter } from '@packages/shared/db-pool'
 import { upstashRedis } from '@packages/shared/redis-client';
 import { listActiveAutoPilotWallets } from '@packages/agent/autopilot-market-feed';
 import { getBytePlusEngineTelemetry } from '@packages/intelligence/llm-advisory-client';
+import {
+  EXECUTION_PLANE_LOCK_KEYS,
+  evaluateOpsPreflightChecklist,
+} from '@packages/shared/ops-preflight';
 import type { Role } from '@packages/shared/types/domain';
 
 export const dynamic = 'force-dynamic';
@@ -60,6 +64,11 @@ export async function GET(req: NextRequest) {
     let dbConnected = false;
     const tradeIntents24h = { total: 0, approved: 0, rejected: 0, executed: 0 };
     const subscriptionsByPlan: Record<string, number> = {};
+    const executionPlane = {
+      workerOnline: false,
+      pendingExecutionCount: 0,
+      lastExecutedAt: null as string | null,
+    };
 
     const [activeKillSwitches, activeAutoPilotWallets, lastPulseRaw] = await Promise.all([
       defaultKillSwitchDbAdapter.getActiveKillSwitches().catch(() => []),
@@ -84,7 +93,7 @@ export async function GET(req: NextRequest) {
         await pool.query('SELECT 1');
         dbConnected = true;
 
-        const [intentsRes, subsRes] = await Promise.all([
+        const [intentsRes, subsRes, lockRes, execPlaneRes] = await Promise.all([
           pool.query(
             `SELECT status, COUNT(*)::int AS cnt
              FROM trade_intents
@@ -97,7 +106,32 @@ export async function GET(req: NextRequest) {
              WHERE status = 'ACTIVE'
              GROUP BY plan_id`
           ),
+          pool
+            .query(
+              `SELECT EXISTS(
+                 SELECT 1 FROM pg_locks
+                 WHERE locktype = 'advisory'
+                   AND classid = $1
+                   AND objid = $2
+               ) AS held`,
+              [EXECUTION_PLANE_LOCK_KEYS.key1, EXECUTION_PLANE_LOCK_KEYS.key2]
+            )
+            .catch(() => ({ rows: [{ held: false }] })),
+          pool
+            .query(
+              `SELECT
+                 COUNT(*) FILTER (WHERE status = 'APPROVED' AND stage IN ('TESTNET', 'LIVE'))::int AS pending_cnt,
+                 MAX(created_at) FILTER (WHERE status = 'EXECUTED') AS last_exec_at
+               FROM trade_intents`
+            )
+            .catch(() => ({ rows: [{ pending_cnt: 0, last_exec_at: null }] })),
         ]);
+
+        executionPlane.workerOnline = Boolean(lockRes.rows[0]?.held);
+        executionPlane.pendingExecutionCount = Number(execPlaneRes.rows[0]?.pending_cnt || 0);
+        executionPlane.lastExecutedAt = execPlaneRes.rows[0]?.last_exec_at
+          ? new Date(execPlaneRes.rows[0].last_exec_at).toISOString()
+          : null;
 
         for (const row of intentsRes.rows) {
           const st = String(row.status || '').toUpperCase();
@@ -117,6 +151,21 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    const aiEngine = getBytePlusEngineTelemetry();
+    const preflight = evaluateOpsPreflightChecklist({
+      dbConnected,
+      redisConfigured: upstashRedis.isConfigured(),
+      activeKillSwitchesCount: activeKillSwitches.length,
+      aiEngine: {
+        primaryProvider: aiEngine.primaryProvider,
+        byteplusConfigured: aiEngine.configured,
+        fastPoolCount: aiEngine.fastPoolSize,
+        deepPoolCount: aiEngine.deepPoolSize,
+        infoQuestEnabled: aiEngine.infoQuestEnabled,
+      },
+      executionPlane,
+    });
+
     return NextResponse.json(
       {
         success: true,
@@ -133,7 +182,9 @@ export async function GET(req: NextRequest) {
             activeWalletsCount: activeAutoPilotWallets.length,
             lastPulseAt,
           },
-          aiEngine: getBytePlusEngineTelemetry(),
+          aiEngine,
+          executionPlane,
+          preflight,
         },
         timestamp: new Date().toISOString(),
       },
