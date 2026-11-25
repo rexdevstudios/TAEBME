@@ -357,6 +357,14 @@ export default function AgentPage() {
                   {proposal.intelligenceSignal?.inputs?.macroSentiment || 'UNAVAILABLE'}
                 </span>
               </div>
+              {proposal.kolConsensus && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                  <span className="text-muted">Verified KOL Consensus:</span>
+                  <span style={{ color: 'var(--color-text-positive)', fontWeight: 800 }}>
+                    {proposal.kolConsensus.score}/100 ({proposal.kolConsensus.verdict}) · {proposal.kolConsensus.uniqueVerifiedKols} KOLs
+                  </span>
+                </div>
+              )}
               <div style={{ marginBottom: '16px' }}>
                 <span className="text-muted" style={{ display: 'block', marginBottom: '8px' }}>Signal Rationale:</span>
                 <div style={{ color: 'var(--color-foreground)', backgroundColor: 'var(--color-background)', padding: '12px', borderRadius: '4px', border: '1px solid var(--color-border)' }}>

@@ -1,9 +1,15 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Layers, Plus, CheckCircle2, Users } from 'lucide-react';
+import { Layers, Plus, CheckCircle2, ShieldCheck, Users } from 'lucide-react';
 import type { SignalPresetListing } from '@packages/agent/signal-marketplace';
 import { useLocale } from '../context/LocaleContext';
+
+type EnrichedPresetListing = SignalPresetListing & {
+  kolVerified?: boolean;
+  kolTier?: 'GOLD' | 'SILVER' | 'UNVERIFIED';
+  kolHandle?: string;
+};
 
 interface SignalMarketplacePanelProps {
   isConnected: boolean;
@@ -11,7 +17,7 @@ interface SignalMarketplacePanelProps {
 
 export function SignalMarketplacePanel({ isConnected }: SignalMarketplacePanelProps) {
   const { tr } = useLocale();
-  const [presets, setPresets] = useState<SignalPresetListing[]>([]);
+  const [presets, setPresets] = useState<EnrichedPresetListing[]>([]);
   const [loading, setLoading] = useState(false);
   const [showPublish, setShowPublish] = useState(false);
   const [title, setTitle] = useState('');
@@ -237,11 +243,33 @@ export function SignalMarketplacePanel({ isConnected }: SignalMarketplacePanelPr
               }}
             >
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px', marginBottom: '4px', flexWrap: 'wrap' }}>
                   <span style={{ fontWeight: 800, fontSize: '13px', color: 'var(--color-foreground)' }}>{p.title}</span>
-                  <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', fontWeight: 800, padding: '2px 6px', borderRadius: '999px', backgroundColor: 'var(--color-badge-success-bg)', color: 'var(--color-badge-success-text)' }}>
-                    {p.priceCredits} cr
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    {p.kolVerified && (
+                      <span
+                        title={p.kolHandle ? `Verified KOL ${p.kolHandle}` : 'Verified KOL'}
+                        style={{
+                          fontSize: '9px',
+                          fontFamily: 'var(--font-mono)',
+                          fontWeight: 800,
+                          padding: '2px 6px',
+                          borderRadius: '999px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '3px',
+                          backgroundColor: 'rgba(16, 185, 129, 0.14)',
+                          color: 'var(--color-text-positive)',
+                          border: '1px solid rgba(16, 185, 129, 0.35)',
+                        }}
+                      >
+                        <ShieldCheck size={10} /> KOL VERIFIED · {p.kolTier}
+                      </span>
+                    )}
+                    <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', fontWeight: 800, padding: '2px 6px', borderRadius: '999px', backgroundColor: 'var(--color-badge-success-bg)', color: 'var(--color-badge-success-text)' }}>
+                      {p.priceCredits} cr
+                    </span>
+                  </div>
                 </div>
                 <p className="text-muted" style={{ margin: '0 0 8px 0', fontSize: '11px', lineHeight: 1.45 }}>
                   {p.description}

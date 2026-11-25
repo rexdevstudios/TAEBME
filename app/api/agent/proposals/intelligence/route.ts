@@ -8,6 +8,10 @@ import { ApiResponse } from '@packages/shared/contracts/api-contracts';
 import { requireCapability } from '@packages/auth/session';
 import { defaultProposalDbAdapter, defaultBillingDbAdapter, getDbPool } from '@packages/shared/db-pool';
 import { SubscriptionsEngine } from '@packages/billing/subscriptions-engine';
+import {
+  computeAntiManipulationKolConsensus,
+  loadVerifiedKolSignalsForSymbol,
+} from '@packages/intelligence/kol-chart-overlay';
 
 export async function POST(req: NextRequest) {
   try {
@@ -21,13 +25,19 @@ export async function POST(req: NextRequest) {
     const userId = auth.user.userId;
     const agentId = body.agentId && typeof body.agentId === 'string' ? body.agentId : 'agent-alpha';
 
-    // 2. Fetch DefiLlama macro signal & SSOT platform config in parallel (non-blocking enrichment)
-    const [macroResult, platformCfgResult] = await Promise.allSettled([
+    // 2. Fetch DefiLlama macro signal, SSOT platform config & Verified KOL signals in parallel (non-blocking)
+    const [macroResult, platformCfgResult, kolSignalsResult] = await Promise.allSettled([
       fetchDefiLlamaMacroSignal(),
       defaultBillingDbAdapter.getPlatformFeeAndRiskConfig(),
+      loadVerifiedKolSignalsForSymbol(getDbPool(), symbol),
     ]);
     const macroSignal = macroResult.status === 'fulfilled' ? macroResult.value : null;
     const platformCfg = platformCfgResult.status === 'fulfilled' ? platformCfgResult.value : null;
+    const kolSignals = kolSignalsResult.status === 'fulfilled' ? kolSignalsResult.value : [];
+    const kolConsensus = computeAntiManipulationKolConsensus({
+      tokenSymbol: symbol,
+      signals: kolSignals,
+    });
     const proposalCostCr = platformCfg?.studioCostCr ?? 1;
 
     // 3. Compute Intelligence Signal (with macro enrichment & SSOT feature weights)
@@ -76,7 +86,7 @@ export async function POST(req: NextRequest) {
       // Non-blocking fallback
     }
 
-    const enrichedProposal = { ...proposal, llmAdvisory, creditsBurned: proposalCostCr, remainingCredits };
+    const enrichedProposal = { ...proposal, llmAdvisory, kolConsensus, creditsBurned: proposalCostCr, remainingCredits };
 
     const response: ApiResponse<typeof enrichedProposal> = {
       success: true,

@@ -11,8 +11,7 @@ import { getDbPool } from '@packages/shared/db-pool';
 import {
   buildCandleChartMarkers,
   computeAntiManipulationKolConsensus,
-  isVerifiedKol,
-  type KolSignalInput,
+  loadVerifiedKolSignalsForSymbol,
 } from '@packages/intelligence/kol-chart-overlay';
 
 const INTERVAL_MS: Record<string, number> = {
@@ -218,47 +217,8 @@ export async function GET(req: NextRequest) {
       signal,
     );
 
-    // 4.5 Phase DU: Verified KOL Chart Overlay & Anti-Manipulation Consensus (Zero-Migration SSOT)
-    const kolEntries: KolSignalInput[] = [];
-    const pool = getDbPool();
-    if (pool) {
-      try {
-        const cleanBase = activeSymbol.replace(/\/.*$/, '').replace(/USDT$/, '');
-        const res = await pool.query(
-          `SELECT ti.side, ti.estimated_price, ti.created_at, w.address AS wallet_address,
-                  kp.twitter_handle, kp.trust_score
-           FROM trade_intents ti
-           JOIN wallets w ON w.user_id = ti.user_id
-           JOIN kol_profiles kp ON kp.user_id = ti.user_id
-           WHERE ti.status = 'EXECUTED'
-             AND (UPPER(ti.symbol) = UPPER($1) OR UPPER(ti.symbol) LIKE UPPER($2))
-           ORDER BY ti.created_at DESC
-           LIMIT 25`,
-          [activeSymbol, `${cleanBase}%`]
-        );
-        for (const row of res.rows) {
-          const v = isVerifiedKol({
-            walletAddress: row.wallet_address,
-            twitterHandle: row.twitter_handle,
-            trustScore: Number(row.trust_score ?? 0),
-          });
-          if (v.verified) {
-            kolEntries.push({
-              walletAddress: String(row.wallet_address),
-              handle: v.handle,
-              trustScore: Number(row.trust_score ?? 0),
-              hasSocialProof: true,
-              source: 'ONCHAIN_ENTRY',
-              side: String(row.side).toUpperCase() === 'SELL' ? 'SELL' : 'BUY',
-              price: Number(row.estimated_price || 0) || undefined,
-              timestampMs: new Date(row.created_at).getTime(),
-            });
-          }
-        }
-      } catch {
-        // Non-blocking fallback when KOL/trade tables have no matching entries
-      }
-    }
+    // 4.5 Phase DU/DV: Verified KOL Chart Overlay & Anti-Manipulation Consensus (Shared SSOT Loader)
+    const kolEntries = await loadVerifiedKolSignalsForSymbol(getDbPool(), activeSymbol);
 
     const aiActionHint = (tradingAnalysis as any)?.regime?.regime || (signal as any)?.action || null;
     const chartMarkers = buildCandleChartMarkers({

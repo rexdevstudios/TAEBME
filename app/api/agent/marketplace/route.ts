@@ -11,18 +11,50 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireActiveSession } from '@packages/auth/session';
-import { defaultBillingDbAdapter } from '@packages/shared/db-pool';
+import { defaultBillingDbAdapter, getDbPool } from '@packages/shared/db-pool';
 import {
   MARKETPLACE_CREATOR_SHARE_PCT,
   MARKETPLACE_PLATFORM_FEE_PCT,
   validateSignalPresetInput,
 } from '@packages/agent/signal-marketplace';
+import {
+  enrichMarketplacePresetsWithKolStatus,
+  type KolProfileSample,
+} from '@packages/intelligence/kol-chart-overlay';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const presets = await defaultBillingDbAdapter.getMarketplacePresets();
+    const rawPresets = await defaultBillingDbAdapter.getMarketplacePresets();
+    const kolMap = new Map<string, KolProfileSample>();
+    const pool = getDbPool();
+    if (pool && rawPresets.length > 0) {
+      try {
+        const wallets = Array.from(
+          new Set(rawPresets.map((p) => String(p.creatorWallet || '').trim().toLowerCase()).filter(Boolean))
+        );
+        if (wallets.length > 0) {
+          const res = await pool.query(
+            `SELECT LOWER(w.address) AS wallet_address, kp.twitter_handle, kp.trust_score
+             FROM wallets w
+             JOIN kol_profiles kp ON kp.user_id = w.user_id
+             WHERE LOWER(w.address) = ANY($1::text[])`,
+            [wallets]
+          );
+          for (const row of res.rows) {
+            kolMap.set(String(row.wallet_address).toLowerCase(), {
+              walletAddress: String(row.wallet_address),
+              twitterHandle: row.twitter_handle,
+              trustScore: Number(row.trust_score ?? 0),
+            });
+          }
+        }
+      } catch {
+        // Non-blocking enrichment fallback
+      }
+    }
+    const presets = enrichMarketplacePresetsWithKolStatus(rawPresets, kolMap);
     return NextResponse.json(
       {
         success: true,
