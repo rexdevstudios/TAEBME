@@ -13,6 +13,10 @@ interface CopilotMessage {
   role: 'user' | 'assistant';
   text: string;
   provider?: string;
+  liveHighlights?: {
+    topMovers?: Array<{ symbol: string; lastPrice: number; priceChangePct24h: number }>;
+    kolConsensus?: { score: number; verdict: string; uniqueVerifiedKols: number };
+  };
   actionDraft?: CopilotActionDraft | null;
   availableAccounts?: CopilotConnectedAccount[];
   riskLimits?: { maxOrderValueUsd: number; maxDailyLossUsd: number; killSwitchActive: boolean };
@@ -131,6 +135,7 @@ export function AiCopilotChatPanel({ isConnected }: AiCopilotChatPanelProps) {
           role: 'assistant',
           text: String(d.reply || ''),
           provider: d.provider,
+          liveHighlights: d.liveHighlights,
           actionDraft: d.actionDraft || null,
           availableAccounts: compatibleAccounts,
           riskLimits: d.riskLimits,
@@ -288,6 +293,52 @@ export function AiCopilotChatPanel({ isConnected }: AiCopilotChatPanelProps) {
                   {m.role === 'user' ? 'YOU' : `COPILOT${m.provider ? ` · ${m.provider}` : ''}`}
                 </div>
                 <div>{m.text}</div>
+
+                {m.liveHighlights &&
+                  ((m.liveHighlights.topMovers && m.liveHighlights.topMovers.length > 0) ||
+                    m.liveHighlights.kolConsensus) && (
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' }}>
+                      {m.liveHighlights.kolConsensus && (
+                        <span
+                          style={{
+                            fontSize: '10px',
+                            fontWeight: 800,
+                            fontFamily: 'var(--font-mono)',
+                            padding: '2px 7px',
+                            borderRadius: '4px',
+                            border: '1px solid rgba(56, 189, 248, 0.35)',
+                            color: 'var(--color-accent-info)',
+                          }}
+                        >
+                          KOL VERIFIED: {m.liveHighlights.kolConsensus.verdict} ({m.liveHighlights.kolConsensus.score}/100)
+                        </span>
+                      )}
+                      {(m.liveHighlights.topMovers || []).slice(0, 4).map((mv) => (
+                        <button
+                          key={mv.symbol}
+                          type="button"
+                          onClick={() =>
+                            setInput(
+                              tr(
+                                `Buy limit ${mv.symbol.replace(/USDT$/, '')} at ${mv.lastPrice} for $100`,
+                                `Beli limit ${mv.symbol.replace(/USDT$/, '')} di ${mv.lastPrice} sebesar $100`
+                              )
+                            )
+                          }
+                          className="btn-secondary"
+                          style={{
+                            fontSize: '10px',
+                            padding: '2px 7px',
+                            fontFamily: 'var(--font-mono)',
+                            color: mv.priceChangePct24h >= 0 ? 'var(--color-text-positive)' : 'var(--color-destructive)',
+                          }}
+                        >
+                          {mv.symbol} {mv.priceChangePct24h >= 0 ? '+' : ''}
+                          {mv.priceChangePct24h.toFixed(1)}%
+                        </button>
+                      ))}
+                    </div>
+                  )}
 
                 {m.actionDraft && !m.confirmedResult && (
                   <div

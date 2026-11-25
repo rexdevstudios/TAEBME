@@ -23,9 +23,20 @@ export type CopilotIntentKind =
   | 'BANKR_PROMPT'
   | 'GENERAL_MARKET';
 
+export type CopilotAccountRail = 'BINANCE' | 'BYBIT' | 'BANKR' | 'PAPER_SIM';
+
+export const COPILOT_PAPER_SIM_ACCOUNT: CopilotConnectedAccount = {
+  id: 'paper-sim-default',
+  rail: 'PAPER_SIM',
+  label: 'Paper Trading Simulator ($0 Risk)',
+  maskedKey: 'SIM-LOCAL',
+  scope: 'PAPER',
+  isDefault: false,
+};
+
 export interface CopilotConnectedAccount {
   id: string;
-  rail: 'BINANCE' | 'BYBIT' | 'BANKR';
+  rail: CopilotAccountRail;
   label: string;
   maskedKey: string;
   scope: string;
@@ -49,7 +60,7 @@ export interface CopilotActionDraft {
   limitPrice?: number;
   amountUsd: number;
   bankrPrompt?: string;
-  supportedRails: Array<'BINANCE' | 'BYBIT' | 'BANKR'>;
+  supportedRails: CopilotAccountRail[];
 }
 
 export interface ParsedCopilotIntent {
@@ -233,7 +244,7 @@ export function parseCopilotUserMessage(rawMessage: unknown): ParsedCopilotInten
       orderType: 'LIMIT',
       limitPrice,
       amountUsd,
-      supportedRails: ['BINANCE', 'BYBIT'],
+      supportedRails: ['BINANCE', 'BYBIT', 'PAPER_SIM'],
     };
     return {
       valid: true,
@@ -254,7 +265,7 @@ export function parseCopilotUserMessage(rawMessage: unknown): ParsedCopilotInten
       side,
       orderType: 'MARKET',
       amountUsd,
-      supportedRails: ['BINANCE', 'BYBIT'],
+      supportedRails: ['BINANCE', 'BYBIT', 'PAPER_SIM'],
     };
     return {
       valid: true,

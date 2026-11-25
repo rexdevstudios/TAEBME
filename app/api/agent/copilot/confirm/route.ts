@@ -26,14 +26,16 @@ import {
 } from '@packages/launchpad/bankr-client';
 import {
   computeMultiAccountExposureCheck,
+  type CopilotAccountRail,
   type CopilotActionDraft,
 } from '@packages/agent/copilot-engine';
+import { notifyUserWebhookBestEffort } from '@packages/notifications/webhook-dispatcher';
 
 export const dynamic = 'force-dynamic';
 
 interface SelectedAccountInput {
   id: string;
-  rail: 'BINANCE' | 'BYBIT' | 'BANKR';
+  rail: CopilotAccountRail;
 }
 
 export async function POST(req: NextRequest) {
@@ -87,7 +89,13 @@ export async function POST(req: NextRequest) {
     }
 
     const selected = rawSelected
-      .filter((a) => a && typeof a.id === 'string' && a.id.trim().length > 0 && ['BINANCE', 'BYBIT', 'BANKR'].includes(String(a.rail)))
+      .filter(
+        (a) =>
+          a &&
+          typeof a.id === 'string' &&
+          a.id.trim().length > 0 &&
+          ['BINANCE', 'BYBIT', 'BANKR', 'PAPER_SIM'].includes(String(a.rail))
+      )
       .slice(0, 15);
 
     const [platformCfg, entitlement] = await Promise.all([
@@ -157,14 +165,14 @@ export async function POST(req: NextRequest) {
           detail: bankrRes.message || bankrRes.status,
         });
       } else {
-        // CEX_LIMIT_ORDER or CEX_MARKET_ORDER
-        if (acct.rail !== 'BINANCE' && acct.rail !== 'BYBIT') {
+        // CEX_LIMIT_ORDER or CEX_MARKET_ORDER (BINANCE, BYBIT, or built-in PAPER_SIM)
+        if (acct.rail !== 'BINANCE' && acct.rail !== 'BYBIT' && acct.rail !== 'PAPER_SIM') {
           results.push({ accountId: acct.id, rail: acct.rail, status: 'REJECTED', detail: 'Non-CEX account skipped for CEX order.' });
           continue;
         }
 
-        // Strict Anti-IDOR ownership verification per account
-        let owned = false;
+        // Strict Anti-IDOR ownership verification per account (PAPER_SIM is virtual & scoped strictly to auth.user.userId)
+        let owned = acct.rail === 'PAPER_SIM' && acct.id === 'paper-sim-default';
         if (acct.rail === 'BINANCE' && pool) {
           const check = await pool
             .query('SELECT id FROM binance_credentials WHERE id = $1 AND user_id = $2 AND is_active = true LIMIT 1', [
@@ -183,10 +191,11 @@ export async function POST(req: NextRequest) {
           continue;
         }
 
+        const effectiveStage: 'PAPER' | 'TESTNET' | 'LIVE' = acct.rail === 'PAPER_SIM' ? 'PAPER' : stage;
         const idempotencyKey = `copilot:${acct.rail.toLowerCase()}:${acct.id.slice(0, 8)}:${draft.symbol}:${draft.side}:${tsBucket}`;
         const intentId = await saveTradeIntent({
           userId: auth.user.userId,
-          stage,
+          stage: effectiveStage,
           symbol: draft.symbol,
           side: draft.side,
           type: draft.orderType === 'LIMIT' ? 'LIMIT' : 'MARKET',
@@ -202,10 +211,12 @@ export async function POST(req: NextRequest) {
           rail: acct.rail,
           status: 'QUEUED',
           referenceId: intentId,
-          detail: `${draft.orderType} ${draft.side} ${draft.symbol} ($${draft.amountUsd}${draft.limitPrice ? ` @ $${draft.limitPrice}` : ''}) queued [${stage}]`,
+          detail: `${draft.orderType} ${draft.side} ${draft.symbol} ($${draft.amountUsd}${draft.limitPrice ? ` @ $${draft.limitPrice}` : ''}) queued [${effectiveStage}]`,
         });
       }
     }
+
+    const queuedOrDispatchedCount = results.filter((r) => r.status !== 'REJECTED').length;
 
     await defaultKolDbAdapter.createAuditLog(
       auth.user.userId,
@@ -214,13 +225,39 @@ export async function POST(req: NextRequest) {
       `kind=${draft.kind} symbol=${draft.symbol} accounts=${selected.length} totalUsd=${exposure.totalExposureUsd}`
     );
 
+    if (queuedOrDispatchedCount > 0) {
+      await notifyUserWebhookBestEffort({
+        resolveWebhookUrl: async () => {
+          const resolved = await defaultProviderKeyVaultAdapter
+            .resolveDecryptedKeyForDeploy({
+              userIdentifier: auth.walletAddress,
+              targetChain: 'all',
+              provider: 'WEBHOOK',
+            })
+            .catch(() => null);
+          return resolved?.apiKey || null;
+        },
+        payload: {
+          event: 'ORDER_APPROVED',
+          title: `Copilot ${draft.orderType} ${draft.side} ${draft.symbol}`,
+          message: `Confirmed across ${queuedOrDispatchedCount} account(s) · Total $${exposure.totalExposureUsd}${draft.limitPrice ? ` @ $${draft.limitPrice}` : ''}`,
+          metadata: {
+            kind: draft.kind,
+            symbol: draft.symbol,
+            accounts: queuedOrDispatchedCount,
+            totalExposureUsd: exposure.totalExposureUsd,
+          },
+        },
+      }).catch(() => {});
+    }
+
     return NextResponse.json(
       {
         success: true,
         data: {
           exposure,
           results,
-          queuedOrDispatchedCount: results.filter((r) => r.status !== 'REJECTED').length,
+          queuedOrDispatchedCount,
         },
         timestamp: new Date().toISOString(),
       },

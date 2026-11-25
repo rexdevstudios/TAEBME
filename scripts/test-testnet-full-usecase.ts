@@ -339,6 +339,45 @@ async function runFullTestnetUsecase() {
       `GET /api/agent/marketplace returned 80/20 Copy-Trading Marketplace (HTTP 200)`
     );
 
+    const copilotMoversRes = await fetch(`${BASE_URL}/api/agent/copilot/chat`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ message: 'Ada token yang naik di atas 5% hari ini?', locale: 'id' }),
+    });
+    const copilotMoversJson: any = await copilotMoversRes.json();
+    assert(
+      copilotMoversRes.status === 200 && copilotMoversJson?.data?.intentKind === 'TOP_MOVERS',
+      `POST /api/agent/copilot/chat resolved TOP_MOVERS live radar (HTTP ${copilotMoversRes.status})`
+    );
+
+    const copilotLimitRes = await fetch(`${BASE_URL}/api/agent/copilot/chat`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ message: 'Kalau BTC turun ke harga 88000 belikan limit sebesar $50', locale: 'id' }),
+    });
+    const copilotLimitJson: any = await copilotLimitRes.json();
+    assert(
+      copilotLimitRes.status === 200 &&
+        copilotLimitJson?.data?.actionDraft?.kind === 'CEX_LIMIT_ORDER' &&
+        Array.isArray(copilotLimitJson?.data?.availableAccounts) &&
+        copilotLimitJson.data.availableAccounts.some((a: any) => a.rail === 'PAPER_SIM'),
+      `POST /api/agent/copilot/chat built LIMIT draft with PAPER_SIM account (HTTP ${copilotLimitRes.status})`
+    );
+
+    const copilotConfirmRes = await fetch(`${BASE_URL}/api/agent/copilot/confirm`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({
+        actionDraft: copilotLimitJson?.data?.actionDraft,
+        selectedAccounts: [{ id: 'paper-sim-default', rail: 'PAPER_SIM' }],
+      }),
+    });
+    const copilotConfirmJson: any = await copilotConfirmRes.json();
+    assert(
+      copilotConfirmRes.status === 200 && copilotConfirmJson?.data?.queuedOrDispatchedCount === 1,
+      `POST /api/agent/copilot/confirm queued PAPER_SIM LIMIT intent (HTTP ${copilotConfirmRes.status})`
+    );
+
     // =========================================================================
     // STAGE 7: KOL Hub, Active Bounties & Public Transparency
     // =========================================================================

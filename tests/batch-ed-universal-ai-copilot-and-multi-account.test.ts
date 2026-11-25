@@ -27,7 +27,7 @@ describe('Phase ED: Universal AI Trading & Launchpad Copilot + Voice + Multi-Acc
     expect(limitCmd.limitPrice).toBe(88000);
     expect(limitCmd.amountUsd).toBe(150);
     expect(limitCmd.actionDraft?.orderType).toBe('LIMIT');
-    expect(limitCmd.actionDraft?.supportedRails).toEqual(['BINANCE', 'BYBIT']);
+    expect(limitCmd.actionDraft?.supportedRails).toEqual(['BINANCE', 'BYBIT', 'PAPER_SIM']);
 
     const moversCmd = parseCopilotUserMessage('Apakah ada token yang naik di atas 7.5% hari ini?');
     expect(moversCmd.valid).toBe(true);

@@ -30,6 +30,7 @@ import {
 import { FeatureEngine } from '@packages/intelligence/feature-engine';
 import { intelligenceCache } from '@packages/intelligence/market-data-cache';
 import {
+  COPILOT_PAPER_SIM_ACCOUNT,
   buildDeterministicCopilotReply,
   filterTopMoversByPercent,
   parseCopilotUserMessage,
@@ -97,6 +98,12 @@ async function loadUserConnectedAccounts(
       isDefault: k.isDefault,
     });
   }
+
+  // Always include built-in zero-risk Paper Trading Simulator account so new/FREE users can test LIMIT/MARKET drafts immediately
+  accounts.push({
+    ...COPILOT_PAPER_SIM_ACCOUNT,
+    isDefault: accounts.filter((a) => a.rail === 'BINANCE' || a.rail === 'BYBIT').length === 0,
+  });
 
   return accounts;
 }
