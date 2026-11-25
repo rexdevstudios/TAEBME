@@ -15,16 +15,9 @@ import {
 } from '@packages/shared/db-pool';
 import { PublishedSnapshotReorgSweeper } from '@packages/launchpad/reorg-sweeper';
 
-export const dynamic = 'force-dynamic';
+import { isCronAuthorized } from '@packages/auth/cron-auth';
 
-function isCronAuthorized(req: NextRequest): boolean {
-  const cronSecret = process.env.CRON_SECRET?.trim();
-  if (!cronSecret || cronSecret.length < 16) {
-    return false;
-  }
-  const authHeader = req.headers.get('authorization');
-  return Boolean(authHeader && authHeader === `Bearer ${cronSecret}`);
-}
+export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   const startMs = performance.now();

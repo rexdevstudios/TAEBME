@@ -10,6 +10,8 @@ import { AngelDealRoomModal } from '../components/AngelDealRoomModal';
 import { AdminMerkleSnapshotPanel } from '../components/AdminMerkleSnapshotPanel';
 import { CreatorStudioPanel } from '../components/CreatorStudioPanel';
 import { PageWorkflowBanner } from '../components/PageWorkflowBanner';
+import { NetworkMismatchBanner } from '../components/NetworkMismatchBanner';
+import { resolveLaunchpadChainHex } from '@packages/trading/paper-wallet';
 import { TokenAvatar } from '../components/TokenAvatar';
 import { BankrKeyVaultPanel } from '../components/BankrKeyVaultPanel';
 import {
@@ -636,6 +638,10 @@ export default function LaunchpadPage() {
       {/* TAB 2: Create Token Wizard + Live Preview + Bankr Fleet */}
       {launchpadTab === 'CREATE' && (
         <>
+          <NetworkMismatchBanner
+            targetChainHex={resolveLaunchpadChainHex(selectedChain)}
+            contextLabel={`Deployer ${selectedChain.toUpperCase()}`}
+          />
           <PageWorkflowBanner
             title="Alur Peluncuran Token"
             isUnlocked={Boolean(entitlements.createLaunch)}

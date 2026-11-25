@@ -7,6 +7,8 @@ import { CreditCard, CheckCircle2, ShieldAlert, Zap, TrendingUp, Wallet, Banknot
 import { ethers } from 'ethers';
 import { ensureBaseNetwork, getBrowserSigner, normalizeWeb3Error, resolveBrowserEthereumProvider } from '@packages/launchpad/web3-provider';
 import { PageWorkflowBanner } from '../components/PageWorkflowBanner';
+import { NetworkMismatchBanner } from '../components/NetworkMismatchBanner';
+import { resolveDefaultBaseChainHex } from '@packages/trading/paper-wallet';
 import { BillingAddonStorePanel } from '../components/BillingAddonStorePanel';
 import { ProviderRegistryStatusPanel } from '../components/ProviderRegistryStatusPanel';
 import { UserWebhookVaultPanel } from '../components/UserWebhookVaultPanel';
@@ -499,6 +501,10 @@ export default function BillingPage() {
       {activeBillingTab === 'plans' && (
         <div className="flex-col gap-lg">
       {/* Workflow & Plan Entitlement Guide */}
+      <NetworkMismatchBanner
+        targetChainHex={resolveDefaultBaseChainHex()}
+        contextLabel="On-Chain Billing"
+      />
       <PageWorkflowBanner
         title={tr('How Subscriptions & Credits Work', 'Cara Berlangganan & Menggunakan Kredit')}
         isUnlocked={true}

@@ -13,14 +13,9 @@ import { runSafeDataRetentionSweep } from '@packages/db/data-retention';
 
 export const dynamic = 'force-dynamic';
 
-const DEFAULT_STALE_MS = 5 * 60 * 1000;
+import { isCronAuthorized } from '@packages/auth/cron-auth';
 
-function isCronAuthorized(req: NextRequest): boolean {
-  const cronSecret = process.env.CRON_SECRET?.trim();
-  if (!cronSecret || cronSecret.length < 16) return false;
-  const authHeader = req.headers.get('authorization');
-  return Boolean(authHeader && authHeader === `Bearer ${cronSecret}`);
-}
+const DEFAULT_STALE_MS = 5 * 60 * 1000;
 
 export async function GET(req: NextRequest) {
   const startMs = performance.now();

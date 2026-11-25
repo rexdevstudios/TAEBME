@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLocale } from '../context/LocaleContext';
 import { PageWorkflowBanner } from '../components/PageWorkflowBanner';
+import { NetworkMismatchBanner } from '../components/NetworkMismatchBanner';
+import { resolveDefaultBaseChainHex } from '@packages/trading/paper-wallet';
 import { WalletRiskBadgeCard } from '../components/WalletRiskBadgeCard';
 import {
   Award,
@@ -562,6 +564,10 @@ export default function KolHubPage() {
 
       {/* Workflow & Plan Entitlement Guide */}
       <div style={{ marginTop: '16px' }}>
+        <NetworkMismatchBanner
+          targetChainHex={resolveDefaultBaseChainHex()}
+          contextLabel="KOL On-Chain Claim"
+        />
         <PageWorkflowBanner
           title={tr('KOL & SocialFi Bounty Flow', 'Alur KOL & SocialFi Bounty')}
           isUnlocked={activeTab === 'CREATOR' ? Boolean(entitlements.createLaunch) : true}

@@ -67,6 +67,6 @@ describe('Phase EK — Unified Multi-Chain Navbar Sync, Virtual Paper Balance & 
     expect(tradingSrc).toContain('applyPaperTradeBalance');
     expect(tradingSrc).toContain('eth_getBalance');
     expect(tradingSrc).toContain('Trade Ticket (Buy / Sell)');
-    expect(tradingSrc).toContain('Switch Network');
+    expect(tradingSrc).toContain('NetworkMismatchBanner');
   });
 });

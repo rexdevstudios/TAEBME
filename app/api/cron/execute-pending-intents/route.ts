@@ -21,17 +21,12 @@ import { BinanceCredentialVault } from '@packages/trading/binance-vault';
 import { validateBinancePermissions } from '@packages/shared/types/domain';
 import { formatBrokerOrderId } from '@packages/trading/fee-monetization';
 
+import { isCronAuthorized } from '@packages/auth/cron-auth';
+
 export const dynamic = 'force-dynamic';
 export const preferredRegion = ['sin1', 'hnd1'];
 
 const MAX_INTENTS_PER_TICK = 5;
-
-function isCronAuthorized(req: NextRequest): boolean {
-  const cronSecret = process.env.CRON_SECRET?.trim();
-  if (!cronSecret || cronSecret.length < 16) return false;
-  const authHeader = req.headers.get('authorization');
-  return Boolean(authHeader && authHeader === `Bearer ${cronSecret}`);
-}
 
 async function submitBinanceSpotOrderStateless(params: {
   apiKey: string;

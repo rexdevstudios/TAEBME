@@ -12,6 +12,7 @@ import { BinanceKeyVaultPanel } from '../components/BinanceKeyVaultPanel';
 import { BybitKeyVaultPanel } from '../components/BybitKeyVaultPanel';
 import { UserRiskPolicyPanel } from '../components/UserRiskPolicyPanel';
 import { RecentTradeHistoryPanel } from '../components/RecentTradeHistoryPanel';
+import { NetworkMismatchBanner } from '../components/NetworkMismatchBanner';
 import {
   PinWatchlistButton,
   TokenWatchlistBar,
@@ -361,11 +362,10 @@ function CandlestickChart({
 }
 
 export default function TradingPage() {
-  const { isConnected, userRole, planId, entitlements, chainId, walletAddress, switchNetwork, connectMetaMask, isConnecting } = useAuth();
+  const { isConnected, userRole, planId, entitlements, chainId, walletAddress, connectMetaMask, isConnecting } = useAuth();
   const { t, tr } = useLocale();
   const [paperBalanceUsd, setPaperBalanceUsd] = useState<number>(DEFAULT_PAPER_BALANCE_USD);
   const [nativeBalanceLabel, setNativeBalanceLabel] = useState<string | null>(null);
-  const [switchingNetwork, setSwitchingNetwork] = useState<boolean>(false);
   const [dexChainManuallyChosen, setDexChainManuallyChosen] = useState<boolean>(false);
   const { items: watchlistItems, togglePin: toggleWatchlistPin, isPinned: isWatchlistItemPinned } = useTokenWatchlist();
   const [connectError, setConnectError] = useState<string | null>(null);
@@ -526,8 +526,20 @@ export default function TradingPage() {
     setProposalStatus('PENDING');
     setActionFeedback(null);
     fetchMarketData();
-    const timer = window.setInterval(fetchMarketData, 5000);
-    return () => window.clearInterval(timer);
+    const timer = window.setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      fetchMarketData();
+    }, 8000);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchMarketData();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
   }, [symbol, interval]);
 
   // Hydrate Virtual Paper Balance per-wallet from localStorage (Phase EK)
@@ -1316,47 +1328,13 @@ export default function TradingPage() {
               )}
             </div>
 
-            {/* 1-Click Network Mismatch Banner when MetaMask chain != DEX target chain */}
-            {executionMode === 'DEX_NON_CUSTODIAL' && isConnected && chainId && parseInt(chainId, 16) !== dexChainId && (
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  gap: '8px',
-                  flexWrap: 'wrap',
-                  padding: '8px 10px',
-                  borderRadius: '6px',
-                  border: '1px solid rgba(245, 158, 11, 0.45)',
-                  backgroundColor: 'rgba(245, 158, 11, 0.1)',
-                  marginBottom: '8px',
-                  fontSize: '11px',
-                }}
-              >
-                <span style={{ color: 'var(--color-accent-amber)', fontWeight: 700 }}>
-                  {tr(
-                    `Wallet is on ${resolveChainDisplayMeta(chainId).label}, target is ${EVM_DEX_CHAINS[dexChainId]?.name || `Chain ${dexChainId}`}.`,
-                    `Wallet Anda di ${resolveChainDisplayMeta(chainId).label}, target swap ${EVM_DEX_CHAINS[dexChainId]?.name || `Chain ${dexChainId}`}.`
-                  )}
-                </span>
-                <button
-                  type="button"
-                  disabled={switchingNetwork}
-                  onClick={async () => {
-                    const targetHex = EVM_DEX_CHAINS[dexChainId]?.hexChainId || '0x2105';
-                    setSwitchingNetwork(true);
-                    try {
-                      await switchNetwork(targetHex);
-                    } finally {
-                      setSwitchingNetwork(false);
-                    }
-                  }}
-                  className="btn-primary"
-                  style={{ fontSize: '10px', padding: '4px 9px' }}
-                >
-                  {switchingNetwork ? tr('Switching...', 'Memindah...') : tr('Switch Network', 'Pindah Jaringan')}
-                </button>
-              </div>
+            {/* Unified 1-Click Network Mismatch Banner when MetaMask chain != DEX target chain */}
+            {executionMode === 'DEX_NON_CUSTODIAL' && (
+              <NetworkMismatchBanner
+                targetChainHex={EVM_DEX_CHAINS[dexChainId]?.hexChainId || '0x2105'}
+                targetChainLabel={EVM_DEX_CHAINS[dexChainId]?.name || `Chain ${dexChainId}`}
+                contextLabel="DEX Swap"
+              />
             )}
 
             {executionMode === 'DEX_NON_CUSTODIAL' && (

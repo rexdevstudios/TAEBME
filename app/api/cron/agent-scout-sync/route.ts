@@ -13,6 +13,8 @@ import { upstashRedis } from '@packages/shared/redis-client';
 import { mapDexScreenerBoostRowsToScoutHints } from '@packages/agent/autonomous-terminal-engine';
 import { fetchBytePlusInfoQuestCatalystHint } from '@packages/intelligence/llm-advisory-client';
 
+import { isCronAuthorized } from '@packages/auth/cron-auth';
+
 export const dynamic = 'force-dynamic';
 
 export interface ScoutDatasetHint {
@@ -21,13 +23,6 @@ export interface ScoutDatasetHint {
   tokenAddress?: string;
   chainId?: number;
   updatedAt: string;
-}
-
-function isCronAuthorized(req: NextRequest): boolean {
-  const cronSecret = process.env.CRON_SECRET?.trim();
-  if (!cronSecret || cronSecret.length < 16) return false;
-  const authHeader = req.headers.get('authorization');
-  return Boolean(authHeader && authHeader === `Bearer ${cronSecret}`);
 }
 
 export async function GET(req: NextRequest) {

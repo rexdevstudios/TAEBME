@@ -123,3 +123,30 @@ export function formatNativeWeiBalance(hexWei: string | null | undefined, symbol
     return `0.0000 ${symbol}`;
   }
 }
+
+/**
+ * Resolves the canonical Base hex chainId for the active environment hostname (Testnet vs Production).
+ */
+export function resolveDefaultBaseChainHex(hostname?: string): '0x14a34' | '0x2105' {
+  const host =
+    hostname !== undefined
+      ? hostname
+      : typeof window !== 'undefined'
+        ? window.location.hostname
+        : '';
+  return host === 'testnet.pndigi.site' ? '0x14a34' : '0x2105';
+}
+
+/**
+ * Maps Launchpad deployer chain keys (`base` | `robinhood` | `arbitrum` | `arc`) to their hex chainId.
+ */
+export function resolveLaunchpadChainHex(
+  chain: 'base' | 'robinhood' | 'arbitrum' | 'arc' | string,
+  hostname?: string
+): string {
+  const clean = String(chain || 'base').trim().toLowerCase();
+  if (clean === 'robinhood') return '0x1237';
+  if (clean === 'arbitrum') return '0xa4b1';
+  if (clean === 'arc') return '0x13b2';
+  return resolveDefaultBaseChainHex(hostname);
+}
