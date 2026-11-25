@@ -15,6 +15,7 @@ import { getBytePlusEngineTelemetry } from '@packages/intelligence/llm-advisory-
 import {
   EXECUTION_PLANE_LOCK_KEYS,
   evaluateOpsPreflightChecklist,
+  isServerlessPulseFresh,
 } from '@packages/shared/ops-preflight';
 import type { Role } from '@packages/shared/types/domain';
 
@@ -66,15 +67,20 @@ export async function GET(req: NextRequest) {
     const subscriptionsByPlan: Record<string, number> = {};
     const executionPlane = {
       workerOnline: false,
+      mode: 'STANDBY' as 'CLOUDFLARE_CRON' | 'VPS_WORKER' | 'STANDBY',
       pendingExecutionCount: 0,
       lastExecutedAt: null as string | null,
+      lastPulseAt: null as string | null,
     };
 
-    const [activeKillSwitches, activeAutoPilotWallets, lastPulseRaw] = await Promise.all([
+    const [activeKillSwitches, activeAutoPilotWallets, lastPulseRaw, execPulseRaw] = await Promise.all([
       defaultKillSwitchDbAdapter.getActiveKillSwitches().catch(() => []),
       listActiveAutoPilotWallets().catch(() => []),
       upstashRedis.isConfigured()
         ? upstashRedis.get<string>('agent:autopilot:last_tick').catch(() => null)
+        : Promise.resolve(null),
+      upstashRedis.isConfigured()
+        ? upstashRedis.get<string>('agent:execution:last_pulse').catch(() => null)
         : Promise.resolve(null),
     ]);
 
@@ -87,6 +93,17 @@ export async function GET(req: NextRequest) {
         // ignore malformed cache
       }
     }
+
+    let execPulseAt: string | null = null;
+    if (execPulseRaw) {
+      try {
+        const parsed = typeof execPulseRaw === 'string' ? JSON.parse(execPulseRaw) : execPulseRaw;
+        if (parsed?.updatedAt) execPulseAt = String(parsed.updatedAt);
+      } catch {
+        // ignore malformed cache
+      }
+    }
+    executionPlane.lastPulseAt = execPulseAt || lastPulseAt;
 
     if (pool) {
       try {
@@ -127,7 +144,15 @@ export async function GET(req: NextRequest) {
             .catch(() => ({ rows: [{ pending_cnt: 0, last_exec_at: null }] })),
         ]);
 
-        executionPlane.workerOnline = Boolean(lockRes.rows[0]?.held);
+        const advisoryLockHeld = Boolean(lockRes.rows[0]?.held);
+        const cfFresh =
+          isServerlessPulseFresh(execPulseAt) || isServerlessPulseFresh(lastPulseAt);
+        executionPlane.workerOnline = cfFresh || advisoryLockHeld;
+        executionPlane.mode = cfFresh
+          ? 'CLOUDFLARE_CRON'
+          : advisoryLockHeld
+            ? 'VPS_WORKER'
+            : 'STANDBY';
         executionPlane.pendingExecutionCount = Number(execPlaneRes.rows[0]?.pending_cnt || 0);
         executionPlane.lastExecutedAt = execPlaneRes.rows[0]?.last_exec_at
           ? new Date(execPlaneRes.rows[0].last_exec_at).toISOString()

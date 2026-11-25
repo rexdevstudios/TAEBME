@@ -94,7 +94,7 @@ describe('Phase EI — Live Execution Plane Heartbeat, BytePlus AI Engine & Ops 
     expect(mainSrc).toContain(String(EXECUTION_PLANE_LOCK_KEYS.key2));
     expect(opsRouteSrc).toContain('pg_locks');
     expect(opsRouteSrc).toContain('evaluateOpsPreflightChecklist');
-    expect(panelSrc).toContain('Execution Plane (worker:binance)');
+    expect(panelSrc).toContain('Serverless Execution (Cloudflare + Vercel)');
     expect(panelSrc).toContain('BytePlus ModelArk AI Engine');
     expect(panelSrc).toContain('Ops Preflight Readiness');
   });

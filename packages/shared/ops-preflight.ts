@@ -47,7 +47,24 @@ export interface OpsPreflightInput {
     workerOnline: boolean;
     pendingExecutionCount: number;
     lastExecutedAt: string | null;
+    mode?: 'CLOUDFLARE_CRON' | 'VPS_WORKER' | 'STANDBY';
+    lastPulseAt?: string | null;
   };
+}
+
+/**
+ * Pure freshness check for Cloudflare Cron serverless pulses (default 15-minute window for 5-minute crons).
+ */
+export function isServerlessPulseFresh(
+  isoTimestamp: string | null | undefined,
+  maxAgeMs: number = 15 * 60_000,
+  nowMs: number = Date.now()
+): boolean {
+  if (!isoTimestamp || typeof isoTimestamp !== 'string') return false;
+  const parsed = Date.parse(isoTimestamp);
+  if (!Number.isFinite(parsed)) return false;
+  const age = nowMs - parsed;
+  return age >= -60_000 && age <= maxAgeMs;
 }
 
 export function evaluateOpsPreflightChecklist(input: OpsPreflightInput): OpsPreflightReport {
@@ -93,9 +110,10 @@ export function evaluateOpsPreflightChecklist(input: OpsPreflightInput): OpsPref
       : `Primary=${input.aiEngine?.primaryProvider || 'fallback'} · BytePlus key not set (deterministic fallback active)`,
   });
 
-  // 5. Execution Plane Worker (worker:binance)
+  // 5. Execution Plane (Zero-VPS Cloudflare Cron + Vercel sin1/hnd1 or optional VPS worker)
   const pending = Math.max(0, Number(input.executionPlane?.pendingExecutionCount || 0));
   const workerOnline = Boolean(input.executionPlane?.workerOnline);
+  const mode = input.executionPlane?.mode || (workerOnline ? 'CLOUDFLARE_CRON' : 'STANDBY');
   const workerStatus: PreflightCheckStatus = workerOnline
     ? 'PASS'
     : pending > 0
@@ -103,12 +121,12 @@ export function evaluateOpsPreflightChecklist(input: OpsPreflightInput): OpsPref
       : 'PASS';
   checks.push({
     id: 'EXECUTION_PLANE_WORKER',
-    label: 'Execution Plane (worker:binance)',
+    label: 'Serverless Execution (Cloudflare + Vercel)',
     status: workerStatus,
     detail: workerOnline
-      ? `ONLINE (advisory lock held) · pending=${pending}`
+      ? `ONLINE (${mode}) · pending=${pending}`
       : pending > 0
-        ? `STANDBY · ${pending} APPROVED intent(s) awaiting external worker:binance`
+        ? `STANDBY · ${pending} APPROVED intent(s) awaiting Cloudflare Cron pulse`
         : 'STANDBY (0 pending CEX intents)',
   });
 

@@ -274,6 +274,14 @@ async function main() {
       cronUnauth.status === 401,
       `Unauthorized cron call rejected on GET /api/cron/kol-consensus-archive (HTTP ${cronUnauth.status})`
     );
+    const execCronUnauth = await fetch(`${BASE_URL}/api/cron/execute-pending-intents`, {
+      method: 'GET',
+      headers: { Authorization: 'Bearer invalid-cron-secret-attempt' },
+    });
+    assert(
+      execCronUnauth.status === 401,
+      `Unauthorized cron call rejected on GET /api/cron/execute-pending-intents (HTTP ${execCronUnauth.status})`
+    );
 
     // Cleanup Victim key & sessions
     for (const kid of victimKeyIds) {

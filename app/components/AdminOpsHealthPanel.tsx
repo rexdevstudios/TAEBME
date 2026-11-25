@@ -29,8 +29,10 @@ interface OpsSummaryData {
   };
   executionPlane?: {
     workerOnline: boolean;
+    mode?: 'CLOUDFLARE_CRON' | 'VPS_WORKER' | 'STANDBY';
     pendingExecutionCount: number;
     lastExecutedAt: string | null;
+    lastPulseAt?: string | null;
   };
   preflight?: {
     overallStatus: 'READY' | 'DEGRADED' | 'HALTED';
@@ -486,7 +488,7 @@ export function AdminOpsHealthPanel() {
               style={{ border: '1px solid var(--color-border)', padding: '12px', borderRadius: '6px' }}
             >
               <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-accent-info)' }}>
-                Execution Plane (worker:binance)
+                Serverless Execution (Cloudflare + Vercel)
               </div>
               <div
                 style={{
@@ -499,14 +501,16 @@ export function AdminOpsHealthPanel() {
                     : 'var(--color-accent-amber)',
                 }}
               >
-                {data.executionPlane.workerOnline ? 'ONLINE (LOCK HELD)' : 'STANDBY'} ·{' '}
-                {data.executionPlane.pendingExecutionCount} PENDING
+                {data.executionPlane.workerOnline
+                  ? `ONLINE (${data.executionPlane.mode || 'CLOUDFLARE_CRON'})`
+                  : 'STANDBY'}{' '}
+                · {data.executionPlane.pendingExecutionCount} PENDING
               </div>
               <div className="text-muted" style={{ fontSize: '10px', fontFamily: 'var(--font-mono)' }}>
-                Last Executed:{' '}
-                {data.executionPlane.lastExecutedAt
-                  ? new Date(data.executionPlane.lastExecutedAt).toLocaleString()
-                  : 'None yet'}
+                Last Pulse:{' '}
+                {data.executionPlane.lastPulseAt
+                  ? new Date(data.executionPlane.lastPulseAt).toLocaleString()
+                  : 'Awaiting Cloudflare Cron'}
               </div>
             </div>
           )}

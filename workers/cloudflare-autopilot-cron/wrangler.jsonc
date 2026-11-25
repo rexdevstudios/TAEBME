@@ -8,7 +8,8 @@
   },
   "vars": {
     "TESTNET_ORIGIN": "https://testnet.pndigi.site",
-    "PROD_ORIGIN": "https://pndigi.site"
+    "PROD_ORIGIN": "https://pndigi.site",
+    "ENABLE_EXECUTION_PULSE": "1"
   },
   "observability": {
     "enabled": true,

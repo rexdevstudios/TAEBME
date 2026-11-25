@@ -13,6 +13,7 @@ export interface CronWorkerEnv {
   PROD_ORIGIN?: string;
   CRON_SECRET_TESTNET?: string;
   CRON_SECRET_PROD?: string;
+  ENABLE_EXECUTION_PULSE?: string;
 }
 
 export interface CronPulseResult {
@@ -58,6 +59,9 @@ export async function runScheduledPulses(
 ): Promise<CronPulseResult[]> {
   const tasks: Array<Promise<CronPulseResult>> = [];
   const paths = ['/api/cron/agent-scout-sync', '/api/cron/autopilot-tick'];
+  if (String(env.ENABLE_EXECUTION_PULSE || '').trim() === '1') {
+    paths.push('/api/cron/execute-pending-intents');
+  }
 
   if (env.TESTNET_ORIGIN && env.CRON_SECRET_TESTNET && env.CRON_SECRET_TESTNET.trim().length >= 16) {
     for (const p of paths) {
