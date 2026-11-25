@@ -52,6 +52,8 @@ export default function TokenActionsClient({
     }
   }, []);
 
+  const isBondingCurveConfigured = getContractConfiguration(launchpadContractAddress).isConfigured;
+
   const handleOnChainCurveBuy = async () => {
     setOnChainSwapMsg(null);
     const contractCfg = getContractConfiguration(launchpadContractAddress);
@@ -542,7 +544,7 @@ export default function TokenActionsClient({
         )}
 
         {/* Direct On-Chain BondingCurveLaunchpad.sol Buy & KOL Referral Rebate (0.25%) */}
-        {!isSolana && !isGraduated && swapMode === 'buy' && (
+        {!isSolana && !isGraduated && swapMode === 'buy' && isBondingCurveConfigured && (
           <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px dashed #334155' }}>
             <div style={{ fontSize: '11px', color: '#94A3B8', marginBottom: '6px', display: 'flex', justifyContent: 'space-between' }}>
               <span>Direct BondingCurveLaunchpad.sol Settlement</span>

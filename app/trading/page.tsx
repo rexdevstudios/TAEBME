@@ -965,20 +965,27 @@ export default function TradingPage() {
                 <PinWatchlistButton
                   pinned={isWatchlistItemPinned(
                     dexChainId,
-                    executionMode === 'DEX_NON_CUSTODIAL' && linkedTokenAddress.trim() ? linkedTokenAddress.trim() : symbol
+                    executionMode === 'DEX_NON_CUSTODIAL' && (linkedTokenAddress || '').trim()
+                      ? (linkedTokenAddress || '').trim()
+                      : symbol
                   )}
                   onClick={() =>
                     toggleWatchlistPin({
                       symbol,
                       name: symbol,
                       chainId: dexChainId,
-                      address: executionMode === 'DEX_NON_CUSTODIAL' && linkedTokenAddress.trim() ? linkedTokenAddress.trim() : undefined,
+                      address:
+                        executionMode === 'DEX_NON_CUSTODIAL' && (linkedTokenAddress || '').trim()
+                          ? (linkedTokenAddress || '').trim()
+                          : undefined,
                     })
                   }
                   label={
                     isWatchlistItemPinned(
                       dexChainId,
-                      executionMode === 'DEX_NON_CUSTODIAL' && linkedTokenAddress.trim() ? linkedTokenAddress.trim() : symbol
+                      executionMode === 'DEX_NON_CUSTODIAL' && (linkedTokenAddress || '').trim()
+                        ? (linkedTokenAddress || '').trim()
+                        : symbol
                     )
                       ? tr('Pinned', 'Disematkan')
                       : tr('Pin', 'Sematkan')
