@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '../context/AuthContext';
 import { useLocale } from '../context/LocaleContext';
+import { KNOWN_NAVBAR_CHAINS } from '@packages/trading/paper-wallet';
 import {
   ShieldAlert,
   Zap,
@@ -77,13 +78,7 @@ export default function HeaderNav() {
     }
   };
 
-  const CHAIN_OPTIONS = [
-    { hex: '0x2105', label: 'Base Mainnet' },
-    { hex: '0x14a34', label: 'Base Sepolia' },
-    { hex: '0x1237', label: 'Robinhood L2' },
-    { hex: '0xa4b1', label: 'Arbitrum One' },
-    { hex: '0x13b2', label: 'Arc Network' },
-  ];
+  const CHAIN_OPTIONS = KNOWN_NAVBAR_CHAINS;
 
   const normChainHex = (chainId || '').toLowerCase();
   const isKnownChain = CHAIN_OPTIONS.some((c) => c.hex === normChainHex);

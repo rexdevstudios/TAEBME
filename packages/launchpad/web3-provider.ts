@@ -205,16 +205,41 @@ export async function ensureBaseNetwork(
 
   const hexChain = (targetHexChainId || fallbackHex).toLowerCase();
 
+  const extraChains: Record<string, {
+    chainId: number;
+    hexChainId: string;
+    name: string;
+    nativeCurrency: { name: string; symbol: string; decimals: number };
+    rpcUrl: string;
+    explorerUrl: string;
+  }> = {
+    '0xcc': {
+      chainId: 204,
+      hexChainId: '0xcc',
+      name: 'opBNB Mainnet',
+      nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 },
+      rpcUrl: 'https://opbnb-mainnet-rpc.bnbchain.org',
+      explorerUrl: 'https://opbnbscan.com',
+    },
+  };
+
   const targetConfig =
     Object.values(SUPPORTED_BASE_CHAINS).find(
       (c) => c.hexChainId.toLowerCase() === hexChain
-    ) || (isTestnetHost ? SUPPORTED_BASE_CHAINS.BASE_SEPOLIA : SUPPORTED_BASE_CHAINS.BASE_MAINNET);
+    ) ||
+    Object.values(EVM_DEX_CHAINS).find(
+      (c) => c.hexChainId.toLowerCase() === hexChain
+    ) ||
+    extraChains[hexChain] ||
+    (isTestnetHost ? SUPPORTED_BASE_CHAINS.BASE_SEPOLIA : SUPPORTED_BASE_CHAINS.BASE_MAINNET);
 
-  // Validate chain consistency with known network registry
-  try {
-    validateChainAndContractConsistency(targetConfig.chainId);
-  } catch (err: any) {
-    return { success: false, error: err.message };
+  // Validate chain consistency for Base Launchpad chains; allow standard multi-chain EVM DEX switches cleanly
+  if (Object.values(SUPPORTED_BASE_CHAINS).some((c) => c.chainId === targetConfig.chainId)) {
+    try {
+      validateChainAndContractConsistency(targetConfig.chainId);
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
   }
 
   try {

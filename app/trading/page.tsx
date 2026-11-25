@@ -43,6 +43,13 @@ import {
   type SubAgentId,
 } from '@packages/agent/autonomous-terminal-engine';
 import { buildErc20ApproveTransaction } from '@packages/trading/zerox-swap-client';
+import {
+  DEFAULT_PAPER_BALANCE_USD,
+  PAPER_WALLET_STORAGE_PREFIX,
+  applyPaperTradeBalance,
+  formatNativeWeiBalance,
+  resolveChainDisplayMeta,
+} from '@packages/trading/paper-wallet';
 
 interface Candle {
   timestamp: number;
@@ -354,8 +361,12 @@ function CandlestickChart({
 }
 
 export default function TradingPage() {
-  const { isConnected, userRole, planId, entitlements, chainId, connectMetaMask, isConnecting } = useAuth();
+  const { isConnected, userRole, planId, entitlements, chainId, walletAddress, switchNetwork, connectMetaMask, isConnecting } = useAuth();
   const { t, tr } = useLocale();
+  const [paperBalanceUsd, setPaperBalanceUsd] = useState<number>(DEFAULT_PAPER_BALANCE_USD);
+  const [nativeBalanceLabel, setNativeBalanceLabel] = useState<string | null>(null);
+  const [switchingNetwork, setSwitchingNetwork] = useState<boolean>(false);
+  const [dexChainManuallyChosen, setDexChainManuallyChosen] = useState<boolean>(false);
   const { items: watchlistItems, togglePin: toggleWatchlistPin, isPinned: isWatchlistItemPinned } = useTokenWatchlist();
   const [connectError, setConnectError] = useState<string | null>(null);
   const [symbol, setSymbol] = useState('BTCUSDT');
@@ -519,10 +530,90 @@ export default function TradingPage() {
     return () => window.clearInterval(timer);
   }, [symbol, interval]);
 
+  // Hydrate Virtual Paper Balance per-wallet from localStorage (Phase EK)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const key = `${PAPER_WALLET_STORAGE_PREFIX}${(walletAddress || 'guest').toLowerCase()}`;
+    try {
+      const saved = window.localStorage.getItem(key);
+      if (saved !== null) {
+        const parsed = Number(saved);
+        if (Number.isFinite(parsed) && parsed >= 0) {
+          setPaperBalanceUsd(parsed);
+          return;
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    setPaperBalanceUsd(DEFAULT_PAPER_BALANCE_USD);
+  }, [walletAddress]);
+
+  // 2-Way Network Sync: sync DEX chain with Navbar/MetaMask wallet chainId when supported (Phase EK)
+  useEffect(() => {
+    if (!chainId || dexChainManuallyChosen) return;
+    const numeric = parseInt(chainId, 16);
+    if (Number.isFinite(numeric) && EVM_DEX_CHAINS[numeric]) {
+      setDexChainId(numeric);
+    }
+  }, [chainId, dexChainManuallyChosen]);
+
+  // Live Native Wallet Balance reader (eth_getBalance) for DEX Swap clarity (Phase EK)
+  useEffect(() => {
+    let active = true;
+    if (!isConnected || !walletAddress || typeof window === 'undefined' || !(window as any).ethereum) {
+      setNativeBalanceLabel(null);
+      return;
+    }
+    const meta = resolveChainDisplayMeta(chainId);
+    (window as any).ethereum
+      .request({ method: 'eth_getBalance', params: [walletAddress, 'latest'] })
+      .then((hexWei: string) => {
+        if (active) {
+          setNativeBalanceLabel(`${formatNativeWeiBalance(hexWei, meta.nativeSymbol)} · ${meta.label}`);
+        }
+      })
+      .catch(() => {
+        if (active) setNativeBalanceLabel(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [isConnected, walletAddress, chainId, dexTxHash]);
+
+  const handleResetPaperBalance = () => {
+    setPaperBalanceUsd(DEFAULT_PAPER_BALANCE_USD);
+    if (typeof window !== 'undefined') {
+      const key = `${PAPER_WALLET_STORAGE_PREFIX}${(walletAddress || 'guest').toLowerCase()}`;
+      try {
+        window.localStorage.setItem(key, String(DEFAULT_PAPER_BALANCE_USD));
+      } catch {
+        // ignore
+      }
+    }
+    setActionFeedback(tr('OK: Virtual Paper Balance reset to $10,000.00 USDT.', 'OK: Saldo Virtual Simulasi di-reset ke $10,000.00 USDT.'));
+  };
+
   const handleApproveProposal = async () => {
     if (!isConnected) {
       setActionFeedback('Auth: SIWE Session Required: Please connect your wallet to approve trade intents.');
       return;
+    }
+
+    const effectiveQty = orderQty > 0 ? orderQty : 0.1;
+    const currentSpotPrice = candles.length > 0 ? candles[candles.length - 1].close : 100;
+    const estimatedPaperNotional = Math.round(effectiveQty * currentSpotPrice * 100) / 100;
+
+    if (executionMode === 'PAPER') {
+      const paperPreCheck = applyPaperTradeBalance({
+        currentBalanceUsd: paperBalanceUsd,
+        side: orderSide,
+        notionalUsd: estimatedPaperNotional,
+      });
+      if (!paperPreCheck.ok) {
+        setActionFeedback(`Notice: ${paperPreCheck.reason}`);
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -571,6 +662,24 @@ export default function TradingPage() {
           typeof json.data?.partnerFee?.feePct === 'number'
             ? ` · Fee ${json.data.partnerFee.feePct}%`
             : '';
+        if (executionMode === 'PAPER') {
+          const paperUpdate = applyPaperTradeBalance({
+            currentBalanceUsd: paperBalanceUsd,
+            side: orderSide,
+            notionalUsd: estimatedPaperNotional,
+          });
+          if (paperUpdate.ok) {
+            setPaperBalanceUsd(paperUpdate.nextBalanceUsd);
+            if (typeof window !== 'undefined') {
+              const key = `${PAPER_WALLET_STORAGE_PREFIX}${(walletAddress || 'guest').toLowerCase()}`;
+              try {
+                window.localStorage.setItem(key, String(paperUpdate.nextBalanceUsd));
+              } catch {
+                // ignore
+              }
+            }
+          }
+        }
         setActionFeedback(
           executionMode === 'DEX_NON_CUSTODIAL'
             ? `OK: [DEX NON-CUSTODIAL] Intent ${intentId} lolos Risk Gate & MEV Guard (${execStatus}${feePctText}). ${
@@ -580,7 +689,7 @@ export default function TradingPage() {
               }`
             : executionMode === 'CEX_SINGLE_SHOT'
             ? `OK: [CEX ${resolvedVenue} SINGLE-SHOT] Intent ${intentId} (${execStatus}) lolos Risk Gate.`
-            : `OK: [PAPER TRADING SIMULATION] Proposal APPROVED & Intent ${intentId} (${execStatus}) lolos Risk Gate! Simulasi 100% bebas risiko modal.`
+            : `OK: [SIMULASI PAPER] ${orderSide} ${effectiveQty} ${symbol} (~$${estimatedPaperNotional.toLocaleString()}) berhasil! Intent ${intentId} (${execStatus}) · 100% simulasi tanpa uang asli.`
         );
       } else {
         const errMsg = typeof json.error === 'string' ? json.error : json.error?.message || 'Policy violation';
@@ -1063,11 +1172,11 @@ export default function TradingPage() {
             </div>
           </div>
 
-          {/* Proposal-Only Action Gate */}
+          {/* Clean Trade Ticket (Beli / Jual) with Real-Time Balance & Network Sync */}
           <div className="bg-panel" style={{ padding: '16px', borderRadius: '8px', border: (userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN') ? '1px solid var(--color-accent-amber)' : '1px solid var(--color-accent)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
               <h3 style={{ fontSize: '14px', fontWeight: 800, margin: 0, color: (userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN') ? 'var(--color-accent-amber)' : 'var(--color-accent)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <ShieldAlert size={16} /> Proposal Gate
+                <ShieldAlert size={16} /> {tr('Trade Ticket (Buy / Sell)', 'Trade Ticket (Beli / Jual)')}
               </h3>
               {(userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN') && (
                 <span className="badge badge-admin">
@@ -1114,30 +1223,141 @@ export default function TradingPage() {
               </div>
             )}
 
-            <div style={{ marginBottom: '8px' }}>
-              <select
-                aria-label="Execution mode"
-                value={executionMode}
-                onChange={(e) => setExecutionMode(e.target.value as 'PAPER' | 'DEX_NON_CUSTODIAL' | 'CEX_SINGLE_SHOT')}
-                className="input"
-                style={{ width: '100%', padding: '6px 8px', fontSize: '11px', fontWeight: 800, color: 'var(--color-accent)' }}
-              >
-                <option value="PAPER">Mode: PAPER (Simulated Fill — All Tiers)</option>
-                <option value="DEX_NON_CUSTODIAL">Mode: DEX_NON_CUSTODIAL (MEV Guard + MetaMask Sign — TRADER/AGENT)</option>
-                <option value="CEX_SINGLE_SHOT">Mode: CEX_SINGLE_SHOT (Stateless Binance / Bybit V5 — TRADER/AGENT)</option>
-              </select>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', borderRadius: '6px', background: 'rgba(148, 163, 184, 0.06)', border: '1px solid var(--color-border)', marginBottom: '8px', fontSize: '11px' }}>
-              <span className="text-muted">Personal Risk Guard Aktif</span>
+            {/* 3 Clear Execution Mode Pills (Simulasi $10K / DEX Wallet / CEX Spot) */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', marginBottom: '8px' }}>
               <button
                 type="button"
-                onClick={() => setActiveTradingTab('vault')}
-                style={{ background: 'none', border: 'none', color: 'var(--color-accent-amber)', fontWeight: 700, cursor: 'pointer', fontSize: '11px', padding: 0 }}
+                onClick={() => setExecutionMode('PAPER')}
+                className={executionMode === 'PAPER' ? 'btn-primary' : 'btn-secondary'}
+                style={{ padding: '7px 6px', fontSize: '11px', fontWeight: 800, justifyContent: 'center' }}
               >
-                Atur Risk &amp; API Key →
+                {tr('Sim ($10K)', 'Simulasi ($10K)')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setExecutionMode('DEX_NON_CUSTODIAL')}
+                className={executionMode === 'DEX_NON_CUSTODIAL' ? 'btn-primary' : 'btn-secondary'}
+                style={{ padding: '7px 6px', fontSize: '11px', fontWeight: 800, justifyContent: 'center' }}
+              >
+                {tr('DEX (Wallet)', 'DEX (Wallet)')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setExecutionMode('CEX_SINGLE_SHOT')}
+                className={executionMode === 'CEX_SINGLE_SHOT' ? 'btn-primary' : 'btn-secondary'}
+                style={{ padding: '7px 6px', fontSize: '11px', fontWeight: 800, justifyContent: 'center' }}
+              >
+                {tr('CEX Spot', 'CEX Spot')}
               </button>
             </div>
+
+            {/* Real-Time Balance Strip (Virtual Paper $10K / Live Wallet eth_getBalance / CEX Vault Status) */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '6px',
+                padding: '8px 10px',
+                borderRadius: '6px',
+                backgroundColor: 'var(--color-surface-elevated)',
+                border: '1px solid var(--color-border)',
+                marginBottom: '8px',
+                fontSize: '11px',
+                fontFamily: 'var(--font-mono)',
+              }}
+            >
+              {executionMode === 'PAPER' ? (
+                <>
+                  <span>
+                    {tr('Virtual Balance', 'Saldo Virtual')}:{' '}
+                    <strong style={{ color: 'var(--color-text-positive)' }}>
+                      ${paperBalanceUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT
+                    </strong>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleResetPaperBalance}
+                    className="btn-secondary"
+                    style={{ fontSize: '10px', padding: '2px 7px' }}
+                  >
+                    {tr('Reset $10K', 'Reset $10K')}
+                  </button>
+                </>
+              ) : executionMode === 'DEX_NON_CUSTODIAL' ? (
+                <>
+                  <span>
+                    {tr('Wallet Balance', 'Saldo Wallet')}:{' '}
+                    <strong style={{ color: 'var(--color-text-positive)' }}>
+                      {isConnected ? nativeBalanceLabel || tr('Reading wallet...', 'Membaca wallet...') : tr('Connect wallet', 'Hubungkan wallet')}
+                    </strong>
+                  </span>
+                  <span className="text-muted" style={{ fontSize: '10px' }}>
+                    {tr('Signed in MetaMask', 'Sign via MetaMask')}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span>
+                    {tr('CEX Vault', 'Vault CEX')}:{' '}
+                    <strong style={{ color: 'var(--color-accent-info)' }}>
+                      Binance {cexActiveCounts?.binance ?? 0} · Bybit {cexActiveCounts?.bybit ?? 0}
+                    </strong>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTradingTab('vault')}
+                    style={{ background: 'none', border: 'none', color: 'var(--color-accent-amber)', fontWeight: 700, cursor: 'pointer', fontSize: '10px', padding: 0 }}
+                  >
+                    {tr('Manage API Keys →', 'Atur API Key →')}
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* 1-Click Network Mismatch Banner when MetaMask chain != DEX target chain */}
+            {executionMode === 'DEX_NON_CUSTODIAL' && isConnected && chainId && parseInt(chainId, 16) !== dexChainId && (
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '8px',
+                  flexWrap: 'wrap',
+                  padding: '8px 10px',
+                  borderRadius: '6px',
+                  border: '1px solid rgba(245, 158, 11, 0.45)',
+                  backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                  marginBottom: '8px',
+                  fontSize: '11px',
+                }}
+              >
+                <span style={{ color: 'var(--color-accent-amber)', fontWeight: 700 }}>
+                  {tr(
+                    `Wallet is on ${resolveChainDisplayMeta(chainId).label}, target is ${EVM_DEX_CHAINS[dexChainId]?.name || `Chain ${dexChainId}`}.`,
+                    `Wallet Anda di ${resolveChainDisplayMeta(chainId).label}, target swap ${EVM_DEX_CHAINS[dexChainId]?.name || `Chain ${dexChainId}`}.`
+                  )}
+                </span>
+                <button
+                  type="button"
+                  disabled={switchingNetwork}
+                  onClick={async () => {
+                    const targetHex = EVM_DEX_CHAINS[dexChainId]?.hexChainId || '0x2105';
+                    setSwitchingNetwork(true);
+                    try {
+                      await switchNetwork(targetHex);
+                    } finally {
+                      setSwitchingNetwork(false);
+                    }
+                  }}
+                  className="btn-primary"
+                  style={{ fontSize: '10px', padding: '4px 9px' }}
+                >
+                  {switchingNetwork ? tr('Switching...', 'Memindah...') : tr('Switch Network', 'Pindah Jaringan')}
+                </button>
+              </div>
+            )}
 
             {executionMode === 'DEX_NON_CUSTODIAL' && (
               <div style={{ marginTop: '8px', marginBottom: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -1146,6 +1366,7 @@ export default function TradingPage() {
                   value={dexChainId}
                   onChange={(e) => {
                     const nextChain = Number(e.target.value) || 8453;
+                    setDexChainManuallyChosen(true);
                     setDexChainId(nextChain);
                     const defPreset = getDefaultDexTokenForChain(nextChain);
                     syncDexTokenSelection(defPreset.address, nextChain);
@@ -1250,6 +1471,28 @@ export default function TradingPage() {
                 )}
               </>
             )}
+
+            <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '8px' }}>
+              <span className="text-muted" style={{ fontSize: '10px', fontWeight: 700 }}>
+                {tr('Quick Qty:', 'Qty Cepat:')}
+              </span>
+              {[0.01, 0.05, 0.1, 0.5].map((q) => (
+                <button
+                  key={q}
+                  type="button"
+                  onClick={() => setOrderQty(q)}
+                  className={orderQty === q ? 'btn-primary' : 'btn-secondary'}
+                  style={{ fontSize: '10px', padding: '2px 7px', fontFamily: 'var(--font-mono)' }}
+                >
+                  {q}
+                </button>
+              ))}
+              {executionMode === 'PAPER' && (
+                <span className="text-muted" style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', marginLeft: 'auto' }}>
+                  ~${Math.round((orderQty > 0 ? orderQty : 0.1) * lastClose * 100) / 100}
+                </span>
+              )}
+            </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
               <select
