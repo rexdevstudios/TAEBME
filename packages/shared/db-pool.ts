@@ -1028,6 +1028,207 @@ export async function cancelUserPendingTradeIntent(params: {
   };
 }
 
+// ----------------------------------------------------------------------------
+// MULTI-OWNED SUB-WALLET ALLOWLIST (SSOT `public.wallets`, Phase EG, Zero-Migration)
+// ----------------------------------------------------------------------------
+export interface OwnedWalletRecord {
+  id: string;
+  address: string;
+  chainType: string;
+  isPrimary: boolean;
+  createdAt: string;
+}
+
+const MAX_OWNED_SUBWALLETS_PER_USER = 10;
+const inMemoryOwnedSubWallets = new Map<string, OwnedWalletRecord[]>();
+
+/**
+ * Lists all verified owned wallets (primary SIWE wallet + cryptographically linked sub-wallets)
+ * for the authenticated user. Always includes `userIdentifier` when it is a valid EVM address.
+ */
+export async function listUserOwnedWallets(userIdentifier: string): Promise<OwnedWalletRecord[]> {
+  const normPrimary = String(userIdentifier || '').trim().toLowerCase();
+  const pool = getDbPool();
+  if (pool) {
+    try {
+      const validUserId = await ensureUserEntity(pool, userIdentifier);
+      const res = await pool.query(
+        `SELECT id, address, chain_type, is_primary, created_at
+         FROM wallets
+         WHERE user_id = $1
+         ORDER BY is_primary DESC, created_at ASC
+         LIMIT 25`,
+        [validUserId]
+      );
+      const rows: OwnedWalletRecord[] = res.rows.map((r: any) => ({
+        id: String(r.id),
+        address: String(r.address || '').toLowerCase(),
+        chainType: String(r.chain_type || 'EVM').toUpperCase(),
+        isPrimary: Boolean(r.is_primary),
+        createdAt: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString(),
+      }));
+      if (/^0x[a-f0-9]{40}$/.test(normPrimary) && !rows.some((r) => r.address === normPrimary)) {
+        rows.unshift({
+          id: `primary-${normPrimary.slice(2, 10)}`,
+          address: normPrimary,
+          chainType: 'EVM',
+          isPrimary: true,
+          createdAt: new Date().toISOString(),
+        });
+      }
+      return rows;
+    } catch (err: any) {
+      console.warn('[DB] listUserOwnedWallets fallback to memory:', err?.message || err);
+    }
+  }
+
+  const memList = inMemoryOwnedSubWallets.get(normPrimary) || [];
+  const base: OwnedWalletRecord[] = /^0x[a-f0-9]{40}$/.test(normPrimary)
+    ? [
+        {
+          id: `primary-${normPrimary.slice(2, 10)}`,
+          address: normPrimary,
+          chainType: 'EVM',
+          isPrimary: true,
+          createdAt: new Date().toISOString(),
+        },
+      ]
+    : [];
+  return [...base, ...memList.filter((w) => w.address !== normPrimary)];
+}
+
+/**
+ * Links a cryptographically verified sub-wallet (`is_primary = false`) into `public.wallets`.
+ * Enforces max 10 sub-wallets per user and DB-level UNIQUE(address, chain_type) anti-hijack guard.
+ */
+export async function linkVerifiedOwnedSubWallet(params: {
+  userIdentifier: string;
+  subWalletAddress: string;
+}): Promise<OwnedWalletRecord> {
+  const normPrimary = String(params.userIdentifier || '').trim().toLowerCase();
+  const normSub = String(params.subWalletAddress || '').trim().toLowerCase();
+  if (!/^0x[a-f0-9]{40}$/.test(normSub)) {
+    throw new Error('INVALID_SUBWALLET_ADDRESS');
+  }
+
+  const pool = getDbPool();
+  if (pool) {
+    const validUserId = await ensureUserEntity(pool, params.userIdentifier);
+
+    const existing = await pool.query(
+      `SELECT id, user_id, address, chain_type, is_primary, created_at
+       FROM wallets
+       WHERE LOWER(address) = LOWER($1) AND UPPER(chain_type) = 'EVM'
+       LIMIT 1`,
+      [normSub]
+    );
+    if (existing.rows.length > 0) {
+      const row = existing.rows[0];
+      if (String(row.user_id) !== String(validUserId)) {
+        throw new Error('WALLET_ALREADY_CLAIMED_BY_ANOTHER_ACCOUNT');
+      }
+      return {
+        id: String(row.id),
+        address: String(row.address).toLowerCase(),
+        chainType: String(row.chain_type || 'EVM').toUpperCase(),
+        isPrimary: Boolean(row.is_primary),
+        createdAt: row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString(),
+      };
+    }
+
+    const cntRes = await pool.query(
+      `SELECT COUNT(*)::int AS cnt FROM wallets WHERE user_id = $1 AND is_primary = false`,
+      [validUserId]
+    );
+    if (Number(cntRes.rows[0]?.cnt || 0) >= MAX_OWNED_SUBWALLETS_PER_USER) {
+      throw new Error(`MAX_SUBWALLETS_REACHED: Maximum ${MAX_OWNED_SUBWALLETS_PER_USER} verified sub-wallets allowed.`);
+    }
+
+    const ins = await pool.query(
+      `INSERT INTO wallets (user_id, address, chain_type, is_primary)
+       VALUES ($1, $2, 'EVM', false)
+       RETURNING id, address, chain_type, is_primary, created_at`,
+      [validUserId, normSub]
+    );
+    const created = ins.rows[0];
+    await pool
+      .query(
+        `INSERT INTO audit_logs (actor_id, action, entity_id, reason, created_at)
+         VALUES ($1, 'OWNED_SUBWALLET_LINKED', $2, $3, NOW())`,
+        [validUserId, isUuid(created.id) ? created.id : null, `Linked verified owned sub-wallet ${normSub}`]
+      )
+      .catch(() => {});
+
+    return {
+      id: String(created.id),
+      address: String(created.address).toLowerCase(),
+      chainType: String(created.chain_type || 'EVM').toUpperCase(),
+      isPrimary: Boolean(created.is_primary),
+      createdAt: created.created_at ? new Date(created.created_at).toISOString() : new Date().toISOString(),
+    };
+  }
+
+  const list = inMemoryOwnedSubWallets.get(normPrimary) || [];
+  const dup = list.find((w) => w.address === normSub);
+  if (dup) return dup;
+  if (list.length >= MAX_OWNED_SUBWALLETS_PER_USER) {
+    throw new Error(`MAX_SUBWALLETS_REACHED: Maximum ${MAX_OWNED_SUBWALLETS_PER_USER} verified sub-wallets allowed.`);
+  }
+  const rec: OwnedWalletRecord = {
+    id: `sub-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    address: normSub,
+    chainType: 'EVM',
+    isPrimary: false,
+    createdAt: new Date().toISOString(),
+  };
+  inMemoryOwnedSubWallets.set(normPrimary, [...list, rec]);
+  return rec;
+}
+
+/**
+ * Unlinks a non-primary sub-wallet from `public.wallets` strictly scoped to the authenticated user.
+ */
+export async function unlinkOwnedSubWallet(params: {
+  userIdentifier: string;
+  subWalletAddress: string;
+}): Promise<{ address: string; removed: boolean }> {
+  const normPrimary = String(params.userIdentifier || '').trim().toLowerCase();
+  const normSub = String(params.subWalletAddress || '').trim().toLowerCase();
+  if (!/^0x[a-f0-9]{40}$/.test(normSub)) {
+    throw new Error('INVALID_SUBWALLET_ADDRESS');
+  }
+
+  const pool = getDbPool();
+  if (pool) {
+    const validUserId = await ensureUserEntity(pool, params.userIdentifier);
+    const del = await pool.query(
+      `DELETE FROM wallets
+       WHERE user_id = $1 AND LOWER(address) = LOWER($2) AND is_primary = false
+       RETURNING id`,
+      [validUserId, normSub]
+    );
+    if (del.rowCount === 0) {
+      throw new Error('SUBWALLET_NOT_FOUND_OR_PRIMARY_PROTECTED');
+    }
+    await pool
+      .query(
+        `INSERT INTO audit_logs (actor_id, action, entity_id, reason, created_at)
+         VALUES ($1, 'OWNED_SUBWALLET_UNLINKED', NULL, $2, NOW())`,
+        [validUserId, `Unlinked owned sub-wallet ${normSub}`]
+      )
+      .catch(() => {});
+    return { address: normSub, removed: true };
+  }
+
+  const list = inMemoryOwnedSubWallets.get(normPrimary) || [];
+  const next = list.filter((w) => w.address !== normSub);
+  if (next.length === list.length) {
+    throw new Error('SUBWALLET_NOT_FOUND_OR_PRIMARY_PROTECTED');
+  }
+  inMemoryOwnedSubWallets.set(normPrimary, next);
+  return { address: normSub, removed: true };
+}
+
 export function resetDbStateForTesting(): void {
   defaultBinanceExecutionDbAdapter.clearInMemoryState();
   defaultKillSwitchDbAdapter.clearKillSwitches();

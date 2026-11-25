@@ -16,6 +16,7 @@ import {
   defaultKillSwitchDbAdapter,
   defaultProviderKeyVaultAdapter,
   getDbPool,
+  listUserOwnedWallets,
 } from '@packages/shared/db-pool';
 import { TOP_LIQUID_CEX_PAIRS } from '@packages/shared/market-pairs';
 import { fetchAutoPilot24hTickers } from '@packages/agent/autopilot-market-feed';
@@ -171,7 +172,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const ownedWallets = [session.walletAddress.toLowerCase()];
+    const ownedRecords = await listUserOwnedWallets(session.walletAddress).catch(() => []);
+    const ownedWallets =
+      ownedRecords.length > 0 ? ownedRecords.map((w) => w.address) : [session.walletAddress.toLowerCase()];
 
     // 3-Zone Transfer Allowlist Guard (Phase EF): hard-block external/unregistered destination transfers
     const transferGuard = validateOwnedWalletTransferPrompt(parsed.sanitizedMessage, ownedWallets);

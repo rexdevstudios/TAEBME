@@ -222,6 +222,28 @@ async function main() {
       `External wallet drain transfer blocked on /api/agent/copilot/chat (HTTP ${foreignTransferCopilot.status})`
     );
 
+    const forgedSubTarget = Wallet.createRandom().address;
+    const chRes = await fetch(
+      `${BASE_URL}/api/user/owned-wallets?challengeFor=${encodeURIComponent(forgedSubTarget)}`,
+      { headers: attackerHeaders }
+    );
+    const chJson: any = await chRes.json().catch(() => ({}));
+    const forgedSig = await attacker.signMessage(chJson?.data?.challenge?.message || 'forged');
+    const forgedLinkRes = await fetch(`${BASE_URL}/api/user/owned-wallets`, {
+      method: 'POST',
+      headers: attackerHeaders,
+      body: JSON.stringify({
+        subWalletAddress: forgedSubTarget,
+        challengeToken: chJson?.data?.challenge?.challengeToken,
+        message: chJson?.data?.challenge?.message,
+        signature: forgedSig,
+      }),
+    });
+    assert(
+      forgedLinkRes.status === 401,
+      `Forged sub-wallet Proof-of-Ownership rejected on /api/user/owned-wallets (HTTP ${forgedLinkRes.status})`
+    );
+
     // -------------------------------------------------------------------------
     // PLAYBOOK 6: Non-Admin RBAC Privilege Escalation
     // -------------------------------------------------------------------------

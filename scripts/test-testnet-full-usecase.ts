@@ -392,6 +392,47 @@ async function runFullTestnetUsecase() {
       `DELETE /api/trade-intents cancelled pending Copilot PAPER_SIM intent (HTTP ${cancelIntentRes.status})`
     );
 
+    // Owned Sub-Wallet ECDSA Proof-of-Ownership round-trip + Copilot TRANSFER_OWNED check (Phase EG)
+    const subWallet = ethers.Wallet.createRandom();
+    const subChRes = await fetch(
+      `${BASE_URL}/api/user/owned-wallets?challengeFor=${encodeURIComponent(subWallet.address)}`,
+      { headers: authHeaders() }
+    );
+    const subChJson: any = await subChRes.json();
+    const subSig = await subWallet.signMessage(subChJson?.data?.challenge?.message || '');
+    const linkSubRes = await fetch(`${BASE_URL}/api/user/owned-wallets`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({
+        subWalletAddress: subWallet.address,
+        challengeToken: subChJson?.data?.challenge?.challengeToken,
+        message: subChJson?.data?.challenge?.message,
+        signature: subSig,
+      }),
+    });
+    assert(
+      linkSubRes.status === 201,
+      `POST /api/user/owned-wallets linked ECDSA-verified sub-wallet (HTTP ${linkSubRes.status})`
+    );
+
+    const ownedTransferRes = await fetch(`${BASE_URL}/api/agent/copilot/chat`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ message: `Kirim $25 USDC ke ${subWallet.address}`, locale: 'id' }),
+    });
+    const ownedTransferJson: any = await ownedTransferRes.json();
+    assert(
+      ownedTransferRes.status === 200 &&
+        ownedTransferJson?.data?.intentKind === 'TRANSFER_OWNED' &&
+        ownedTransferJson?.data?.actionDraft?.verifiedDestination === subWallet.address.toLowerCase(),
+      `POST /api/agent/copilot/chat allowed verified sub-wallet TRANSFER_OWNED draft (HTTP ${ownedTransferRes.status})`
+    );
+
+    await fetch(
+      `${BASE_URL}/api/user/owned-wallets?address=${encodeURIComponent(subWallet.address)}`,
+      { method: 'DELETE', headers: authHeaders() }
+    );
+
     // =========================================================================
     // STAGE 7: KOL Hub, Active Bounties & Public Transparency
     // =========================================================================

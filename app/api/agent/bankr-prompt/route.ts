@@ -14,6 +14,7 @@ import { rateLimiter } from '@packages/auth/rate-limiter';
 import {
   defaultKillSwitchDbAdapter,
   defaultProviderKeyVaultAdapter,
+  listUserOwnedWallets,
 } from '@packages/shared/db-pool';
 import {
   getBankrAgentJobStatus,
@@ -95,8 +96,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 3-Zone Transfer Allowlist Guard (Phase EF): block external/unregistered 0x transfers via AI Agent
-    const transferGuard = validateOwnedWalletTransferPrompt(check.sanitizedPrompt, [session.walletAddress]);
+    // 3-Zone Transfer Allowlist Guard (Phase EF/EG): block external/unregistered 0x transfers via AI Agent
+    const ownedRecords = await listUserOwnedWallets(session.walletAddress).catch(() => []);
+    const ownedAddresses = ownedRecords.length > 0 ? ownedRecords.map((w) => w.address) : [session.walletAddress];
+    const transferGuard = validateOwnedWalletTransferPrompt(check.sanitizedPrompt, ownedAddresses);
     if (!transferGuard.allowed) {
       return NextResponse.json(
         {

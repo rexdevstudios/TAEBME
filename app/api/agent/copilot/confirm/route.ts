@@ -18,6 +18,7 @@ import {
   defaultKolDbAdapter,
   defaultProviderKeyVaultAdapter,
   getDbPool,
+  listUserOwnedWallets,
   saveTradeIntent,
 } from '@packages/shared/db-pool';
 import {
@@ -89,11 +90,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Defense-in-depth 3-Zone Transfer Allowlist Guard (Phase EF)
+    // Defense-in-depth 3-Zone Transfer Allowlist Guard (Phase EF/EG)
     if (draft.kind === 'TRANSFER_OWNED' || draft.kind === 'BANKR_PROMPT') {
-      const transferGuard = validateOwnedWalletTransferPrompt(String(draft.bankrPrompt || ''), [
-        auth.walletAddress.toLowerCase(),
-      ]);
+      const ownedRecords = await listUserOwnedWallets(auth.walletAddress).catch(() => []);
+      const ownedAddresses =
+        ownedRecords.length > 0 ? ownedRecords.map((w) => w.address) : [auth.walletAddress.toLowerCase()];
+      const transferGuard = validateOwnedWalletTransferPrompt(String(draft.bankrPrompt || ''), ownedAddresses);
       if (!transferGuard.allowed) {
         return NextResponse.json(
           {

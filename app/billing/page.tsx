@@ -15,6 +15,7 @@ import { AdminOpsHealthPanel } from '../components/AdminOpsHealthPanel';
 import { AdminWhiteLabelPartnersPanel } from '../components/AdminWhiteLabelPartnersPanel';
 import { AdminGenesisSnapshotPanel } from '../components/AdminGenesisSnapshotPanel';
 import { AdminKolVerificationPanel } from '../components/AdminKolVerificationPanel';
+import { OwnedWalletsAllowlistPanel } from '../components/OwnedWalletsAllowlistPanel';
 
 interface LedgerEntry {
   id: string;
@@ -1006,6 +1007,9 @@ export default function BillingPage() {
 
       {/* Outbound Alert Webhooks (SSRF-Safe HTTPS · Discord / Custom Endpoint + Test Ping) */}
       <UserWebhookVaultPanel isConnected={isConnected} />
+
+      {/* Multi-Owned Sub-Wallet Allowlist (ECDSA Proof-of-Ownership · AI Copilot Transfer Guard) */}
+      <OwnedWalletsAllowlistPanel isConnected={isConnected} />
         </div>
       )}
 
