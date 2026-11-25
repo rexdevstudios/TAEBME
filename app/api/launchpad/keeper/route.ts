@@ -1,34 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { KeeperAutomationService } from '@/packages/launchpad/keeper-automation-service';
 import { defaultDraftDbAdapter } from '@/packages/shared/db-pool';
+import { isCronAuthorized } from '@packages/auth/cron-auth';
 import { ethers } from 'ethers';
 
 const SYSTEM_ACTOR_ID = '07f847b9-60a4-48e4-8a45-3626b133b0fe';
-
-/**
- * Validates request authorization against CRON_SECRET Bearer token.
- * Note: x-vercel-cron header alone is NOT an authorization mechanism.
- * In production, CRON_SECRET is strictly required and must be at least 16 characters.
- */
-function isCronAuthorized(req: NextRequest): boolean {
-  const cronSecret = process.env.CRON_SECRET?.trim();
-
-  // CRON_SECRET is strictly mandatory (min 16 chars) and fail-closed
-  if (!cronSecret || cronSecret.length < 16) {
-    if (process.env.NODE_ENV === 'production') {
-      console.error('[SECURITY] CRON_SECRET is unconfigured or insufficient in production.');
-    }
-    return false;
-  }
-
-  // Authorize strictly via Authorization: Bearer <CRON_SECRET>
-  const authHeader = req.headers.get('authorization');
-  if (authHeader && authHeader === `Bearer ${cronSecret}`) {
-    return true;
-  }
-
-  return false;
-}
 
 export async function GET(req: NextRequest) {
   const startTime = performance.now();

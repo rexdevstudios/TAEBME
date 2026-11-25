@@ -1,11 +1,9 @@
-name: RTrader Smart Contract Keeper Cron
+name: RTrader Smart Contract Keeper Manual Trigger
 
 on:
-  schedule:
-    # Run every 30 minutes (100% Free on GitHub Actions public/private runners)
-    - cron: '*/30 * * * *'
   workflow_dispatch:
-    # Allow manual on-demand trigger from GitHub Actions dashboard
+    # Manual on-demand trigger from GitHub Actions dashboard.
+    # Automated daily execution is handled natively by Vercel Cron (vercel.json -> /api/launchpad/keeper).
 
 jobs:
   trigger-keeper:
@@ -17,7 +15,7 @@ jobs:
           VERCEL_APP_URL: ${{ secrets.VERCEL_APP_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          TARGET_URL="${VERCEL_APP_URL:-https://rtrader.vercel.app}/api/launchpad/keeper"
+          TARGET_URL="${VERCEL_APP_URL:-https://pndigi.site}/api/launchpad/keeper"
           echo "Triggering Keeper Upkeep at: $TARGET_URL"
           
           RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$TARGET_URL" \
