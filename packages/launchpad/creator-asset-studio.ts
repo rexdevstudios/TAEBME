@@ -12,6 +12,7 @@
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { z } from 'zod';
+import { parseBytePlusEndpointPool } from '../intelligence/llm-advisory-client';
 
 export const TokenIdentitySchema = z.object({
   name: z
@@ -214,9 +215,15 @@ export async function generateTokenIdentityFromTrend(
   const geminiKey = process.env.GEMINI_API_KEY?.trim();
 
   const tryBytePlus = async (): Promise<GenerateIdentityResult | null> => {
-    if (!arkKey || !arkEndpoint || !arkBaseUrl || arkKey.startsWith('mock_')) return null;
-    const arkIdentity = await callByteDanceIdentity(trendPrompt, arkKey, arkEndpoint, arkBaseUrl);
-    return arkIdentity ? { identity: arkIdentity, provider: 'bytedance-modelark' } : null;
+    const endpoints = parseBytePlusEndpointPool(arkEndpoint, 6);
+    if (!arkKey || endpoints.length === 0 || !arkBaseUrl || arkKey.startsWith('mock_')) return null;
+    const deadlineMs = performance.now() + 18000;
+    for (const ep of endpoints) {
+      if (deadlineMs - performance.now() < 1500) break;
+      const arkIdentity = await callByteDanceIdentity(trendPrompt, arkKey, ep, arkBaseUrl);
+      if (arkIdentity) return { identity: arkIdentity, provider: 'bytedance-modelark' };
+    }
+    return null;
   };
 
   const tryGemini = async (): Promise<GenerateIdentityResult | null> => {
@@ -298,10 +305,15 @@ export async function generateTokenLogoBuffer(
   const imageEndpoint = process.env.BYTEDANCE_IMAGE_ENDPOINT?.trim();
   const arkBaseUrl = process.env.BYTEDANCE_BASE_URL?.trim();
 
-  if (arkKey && imageEndpoint && arkBaseUrl && !arkKey.startsWith('mock_')) {
-    const seedreamBuf = await callBytePlusSeedreamLogo(imagePrompt, arkKey, imageEndpoint, arkBaseUrl);
-    if (seedreamBuf) {
-      return { buffer: seedreamBuf, isFallback: false, provider: 'bytedance-seedream' };
+  const imageEndpoints = parseBytePlusEndpointPool(imageEndpoint, 6);
+  if (arkKey && imageEndpoints.length > 0 && arkBaseUrl && !arkKey.startsWith('mock_')) {
+    const deadlineMs = performance.now() + 18000;
+    for (const ep of imageEndpoints) {
+      if (deadlineMs - performance.now() < 1500) break;
+      const seedreamBuf = await callBytePlusSeedreamLogo(imagePrompt, arkKey, ep, arkBaseUrl);
+      if (seedreamBuf) {
+        return { buffer: seedreamBuf, isFallback: false, provider: 'bytedance-seedream' };
+      }
     }
   }
 

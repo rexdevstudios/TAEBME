@@ -29,16 +29,21 @@ BytePlus ModelArk is already wired as the **Default Primary LLM Engine** (`AI_PR
 | 5-Agent Trading Desk API | `app/api/agent/desk/run/route.ts` | Multi-agent advisory cycle with metered credit deduction |
 | Scheduled Dataset Archive Cron | `app/api/cron/kol-consensus-archive/route.ts` | Daily `00:00 UTC` archive into `scraped_documents` (`domain = 'kol_consensus_archive'`) |
 
-### Current Environment Variables
+### Current Environment Variables (Supports Comma-Separated Free-Quota Waterfall)
 ```env
 AI_PRIMARY_PROVIDER=byteplus
 BYTEDANCE_BASE_URL=https://ark.ap-southeast.bytepluses.com/api/v3
 BYTEDANCE_ARK_API_KEY=<Project-scoped API key from BytePlus project "kripto">
-BYTEDANCE_MODEL_ENDPOINT=<Endpoint ID ep-... for ByteDance-Seed-1.8>
 
-# Optional Specialist Endpoints (Roadmap Phase DY / DZ)
-BYTEDANCE_DEEP_ENDPOINT=<Endpoint ID ep-... for DeepSeek-V3 / DeepSeek-R1>
-BYTEDANCE_IMAGE_ENDPOINT=<Endpoint ID ep-... for ByteDance-Seedream-4.5 / 5.x>
+# Comma-separated pool: auto-fails over to the next free-quota endpoint on HTTP 429/402/403
+# Recommended Fast Pool: Dola-Seed-2.0-mini, Dola-Seed-2.0-lite, ByteDance-Seed-1.8, DeepSeek-V4.1-Flash-Economy
+BYTEDANCE_MODEL_ENDPOINT=<ep-seed20-mini,ep-seed20-lite,ep-seed18,ep-deepseek-v41-flash-eco>
+
+# Recommended Deep Pool: DeepSeek-V4-Pro-GA, Dola-Seed-2.1-turbo, Dola-Seed-2.0-pro
+BYTEDANCE_DEEP_ENDPOINT=<ep-deepseek-v4-pro-ga,ep-dola-seed-21-turbo,ep-dola-seed-20-pro>
+
+# Optional Launchpad Image Studio Pool: ByteDance-Seedream-4.5, Dola-Seedream-5.0-flash
+BYTEDANCE_IMAGE_ENDPOINT=<ep-seedream-45,ep-seedream-50-flash>
 ```
 
 ---

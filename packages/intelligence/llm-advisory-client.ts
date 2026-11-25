@@ -384,6 +384,42 @@ async function callGeminiAdvisory(
   }
 }
 
+export function parseBytePlusEndpointPool(raw?: string | null, maxEndpoints: number = 6): string[] {
+  if (!raw || typeof raw !== 'string') return [];
+  const cap = Math.max(1, Math.min(12, Math.floor(Number(maxEndpoints) || 6)));
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const token of raw.split(/[,;\s]+/)) {
+    const clean = token.trim();
+    if (!clean || seen.has(clean)) continue;
+    seen.add(clean);
+    out.push(clean);
+    if (out.length >= cap) break;
+  }
+  return out;
+}
+
+export function resolveBytePlusWaterfallEndpoints(params: {
+  fastRaw?: string | null;
+  deepRaw?: string | null;
+  thinkingMode?: AdvisoryThinkingMode;
+  maxTotal?: number;
+}): string[] {
+  const fastList = parseBytePlusEndpointPool(params.fastRaw, 6);
+  const deepList = parseBytePlusEndpointPool(params.deepRaw, 6);
+  const ordered = params.thinkingMode === 'deep' ? [...deepList, ...fastList] : [...fastList, ...deepList];
+  const maxTotal = Math.max(1, Math.min(12, Math.floor(Number(params.maxTotal) || 8)));
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const ep of ordered) {
+    if (seen.has(ep)) continue;
+    seen.add(ep);
+    out.push(ep);
+    if (out.length >= maxTotal) break;
+  }
+  return out;
+}
+
 /**
  * Generates a non-blocking, strictly advisory narrative note using BYOK LLM (if provided),
  * BytePlus ModelArk, or Gemini.
@@ -465,19 +501,33 @@ export async function generateMarketAdvisoryNote(
 
   const tryBytePlus = async (): Promise<MarketAdvisoryNote | null> => {
     if (!arkKey || !arkBaseUrl || arkKey.startsWith('mock_')) return null;
-    const candidateEndpoints =
-      thinkingMode === 'deep'
-        ? [arkDeepEndpoint, arkEndpoint].filter((ep): ep is string => Boolean(ep))
-        : [arkEndpoint, arkDeepEndpoint].filter((ep): ep is string => Boolean(ep));
-    const uniqueEndpoints = Array.from(new Set(candidateEndpoints));
+    const uniqueEndpoints = resolveBytePlusWaterfallEndpoints({
+      fastRaw: arkEndpoint,
+      deepRaw: arkDeepEndpoint,
+      thinkingMode,
+      maxTotal: 8,
+    });
     if (uniqueEndpoints.length === 0) return null;
 
-    const timeoutMs = thinkingMode === 'deep' ? 9000 : 6000;
+    const perCallTimeoutMs = thinkingMode === 'deep' ? 9000 : 6000;
+    const totalBudgetMs = thinkingMode === 'deep' ? 12000 : 8500;
+    const deadlineMs = performance.now() + totalBudgetMs;
+
     for (const ep of uniqueEndpoints) {
-      const res = await callBytePlusAdvisory(sanitizedPrompt, arkKey, ep, arkBaseUrl, systemPrompt, timeoutMs, {
-        useBytePlusFeatures: true,
-        thinkingMode,
-      });
+      const remainingMs = Math.floor(deadlineMs - performance.now());
+      if (remainingMs < 1200) break;
+      const res = await callBytePlusAdvisory(
+        sanitizedPrompt,
+        arkKey,
+        ep,
+        arkBaseUrl,
+        systemPrompt,
+        Math.min(perCallTimeoutMs, remainingMs),
+        {
+          useBytePlusFeatures: true,
+          thinkingMode,
+        }
+      );
       if (res) {
         return {
           provider: 'bytedance-modelark',
