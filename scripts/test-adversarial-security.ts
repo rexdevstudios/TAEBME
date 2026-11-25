@@ -217,6 +217,14 @@ async function main() {
       });
       assert(r.status === 403, `Non-admin blocked on ${m} ${p} (HTTP ${r.status})`);
     }
+    const cronUnauth = await fetch(`${BASE_URL}/api/cron/kol-consensus-archive`, {
+      method: 'GET',
+      headers: { Authorization: 'Bearer invalid-cron-secret-attempt' },
+    });
+    assert(
+      cronUnauth.status === 401,
+      `Unauthorized cron call rejected on GET /api/cron/kol-consensus-archive (HTTP ${cronUnauth.status})`
+    );
 
     // Cleanup Victim key & sessions
     for (const kid of victimKeyIds) {

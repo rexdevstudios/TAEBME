@@ -481,3 +481,122 @@ export function serializeKolConsensusDatasetToCsv(snapshot: CuratedKolDatasetSna
 
   return [header, ...lines].join('\n');
 }
+
+// ============================================================================
+// PHASE DX: SCHEDULED ARCHIVE BACKTEST EVALUATOR & SPOT PRICE SNAPSHOT HELPER
+// ============================================================================
+
+export const KOL_CONSENSUS_ARCHIVE_DOMAIN = 'kol_consensus_archive';
+
+export interface KolConsensusArchiveEntry {
+  archivedAt: string;
+  snapshot: CuratedKolDatasetSnapshot;
+  spotPrices: Record<string, number>;
+}
+
+export interface KolBacktestSummary {
+  totalArchives: number;
+  evaluatedSignals: number;
+  wins: number;
+  losses: number;
+  winRatePct: number;
+  avgDirectionalReturnPct: number;
+}
+
+/**
+ * Pure deterministic win-rate backtest evaluator comparing archived directional
+ * KOL consensus verdicts against current live spot prices.
+ */
+export function evaluateKolConsensusBacktest(params: {
+  archives: readonly KolConsensusArchiveEntry[];
+  currentSpotPrices: Readonly<Record<string, number>>;
+}): KolBacktestSummary {
+  const archives = params.archives || [];
+  let evaluatedSignals = 0;
+  let wins = 0;
+  let losses = 0;
+  let returnSumPct = 0;
+
+  for (const archive of archives) {
+    const rows = archive?.snapshot?.rows || [];
+    const entryPrices = archive?.spotPrices || {};
+
+    for (const row of rows) {
+      if (!row || Number(row.uniqueVerifiedKols || 0) <= 0) continue;
+      const isBullish = row.verdict === 'STRONG_BULLISH' || row.verdict === 'BULLISH';
+      const isBearish = row.verdict === 'BEARISH';
+      if (!isBullish && !isBearish) continue;
+
+      const sym = String(row.tokenSymbol || '').trim().toUpperCase();
+      const entryPx = Number(entryPrices[sym]);
+      const currentPx = Number(params.currentSpotPrices[sym]);
+      if (!Number.isFinite(entryPx) || entryPx <= 0 || !Number.isFinite(currentPx) || currentPx <= 0) {
+        continue;
+      }
+
+      const rawReturnPct = ((currentPx - entryPx) / entryPx) * 100;
+      const directionalReturnPct = isBullish ? rawReturnPct : -rawReturnPct;
+
+      evaluatedSignals += 1;
+      returnSumPct += directionalReturnPct;
+      if (directionalReturnPct > 0) {
+        wins += 1;
+      } else {
+        losses += 1;
+      }
+    }
+  }
+
+  const winRatePct =
+    evaluatedSignals > 0 ? Math.round((wins / evaluatedSignals) * 1000) / 10 : 0;
+  const avgDirectionalReturnPct =
+    evaluatedSignals > 0 ? Math.round((returnSumPct / evaluatedSignals) * 100) / 100 : 0;
+
+  return {
+    totalArchives: archives.length,
+    evaluatedSignals,
+    wins,
+    losses,
+    winRatePct,
+    avgDirectionalReturnPct,
+  };
+}
+
+/**
+ * Best-effort public Binance Spot price fetcher (with data-api.binance.vision fallback)
+ * for recording reference spot prices alongside archived KOL consensus snapshots.
+ */
+export async function fetchPublicSpotPricesForSymbols(
+  symbols: readonly string[]
+): Promise<Record<string, number>> {
+  const wanted = new Set(symbols.map((s) => String(s).trim().toUpperCase()).filter(Boolean));
+  const prices: Record<string, number> = {};
+  if (wanted.size === 0) return prices;
+
+  const endpoints = [
+    'https://data-api.binance.vision/api/v3/ticker/price',
+    'https://api.binance.com/api/v3/ticker/price',
+  ];
+
+  for (const url of endpoints) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
+      if (!res.ok) continue;
+      const rows = (await res.json()) as Array<{ symbol?: string; price?: string }>;
+      if (!Array.isArray(rows)) continue;
+      for (const row of rows) {
+        const sym = String(row?.symbol || '').trim().toUpperCase();
+        if (!wanted.has(sym)) continue;
+        const px = Number(row?.price);
+        if (Number.isFinite(px) && px > 0) {
+          prices[sym] = px;
+        }
+      }
+      if (Object.keys(prices).length > 0) break;
+    } catch {
+      // Fallback to next endpoint
+    }
+  }
+
+  return prices;
+}

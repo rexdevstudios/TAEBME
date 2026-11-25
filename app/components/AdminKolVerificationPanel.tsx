@@ -27,9 +27,19 @@ interface KolQueueSummary {
   profiles: AdminKolProfileRow[];
 }
 
+interface KolBacktestTelemetry {
+  totalArchives: number;
+  evaluatedSignals: number;
+  wins: number;
+  losses: number;
+  winRatePct: number;
+  avgDirectionalReturnPct: number;
+}
+
 export function AdminKolVerificationPanel() {
   const { tr } = useLocale();
   const [queue, setQueue] = useState<KolQueueSummary | null>(null);
+  const [backtest, setBacktest] = useState<KolBacktestTelemetry | null>(null);
   const [loading, setLoading] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<'csv' | 'json' | null>(null);
@@ -38,12 +48,17 @@ export function AdminKolVerificationPanel() {
   const loadQueue = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/kol-verification', {
-        credentials: 'same-origin',
-      });
-      const json = await res.json();
-      if (res.ok && json?.success && json.data) {
-        setQueue(json.data as KolQueueSummary);
+      const [queueRes, datasetRes] = await Promise.all([
+        fetch('/api/admin/kol-verification', { credentials: 'same-origin' }),
+        fetch('/api/admin/kol-dataset?format=json', { credentials: 'same-origin' }),
+      ]);
+      const queueJson = await queueRes.json().catch(() => null);
+      if (queueRes.ok && queueJson?.success && queueJson.data) {
+        setQueue(queueJson.data as KolQueueSummary);
+      }
+      const datasetJson = await datasetRes.json().catch(() => null);
+      if (datasetRes.ok && datasetJson?.success && datasetJson.data?.backtest) {
+        setBacktest(datasetJson.data.backtest as KolBacktestTelemetry);
       }
     } catch {
       // ignore
@@ -201,6 +216,15 @@ export function AdminKolVerificationPanel() {
         </span>
         <span style={{ color: 'var(--color-accent-info)', fontWeight: 700 }}>
           SILVER: {queue?.silverCount ?? 0}
+        </span>
+        <span style={{ color: 'var(--color-muted)', fontWeight: 700 }}>
+          {tr('Archived Snapshots', 'Arsip Snapshot')}: {backtest?.totalArchives ?? 0}
+        </span>
+        <span style={{ color: 'var(--color-text-positive)', fontWeight: 700 }}>
+          {tr('Backtest Win-Rate', 'Win-Rate Backtest')}:{' '}
+          {backtest && backtest.evaluatedSignals > 0
+            ? `${backtest.winRatePct}% (${backtest.wins}/${backtest.evaluatedSignals})`
+            : tr('Pending Archive', 'Menunggu Arsip')}
         </span>
       </div>
 

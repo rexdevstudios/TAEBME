@@ -12,10 +12,15 @@ import { requireCapability } from '@packages/auth/session';
 import { getDbPool } from '@packages/shared/db-pool';
 import { TOP_LIQUID_CEX_PAIRS } from '@packages/shared/market-pairs';
 import {
+  KOL_CONSENSUS_ARCHIVE_DOMAIN,
   buildCuratedKolDatasetSnapshot,
   computeAntiManipulationKolConsensus,
+  evaluateKolConsensusBacktest,
+  fetchPublicSpotPricesForSymbols,
   loadVerifiedKolSignalsForSymbol,
   serializeKolConsensusDatasetToCsv,
+  type KolBacktestSummary,
+  type KolConsensusArchiveEntry,
   type KolConsensusReport,
 } from '@packages/intelligence/kol-chart-overlay';
 
@@ -66,10 +71,56 @@ export async function GET(req: NextRequest) {
       });
     }
 
+    let backtest: KolBacktestSummary = {
+      totalArchives: 0,
+      evaluatedSignals: 0,
+      wins: 0,
+      losses: 0,
+      winRatePct: 0,
+      avgDirectionalReturnPct: 0,
+    };
+
+    if (pool) {
+      try {
+        const archiveRes = await pool.query(
+          `SELECT extracted_metadata, scraped_at
+           FROM scraped_documents
+           WHERE domain = $1
+           ORDER BY scraped_at DESC
+           LIMIT 60`,
+          [KOL_CONSENSUS_ARCHIVE_DOMAIN]
+        );
+        if (archiveRes.rows.length > 0) {
+          const archives: KolConsensusArchiveEntry[] = archiveRes.rows
+            .map((r) => {
+              const meta = r.extracted_metadata || {};
+              if (!meta?.snapshot) return null;
+              return {
+                archivedAt: new Date(r.scraped_at).toISOString(),
+                snapshot: meta.snapshot,
+                spotPrices: meta.spotPrices || {},
+              };
+            })
+            .filter((x): x is KolConsensusArchiveEntry => x !== null);
+
+          const currentSpotPrices = await fetchPublicSpotPricesForSymbols(
+            TOP_LIQUID_CEX_PAIRS.map((p) => p.symbol)
+          );
+          backtest = evaluateKolConsensusBacktest({ archives, currentSpotPrices });
+        }
+      } catch {
+        // Non-blocking telemetry fallback
+      }
+    }
+
     return NextResponse.json(
       {
         success: true,
-        data: snapshot,
+        data: {
+          ...snapshot,
+          archiveCount: backtest.totalArchives,
+          backtest,
+        },
         timestamp: new Date().toISOString(),
       },
       {
