@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { upstashRedis } from '@packages/shared/redis-client';
 import { mapDexScreenerBoostRowsToScoutHints } from '@packages/agent/autonomous-terminal-engine';
+import { fetchBytePlusInfoQuestCatalystHint } from '@packages/intelligence/llm-advisory-client';
 
 export const dynamic = 'force-dynamic';
 
@@ -58,6 +59,17 @@ export async function GET(req: NextRequest) {
       }
     } catch {
       // Non-fatal external discovery fallback
+    }
+
+    const infoQuestCatalyst = await fetchBytePlusInfoQuestCatalystHint(
+      'Top Base L2 and Bitcoin spot crypto market catalyst in the last 24 hours'
+    ).catch(() => null);
+    if (infoQuestCatalyst) {
+      hints.unshift({
+        symbol: 'MACRO',
+        note: `InfoQuest MCP: ${infoQuestCatalyst}`,
+        updatedAt: nowIso,
+      });
     }
 
     if (hints.length === 0) {

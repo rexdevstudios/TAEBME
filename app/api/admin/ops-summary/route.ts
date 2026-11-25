@@ -11,6 +11,7 @@ import { requireActiveSession } from '@packages/auth/session';
 import { getDbPool, defaultKillSwitchDbAdapter } from '@packages/shared/db-pool';
 import { upstashRedis } from '@packages/shared/redis-client';
 import { listActiveAutoPilotWallets } from '@packages/agent/autopilot-market-feed';
+import { getBytePlusEngineTelemetry } from '@packages/intelligence/llm-advisory-client';
 import type { Role } from '@packages/shared/types/domain';
 
 export const dynamic = 'force-dynamic';
@@ -132,6 +133,7 @@ export async function GET(req: NextRequest) {
             activeWalletsCount: activeAutoPilotWallets.length,
             lastPulseAt,
           },
+          aiEngine: getBytePlusEngineTelemetry(),
         },
         timestamp: new Date().toISOString(),
       },

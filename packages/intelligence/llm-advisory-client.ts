@@ -654,3 +654,129 @@ export async function verifyByokLlmKeyLive(params: {
     };
   }
 }
+
+// ============================================================================
+// PHASE EC: BYTEPLUS RESPONSES API INFO QUEST MCP & ZERO-SECRET ENGINE TELEMETRY
+// ============================================================================
+
+export const BYTEPLUS_INFOQUEST_MCP_URL = 'https://mcp.infoquest.bytepluses.com/mcp';
+
+export interface BytePlusEngineTelemetry {
+  configured: boolean;
+  primaryProvider: string;
+  fastPoolSize: number;
+  deepPoolSize: number;
+  imagePoolSize: number;
+  infoQuestEnabled: boolean;
+  geminiFallbackConfigured: boolean;
+}
+
+/**
+ * Pure read-only, zero-secret AI engine readiness snapshot for Admin Ops telemetry.
+ * Never returns API keys, base URLs, or endpoint IDs.
+ */
+export function getBytePlusEngineTelemetry(
+  env: Readonly<Record<string, string | undefined>> = process.env
+): BytePlusEngineTelemetry {
+  const arkKey = (env.BYTEDANCE_ARK_API_KEY || '').trim();
+  const arkBaseUrl = (env.BYTEDANCE_BASE_URL || '').trim();
+  const fastPoolSize = parseBytePlusEndpointPool(env.BYTEDANCE_MODEL_ENDPOINT, 6).length;
+  const deepPoolSize = parseBytePlusEndpointPool(env.BYTEDANCE_DEEP_ENDPOINT, 6).length;
+  const imagePoolSize = parseBytePlusEndpointPool(env.BYTEDANCE_IMAGE_ENDPOINT, 6).length;
+  const geminiKey = (env.GEMINI_API_KEY || '').trim();
+
+  const hasValidArkKey = Boolean(arkKey && !arkKey.startsWith('mock_') && arkBaseUrl);
+  return {
+    configured: hasValidArkKey && (fastPoolSize > 0 || deepPoolSize > 0),
+    primaryProvider: (env.AI_PRIMARY_PROVIDER || 'byteplus').trim().toLowerCase() || 'byteplus',
+    fastPoolSize,
+    deepPoolSize,
+    imagePoolSize,
+    infoQuestEnabled: hasValidArkKey && fastPoolSize > 0 && (env.BYTEDANCE_INFOQUEST_ENABLED || '').trim() === '1',
+    geminiFallbackConfigured: Boolean(geminiKey && !geminiKey.startsWith('mock_')),
+  };
+}
+
+/**
+ * Builds a BytePlus ModelArk Responses API (/api/v3/responses) payload configured with
+ * Remote Info Quest MCP and explicit prompt_cache_key for prefix caching.
+ */
+export function buildBytePlusInfoQuestMcpPayload(params: {
+  endpoint: string;
+  query: string;
+  cacheKey?: string;
+}): Record<string, unknown> {
+  const cleanQuery = String(params.query || '')
+    .replace(/[\x00-\x1F\x7F]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 260);
+  const cacheKey = (params.cacheKey || 'poolnet-scout-catalyst-v1').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 48);
+
+  return {
+    model: params.endpoint.trim(),
+    store: false,
+    prompt_cache_key: cacheKey || 'poolnet-scout-catalyst-v1',
+    tools: [
+      {
+        type: 'mcp',
+        server_label: 'infoquest',
+        server_url: BYTEPLUS_INFOQUEST_MCP_URL,
+      },
+    ],
+    input: [
+      {
+        role: 'system',
+        content:
+          'Summarize the top 1 crypto market catalyst from web search in under 160 characters. Neutral, factual, no financial advice.',
+      },
+      {
+        role: 'user',
+        content: cleanQuery || 'Top Base L2 DeFi and BTC crypto market catalyst today',
+      },
+    ],
+  };
+}
+
+/**
+ * Opt-in, non-blocking BytePlus Info Quest MCP real-time catalyst fetcher for Scout Cron.
+ * Active only when BYTEDANCE_INFOQUEST_ENABLED=1. Strict 5s timeout, zero PII.
+ */
+export async function fetchBytePlusInfoQuestCatalystHint(query: string): Promise<string | null> {
+  if ((process.env.BYTEDANCE_INFOQUEST_ENABLED || '').trim() !== '1') return null;
+  const arkKey = process.env.BYTEDANCE_ARK_API_KEY?.trim();
+  const arkBaseUrl = process.env.BYTEDANCE_BASE_URL?.trim();
+  const endpoints = parseBytePlusEndpointPool(process.env.BYTEDANCE_MODEL_ENDPOINT, 3);
+  if (!arkKey || !arkBaseUrl || arkKey.startsWith('mock_') || endpoints.length === 0) return null;
+
+  try {
+    const res = await fetch(`${arkBaseUrl.replace(/\/+$/, '')}/responses`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${arkKey}`,
+        'ark-beta-mcp': 'true',
+      },
+      body: JSON.stringify(
+        buildBytePlusInfoQuestMcpPayload({
+          endpoint: endpoints[0],
+          query,
+        })
+      ),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      output_text?: string;
+      output?: Array<{ content?: Array<{ text?: string }> }>;
+    };
+    const text =
+      (typeof data?.output_text === 'string' && data.output_text.trim()) ||
+      data?.output?.[0]?.content?.find((c) => typeof c?.text === 'string')?.text?.trim() ||
+      '';
+    if (!text) return null;
+    return text.replace(/\s+/g, ' ').trim().slice(0, 180);
+  } catch {
+    return null;
+  }
+}
