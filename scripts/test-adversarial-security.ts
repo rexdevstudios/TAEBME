@@ -205,6 +205,9 @@ async function main() {
       ['GET', '/api/admin/ops-summary'],
       ['POST', '/api/admin/kill-switch'],
       ['POST', '/api/admin/partners'],
+      ['GET', '/api/admin/kol-verification'],
+      ['POST', '/api/admin/kol-verification'],
+      ['GET', '/api/admin/kol-dataset'],
     ];
     for (const [m, p] of adminChecks) {
       const r = await fetch(`${BASE_URL}${p}`, {

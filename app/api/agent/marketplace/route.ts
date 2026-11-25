@@ -36,7 +36,7 @@ export async function GET() {
         );
         if (wallets.length > 0) {
           const res = await pool.query(
-            `SELECT LOWER(w.address) AS wallet_address, kp.twitter_handle, kp.trust_score
+            `SELECT LOWER(w.address) AS wallet_address, kp.twitter_handle, kp.trust_score, kp.is_verified
              FROM wallets w
              JOIN kol_profiles kp ON kp.user_id = w.user_id
              WHERE LOWER(w.address) = ANY($1::text[])`,
@@ -47,6 +47,7 @@ export async function GET() {
               walletAddress: String(row.wallet_address),
               twitterHandle: row.twitter_handle,
               trustScore: Number(row.trust_score ?? 0),
+              isVerified: row.is_verified === false ? false : undefined,
             });
           }
         }

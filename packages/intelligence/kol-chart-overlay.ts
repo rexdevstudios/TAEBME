@@ -20,6 +20,7 @@ export interface KolProfileSample {
   farcasterUsername?: string | null;
   lensHandle?: string | null;
   trustScore?: number | null;
+  isVerified?: boolean | null;
 }
 
 export interface KolSignalInput {
@@ -73,7 +74,7 @@ export function isVerifiedKol(profile: KolProfileSample): {
       (profile.lensHandle && String(profile.lensHandle).trim().length > 0)
   );
 
-  if (!hasSocialProof || score < 65) {
+  if (profile.isVerified === false || !hasSocialProof || score < 65) {
     return { verified: false, tier: 'UNVERIFIED', handle };
   }
   return {
@@ -293,7 +294,7 @@ export async function loadVerifiedKolSignalsForSymbol(
     const cleanBase = activeSymbol.replace(/\/.*$/, '').replace(/USDT$/, '');
     const res = await pool.query(
       `SELECT ti.side, ti.estimated_price, ti.created_at, w.address AS wallet_address,
-              kp.twitter_handle, kp.trust_score
+              kp.twitter_handle, kp.trust_score, kp.is_verified
        FROM trade_intents ti
        JOIN wallets w ON w.user_id = ti.user_id
        JOIN kol_profiles kp ON kp.user_id = ti.user_id
@@ -308,6 +309,7 @@ export async function loadVerifiedKolSignalsForSymbol(
         walletAddress: row.wallet_address,
         twitterHandle: row.twitter_handle,
         trustScore: Number(row.trust_score ?? 0),
+        isVerified: row.is_verified === false ? false : undefined,
       });
       if (v.verified) {
         kolEntries.push({
@@ -355,4 +357,127 @@ export function enrichMarketplacePresetsWithKolStatus<T extends { creatorWallet:
       kolHandle: v.verified ? v.handle : undefined,
     };
   });
+}
+
+// ============================================================================
+// PHASE DW: ADMIN KOL VERIFICATION DECISION RESOLVER & CURATED AI DATASET EXPORT
+// ============================================================================
+
+export type KolVerificationDecision = 'APPROVE_GOLD' | 'APPROVE_SILVER' | 'REVOKE';
+
+export interface ResolvedKolVerificationUpdate {
+  decision: KolVerificationDecision;
+  isVerified: boolean;
+  trustScore: number;
+  resultingTier: KolVerificationTier;
+}
+
+export function resolveKolVerificationDecision(
+  raw: unknown
+): ResolvedKolVerificationUpdate | null {
+  const clean = typeof raw === 'string' ? raw.trim().toUpperCase() : '';
+  if (clean === 'APPROVE_GOLD') {
+    return { decision: 'APPROVE_GOLD', isVerified: true, trustScore: 90, resultingTier: 'GOLD' };
+  }
+  if (clean === 'APPROVE_SILVER') {
+    return { decision: 'APPROVE_SILVER', isVerified: true, trustScore: 75, resultingTier: 'SILVER' };
+  }
+  if (clean === 'REVOKE') {
+    return { decision: 'REVOKE', isVerified: false, trustScore: 40, resultingTier: 'UNVERIFIED' };
+  }
+  return null;
+}
+
+export interface CuratedKolDatasetRow {
+  tokenSymbol: string;
+  consensusScore: number;
+  verdict: KolConsensusReport['verdict'];
+  uniqueVerifiedKols: number;
+  skinInTheGameCount: number;
+  buySignals: number;
+  sellSignals: number;
+  flags: string[];
+  guardrailsVersion: string;
+}
+
+export interface CuratedKolDatasetSnapshot {
+  guardrailsVersion: string;
+  generatedAt: string;
+  totalSymbols: number;
+  activeConsensusSymbols: number;
+  rows: CuratedKolDatasetRow[];
+}
+
+export const KOL_DATASET_GUARDRAILS_VERSION = 'v1-5guardrails';
+
+export function buildCuratedKolDatasetSnapshot(params: {
+  reports: readonly KolConsensusReport[];
+  generatedAt?: string;
+}): CuratedKolDatasetSnapshot {
+  const generatedAt = params.generatedAt || new Date().toISOString();
+  const rows: CuratedKolDatasetRow[] = (params.reports || []).map((r) => ({
+    tokenSymbol: String(r.tokenSymbol || '').trim().toUpperCase(),
+    consensusScore: Number(r.score ?? 50),
+    verdict: r.verdict,
+    uniqueVerifiedKols: Number(r.uniqueVerifiedKols ?? 0),
+    skinInTheGameCount: Number(r.skinInTheGameCount ?? 0),
+    buySignals: Number(r.buySignals ?? 0),
+    sellSignals: Number(r.sellSignals ?? 0),
+    flags: Array.isArray(r.flags) ? [...r.flags] : [],
+    guardrailsVersion: KOL_DATASET_GUARDRAILS_VERSION,
+  }));
+
+  const activeConsensusSymbols = rows.filter((r) => r.uniqueVerifiedKols > 0).length;
+
+  return {
+    guardrailsVersion: KOL_DATASET_GUARDRAILS_VERSION,
+    generatedAt,
+    totalSymbols: rows.length,
+    activeConsensusSymbols,
+    rows,
+  };
+}
+
+function escapeDatasetCsvCell(raw: unknown): string {
+  let str = String(raw ?? '');
+  // OWASP CSV formula-injection neutralization
+  if (/^[=+\-@\t\r]/.test(str)) {
+    str = `'${str}`;
+  }
+  if (/[",\r\n]/.test(str)) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
+
+export function serializeKolConsensusDatasetToCsv(snapshot: CuratedKolDatasetSnapshot): string {
+  const header = [
+    'generated_at',
+    'token_symbol',
+    'consensus_score',
+    'verdict',
+    'unique_verified_kols',
+    'skin_in_the_game_count',
+    'buy_signals',
+    'sell_signals',
+    'flags',
+    'guardrails_version',
+  ].join(',');
+
+  const lines = (snapshot.rows || []).map((row) =>
+    [
+      escapeDatasetCsvCell(snapshot.generatedAt),
+      escapeDatasetCsvCell(row.tokenSymbol),
+      escapeDatasetCsvCell(row.consensusScore),
+      escapeDatasetCsvCell(row.verdict),
+      escapeDatasetCsvCell(row.uniqueVerifiedKols),
+      escapeDatasetCsvCell(row.skinInTheGameCount),
+      escapeDatasetCsvCell(row.buySignals),
+      escapeDatasetCsvCell(row.sellSignals),
+      escapeDatasetCsvCell(row.flags.join('|')),
+      escapeDatasetCsvCell(row.guardrailsVersion),
+    ].join(',')
+  );
+
+  return [header, ...lines].join('\n');
 }

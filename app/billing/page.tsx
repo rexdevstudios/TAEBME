@@ -14,6 +14,7 @@ import { UserSecurityActivityPanel } from '../components/UserSecurityActivityPan
 import { AdminOpsHealthPanel } from '../components/AdminOpsHealthPanel';
 import { AdminWhiteLabelPartnersPanel } from '../components/AdminWhiteLabelPartnersPanel';
 import { AdminGenesisSnapshotPanel } from '../components/AdminGenesisSnapshotPanel';
+import { AdminKolVerificationPanel } from '../components/AdminKolVerificationPanel';
 
 interface LedgerEntry {
   id: string;
@@ -1266,6 +1267,7 @@ export default function BillingPage() {
           <AdminOpsHealthPanel />
           <AdminWhiteLabelPartnersPanel />
           <AdminGenesisSnapshotPanel />
+          <AdminKolVerificationPanel />
 
           <div className="grid-4">
             <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '16px', borderRadius: '6px' }}>
