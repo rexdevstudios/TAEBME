@@ -104,10 +104,11 @@ export function CreatorStudioPanel({
         });
       }
       refreshSession().catch(() => {});
+      const providerLabel = json.data.provider ? ` · ${json.data.provider}` : '';
       setStatusMsg(
         json.data.uploadedToIpfs
-          ? `OK: Logo dibuat & terunggah ke IPFS Pinata (${json.data.byteLength} bytes).`
-          : `OK: Logo preview siap (${json.data.byteLength} bytes, stateless fallback).`
+          ? `OK: Logo dibuat & terunggah ke IPFS Pinata (${json.data.byteLength} bytes${providerLabel}).`
+          : `OK: Logo preview siap (${json.data.byteLength} bytes${providerLabel}).`
       );
     } catch (err: any) {
       setErrorMsg(`Koneksi gagal: ${err?.message || 'Unknown error'}`);

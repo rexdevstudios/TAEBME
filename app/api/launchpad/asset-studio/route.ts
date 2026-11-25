@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const { buffer, isFallback } = await generateTokenLogoBuffer(imagePrompt, tokenName);
+      const { buffer, isFallback, provider } = await generateTokenLogoBuffer(imagePrompt, tokenName);
       const imageDataUri = `data:image/png;base64,${buffer.toString('base64')}`;
 
       if (body?.uploadToIpfs && body?.identity) {
@@ -107,6 +107,7 @@ export async function POST(req: NextRequest) {
             imageDataUri,
             byteLength: buffer.length,
             isFallback,
+            provider,
             ipfsImageUrl: ipfs.imageUrl,
             ipfsMetadataUrl: ipfs.metadataUrl,
             uploadedToIpfs: ipfs.uploadedToIpfs,
@@ -124,6 +125,7 @@ export async function POST(req: NextRequest) {
           imageDataUri,
           byteLength: buffer.length,
           isFallback,
+          provider,
           uploadedToIpfs: false,
           creditsBurned: 1,
           remainingCredits,

@@ -39,6 +39,8 @@ export interface GenerateIdentityResult {
   provider: 'gemini' | 'bytedance-modelark' | 'deterministic-fallback';
 }
 
+export type LogoImageProvider = 'bytedance-seedream' | 'pollinations' | 'deterministic-fallback';
+
 export interface IpfsUploadResult {
   imageUrl: string;
   metadataUrl: string | null;
@@ -176,6 +178,7 @@ async function callByteDanceIdentity(
           { role: 'user', content: trendPrompt.slice(0, 3000) },
         ],
         temperature: 0.7,
+        thinking: { type: 'disabled' },
         response_format: { type: 'json_object' },
       }),
       signal: AbortSignal.timeout(20000),
@@ -199,27 +202,33 @@ async function callByteDanceIdentity(
 
 /**
  * Generates a validated TokenIdentity from a trend/narrative prompt.
- * Tries Gemini -> ByteDance ModelArk -> deterministic fallback.
+ * Respects AI_PRIMARY_PROVIDER (default 'byteplus': BytePlus ModelArk -> Gemini -> deterministic fallback).
  */
 export async function generateTokenIdentityFromTrend(
   trendPrompt: string
 ): Promise<GenerateIdentityResult> {
-  const geminiKey = process.env.GEMINI_API_KEY?.trim();
-  if (geminiKey && !geminiKey.startsWith('mock_')) {
-    const geminiIdentity = await callGeminiIdentity(trendPrompt, geminiKey);
-    if (geminiIdentity) {
-      return { identity: geminiIdentity, provider: 'gemini' };
-    }
-  }
-
+  const primaryPref = (process.env.AI_PRIMARY_PROVIDER || 'byteplus').trim().toLowerCase();
   const arkKey = process.env.BYTEDANCE_ARK_API_KEY?.trim();
   const arkEndpoint = process.env.BYTEDANCE_MODEL_ENDPOINT?.trim();
   const arkBaseUrl = process.env.BYTEDANCE_BASE_URL?.trim();
-  if (arkKey && arkEndpoint && arkBaseUrl) {
+  const geminiKey = process.env.GEMINI_API_KEY?.trim();
+
+  const tryBytePlus = async (): Promise<GenerateIdentityResult | null> => {
+    if (!arkKey || !arkEndpoint || !arkBaseUrl || arkKey.startsWith('mock_')) return null;
     const arkIdentity = await callByteDanceIdentity(trendPrompt, arkKey, arkEndpoint, arkBaseUrl);
-    if (arkIdentity) {
-      return { identity: arkIdentity, provider: 'bytedance-modelark' };
-    }
+    return arkIdentity ? { identity: arkIdentity, provider: 'bytedance-modelark' } : null;
+  };
+
+  const tryGemini = async (): Promise<GenerateIdentityResult | null> => {
+    if (!geminiKey || geminiKey.startsWith('mock_')) return null;
+    const geminiIdentity = await callGeminiIdentity(trendPrompt, geminiKey);
+    return geminiIdentity ? { identity: geminiIdentity, provider: 'gemini' } : null;
+  };
+
+  const order = primaryPref === 'gemini' ? [tryGemini, tryBytePlus] : [tryBytePlus, tryGemini];
+  for (const attempt of order) {
+    const res = await attempt();
+    if (res) return res;
   }
 
   return {
@@ -229,29 +238,89 @@ export async function generateTokenIdentityFromTrend(
 }
 
 /**
- * Generates a 512x512 PNG logo buffer via Pollinations.ai (memory-only, zero fs).
- * Falls back to a valid PNG buffer on timeout or network failure.
+ * Pure deterministic request builder for BytePlus ModelArk Seedream Image Generation API
+ * (POST /api/v3/images/generations). Uses b64_json to eliminate secondary URL fetches / SSRF.
+ */
+export function buildSeedreamImageRequestPayload(params: {
+  endpoint: string;
+  imagePrompt: string;
+}): Record<string, unknown> {
+  const cleanPrompt = String(params.imagePrompt || '')
+    .replace(/[\x00-\x1F\x7F]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 380);
+  return {
+    model: params.endpoint.trim(),
+    prompt: `${cleanPrompt || 'minimalist futuristic crypto token emblem'}, crypto token logo, minimalist, high quality, centered, clean vector style`,
+    size: '1024x1024',
+    response_format: 'b64_json',
+    watermark: false,
+  };
+}
+
+async function callBytePlusSeedreamLogo(
+  imagePrompt: string,
+  apiKey: string,
+  endpoint: string,
+  baseUrl: string
+): Promise<Buffer | null> {
+  try {
+    const res = await fetch(`${baseUrl.replace(/\/+$/, '')}/images/generations`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(buildSeedreamImageRequestPayload({ endpoint, imagePrompt })),
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { data?: Array<{ b64_json?: string }> };
+    const b64 = json?.data?.[0]?.b64_json?.trim();
+    if (!b64) return null;
+    const buf = Buffer.from(b64, 'base64');
+    return buf.length >= 64 ? buf : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Generates a token logo PNG buffer (memory-only, zero fs).
+ * Priority: BytePlus Seedream (BYTEDANCE_IMAGE_ENDPOINT) -> Pollinations.ai -> deterministic fallback.
  */
 export async function generateTokenLogoBuffer(
   imagePrompt: string,
   _tokenName: string
-): Promise<{ buffer: Buffer; isFallback: boolean }> {
+): Promise<{ buffer: Buffer; isFallback: boolean; provider: LogoImageProvider }> {
+  const arkKey = process.env.BYTEDANCE_ARK_API_KEY?.trim();
+  const imageEndpoint = process.env.BYTEDANCE_IMAGE_ENDPOINT?.trim();
+  const arkBaseUrl = process.env.BYTEDANCE_BASE_URL?.trim();
+
+  if (arkKey && imageEndpoint && arkBaseUrl && !arkKey.startsWith('mock_')) {
+    const seedreamBuf = await callBytePlusSeedreamLogo(imagePrompt, arkKey, imageEndpoint, arkBaseUrl);
+    if (seedreamBuf) {
+      return { buffer: seedreamBuf, isFallback: false, provider: 'bytedance-seedream' };
+    }
+  }
+
   const fullPrompt = `${imagePrompt.slice(0, 400)}, crypto token logo, minimalist, high quality, centered`;
   const url = `${POLLINATIONS_BASE_URL}/${encodeURIComponent(fullPrompt)}?width=512&height=512&seed=${Date.now()}&nologo=true`;
 
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(25000) });
     if (!res.ok) {
-      return { buffer: FALLBACK_LOGO_PNG_BUFFER, isFallback: true };
+      return { buffer: FALLBACK_LOGO_PNG_BUFFER, isFallback: true, provider: 'deterministic-fallback' };
     }
     const arrayBuffer = await res.arrayBuffer();
     const buf = Buffer.from(arrayBuffer);
     if (buf.length < 64) {
-      return { buffer: FALLBACK_LOGO_PNG_BUFFER, isFallback: true };
+      return { buffer: FALLBACK_LOGO_PNG_BUFFER, isFallback: true, provider: 'deterministic-fallback' };
     }
-    return { buffer: buf, isFallback: false };
+    return { buffer: buf, isFallback: false, provider: 'pollinations' };
   } catch {
-    return { buffer: FALLBACK_LOGO_PNG_BUFFER, isFallback: true };
+    return { buffer: FALLBACK_LOGO_PNG_BUFFER, isFallback: true, provider: 'deterministic-fallback' };
   }
 }
 
