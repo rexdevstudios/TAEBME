@@ -21,6 +21,7 @@ export type CopilotIntentKind =
   | 'CEX_LIMIT_ORDER'
   | 'CEX_MARKET_ORDER'
   | 'BANKR_PROMPT'
+  | 'TRANSFER_OWNED'
   | 'GENERAL_MARKET';
 
 export type CopilotAccountRail = 'BINANCE' | 'BYBIT' | 'BANKR' | 'PAPER_SIM';
@@ -53,14 +54,92 @@ export interface CopilotDeployerFeeSummary {
 }
 
 export interface CopilotActionDraft {
-  kind: 'CEX_LIMIT_ORDER' | 'CEX_MARKET_ORDER' | 'BANKR_PROMPT';
+  kind: 'CEX_LIMIT_ORDER' | 'CEX_MARKET_ORDER' | 'BANKR_PROMPT' | 'TRANSFER_OWNED';
   symbol: string;
   side: 'BUY' | 'SELL';
   orderType: 'LIMIT' | 'MARKET';
   limitPrice?: number;
   amountUsd: number;
   bankrPrompt?: string;
+  verifiedDestination?: string;
   supportedRails: CopilotAccountRail[];
+}
+
+export interface OwnedTransferValidationResult {
+  isTransferCommand: boolean;
+  allowed: boolean;
+  code?: 'TRANSFER_DESTINATION_NOT_WHITELISTED' | 'TRANSFER_DESTINATION_REQUIRED';
+  blockedAddress?: string;
+  verifiedDestination?: string;
+  reason?: string;
+}
+
+const TRANSFER_COMMAND_REGEX =
+  /\b(transfer|send|kirim|kirimkan|withdraw|tarik|pindahkan|move\s+funds|sweep)\b/i;
+
+const OWN_WALLET_ALIAS_REGEX =
+  /\b(my\s+wallet|own\s+wallet|wallet\s+saya|dompet\s+saya|akun\s+utama|wallet\s+utama)\b/i;
+
+const EVM_ADDRESS_GLOBAL_REGEX = /\b0x[a-fA-F0-9]{40}\b/g;
+
+/**
+ * Pure, deterministic 3-Zone Owned-Wallet Transfer Allowlist Guard (Phase EF).
+ * - Non-transfer prompts pass untouched (`isTransferCommand: false, allowed: true`).
+ * - Transfer/withdraw prompts MUST target only verified owned wallets (e.g., SIWE session wallet).
+ * - Any external/unregistered 0x address is hard-blocked (`TRANSFER_DESTINATION_NOT_WHITELISTED`).
+ */
+export function validateOwnedWalletTransferPrompt(
+  prompt: string,
+  ownedWallets: readonly string[]
+): OwnedTransferValidationResult {
+  const clean = typeof prompt === 'string' ? prompt.trim() : '';
+  if (!TRANSFER_COMMAND_REGEX.test(clean)) {
+    return { isTransferCommand: false, allowed: true };
+  }
+
+  const normalizedOwned = new Set(
+    (ownedWallets || [])
+      .map((w) => String(w || '').trim().toLowerCase())
+      .filter((w) => /^0x[a-f0-9]{40}$/.test(w))
+  );
+
+  const foundAddresses = Array.from(clean.matchAll(EVM_ADDRESS_GLOBAL_REGEX)).map((m) => m[0]);
+
+  if (foundAddresses.length === 0) {
+    if (OWN_WALLET_ALIAS_REGEX.test(clean) && normalizedOwned.size > 0) {
+      const primaryOwned = Array.from(normalizedOwned)[0];
+      return {
+        isTransferCommand: true,
+        allowed: true,
+        verifiedDestination: primaryOwned,
+      };
+    }
+    return {
+      isTransferCommand: true,
+      allowed: false,
+      code: 'TRANSFER_DESTINATION_REQUIRED',
+      reason:
+        'TRANSFER_DESTINATION_REQUIRED: Specify your verified owned wallet address (0x...) or "my wallet" for internal transfer.',
+    };
+  }
+
+  for (const addr of foundAddresses) {
+    if (!normalizedOwned.has(addr.toLowerCase())) {
+      return {
+        isTransferCommand: true,
+        allowed: false,
+        code: 'TRANSFER_DESTINATION_NOT_WHITELISTED',
+        blockedAddress: addr,
+        reason: `TRANSFER_DESTINATION_NOT_WHITELISTED: Destination ${addr} is not in your verified owned-wallet allowlist. External transfers must be signed directly in your personal wallet.`,
+      };
+    }
+  }
+
+  return {
+    isTransferCommand: true,
+    allowed: true,
+    verifiedDestination: foundAddresses[0].toLowerCase(),
+  };
 }
 
 export interface ParsedCopilotIntent {
@@ -169,6 +248,30 @@ export function parseCopilotUserMessage(rawMessage: unknown): ParsedCopilotInten
     if (Number.isFinite(parsed) && parsed > 0) {
       limitPrice = parsed;
     }
+  }
+
+  // 0. Owned-Wallet Transfer / Withdraw command (strictly gated by Owned-Wallet Allowlist on server)
+  if (TRANSFER_COMMAND_REGEX.test(lower)) {
+    const firstAddrMatch = raw.match(/\b0x[a-fA-F0-9]{40}\b/);
+    const actionDraft: CopilotActionDraft = {
+      kind: 'TRANSFER_OWNED',
+      symbol,
+      side: 'SELL',
+      orderType: 'MARKET',
+      amountUsd,
+      bankrPrompt: raw,
+      verifiedDestination: firstAddrMatch ? firstAddrMatch[0].toLowerCase() : undefined,
+      supportedRails: ['BANKR'],
+    };
+    return {
+      valid: true,
+      kind: 'TRANSFER_OWNED',
+      symbol,
+      side: 'SELL',
+      amountUsd,
+      sanitizedMessage: raw,
+      actionDraft,
+    };
   }
 
   // 1. Bankr Agent natural-language command
@@ -434,6 +537,12 @@ export function buildDeterministicCopilotReply(params: {
 
   if (params.intent.actionDraft) {
     const d = params.intent.actionDraft;
+    if (d.kind === 'TRANSFER_OWNED') {
+      const destLabel = d.verifiedDestination || 'verified owned wallet';
+      return isId
+        ? `Draft Transfer Internal (VERIFIED OWNED WALLET) ke ${destLabel} siap ($${d.amountUsd}/akun). Pilih akun Bankr API sumber di kartu konfirmasi lalu klik Confirm.`
+        : `Internal Transfer draft (VERIFIED OWNED WALLET) to ${destLabel} is ready ($${d.amountUsd}/account). Select source Bankr API account(s) below and click Confirm.`;
+    }
     if (d.kind === 'BANKR_PROMPT') {
       return isId
         ? `Perintah Bankr Agent siap: "${d.bankrPrompt}". Pilih akun Bankr API yang ingin digunakan di kartu konfirmasi di bawah lalu klik Confirm.`

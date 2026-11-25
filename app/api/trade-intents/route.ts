@@ -8,6 +8,7 @@ import {
   saveTradeIntent,
   listUserRecentTradeIntents,
   confirmUserDexTradeIntentSettlement,
+  cancelUserPendingTradeIntent,
   defaultKillSwitchDbAdapter,
   defaultBillingDbAdapter,
   defaultProviderKeyVaultAdapter,
@@ -251,6 +252,81 @@ export async function PATCH(req: NextRequest) {
     const isNotFound = msg.includes('TRADE_INTENT_NOT_FOUND_OR_FORBIDDEN');
     const isBadReq =
       msg.includes('INVALID_') || msg.includes('UNSUPPORTED_DEX_SETTLEMENT_CHAIN');
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: isNotFound ? 'NOT_FOUND' : isBadReq ? 'BAD_REQUEST' : 'SERVER_ERROR',
+          message: msg,
+        },
+        timestamp: new Date().toISOString(),
+      },
+      { status: isNotFound ? 404 : isBadReq ? 400 : 500 }
+    );
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const ip = req.headers.get('x-forwarded-for') || '127.0.0.1';
+    const rateCheck = await rateLimiter.checkRateLimit(`ratelimit:trade:cancel:${ip}`, 30, 60);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: { code: 'TOO_MANY_REQUESTS', message: 'Cancel intent rate limit exceeded.' },
+          timestamp: new Date().toISOString(),
+        },
+        { status: 429 }
+      );
+    }
+
+    let auth;
+    try {
+      auth = await requireCapability(req, 'TRADE_MANUALLY');
+    } catch (authErr: unknown) {
+      const msg = authErr instanceof Error ? authErr.message : String(authErr);
+      const isForbidden = msg.startsWith('RBAC_FORBIDDEN') || msg.startsWith('AUTH_ACCOUNT_');
+      return NextResponse.json(
+        {
+          success: false,
+          error: { code: isForbidden ? 'FORBIDDEN' : 'UNAUTHORIZED', message: msg },
+          timestamp: new Date().toISOString(),
+        },
+        { status: isForbidden ? 403 : 401 }
+      );
+    }
+
+    const { searchParams } = new URL(req.url);
+    const tradeIntentId = (searchParams.get('tradeIntentId') || '').trim();
+    if (!tradeIntentId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: { code: 'BAD_REQUEST', message: 'tradeIntentId query param is required.' },
+          timestamp: new Date().toISOString(),
+        },
+        { status: 400 }
+      );
+    }
+
+    const cancelled = await cancelUserPendingTradeIntent({
+      userIdentifier: auth.user.userId,
+      tradeIntentId,
+    });
+
+    return NextResponse.json(
+      {
+        success: true,
+        data: cancelled,
+        timestamp: new Date().toISOString(),
+      },
+      { status: 200 }
+    );
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'TRADE_INTENT_CANCEL_FAILED';
+    const isNotFound = msg.includes('TRADE_INTENT_NOT_FOUND_OR_NOT_CANCELLABLE');
+    const isBadReq = msg.includes('INVALID_');
     return NextResponse.json(
       {
         success: false,

@@ -963,6 +963,71 @@ export async function confirmUserDexTradeIntentSettlement(params: {
   };
 }
 
+/**
+ * Cancels a pending/approved trade intent strictly scoped to the authenticated user (Phase EF).
+ * - Anti-IDOR: only cancels intents owned by `userIdentifier` with status `APPROVED` or `PENDING_RISK`.
+ * - Appends an immutable `audit_logs` record (`TRADE_INTENT_CANCELLED`).
+ */
+export async function cancelUserPendingTradeIntent(params: {
+  userIdentifier: string;
+  tradeIntentId: string;
+}): Promise<{ tradeIntentId: string; status: 'CANCELLED' }> {
+  const intentId = String(params.tradeIntentId || '').trim();
+  if (!intentId) {
+    throw new Error('INVALID_TRADE_INTENT_ID');
+  }
+
+  const pool = getDbPool();
+  if (pool) {
+    const validUserId = await ensureUserEntity(pool, params.userIdentifier);
+    const res = await pool.query(
+      `UPDATE trade_intents
+       SET status = 'CANCELLED'
+       WHERE id = $1
+         AND user_id = $2
+         AND status IN ('APPROVED', 'PENDING_RISK')
+       RETURNING id`,
+      [intentId, validUserId]
+    );
+    if (res.rowCount === 0) {
+      throw new Error('TRADE_INTENT_NOT_FOUND_OR_NOT_CANCELLABLE');
+    }
+    await pool
+      .query(
+        `INSERT INTO audit_logs (actor_id, action, entity_id, reason, created_at)
+         VALUES ($1, 'TRADE_INTENT_CANCELLED', $2, $3, NOW())`,
+        [validUserId, isUuid(intentId) ? intentId : null, `User cancelled pending trade intent ${intentId}`]
+      )
+      .catch(() => {});
+  } else {
+    const normUser = (params.userIdentifier || '').trim().toLowerCase();
+    const memMatch = defaultBinanceExecutionDbAdapter
+      .getInMemoryIntents()
+      .find(
+        (i) =>
+          i.id === intentId &&
+          (i.userId || '').trim().toLowerCase() === normUser &&
+          (i.status === 'APPROVED' || i.status === 'PENDING_RISK')
+      );
+    if (!memMatch) {
+      throw new Error('TRADE_INTENT_NOT_FOUND_OR_NOT_CANCELLABLE');
+    }
+    memMatch.status = 'CANCELLED';
+  }
+
+  const memMirror = defaultBinanceExecutionDbAdapter
+    .getInMemoryIntents()
+    .find((i) => i.id === intentId);
+  if (memMirror && (memMirror.status === 'APPROVED' || memMirror.status === 'PENDING_RISK')) {
+    memMirror.status = 'CANCELLED';
+  }
+
+  return {
+    tradeIntentId: intentId,
+    status: 'CANCELLED',
+  };
+}
+
 export function resetDbStateForTesting(): void {
   defaultBinanceExecutionDbAdapter.clearInMemoryState();
   defaultKillSwitchDbAdapter.clearKillSwitches();

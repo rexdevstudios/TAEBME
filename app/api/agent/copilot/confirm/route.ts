@@ -26,6 +26,7 @@ import {
 } from '@packages/launchpad/bankr-client';
 import {
   computeMultiAccountExposureCheck,
+  validateOwnedWalletTransferPrompt,
   type CopilotAccountRail,
   type CopilotActionDraft,
 } from '@packages/agent/copilot-engine';
@@ -88,6 +89,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Defense-in-depth 3-Zone Transfer Allowlist Guard (Phase EF)
+    if (draft.kind === 'TRANSFER_OWNED' || draft.kind === 'BANKR_PROMPT') {
+      const transferGuard = validateOwnedWalletTransferPrompt(String(draft.bankrPrompt || ''), [
+        auth.walletAddress.toLowerCase(),
+      ]);
+      if (!transferGuard.allowed) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: transferGuard.reason || 'TRANSFER_DESTINATION_NOT_WHITELISTED',
+            code: transferGuard.code,
+            timestamp: new Date().toISOString(),
+          },
+          { status: 403 }
+        );
+      }
+    }
+
     const selected = rawSelected
       .filter(
         (a) =>
@@ -130,7 +149,7 @@ export async function POST(req: NextRequest) {
     const tsBucket = Math.floor(Date.now() / 1000);
 
     for (const acct of selected) {
-      if (draft.kind === 'BANKR_PROMPT') {
+      if (draft.kind === 'BANKR_PROMPT' || draft.kind === 'TRANSFER_OWNED') {
         if (acct.rail !== 'BANKR') {
           results.push({ accountId: acct.id, rail: acct.rail, status: 'REJECTED', detail: 'Non-Bankr account skipped for Bankr prompt.' });
           continue;

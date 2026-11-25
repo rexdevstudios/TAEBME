@@ -373,9 +373,23 @@ async function runFullTestnetUsecase() {
       }),
     });
     const copilotConfirmJson: any = await copilotConfirmRes.json();
+    const copilotIntentId = copilotConfirmJson?.data?.results?.[0]?.referenceId;
     assert(
       copilotConfirmRes.status === 200 && copilotConfirmJson?.data?.queuedOrDispatchedCount === 1,
       `POST /api/agent/copilot/confirm queued PAPER_SIM LIMIT intent (HTTP ${copilotConfirmRes.status})`
+    );
+
+    const cancelIntentRes = await fetch(
+      `${BASE_URL}/api/trade-intents?tradeIntentId=${encodeURIComponent(String(copilotIntentId || ''))}`,
+      {
+        method: 'DELETE',
+        headers: authHeaders(),
+      }
+    );
+    const cancelIntentJson: any = await cancelIntentRes.json();
+    assert(
+      cancelIntentRes.status === 200 && cancelIntentJson?.data?.status === 'CANCELLED',
+      `DELETE /api/trade-intents cancelled pending Copilot PAPER_SIM intent (HTTP ${cancelIntentRes.status})`
     );
 
     // =========================================================================

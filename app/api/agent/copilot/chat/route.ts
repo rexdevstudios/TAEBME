@@ -34,6 +34,7 @@ import {
   buildDeterministicCopilotReply,
   filterTopMoversByPercent,
   parseCopilotUserMessage,
+  validateOwnedWalletTransferPrompt,
   type CopilotConnectedAccount,
   type CopilotDeployerFeeSummary,
 } from '@packages/agent/copilot-engine';
@@ -170,6 +171,29 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const ownedWallets = [session.walletAddress.toLowerCase()];
+
+    // 3-Zone Transfer Allowlist Guard (Phase EF): hard-block external/unregistered destination transfers
+    const transferGuard = validateOwnedWalletTransferPrompt(parsed.sanitizedMessage, ownedWallets);
+    if (!transferGuard.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: transferGuard.reason || 'TRANSFER_DESTINATION_NOT_WHITELISTED',
+          code: transferGuard.code,
+          timestamp: new Date().toISOString(),
+        },
+        { status: 403 }
+      );
+    }
+
+    if (parsed.actionDraft && parsed.actionDraft.kind === 'TRANSFER_OWNED' && transferGuard.verifiedDestination) {
+      parsed.actionDraft.verifiedDestination = transferGuard.verifiedDestination;
+      if (!parsed.actionDraft.bankrPrompt?.toLowerCase().includes(transferGuard.verifiedDestination)) {
+        parsed.actionDraft.bankrPrompt = `${parsed.sanitizedMessage} (verified destination: ${transferGuard.verifiedDestination})`;
+      }
+    }
+
     const symbols = TOP_LIQUID_CEX_PAIRS.map((p) => p.symbol);
     const pool = getDbPool();
 
@@ -228,6 +252,12 @@ export async function POST(req: NextRequest) {
 
     const reply = llmSummary ? `${deterministicReply}\n\nAI Insight: ${llmSummary}` : deterministicReply;
     const killSwitchActive = activeKillSwitches.some((ks) => ks.isActive);
+    const railSummary = {
+      paperSim: true,
+      binanceCount: accounts.filter((a) => a.rail === 'BINANCE').length,
+      bybitCount: accounts.filter((a) => a.rail === 'BYBIT').length,
+      bankrCount: accounts.filter((a) => a.rail === 'BANKR').length,
+    };
 
     return NextResponse.json(
       {
@@ -245,6 +275,8 @@ export async function POST(req: NextRequest) {
           },
           actionDraft: parsed.actionDraft || null,
           availableAccounts: accounts,
+          ownedWallets,
+          railSummary,
           riskLimits: {
             maxOrderValueUsd: platformCfg?.maxOrderValueUsd ?? 1000,
             maxDailyLossUsd: platformCfg?.maxDailyLossUsd ?? 5000,

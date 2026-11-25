@@ -20,6 +20,7 @@ import {
   submitBankrAgentPrompt,
   validateBankrAgentPromptInput,
 } from '@packages/launchpad/bankr-client';
+import { validateOwnedWalletTransferPrompt } from '@packages/agent/copilot-engine';
 
 export const dynamic = 'force-dynamic';
 
@@ -91,6 +92,20 @@ export async function POST(req: NextRequest) {
           timestamp: new Date().toISOString(),
         },
         { status: 400 }
+      );
+    }
+
+    // 3-Zone Transfer Allowlist Guard (Phase EF): block external/unregistered 0x transfers via AI Agent
+    const transferGuard = validateOwnedWalletTransferPrompt(check.sanitizedPrompt, [session.walletAddress]);
+    if (!transferGuard.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: transferGuard.reason || 'TRANSFER_DESTINATION_NOT_WHITELISTED',
+          code: transferGuard.code,
+          timestamp: new Date().toISOString(),
+        },
+        { status: 403 }
       );
     }
 

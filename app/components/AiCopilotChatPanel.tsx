@@ -1,12 +1,33 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
-import { Bot, Mic, MicOff, Send, ShieldCheck, CheckSquare, Square } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Bot, Mic, MicOff, Send, ShieldCheck, CheckSquare, Square, Trash2, ListOrdered, XCircle } from 'lucide-react';
 import { useLocale } from '../context/LocaleContext';
 import type {
   CopilotActionDraft,
   CopilotConnectedAccount,
 } from '@packages/agent/copilot-engine';
+
+const COPILOT_HISTORY_STORAGE_KEY = 'poolnet:copilot:history:v1';
+
+interface CopilotRecentIntent {
+  id: string;
+  stage: string;
+  symbol: string;
+  side: string;
+  type: string;
+  quantity: number;
+  price?: number;
+  status: string;
+  createdAt?: string;
+}
+
+interface CopilotRailSummary {
+  paperSim: boolean;
+  binanceCount: number;
+  bybitCount: number;
+  bankrCount: number;
+}
 
 interface CopilotMessage {
   id: string;
@@ -36,7 +57,87 @@ export function AiCopilotChatPanel({ isConnected }: AiCopilotChatPanelProps) {
   const [voiceNotice, setVoiceNotice] = useState<string | null>(null);
   const [selectedByMsg, setSelectedByMsg] = useState<Record<string, string[]>>({});
   const [confirmingMsgId, setConfirmingMsgId] = useState<string | null>(null);
+  const [railSummary, setRailSummary] = useState<CopilotRailSummary>({
+    paperSim: true,
+    binanceCount: 0,
+    bybitCount: 0,
+    bankrCount: 0,
+  });
+  const [showOrdersDrawer, setShowOrdersDrawer] = useState(false);
+  const [recentIntents, setRecentIntents] = useState<CopilotRecentIntent[]>([]);
+  const [loadingIntents, setLoadingIntents] = useState(false);
+  const [cancellingIntentId, setCancellingIntentId] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const saved = window.localStorage.getItem(COPILOT_HISTORY_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          setMessages(parsed.slice(-20));
+        }
+      }
+    } catch {
+      // ignore corrupt storage
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      if (messages.length === 0) {
+        window.localStorage.removeItem(COPILOT_HISTORY_STORAGE_KEY);
+      } else {
+        window.localStorage.setItem(COPILOT_HISTORY_STORAGE_KEY, JSON.stringify(messages.slice(-20)));
+      }
+    } catch {
+      // ignore storage quota errors
+    }
+  }, [messages]);
+
+  const loadRecentIntents = useCallback(async () => {
+    if (!isConnected) return;
+    setLoadingIntents(true);
+    try {
+      const res = await fetch('/api/trade-intents?limit=6', { credentials: 'same-origin' });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && json?.success && Array.isArray(json.data?.intents)) {
+        setRecentIntents(json.data.intents);
+      }
+    } finally {
+      setLoadingIntents(false);
+    }
+  }, [isConnected]);
+
+  const handleCancelIntent = async (intentId: string) => {
+    setCancellingIntentId(intentId);
+    try {
+      const res = await fetch(`/api/trade-intents?tradeIntentId=${encodeURIComponent(intentId)}`, {
+        method: 'DELETE',
+        credentials: 'same-origin',
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && json?.success) {
+        setRecentIntents((prev) =>
+          prev.map((it) => (it.id === intentId ? { ...it, status: 'CANCELLED' } : it))
+        );
+      } else {
+        setVoiceNotice(`Notice: ${json?.error?.message || `HTTP ${res.status}`}`);
+      }
+    } finally {
+      setCancellingIntentId(null);
+    }
+  };
+
+  const handleClearHistory = () => {
+    setMessages([]);
+    setSelectedByMsg({});
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem(COPILOT_HISTORY_STORAGE_KEY);
+    }
+  };
 
   const quickPrompts = [
     tr('Any token up > 5% today?', 'Ada token naik > 5% hari ini?'),
@@ -118,6 +219,9 @@ export function AiCopilotChatPanel({ isConnected }: AiCopilotChatPanelProps) {
       }
 
       const d = json.data;
+      if (d?.railSummary) {
+        setRailSummary(d.railSummary);
+      }
       const msgId = `a-${Date.now()}`;
       const compatibleAccounts: CopilotConnectedAccount[] = (d.availableAccounts || []).filter(
         (a: CopilotConnectedAccount) =>
@@ -206,6 +310,9 @@ export function AiCopilotChatPanel({ isConnected }: AiCopilotChatPanelProps) {
             : m
         )
       );
+      if (showOrdersDrawer) {
+        void loadRecentIntents();
+      }
     } finally {
       setConfirmingMsgId(null);
     }
@@ -236,10 +343,116 @@ export function AiCopilotChatPanel({ isConnected }: AiCopilotChatPanelProps) {
             )}
           </div>
         </div>
-        <span style={{ fontSize: '10px', fontWeight: 800, fontFamily: 'var(--font-mono)', color: 'var(--color-text-positive)' }}>
-          HUMAN-IN-THE-LOOP · NON-CUSTODIAL
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '10px', fontWeight: 800, fontFamily: 'var(--font-mono)', color: 'var(--color-text-positive)' }}>
+            PAPER_SIM READY · BINANCE {railSummary.binanceCount} · BYBIT {railSummary.bybitCount} · BANKR {railSummary.bankrCount}
+          </span>
+          {isConnected && (
+            <button
+              type="button"
+              onClick={() => {
+                const next = !showOrdersDrawer;
+                setShowOrdersDrawer(next);
+                if (next) void loadRecentIntents();
+              }}
+              className="btn-secondary"
+              style={{ fontSize: '10px', padding: '3px 8px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+            >
+              <ListOrdered size={12} />
+              {tr('Orders', 'Order')}
+            </button>
+          )}
+          {messages.length > 0 && (
+            <button
+              type="button"
+              onClick={handleClearHistory}
+              className="btn-secondary"
+              title={tr('Clear chat history', 'Hapus riwayat chat')}
+              style={{ fontSize: '10px', padding: '3px 8px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+            >
+              <Trash2 size={12} />
+              {tr('Clear', 'Hapus')}
+            </button>
+          )}
+        </div>
       </div>
+
+      {showOrdersDrawer && isConnected && (
+        <div
+          style={{
+            padding: '10px 12px',
+            borderRadius: '8px',
+            border: '1px solid var(--color-border)',
+            backgroundColor: 'var(--color-surface-elevated)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '6px',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', fontWeight: 800, fontFamily: 'var(--font-mono)' }}>
+            <span>{tr('Recent Copilot & Trade Intents (SSOT)', 'Order & Intent Terbaru (SSOT)')}</span>
+            <button
+              type="button"
+              onClick={() => void loadRecentIntents()}
+              disabled={loadingIntents}
+              className="btn-secondary"
+              style={{ fontSize: '10px', padding: '2px 7px' }}
+            >
+              {loadingIntents ? tr('Loading...', 'Memuat...') : tr('Refresh', 'Muat Ulang')}
+            </button>
+          </div>
+          {recentIntents.length === 0 ? (
+            <div className="text-muted" style={{ fontSize: '11px' }}>
+              {tr('No recent trade intents found.', 'Belum ada trade intent terbaru.')}
+            </div>
+          ) : (
+            recentIntents.map((it) => {
+              const cancellable = it.status === 'APPROVED' || it.status === 'PENDING_RISK';
+              return (
+                <div
+                  key={it.id}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '6px 8px',
+                    borderRadius: '6px',
+                    border: '1px solid var(--color-border)',
+                    backgroundColor: 'var(--color-panel)',
+                    fontSize: '11px',
+                    fontFamily: 'var(--font-mono)',
+                  }}
+                >
+                  <span>
+                    [{it.stage}] {it.type} {it.side} {it.symbol} (${it.quantity}
+                    {it.price ? ` @ $${it.price}` : ''}) · <strong>{it.status}</strong>
+                  </span>
+                  {cancellable && (
+                    <button
+                      type="button"
+                      disabled={cancellingIntentId === it.id}
+                      onClick={() => void handleCancelIntent(it.id)}
+                      className="btn-secondary"
+                      style={{
+                        fontSize: '10px',
+                        padding: '2px 7px',
+                        color: 'var(--color-destructive)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '3px',
+                      }}
+                    >
+                      <XCircle size={11} />
+                      {cancellingIntentId === it.id ? '...' : tr('Cancel', 'Batalkan')}
+                    </button>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
         {quickPrompts.map((qp) => (
@@ -356,7 +569,9 @@ export function AiCopilotChatPanel({ isConnected }: AiCopilotChatPanelProps) {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
                       <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-text-positive)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                         <ShieldCheck size={13} />
-                        {tr('Multi-Account Execution Confirmation', 'Konfirmasi Eksekusi Multi-Akun')}
+                        {m.actionDraft.kind === 'TRANSFER_OWNED'
+                          ? tr('VERIFIED OWNED WALLET · Transfer Confirmation', 'VERIFIED OWNED WALLET · Konfirmasi Transfer')
+                          : tr('Multi-Account Execution Confirmation', 'Konfirmasi Eksekusi Multi-Akun')}
                       </span>
                       {(m.availableAccounts || []).length > 1 && (
                         <button
