@@ -24,6 +24,8 @@ export async function POST(req: NextRequest) {
     const suggestedQty = Number(body.suggestedQty) > 0 ? Number(body.suggestedQty) : 100;
     const userId = auth.user.userId;
     const agentId = body.agentId && typeof body.agentId === 'string' ? body.agentId : 'agent-alpha';
+    const locale = body.locale === 'id' ? 'id' : 'en';
+    const thinkingMode = body.thinkingMode === 'deep' ? 'deep' : 'fast';
 
     // 2. Fetch DefiLlama macro signal, SSOT platform config & Verified KOL signals in parallel (non-blocking)
     const [macroResult, platformCfgResult, kolSignalsResult] = await Promise.allSettled([
@@ -68,6 +70,9 @@ export async function POST(req: NextRequest) {
       symbol,
       action,
       suggestedQty,
+      locale,
+      thinkingMode,
+      kolConsensus,
     }).catch(() => null);
 
     let remainingCredits: number | undefined;

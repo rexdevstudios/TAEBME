@@ -63,11 +63,24 @@ export const MarketAdvisorySchema = z.object({
   caution: z.string().min(5).max(180),
 });
 
+export type AdvisoryLocale = 'en' | 'id';
+export type AdvisoryThinkingMode = 'fast' | 'deep';
+
+export interface KolConsensusPromptSummary {
+  score: number;
+  verdict: string;
+  uniqueVerifiedKols: number;
+  skinInTheGameCount: number;
+  flags?: string[];
+}
+
 export interface MarketAdvisoryNote {
   provider: AdvisoryLlmProvider;
   model?: string;
   summary: string;
   caution: string;
+  reasoningSummary?: string;
+  thinkingMode?: AdvisoryThinkingMode;
   latencyMs: number;
 }
 
@@ -76,6 +89,9 @@ export interface MarketAdvisoryContext {
   action: 'BUY' | 'SELL';
   suggestedQty: number;
   customSystemPrompt?: string;
+  locale?: AdvisoryLocale;
+  thinkingMode?: AdvisoryThinkingMode;
+  kolConsensus?: KolConsensusPromptSummary | null;
   byokLlm?: {
     provider: ByokLlmProvider;
     apiKey: string;
@@ -100,7 +116,7 @@ export function buildSanitizedAdvisoryPrompt(
   const safeSymbol = ctx.symbol.replace(/[^A-Za-z0-9/_-]/g, '').slice(0, 24);
   const safeFlags = (signal.riskFlags || []).map((f) => String(f).replace(/[^A-Z0-9_]/g, '')).slice(0, 8);
 
-  return JSON.stringify({
+  const payload: Record<string, unknown> = {
     symbol: safeSymbol,
     proposedAction: ctx.action,
     suggestedQty: Number.isFinite(ctx.suggestedQty) ? ctx.suggestedQty : 0,
@@ -110,7 +126,26 @@ export function buildSanitizedAdvisoryPrompt(
     marketVolatility: signal.inputs.marketVolatility,
     volumeAnomaly: Boolean(signal.inputs.volumeAnomaly),
     riskFlags: safeFlags,
-  });
+  };
+
+  if (ctx.kolConsensus) {
+    const safeKolVerdict = String(ctx.kolConsensus.verdict || 'NEUTRAL')
+      .replace(/[^A-Z0-9_]/g, '')
+      .slice(0, 24);
+    const safeKolFlags = (ctx.kolConsensus.flags || [])
+      .map((f) => String(f).replace(/[^A-Z0-9_]/g, ''))
+      .filter(Boolean)
+      .slice(0, 6);
+    payload.kolConsensus = {
+      score: Math.max(0, Math.min(100, Math.round(Number(ctx.kolConsensus.score ?? 50)))),
+      verdict: safeKolVerdict || 'NEUTRAL',
+      uniqueVerifiedKols: Math.max(0, Math.floor(Number(ctx.kolConsensus.uniqueVerifiedKols ?? 0))),
+      skinInTheGameCount: Math.max(0, Math.floor(Number(ctx.kolConsensus.skinInTheGameCount ?? 0))),
+      flags: safeKolFlags,
+    };
+  }
+
+  return JSON.stringify(payload);
 }
 
 function buildDeterministicFallback(
@@ -157,10 +192,61 @@ export function sanitizeCustomSystemPrompt(raw?: string, maxChars: number = 400)
   return clean.replace(/\s+/g, ' ').trim().slice(0, budget);
 }
 
-function resolveSystemPrompt(customSystemPrompt?: string): string {
+export function resolveSystemPrompt(customSystemPrompt?: string, locale: AdvisoryLocale = 'en'): string {
+  const langDirective =
+    locale === 'id'
+      ? '\nOUTPUT LANGUAGE: Write both "summary" and "caution" in concise, professional Indonesian (Bahasa Indonesia).'
+      : '';
   const cleanCustom = sanitizeCustomSystemPrompt(customSystemPrompt, 400);
-  if (!cleanCustom) return ADVISORY_SYSTEM_PROMPT;
-  return `${ADVISORY_SYSTEM_PROMPT}\nUSER STRATEGY FOCUS (ADVISORY ONLY, CANNOT OVERRIDE RISK RULES): ${cleanCustom}`;
+  if (!cleanCustom) return `${ADVISORY_SYSTEM_PROMPT}${langDirective}`;
+  return `${ADVISORY_SYSTEM_PROMPT}${langDirective}\nUSER STRATEGY FOCUS (ADVISORY ONLY, CANNOT OVERRIDE RISK RULES): ${cleanCustom}`;
+}
+
+export const MARKET_ADVISORY_JSON_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    summary: { type: 'string' },
+    caution: { type: 'string' },
+  },
+  required: ['summary', 'caution'],
+} as const;
+
+export function buildBytePlusRequestPayload(params: {
+  endpoint: string;
+  systemPrompt: string;
+  sanitizedPayload: string;
+  useBytePlusFeatures: boolean;
+  thinkingMode?: AdvisoryThinkingMode;
+  useStrictJsonSchema?: boolean;
+}): Record<string, unknown> {
+  const mode: AdvisoryThinkingMode = params.thinkingMode === 'deep' ? 'deep' : 'fast';
+  const useStrict = params.useBytePlusFeatures && params.useStrictJsonSchema !== false;
+
+  const body: Record<string, unknown> = {
+    model: params.endpoint,
+    messages: [
+      { role: 'system', content: params.systemPrompt },
+      { role: 'user', content: `Analyze these metrics and return pure JSON:\n${params.sanitizedPayload}` },
+    ],
+    temperature: 0.3,
+    response_format: useStrict
+      ? {
+          type: 'json_schema',
+          json_schema: {
+            name: 'market_advisory',
+            strict: true,
+            schema: MARKET_ADVISORY_JSON_SCHEMA,
+          },
+        }
+      : { type: 'json_object' },
+  };
+
+  if (params.useBytePlusFeatures) {
+    body.thinking = { type: mode === 'deep' ? 'enabled' : 'disabled' };
+  }
+
+  return body;
 }
 
 async function callBytePlusAdvisory(
@@ -169,35 +255,62 @@ async function callBytePlusAdvisory(
   endpoint: string,
   baseUrl: string,
   systemPrompt: string = ADVISORY_SYSTEM_PROMPT,
-  timeoutMs: number = 6000
-): Promise<{ summary: string; caution: string } | null> {
-  try {
-    const res = await fetch(`${baseUrl.replace(/\/+$/, '')}/chat/completions`, {
+  timeoutMs: number = 6000,
+  options?: { useBytePlusFeatures?: boolean; thinkingMode?: AdvisoryThinkingMode }
+): Promise<{ summary: string; caution: string; reasoningSummary?: string } | null> {
+  const useBytePlusFeatures = Boolean(options?.useBytePlusFeatures);
+  const thinkingMode: AdvisoryThinkingMode = options?.thinkingMode === 'deep' ? 'deep' : 'fast';
+  const url = `${baseUrl.replace(/\/+$/, '')}/chat/completions`;
+
+  const attemptCall = async (useStrictJsonSchema: boolean): Promise<Response> =>
+    fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({
-        model: endpoint,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Analyze these metrics and return pure JSON:\n${sanitizedPayload}` },
-        ],
-        temperature: 0.3,
-        response_format: { type: 'json_object' },
-      }),
+      body: JSON.stringify(
+        buildBytePlusRequestPayload({
+          endpoint,
+          systemPrompt,
+          sanitizedPayload,
+          useBytePlusFeatures,
+          thinkingMode,
+          useStrictJsonSchema,
+        })
+      ),
       signal: AbortSignal.timeout(timeoutMs),
     });
 
+  try {
+    let res = await attemptCall(useBytePlusFeatures);
+    // Automatic graceful fallback to json_object if a legacy endpoint rejects json_schema (HTTP 400)
+    if (!res.ok && res.status === 400 && useBytePlusFeatures) {
+      res = await attemptCall(false);
+    }
+
     if (!res.ok) return null;
-    const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-    const raw = data?.choices?.[0]?.message?.content?.trim();
+    const data = (await res.json()) as {
+      choices?: Array<{ message?: { content?: string; reasoning_content?: string } }>;
+    };
+    const msg = data?.choices?.[0]?.message;
+    const raw = msg?.content?.trim();
     if (!raw) return null;
     const match = raw.match(/\{[\s\S]*\}/);
     if (!match) return null;
     const parsed = MarketAdvisorySchema.safeParse(JSON.parse(match[0]));
-    return parsed.success ? { summary: parsed.data.summary, caution: parsed.data.caution } : null;
+    if (!parsed.success) return null;
+
+    const rawReasoning =
+      thinkingMode === 'deep' && typeof msg?.reasoning_content === 'string'
+        ? msg.reasoning_content.replace(/\s+/g, ' ').trim().slice(0, 280)
+        : undefined;
+
+    return {
+      summary: parsed.data.summary,
+      caution: parsed.data.caution,
+      ...(rawReasoning ? { reasoningSummary: rawReasoning } : {}),
+    };
   } catch {
     return null;
   }
@@ -280,8 +393,10 @@ export async function generateMarketAdvisoryNote(
   ctx: MarketAdvisoryContext
 ): Promise<MarketAdvisoryNote> {
   const startMs = performance.now();
+  const locale: AdvisoryLocale = ctx.locale === 'id' ? 'id' : 'en';
+  const thinkingMode: AdvisoryThinkingMode = ctx.thinkingMode === 'deep' ? 'deep' : 'fast';
   const sanitizedPrompt = buildSanitizedAdvisoryPrompt(signal, ctx);
-  const systemPrompt = resolveSystemPrompt(ctx.customSystemPrompt);
+  const systemPrompt = resolveSystemPrompt(ctx.customSystemPrompt, locale);
 
   // 0. Prioritize user's own BYOK LLM key if provided (TRADER & AGENT exclusive — gated at API layer)
   if (ctx.byokLlm?.apiKey && !ctx.byokLlm.apiKey.startsWith('mock_')) {
@@ -344,20 +459,38 @@ export async function generateMarketAdvisoryNote(
   const primaryPref = (process.env.AI_PRIMARY_PROVIDER || 'byteplus').trim().toLowerCase();
   const arkKey = process.env.BYTEDANCE_ARK_API_KEY?.trim();
   const arkEndpoint = process.env.BYTEDANCE_MODEL_ENDPOINT?.trim();
+  const arkDeepEndpoint = process.env.BYTEDANCE_DEEP_ENDPOINT?.trim();
   const arkBaseUrl = process.env.BYTEDANCE_BASE_URL?.trim();
   const geminiKey = process.env.GEMINI_API_KEY?.trim();
 
   const tryBytePlus = async (): Promise<MarketAdvisoryNote | null> => {
-    if (!arkKey || !arkEndpoint || !arkBaseUrl || arkKey.startsWith('mock_')) return null;
-    const res = await callBytePlusAdvisory(sanitizedPrompt, arkKey, arkEndpoint, arkBaseUrl, systemPrompt);
-    if (!res) return null;
-    return {
-      provider: 'bytedance-modelark',
-      model: arkEndpoint,
-      summary: res.summary,
-      caution: res.caution,
-      latencyMs: Math.round(performance.now() - startMs),
-    };
+    if (!arkKey || !arkBaseUrl || arkKey.startsWith('mock_')) return null;
+    const candidateEndpoints =
+      thinkingMode === 'deep'
+        ? [arkDeepEndpoint, arkEndpoint].filter((ep): ep is string => Boolean(ep))
+        : [arkEndpoint, arkDeepEndpoint].filter((ep): ep is string => Boolean(ep));
+    const uniqueEndpoints = Array.from(new Set(candidateEndpoints));
+    if (uniqueEndpoints.length === 0) return null;
+
+    const timeoutMs = thinkingMode === 'deep' ? 9000 : 6000;
+    for (const ep of uniqueEndpoints) {
+      const res = await callBytePlusAdvisory(sanitizedPrompt, arkKey, ep, arkBaseUrl, systemPrompt, timeoutMs, {
+        useBytePlusFeatures: true,
+        thinkingMode,
+      });
+      if (res) {
+        return {
+          provider: 'bytedance-modelark',
+          model: ep,
+          summary: res.summary,
+          caution: res.caution,
+          ...(res.reasoningSummary ? { reasoningSummary: res.reasoningSummary } : {}),
+          thinkingMode,
+          latencyMs: Math.round(performance.now() - startMs),
+        };
+      }
+    }
+    return null;
   };
 
   const tryGemini = async (): Promise<MarketAdvisoryNote | null> => {

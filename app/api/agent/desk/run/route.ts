@@ -27,6 +27,10 @@ import {
   generateMarketAdvisoryNote,
   type ByokLlmProvider,
 } from '@packages/intelligence/llm-advisory-client';
+import {
+  computeAntiManipulationKolConsensus,
+  loadVerifiedKolSignalsForSymbol,
+} from '@packages/intelligence/kol-chart-overlay';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,6 +63,8 @@ export async function POST(req: NextRequest) {
     const quantity = Number(body?.quantity ?? 100);
     const maxSlippagePct = Number(body?.maxSlippagePct ?? 1.0);
     const mode = body?.mode === 'LIVE_ADVISORY' ? 'LIVE_ADVISORY' : 'PAPER';
+    const locale = body?.locale === 'id' ? 'id' : 'en';
+    const thinkingMode = body?.thinkingMode === 'deep' ? 'deep' : 'fast';
     const tokenAddress = typeof body?.tokenAddress === 'string' ? body.tokenAddress.trim() : undefined;
     const chainId = body?.chainId !== undefined ? Number(body.chainId) : undefined;
     const dexNetwork = typeof body?.dexNetwork === 'string' ? body.dexNetwork.trim().toLowerCase() : undefined;
@@ -80,7 +86,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const platformCfg = await defaultBillingDbAdapter.getPlatformFeeAndRiskConfig().catch(() => null);
+    const [platformCfg, kolSignals] = await Promise.all([
+      defaultBillingDbAdapter.getPlatformFeeAndRiskConfig().catch(() => null),
+      loadVerifiedKolSignalsForSymbol(getDbPool(), symbol).catch(() => []),
+    ]);
+    const kolConsensus = computeAntiManipulationKolConsensus({
+      tokenSymbol: symbol,
+      signals: kolSignals,
+    });
     const requestedLlm = typeof body?.llmProvider === 'string' ? body.llmProvider.trim().toUpperCase() : 'PLATFORM';
     const requestedLlmModel = typeof body?.llmModel === 'string' ? body.llmModel.trim() : undefined;
     let byokLlm: { provider: ByokLlmProvider; apiKey: string; model?: string } | undefined;
@@ -134,6 +147,9 @@ export async function POST(req: NextRequest) {
           generateMarketAdvisoryNote(sig, {
             ...ctx,
             customSystemPrompt: customAgent?.systemPrompt,
+            locale,
+            thinkingMode,
+            kolConsensus,
             byokLlm,
           }),
       }

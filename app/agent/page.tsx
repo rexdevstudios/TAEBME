@@ -19,7 +19,7 @@ import { TOP_LIQUID_CEX_PAIRS } from '@packages/shared/market-pairs';
 
 export default function AgentPage() {
   const { isConnected, userRole, hasCapability, entitlements, connectMetaMask, isConnecting, refreshSession } = useAuth();
-  const { t, tr } = useLocale();
+  const { t, tr, locale } = useLocale();
   const [connectError, setConnectError] = useState<string | null>(null);
   const [symbol, setSymbol] = useState('BTCUSDT');
   const [action, setAction] = useState<'BUY' | 'SELL'>('BUY');
@@ -120,6 +120,7 @@ export default function AgentPage() {
           action,
           suggestedQty: qty,
           agentId: 'agent-alpha-v1',
+          locale,
         }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);

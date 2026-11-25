@@ -36,7 +36,7 @@ export function FiveAgentDeskPanel({
   selectedLlmProvider = 'PLATFORM',
   selectedLlmModel,
 }: FiveAgentDeskPanelProps) {
-  const { tr } = useLocale();
+  const { locale, tr } = useLocale();
   const { refreshSession } = useAuth();
   const [targetSource, setTargetSource] = useState<'CEX' | 'LAUNCHPAD' | 'EXTERNAL_DEX'>('CEX');
   const [launchpadTokens, setLaunchpadTokens] = useState<any[]>([]);
@@ -44,6 +44,7 @@ export function FiveAgentDeskPanel({
   const [dexNetwork, setDexNetwork] = useState<string>('base');
   const [strategyProfile, setStrategyProfile] = useState<StrategyProfileId>('MOMENTUM_BREAKOUT');
   const [mode, setMode] = useState<'PAPER' | 'LIVE_ADVISORY'>('PAPER');
+  const [thinkingMode, setThinkingMode] = useState<'fast' | 'deep'>('fast');
   const [symbol, setSymbol] = useState(defaultSymbol || 'BTCUSDT');
   const [action, setAction] = useState<'BUY' | 'SELL'>(defaultAction || 'BUY');
   const [quantity, setQuantity] = useState<number>(defaultQty || 100);
@@ -92,6 +93,8 @@ export function FiveAgentDeskPanel({
           quantity,
           maxSlippagePct,
           mode,
+          locale,
+          thinkingMode,
           tokenAddress: effectiveAddr,
           dexNetwork: targetSource === 'CEX' ? undefined : dexNetwork,
           strategyProfile,
@@ -288,6 +291,15 @@ export function FiveAgentDeskPanel({
           <option value="PAPER">PAPER (Auto-Fill Sim)</option>
           <option value="LIVE_ADVISORY">LIVE (Non-Custodial Handoff)</option>
         </select>
+        <select
+          value={thinkingMode}
+          onChange={(e) => setThinkingMode(e.target.value as 'fast' | 'deep')}
+          title={tr('BytePlus ModelArk Thinking Mode', 'Mode Berpikir BytePlus ModelArk')}
+          style={{ padding: '7px 10px', borderRadius: '6px', backgroundColor: 'var(--color-surface-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-foreground)', fontSize: '12px' }}
+        >
+          <option value="fast">{tr('AI: Fast (Seed-1.8)', 'AI: Cepat (Seed-1.8)')}</option>
+          <option value="deep">{tr('AI: Deep Thinking', 'AI: Deep Thinking')}</option>
+        </select>
         <button
           type="button"
           className="btn-primary"
@@ -414,9 +426,15 @@ export function FiveAgentDeskPanel({
               }}
             >
               <div style={{ fontWeight: 800, color: 'var(--color-accent-info)', marginBottom: '4px' }}>
-                AI Narrative Advisory ({report.llmAdvisory.provider} · Advisory Only)
+                AI Narrative Advisory ({report.llmAdvisory.provider}
+                {report.llmAdvisory.thinkingMode ? ` · ${report.llmAdvisory.thinkingMode.toUpperCase()}` : ''} · Advisory Only)
               </div>
-              <div style={{ color: '#E2E8F0', marginBottom: '4px' }}>{report.llmAdvisory.summary}</div>
+              <div style={{ color: 'var(--color-foreground)', marginBottom: '4px' }}>{report.llmAdvisory.summary}</div>
+              {report.llmAdvisory.reasoningSummary && (
+                <div className="text-muted" style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', marginBottom: '4px' }}>
+                  {tr('Reasoning', 'Penalaran')}: {report.llmAdvisory.reasoningSummary}
+                </div>
+              )}
               <div style={{ color: 'var(--color-accent-amber)' }}>{report.llmAdvisory.caution}</div>
             </div>
           )}
