@@ -139,11 +139,19 @@ export async function GET(req: NextRequest) {
 
     if (pool) {
       const pendingRes = await pool.query(
-        `SELECT id, user_id, stage, symbol, side, type, quantity::float AS quantity, price::float AS price, idempotency_key
-         FROM trade_intents
-         WHERE status = 'APPROVED'
-           AND stage IN ('TESTNET', 'LIVE')
-         ORDER BY created_at ASC
+        `SELECT ti.id, ti.user_id, ti.stage, ti.symbol, ti.side, ti.type,
+                ti.quantity::float AS quantity, ti.price::float AS price, ti.idempotency_key
+         FROM trade_intents ti
+         WHERE ti.status = 'APPROVED'
+           AND ti.stage IN ('TESTNET', 'LIVE')
+           AND ti.created_at >= NOW() - INTERVAL '24 hours'
+           AND EXISTS (
+             SELECT 1
+             FROM binance_credentials bc
+             WHERE bc.user_id = ti.user_id
+               AND bc.is_active = true
+           )
+         ORDER BY ti.created_at ASC
          LIMIT $1`,
         [MAX_INTENTS_PER_TICK]
       );

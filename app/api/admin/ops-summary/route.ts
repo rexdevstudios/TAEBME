@@ -69,6 +69,7 @@ export async function GET(req: NextRequest) {
       workerOnline: false,
       mode: 'STANDBY' as 'CLOUDFLARE_CRON' | 'VPS_WORKER' | 'STANDBY',
       pendingExecutionCount: 0,
+      staleUnexecutableCount: 0,
       lastExecutedAt: null as string | null,
       lastPulseAt: null as string | null,
     };
@@ -137,11 +138,30 @@ export async function GET(req: NextRequest) {
           pool
             .query(
               `SELECT
-                 COUNT(*) FILTER (WHERE status = 'APPROVED' AND stage IN ('TESTNET', 'LIVE'))::int AS pending_cnt,
-                 MAX(created_at) FILTER (WHERE status = 'EXECUTED') AS last_exec_at
-               FROM trade_intents`
+                 COUNT(*) FILTER (
+                   WHERE ti.status = 'APPROVED'
+                     AND ti.stage IN ('TESTNET', 'LIVE')
+                     AND ti.created_at >= NOW() - INTERVAL '24 hours'
+                     AND EXISTS (
+                       SELECT 1 FROM binance_credentials bc
+                       WHERE bc.user_id = ti.user_id AND bc.is_active = true
+                     )
+                 )::int AS pending_cnt,
+                 COUNT(*) FILTER (
+                   WHERE ti.status = 'APPROVED'
+                     AND ti.stage IN ('TESTNET', 'LIVE')
+                     AND (
+                       ti.created_at < NOW() - INTERVAL '24 hours'
+                       OR NOT EXISTS (
+                         SELECT 1 FROM binance_credentials bc
+                         WHERE bc.user_id = ti.user_id AND bc.is_active = true
+                       )
+                     )
+                 )::int AS stale_unexec_cnt,
+                 MAX(ti.created_at) FILTER (WHERE ti.status = 'EXECUTED') AS last_exec_at
+               FROM trade_intents ti`
             )
-            .catch(() => ({ rows: [{ pending_cnt: 0, last_exec_at: null }] })),
+            .catch(() => ({ rows: [{ pending_cnt: 0, stale_unexec_cnt: 0, last_exec_at: null }] })),
         ]);
 
         const advisoryLockHeld = Boolean(lockRes.rows[0]?.held);
@@ -154,6 +174,7 @@ export async function GET(req: NextRequest) {
             ? 'VPS_WORKER'
             : 'STANDBY';
         executionPlane.pendingExecutionCount = Number(execPlaneRes.rows[0]?.pending_cnt || 0);
+        executionPlane.staleUnexecutableCount = Number(execPlaneRes.rows[0]?.stale_unexec_cnt || 0);
         executionPlane.lastExecutedAt = execPlaneRes.rows[0]?.last_exec_at
           ? new Date(execPlaneRes.rows[0].last_exec_at).toISOString()
           : null;
