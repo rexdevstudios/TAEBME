@@ -1,6 +1,7 @@
 ﻿'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import { useAuth } from '../context/AuthContext';
 import { useLocale } from '../context/LocaleContext';
 import { CreditCard, CheckCircle2, ShieldAlert, Zap, TrendingUp, Wallet, Banknote, Scale, History, RefreshCw } from 'lucide-react';
@@ -963,9 +964,9 @@ export default function BillingPage() {
                   <p className="text-muted" style={{ fontSize: '11px', margin: '0 0 10px 0', lineHeight: 1.45 }}>
                     Simpan hingga 15 (CREATOR) / 25 (AGENT) API Key Bankr (+ Permanent Add-On Slots) dengan isolasi multi-chain (Base, Robinhood, Arbitrum, Arc).
                   </p>
-                  <a href="/launchpad" className="btn-secondary" style={{ fontSize: '11px', padding: '5px 10px', display: 'inline-block' }}>
+                  <Link href="/launchpad" className="btn-secondary" style={{ fontSize: '11px', padding: '5px 10px', display: 'inline-block', textDecoration: 'none' }}>
                     Kelola di /launchpad →
-                  </a>
+                  </Link>
                 </div>
                 <div style={{ padding: '12px', borderRadius: '12px', border: '1px solid var(--color-border)' }}>
                   <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--color-foreground)', marginBottom: '4px' }}>
@@ -975,9 +976,9 @@ export default function BillingPage() {
                   <p className="text-muted" style={{ fontSize: '11px', margin: '0 0 10px 0', lineHeight: 1.45 }}>
                     Simpan hingga 5 (TRADER) / 15 (AGENT) akun API Binance Testnet/Mainnet (+ Add-On Slots) dengan No-Withdrawal Guard &amp; Live Ping.
                   </p>
-                  <a href="/trading" className="btn-secondary" style={{ fontSize: '11px', padding: '5px 10px', display: 'inline-block' }}>
+                  <Link href="/trading" className="btn-secondary" style={{ fontSize: '11px', padding: '5px 10px', display: 'inline-block', textDecoration: 'none' }}>
                     Kelola di /trading →
-                  </a>
+                  </Link>
                 </div>
                 <div style={{ padding: '12px', borderRadius: '12px', border: '1px solid var(--color-border)' }}>
                   <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--color-foreground)', marginBottom: '4px' }}>
@@ -987,9 +988,9 @@ export default function BillingPage() {
                   <p className="text-muted" style={{ fontSize: '11px', margin: '0 0 10px 0', lineHeight: 1.45 }}>
                     Eksekusi Single-Shot Spot Bybit V5 (Testnet/Mainnet) dengan HMAC-SHA256, No-Withdrawal Guard, dan kuota bersama add-on CEX.
                   </p>
-                  <a href="/trading" className="btn-secondary" style={{ fontSize: '11px', padding: '5px 10px', display: 'inline-block' }}>
+                  <Link href="/trading" className="btn-secondary" style={{ fontSize: '11px', padding: '5px 10px', display: 'inline-block', textDecoration: 'none' }}>
                     Kelola di /trading →
-                  </a>
+                  </Link>
                 </div>
                 <div style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
                   <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--color-foreground)', marginBottom: '4px' }}>
@@ -999,9 +1000,9 @@ export default function BillingPage() {
                   <p className="text-muted" style={{ fontSize: '11px', margin: '0 0 10px 0', lineHeight: 1.45 }}>
                     Simpan hingga 3 (TRADER) / 5 (AGENT) key Google Gemini, OpenAI GPT-4o, &amp; Anthropic Claude (Sonnet/Haiku/Opus) — hemat 60% credits (2 Cr/run).
                   </p>
-                  <a href="/agent" className="btn-secondary" style={{ fontSize: '11px', padding: '5px 10px', display: 'inline-block' }}>
+                  <Link href="/agent" className="btn-secondary" style={{ fontSize: '11px', padding: '5px 10px', display: 'inline-block', textDecoration: 'none' }}>
                     Kelola di /agent →
-                  </a>
+                  </Link>
                 </div>
               </>
             );

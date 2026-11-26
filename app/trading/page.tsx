@@ -1,6 +1,7 @@
 ﻿'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useAuth } from '../context/AuthContext';
 import { useLocale } from '../context/LocaleContext';
 import { Activity, ShieldAlert, BarChart3, Clock, AlertTriangle, Lightbulb, Wallet, BrainCircuit, ActivitySquare, Lock } from 'lucide-react';
@@ -1001,8 +1002,8 @@ export default function TradingPage() {
                   <button
                     key={tf}
                     onClick={() => setInterval(tf)}
-                    className={interval === tf ? 'btn-primary' : 'btn-secondary'}
-                    style={{ padding: '4px 8px', fontSize: '12px', minWidth: '40px', justifyContent: 'center' }}
+                    className={`btn-pill ${interval === tf ? 'active' : ''}`}
+                    style={{ padding: '4px 8px', fontSize: '12px', minWidth: '40px' }}
                   >
                     {tf.toUpperCase()}
                   </button>
@@ -1056,24 +1057,21 @@ export default function TradingPage() {
                 <button
                   type="button"
                   onClick={() => setIntelPanelTab('orderbook')}
-                  className={intelPanelTab === 'orderbook' ? 'btn-primary' : 'btn-secondary'}
-                  style={{ padding: '5px 10px', fontSize: '11px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                  className={`btn-pill ${intelPanelTab === 'orderbook' ? 'active' : ''}`}
                 >
                   <BarChart3 size={13} /> Orderbook
                 </button>
                 <button
                   type="button"
                   onClick={() => setIntelPanelTab('signal')}
-                  className={intelPanelTab === 'signal' ? 'btn-primary' : 'btn-secondary'}
-                  style={{ padding: '5px 10px', fontSize: '11px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                  className={`btn-pill ${intelPanelTab === 'signal' ? 'active' : ''}`}
                 >
                   <BrainCircuit size={13} /> AI Signal ({signal ? `${(signal.computedConfidenceScore * 100).toFixed(0)}%` : '85%'})
                 </button>
                 <button
                   type="button"
                   onClick={() => setIntelPanelTab('alerts')}
-                  className={intelPanelTab === 'alerts' ? 'btn-primary' : 'btn-secondary'}
-                  style={{ padding: '5px 10px', fontSize: '11px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                  className={`btn-pill ${intelPanelTab === 'alerts' ? 'active' : ''}`}
                 >
                   <AlertTriangle size={13} /> Alerts ({tradingAnalysis?.alerts?.length ?? 0})
                 </button>
@@ -1265,24 +1263,24 @@ export default function TradingPage() {
               <button
                 type="button"
                 onClick={() => setExecutionMode('PAPER')}
-                className={executionMode === 'PAPER' ? 'btn-primary' : 'btn-secondary'}
-                style={{ padding: '7px 6px', fontSize: '11px', fontWeight: 800, justifyContent: 'center' }}
+                className={`btn-pill ${executionMode === 'PAPER' ? 'active' : ''}`}
+                style={{ padding: '7px 6px' }}
               >
                 {tr('Sim ($10K)', 'Simulasi ($10K)')}
               </button>
               <button
                 type="button"
                 onClick={() => setExecutionMode('DEX_NON_CUSTODIAL')}
-                className={executionMode === 'DEX_NON_CUSTODIAL' ? 'btn-primary' : 'btn-secondary'}
-                style={{ padding: '7px 6px', fontSize: '11px', fontWeight: 800, justifyContent: 'center' }}
+                className={`btn-pill ${executionMode === 'DEX_NON_CUSTODIAL' ? 'active' : ''}`}
+                style={{ padding: '7px 6px' }}
               >
                 {tr('DEX (Wallet)', 'DEX (Wallet)')}
               </button>
               <button
                 type="button"
                 onClick={() => setExecutionMode('CEX_SINGLE_SHOT')}
-                className={executionMode === 'CEX_SINGLE_SHOT' ? 'btn-primary' : 'btn-secondary'}
-                style={{ padding: '7px 6px', fontSize: '11px', fontWeight: 800, justifyContent: 'center' }}
+                className={`btn-pill ${executionMode === 'CEX_SINGLE_SHOT' ? 'active' : ''}`}
+                style={{ padding: '7px 6px' }}
               >
                 {tr('CEX Spot', 'CEX Spot')}
               </button>
@@ -1442,8 +1440,8 @@ export default function TradingPage() {
                       setVenueManuallyChosen(true);
                       setCexVenue('BINANCE');
                     }}
-                    className={cexVenue === 'BINANCE' ? 'btn-primary' : 'btn-secondary'}
-                    style={{ flex: 1, padding: '5px 8px', fontSize: '11px', justifyContent: 'center' }}
+                    className={`btn-pill ${cexVenue === 'BINANCE' ? 'active' : ''}`}
+                    style={{ flex: 1, padding: '5px 8px' }}
                   >
                     Binance Spot{cexActiveCounts ? ` (${cexActiveCounts.binance})` : ''}
                   </button>
@@ -1453,8 +1451,8 @@ export default function TradingPage() {
                       setVenueManuallyChosen(true);
                       setCexVenue('BYBIT');
                     }}
-                    className={cexVenue === 'BYBIT' ? 'btn-primary' : 'btn-secondary'}
-                    style={{ flex: 1, padding: '5px 8px', fontSize: '11px', justifyContent: 'center' }}
+                    className={`btn-pill ${cexVenue === 'BYBIT' ? 'active' : ''}`}
+                    style={{ flex: 1, padding: '5px 8px' }}
                   >
                     Bybit V5 Spot{cexActiveCounts ? ` (${cexActiveCounts.bybit})` : ''}
                   </button>
@@ -1484,7 +1482,7 @@ export default function TradingPage() {
                   key={q}
                   type="button"
                   onClick={() => setOrderQty(q)}
-                  className={orderQty === q ? 'btn-primary' : 'btn-secondary'}
+                  className={`btn-pill ${orderQty === q ? 'active' : ''}`}
                   style={{ fontSize: '10px', padding: '2px 7px', fontFamily: 'var(--font-mono)' }}
                 >
                   {q}
@@ -1740,6 +1738,40 @@ export default function TradingPage() {
                 </div>
               </div>
             )}
+
+            {/* Cross-Page SPA Bridges (Phase ER) */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '6px',
+                marginTop: '12px',
+                paddingTop: '10px',
+                borderTop: '1px solid var(--color-border)',
+                fontSize: '11px',
+              }}
+            >
+              <Link
+                href={`/agent?symbol=${encodeURIComponent(symbol)}&tab=analyst`}
+                style={{ color: 'var(--color-accent-info)', fontWeight: 700, textDecoration: 'none' }}
+              >
+                {tr('Ask AI Copilot →', 'Tanya AI Copilot →')}
+              </Link>
+              <Link
+                href="/launchpad"
+                style={{ color: 'var(--color-muted)', fontWeight: 700, textDecoration: 'none' }}
+              >
+                {tr('Launchpad →', 'Launchpad →')}
+              </Link>
+              <Link
+                href="/billing"
+                style={{ color: 'var(--color-muted)', fontWeight: 700, textDecoration: 'none' }}
+              >
+                {tr('Plans & Vault →', 'Paket & Vault →')}
+              </Link>
+            </div>
           </div>
 
           {/* Investor Safety Nutrition Label (for SocialFi / Bonding Curve tokens) */}

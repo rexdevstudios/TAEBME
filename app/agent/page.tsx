@@ -42,6 +42,17 @@ export default function AgentPage() {
   const [weightsFeedback, setWeightsFeedback] = useState<string | null>(null);
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const qs = new URLSearchParams(window.location.search);
+      const qSymbol = (qs.get('symbol') || '').trim().toUpperCase();
+      if (qSymbol && /^[A-Z0-9/_-]{2,20}$/.test(qSymbol)) {
+        setSymbol(qSymbol);
+      }
+      const qTab = (qs.get('tab') || '').trim().toLowerCase();
+      if (qTab === 'autopilot' || qTab === 'analyst' || qTab === 'pro') {
+        setActiveAgentTab(qTab);
+      }
+    }
     fetch('/api/billing/plans')
       .then((r) => r.json())
       .then((json) => {

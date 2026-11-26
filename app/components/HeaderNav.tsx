@@ -92,17 +92,36 @@ export default function HeaderNav() {
     ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
     : null;
 
-  const navItems = [
-    { href: '/', label: t('nav.overview'), icon: LayoutDashboard },
-    { href: '/launchpad', label: t('nav.launchpad'), icon: Rocket },
-    { href: '/trading', label: t('nav.trade'), icon: Network },
-    { href: '/agent', label: t('nav.agent'), icon: BrainCircuit },
-    { href: '/kol', label: t('nav.kol'), icon: Award },
-    { href: '/prop', label: t('nav.prop'), icon: Trophy },
-    { href: '/leaderboard', label: t('nav.leaderboard'), icon: Medal },
-    { href: '/transparency', label: t('nav.transparency'), icon: BarChart3 },
-    { href: '/billing', label: t('nav.account'), icon: CreditCard },
+  const navGroups = [
+    {
+      id: 'core',
+      label: tr('Core', 'Utama'),
+      items: [
+        { href: '/', label: t('nav.overview'), icon: LayoutDashboard },
+        { href: '/launchpad', label: t('nav.launchpad'), icon: Rocket },
+        { href: '/trading', label: t('nav.trade'), icon: Network },
+        { href: '/agent', label: t('nav.agent'), icon: BrainCircuit },
+      ],
+    },
+    {
+      id: 'earn',
+      label: tr('Earn & Social', 'Earn & Sosial'),
+      items: [
+        { href: '/kol', label: t('nav.kol'), icon: Award },
+        { href: '/prop', label: t('nav.prop'), icon: Trophy },
+        { href: '/leaderboard', label: t('nav.leaderboard'), icon: Medal },
+      ],
+    },
+    {
+      id: 'account',
+      label: tr('Trust & Account', 'Akun & Trust'),
+      items: [
+        { href: '/transparency', label: t('nav.transparency'), icon: BarChart3 },
+        { href: '/billing', label: t('nav.account'), icon: CreditCard },
+      ],
+    },
   ];
+  const navItems = navGroups.flatMap((g) => g.items);
 
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/';
@@ -145,21 +164,27 @@ export default function HeaderNav() {
         </div>
 
         <nav className="pons-sidebar-nav">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const active = isActive(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                title={item.label}
-                className={`pons-sidebar-link ${active ? 'active' : ''}`}
-              >
-                <Icon size={17} style={{ flexShrink: 0 }} />
-                <span className="pons-sidebar-label">{item.label}</span>
-              </Link>
-            );
-          })}
+          {navGroups.map((group, gIdx) => (
+            <React.Fragment key={group.id}>
+              {gIdx > 0 && <div className="pons-sidebar-divider" />}
+              <div className="pons-sidebar-group-label">{group.label}</div>
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                const active = isActive(item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    title={item.label}
+                    className={`pons-sidebar-link ${active ? 'active' : ''}`}
+                  >
+                    <Icon size={17} style={{ flexShrink: 0 }} />
+                    <span className="pons-sidebar-label">{item.label}</span>
+                  </Link>
+                );
+              })}
+            </React.Fragment>
+          ))}
         </nav>
       </aside>
 

@@ -1524,3 +1524,69 @@ a {
     padding-bottom: 74px;
   }
 }
+
+/* ============================================================================
+   Phase ER: Calm Segmented Pill Controls & Sidebar Category Labels
+   ============================================================================ */
+.btn-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface-subtle);
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+
+.btn-pill:hover {
+  color: var(--color-foreground);
+  border-color: var(--color-border-strong, rgba(148, 163, 184, 0.45));
+}
+
+.btn-pill.active {
+  background-color: var(--color-surface-inset, rgba(16, 185, 129, 0.14));
+  border-color: var(--color-accent);
+  color: var(--color-foreground);
+  font-weight: 800;
+}
+
+[data-theme="light"] .btn-pill.active {
+  background-color: rgba(0, 200, 5, 0.12);
+  border-color: #008A04;
+  color: #0C1500;
+}
+
+.pons-sidebar-divider {
+  height: 1px;
+  margin: 6px 8px;
+  background-color: var(--color-border);
+  opacity: 0.65;
+}
+
+.pons-sidebar-group-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  padding: 4px 11px 2px 11px;
+  white-space: nowrap;
+  opacity: 0;
+  max-height: 0;
+  overflow: hidden;
+  transition: opacity 140ms ease, max-height 140ms ease;
+}
+
+@media (min-width: 960px) {
+  .pons-sidebar:hover .pons-sidebar-group-label,
+  .pons-sidebar.pinned .pons-sidebar-group-label {
+    opacity: 0.85;
+    max-height: 22px;
+  }
+}

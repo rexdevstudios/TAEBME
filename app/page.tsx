@@ -1,6 +1,7 @@
 ﻿'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useAuth } from './context/AuthContext';
 import { useLocale } from './context/LocaleContext';
 import { Activity, ShieldAlert, Zap, Rocket, Award, Server, Cpu, Lock, Network, Wallet, BrainCircuit } from 'lucide-react';
@@ -369,18 +370,18 @@ export default function OverviewPage() {
             </p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-            <a href="/launchpad" className="cex-btn-gold">
+            <Link href="/launchpad" className="cex-btn-gold">
               <Rocket size={15} /> {t('home.ctaLaunch')}
-            </a>
-            <a href="/trading" className="btn-secondary" style={{ textDecoration: 'none', padding: '10px 16px', fontSize: '13px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            </Link>
+            <Link href="/trading" className="btn-secondary" style={{ textDecoration: 'none', padding: '10px 16px', fontSize: '13px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
               <Network size={15} /> {t('home.ctaTrade')}
-            </a>
+            </Link>
           </div>
         </div>
 
         {/* 4 Role-Based Quick-Start Action Cards */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
-          <a href="/launchpad" className="cex-role-card" style={{ borderTop: '2px solid var(--color-accent-amber)' }}>
+          <Link href="/launchpad" className="cex-role-card" style={{ borderTop: '2px solid var(--color-accent-amber)' }}>
             <div>
               <div style={{ fontWeight: 900, color: 'var(--color-accent-amber)', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '6px' }}>
                 <Rocket size={16} /> 1. Launchpad &amp; Pools
@@ -393,8 +394,8 @@ export default function OverviewPage() {
               </div>
             </div>
             <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-accent-amber)' }}>{tr('Open Launchpad →', 'Buka Launchpad →')}</span>
-          </a>
-          <a href="/trading" className="cex-role-card" style={{ borderTop: '2px solid #10B981' }}>
+          </Link>
+          <Link href="/trading" className="cex-role-card" style={{ borderTop: '2px solid #10B981' }}>
             <div>
               <div style={{ fontWeight: 900, color: 'var(--color-text-positive)', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '6px' }}>
                 <Network size={16} /> 2. Spot &amp; DEX Terminal
@@ -407,8 +408,8 @@ export default function OverviewPage() {
               </div>
             </div>
             <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-text-positive)' }}>{tr('Start Trading →', 'Mulai Trading →')}</span>
-          </a>
-          <a href="/agent" className="cex-role-card" style={{ borderTop: '2px solid var(--color-accent-info)' }}>
+          </Link>
+          <Link href="/agent" className="cex-role-card" style={{ borderTop: '2px solid var(--color-accent-info)' }}>
             <div>
               <div style={{ fontWeight: 900, color: 'var(--color-accent-info)', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '6px' }}>
                 <BrainCircuit size={16} /> 3. AI Auto-Pilot 24/7
@@ -421,8 +422,8 @@ export default function OverviewPage() {
               </div>
             </div>
             <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-accent-info)' }}>{tr('Configure AI Bot →', 'Atur AI Bot →')}</span>
-          </a>
-          <a href="/kol" className="cex-role-card" style={{ borderTop: '2px solid #A855F7' }}>
+          </Link>
+          <Link href="/kol" className="cex-role-card" style={{ borderTop: '2px solid #A855F7' }}>
             <div>
               <div style={{ fontWeight: 900, color: 'var(--color-accent-purple)', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '6px' }}>
                 <Award size={16} /> 4. Earn &amp; KOL Hub
@@ -435,7 +436,7 @@ export default function OverviewPage() {
               </div>
             </div>
             <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-accent-purple)' }}>{tr('View Campaigns →', 'Lihat Campaign →')}</span>
-          </a>
+          </Link>
         </div>
 
         {/* 3-Column Security, Subscription/Fee & Live Launchpad Activity */}

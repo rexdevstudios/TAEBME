@@ -1,6 +1,7 @@
 ﻿'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useAuth } from '../context/AuthContext';
 import { useLocale } from '../context/LocaleContext';
 import { PageWorkflowBanner } from '../components/PageWorkflowBanner';
@@ -580,6 +581,17 @@ export default function KolHubPage() {
             { step: '4', label: tr('Claim Merkle Proof On-Chain', 'Klaim Merkle Proof On-Chain') },
           ]}
         />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '8px' }}>
+          <Link href="/trading" className="btn-pill" style={{ textDecoration: 'none' }}>
+            {tr('Trade Terminal →', 'Terminal Trading →')}
+          </Link>
+          <Link href="/launchpad" className="btn-pill" style={{ textDecoration: 'none' }}>
+            {tr('Live Pools & Deploy →', 'Live Pools & Deploy →')}
+          </Link>
+          <Link href="/billing" className="btn-pill" style={{ textDecoration: 'none' }}>
+            {tr('Plans & Vault →', 'Paket & Vault →')}
+          </Link>
+        </div>
       </div>
 
       {/* TAB 1: KOL PASSPORT */}
