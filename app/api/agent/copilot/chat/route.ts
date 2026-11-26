@@ -41,6 +41,7 @@ import {
   type CopilotConnectedAccount,
   type CopilotDeployerFeeSummary,
 } from '@packages/agent/copilot-engine';
+import { buildMarketplaceDatasetAdvisorySummary } from '@packages/agent/signal-marketplace';
 
 export const dynamic = 'force-dynamic';
 
@@ -213,6 +214,7 @@ export async function POST(req: NextRequest) {
       userPlanId,
       userPolicy,
       used24hTransferUsd,
+      marketplacePresets,
     ] = await Promise.all([
       fetchAutoPilot24hTickers(symbols).catch(() => ({})),
       loadVerifiedKolSignalsForSymbol(pool, parsed.symbol).catch(() => []),
@@ -226,7 +228,10 @@ export async function POST(req: NextRequest) {
       defaultBillingDbAdapter.getUserPlan(session.walletAddress).catch(() => 'FREE' as const),
       defaultBillingDbAdapter.getUserRiskPolicy(session.walletAddress).catch(() => null),
       getUser24hOwnedTransferUsd(session.walletAddress).catch(() => 0),
+      defaultBillingDbAdapter.getMarketplacePresets().catch(() => []),
     ]);
+
+    const marketplaceDataset = buildMarketplaceDatasetAdvisorySummary(marketplacePresets, parsed.symbol);
 
     const effectiveLimits = computeEffectiveUserRiskLimits({
       planId: userPlanId,
@@ -282,7 +287,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const reply = llmSummary ? `${deterministicReply}\n\nAI Insight: ${llmSummary}` : deterministicReply;
+    const baseReply = llmSummary ? `${deterministicReply}\n\nAI Insight: ${llmSummary}` : deterministicReply;
+    const reply = marketplaceDataset ? `${baseReply}\n\n${marketplaceDataset.summaryLine}` : baseReply;
     const killSwitchActive = activeKillSwitches.some((ks) => ks.isActive);
     const railSummary = {
       paperSim: true,
@@ -304,6 +310,7 @@ export async function POST(req: NextRequest) {
             deployerTokens: deployerTokens.slice(0, 5),
             kolConsensus,
             newsHint,
+            marketplaceDataset,
           },
           actionDraft: parsed.actionDraft || null,
           availableAccounts: accounts,

@@ -2,7 +2,11 @@
 
 import React, { useEffect, useState } from 'react';
 import { Layers, Plus, CheckCircle2, ShieldCheck, Users } from 'lucide-react';
-import type { SignalPresetListing } from '@packages/agent/signal-marketplace';
+import {
+  buildAutoPilotDraftFromPreset,
+  type AutoPilotPresetDraft,
+  type SignalPresetListing,
+} from '@packages/agent/signal-marketplace';
 import { useLocale } from '../context/LocaleContext';
 
 type EnrichedPresetListing = SignalPresetListing & {
@@ -13,9 +17,15 @@ type EnrichedPresetListing = SignalPresetListing & {
 
 interface SignalMarketplacePanelProps {
   isConnected: boolean;
+  onApplyTemplate?: (draft: AutoPilotPresetDraft) => void;
+  highlightedPresetId?: string | null;
 }
 
-export function SignalMarketplacePanel({ isConnected }: SignalMarketplacePanelProps) {
+export function SignalMarketplacePanel({
+  isConnected,
+  onApplyTemplate,
+  highlightedPresetId,
+}: SignalMarketplacePanelProps) {
   const { tr } = useLocale();
   const [presets, setPresets] = useState<EnrichedPresetListing[]>([]);
   const [loading, setLoading] = useState(false);
@@ -26,6 +36,8 @@ export function SignalMarketplacePanel({ isConnected }: SignalMarketplacePanelPr
   const [takeProfitPct, setTakeProfitPct] = useState(15);
   const [stopLossPct, setStopLossPct] = useState(5);
   const [trailingStopPct, setTrailingStopPct] = useState(3);
+  const [publishRail, setPublishRail] = useState<'CEX_AUTO' | 'DEX_SESSION'>('CEX_AUTO');
+  const [symbolsInput, setSymbolsInput] = useState('BTCUSDT, ETHUSDT, SOLUSDT');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
 
@@ -64,8 +76,11 @@ export function SignalMarketplacePanel({ isConnected }: SignalMarketplacePanelPr
           takeProfitPct,
           stopLossPct,
           trailingStopPct,
-          rail: 'CEX_AUTO',
-          allowedSymbols: ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'],
+          rail: publishRail,
+          allowedSymbols: symbolsInput
+            .split(',')
+            .map((s) => s.trim().toUpperCase())
+            .filter(Boolean),
         }),
       });
       const json = await res.json();
@@ -103,8 +118,13 @@ export function SignalMarketplacePanel({ isConnected }: SignalMarketplacePanelPr
         setFeedback(`Notice: ${json.error || 'Subscription failed'}`);
         return;
       }
+      const appliedPreset: SignalPresetListing = json.data?.preset || preset;
+      const alreadySub = Boolean(json.data?.alreadySubscribed);
+      onApplyTemplate?.(buildAutoPilotDraftFromPreset(appliedPreset));
       setFeedback(
-        `OK: Subscribed to "${preset.title}" (${preset.priceCredits} cr · 80% creator / 20% treasury). TP ${preset.takeProfitPct}% / SL ${preset.stopLossPct}% / Trailing ${preset.trailingStopPct}%.`
+        alreadySub
+          ? `OK: Already subscribed to "${appliedPreset.title}" (0 cr · free re-apply). Loaded into Auto-Pilot Draft (TP ${appliedPreset.takeProfitPct}% / SL ${appliedPreset.stopLossPct}% / Trail ${appliedPreset.trailingStopPct}%).`
+          : `OK: Subscribed to "${appliedPreset.title}" (${appliedPreset.priceCredits} cr · 80% creator / 20% treasury). Loaded into Auto-Pilot Draft (TP ${appliedPreset.takeProfitPct}% / SL ${appliedPreset.stopLossPct}% / Trail ${appliedPreset.trailingStopPct}%).`
       );
       await loadPresets();
     } catch (err: any) {
@@ -198,6 +218,31 @@ export function SignalMarketplacePanel({ isConnected }: SignalMarketplacePanelPr
               <input type="number" step="0.5" min={0.5} max={30} value={trailingStopPct} onChange={(e) => setTrailingStopPct(Number(e.target.value))} className="input" style={{ width: '100%', padding: '6px 8px', marginTop: '4px' }} />
             </label>
           </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(140px, 1fr) 2fr', gap: '8px', fontSize: '11px' }}>
+            <label>
+              {tr('Execution Rail', 'Jalur Eksekusi', '执行通道')}
+              <select
+                value={publishRail}
+                onChange={(e) => setPublishRail(e.target.value === 'DEX_SESSION' ? 'DEX_SESSION' : 'CEX_AUTO')}
+                className="input"
+                style={{ width: '100%', padding: '6px 8px', marginTop: '4px' }}
+              >
+                <option value="CEX_AUTO">CEX_AUTO (Binance/Bybit)</option>
+                <option value="DEX_SESSION">DEX_SESSION (Base/EVM)</option>
+              </select>
+            </label>
+            <label>
+              {tr('Allowed Symbols (comma-separated)', 'Pair Token (pisahkan koma)', '允许交易对（逗号分隔）')}
+              <input
+                type="text"
+                value={symbolsInput}
+                onChange={(e) => setSymbolsInput(e.target.value)}
+                placeholder="BTCUSDT, ETHUSDT, SOLUSDT"
+                className="input"
+                style={{ width: '100%', padding: '6px 8px', marginTop: '4px' }}
+              />
+            </label>
+          </div>
           <button type="submit" disabled={busyId === 'PUBLISH'} className="btn-primary" style={{ alignSelf: 'flex-start', padding: '7px 14px', fontSize: '12px' }}>
             {busyId === 'PUBLISH' ? tr('Publishing...', 'Mempublikasikan...') : tr('Publish Strategy (80% Rev-Share)', 'Publikasikan Strategi (Bagi Hasil 80%)')}
           </button>
@@ -235,7 +280,10 @@ export function SignalMarketplacePanel({ isConnected }: SignalMarketplacePanelPr
               style={{
                 padding: '14px',
                 borderRadius: '12px',
-                border: '1px solid var(--color-border)',
+                border:
+                  highlightedPresetId && highlightedPresetId === p.id
+                    ? '1px solid var(--color-badge-info-border)'
+                    : '1px solid var(--color-border)',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'space-between',

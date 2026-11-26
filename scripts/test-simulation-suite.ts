@@ -58,6 +58,11 @@ import {
 } from '../packages/shared/airdrop-referral';
 import { normalizeReferrerWallet } from '../packages/billing/genesis-sbt';
 import {
+  buildAutoPilotDraftFromPreset,
+  buildMarketplaceDatasetAdvisorySummary,
+} from '../packages/agent/signal-marketplace';
+import { PostgresBillingDbAdapter } from '../packages/db/billing-repo';
+import {
   clearAutoPilotPeakPrice,
   computeDynamicSignalConfidence,
   computeUpdatedPeakPrice,
@@ -1226,6 +1231,47 @@ async function runSimulationSuite() {
       refSummary.totalCreditsEarned === 30 &&
       refSummary.recentReferrals[0]?.claimId === 'claim-102',
     'Viral airdrop referral flow encodes Follow @handle, blocks self-referral, deduplicates bounty_ref ledger rows & aggregates +15 cr accurately'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 48: Hybrid Signal Marketplace (AI Dataset + Draft Pre-Fill + Anti-Double-Charge)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 48: Hybrid Signal Marketplace & AI Copilot Dataset] ---');
+  const mktRepo = new PostgresBillingDbAdapter({
+    getDbPool: () => null,
+    ensureUserEntity: async (_p, u) => u,
+  });
+  await mktRepo.updateUserSubscription(walletA, 'FREE');
+  await mktRepo.updateUserSubscription(walletB, 'CREATOR');
+  const ezPreset = await mktRepo.publishMarketplacePreset({
+    title: 'KOL Momentum Guard',
+    description: 'Verified trend template with tight trailing stop',
+    creatorWallet: walletA,
+    priceCredits: 100,
+    rail: 'DEX_SESSION',
+    takeProfitPct: 18,
+    stopLossPct: 5,
+    trailingStopPct: 2.5,
+    allowedSymbols: ['BTCUSDT', 'ETHUSDT'],
+  });
+  const firstSub = await mktRepo.subscribeMarketplacePreset(walletB, ezPreset.id);
+  const secondSub = await mktRepo.subscribeMarketplacePreset(walletB, ezPreset.id);
+  const draftPreFill = buildAutoPilotDraftFromPreset(ezPreset);
+  const datasetHint = buildMarketplaceDatasetAdvisorySummary([{ ...ezPreset, kolVerified: true, subscribersCount: 4 }], 'BTCUSDT');
+  assert(
+    firstSub.ok === true &&
+      firstSub.alreadySubscribed !== true &&
+      firstSub.split?.totalCredits === 100 &&
+      secondSub.ok === true &&
+      secondSub.alreadySubscribed === true &&
+      secondSub.split?.totalCredits === 0 &&
+      draftPreFill.autoEnable === false &&
+      draftPreFill.rail === 'DEX_SESSION' &&
+      draftPreFill.takeProfitPct === 18 &&
+      datasetHint !== null &&
+      datasetHint.verifiedPresetsCount === 1 &&
+      datasetHint.summaryLine.includes('KOL Momentum Guard'),
+    'Hybrid Signal Marketplace enforces anti-double-charge idempotency (0 cr re-apply), non-custodial autoEnable=false draft pre-fill & AI dataset grounding'
   );
 
   console.log('\n================================================================');

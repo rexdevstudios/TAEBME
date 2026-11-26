@@ -934,6 +934,7 @@ export class PostgresBillingDbAdapter implements BillingDbAdapter {
   }
 
   private inMemoryMarketplacePresets: SignalPresetListing[] = [];
+  private inMemoryMarketplaceSubscriptions: Set<string> = new Set();
 
   async getMarketplacePresets(): Promise<SignalPresetListing[]> {
     const pool = this.resolveDeps()?.getDbPool() || null;
@@ -992,6 +993,7 @@ export class PostgresBillingDbAdapter implements BillingDbAdapter {
     presetId: string
   ): Promise<{
     ok: boolean;
+    alreadySubscribed?: boolean;
     error?: string;
     preset?: SignalPresetListing;
     split?: { totalCredits: number; creatorCredits: number; platformCredits: number };
@@ -1003,6 +1005,41 @@ export class PostgresBillingDbAdapter implements BillingDbAdapter {
     }
     if (target.creatorWallet.toLowerCase() === subscriberWallet.toLowerCase()) {
       return { ok: false, error: 'SELF_SUBSCRIBE_FORBIDDEN: You cannot subscribe to your own preset.' };
+    }
+
+    // Phase EZ: Idempotent anti-double-charge check (in-memory + indexed Neon ledger_entries)
+    const subKey = `${subscriberWallet.trim().toLowerCase()}:${target.id}`;
+    let alreadySubscribed = this.inMemoryMarketplaceSubscriptions.has(subKey);
+    if (!alreadySubscribed) {
+      const deps = this.resolveDeps();
+      const pool = deps?.getDbPool() || null;
+      if (pool && deps) {
+        try {
+          const validUserId = await deps.ensureUserEntity(pool, subscriberWallet);
+          const dupRes = await pool.query(
+            `SELECT 1 FROM ledger_entries
+             WHERE user_id = $1::uuid
+               AND type = 'MARKETPLACE_PRESET_SUBSCRIBE'
+               AND reference_id LIKE $2
+             LIMIT 1`,
+            [validUserId, `mkt-sub:${target.id}:%`]
+          );
+          if (dupRes.rows.length > 0) {
+            alreadySubscribed = true;
+            this.inMemoryMarketplaceSubscriptions.add(subKey);
+          }
+        } catch {
+          // Non-blocking idempotency fallback
+        }
+      }
+    }
+    if (alreadySubscribed) {
+      return {
+        ok: true,
+        alreadySubscribed: true,
+        preset: target,
+        split: { totalCredits: 0, creatorCredits: 0, platformCredits: 0 },
+      };
     }
 
     const balance = await this.getUserCreditBalance(subscriberWallet);
@@ -1024,6 +1061,7 @@ export class PostgresBillingDbAdapter implements BillingDbAdapter {
       referenceId: refId,
       description: `Subscribed to preset "${target.title}" (${split.totalCredits} cr)`,
     });
+    this.inMemoryMarketplaceSubscriptions.add(subKey);
 
     if (split.creatorCredits > 0) {
       await this.recordLedgerEntry({

@@ -27,6 +27,11 @@ interface SignalPresetRow {
   priceCredits: number;
   subscribersCount: number;
   strategyType?: string;
+  takeProfitPct?: number;
+  stopLossPct?: number;
+  trailingStopPct?: number;
+  kolVerified?: boolean;
+  kolHandle?: string;
 }
 
 function maskWallet(addr: string): string {
@@ -292,20 +297,52 @@ export default function LeaderboardPage() {
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--color-border)', textAlign: 'left', color: 'var(--color-muted)' }}>
                   <th style={{ padding: '8px' }}>#</th>
-                  <th style={{ padding: '8px' }}>{tr('Preset Title', 'Nama Preset')}</th>
-                  <th style={{ padding: '8px' }}>{tr('Creator', 'Kreator')}</th>
-                  <th style={{ padding: '8px' }}>{tr('Subscribers', 'Pelanggan')}</th>
-                  <th style={{ padding: '8px' }}>{tr('Price', 'Harga')}</th>
+                  <th style={{ padding: '8px' }}>{tr('Preset Title', 'Nama Preset', '策略名称')}</th>
+                  <th style={{ padding: '8px' }}>{tr('Creator', 'Kreator', '创作者')}</th>
+                  <th style={{ padding: '8px' }}>{tr('Risk Params', 'Parameter Risiko', '风控参数')}</th>
+                  <th style={{ padding: '8px' }}>{tr('Subscribers', 'Pelanggan', '订阅数')}</th>
+                  <th style={{ padding: '8px' }}>{tr('Price', 'Harga', '价格')}</th>
+                  <th style={{ padding: '8px' }}>{tr('Action', 'Aksi', '操作')}</th>
                 </tr>
               </thead>
               <tbody>
                 {signalPresets.map((row, idx) => (
                   <tr key={row.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
                     <td style={{ padding: '10px 8px', fontWeight: 900 }}>#{idx + 1}</td>
-                    <td style={{ padding: '10px 8px', color: 'var(--color-foreground)', fontWeight: 700 }}>{row.title}</td>
-                    <td style={{ padding: '10px 8px' }}>{maskWallet(row.creatorWallet)}</td>
+                    <td style={{ padding: '10px 8px', color: 'var(--color-foreground)', fontWeight: 700 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                        <span>{row.title}</span>
+                        {row.kolVerified && (
+                          <span
+                            style={{
+                              fontSize: '9px',
+                              fontWeight: 800,
+                              padding: '2px 6px',
+                              borderRadius: '999px',
+                              backgroundColor: 'var(--color-badge-info-bg)',
+                              color: 'var(--color-badge-info-text)',
+                              border: '1px solid var(--color-badge-info-border)',
+                            }}
+                          >
+                            KOL VERIFIED
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td style={{ padding: '10px 8px' }}>{row.kolHandle || maskWallet(row.creatorWallet)}</td>
+                    <td style={{ padding: '10px 8px', color: 'var(--color-muted)' }}>
+                      TP +{row.takeProfitPct ?? '-'}% / SL -{row.stopLossPct ?? '-'}% / Trail {row.trailingStopPct ?? '-'}%
+                    </td>
                     <td style={{ padding: '10px 8px', fontWeight: 800, color: 'var(--color-accent-info)' }}>{row.subscribersCount}</td>
                     <td style={{ padding: '10px 8px', fontWeight: 800, color: 'var(--color-text-positive)' }}>{row.priceCredits} cr</td>
+                    <td style={{ padding: '10px 8px' }}>
+                      <Link
+                        href={`/agent?tab=autopilot&presetId=${encodeURIComponent(row.id)}`}
+                        style={{ color: 'var(--color-accent-info)', fontWeight: 800, textDecoration: 'none' }}
+                      >
+                        {tr('Apply →', 'Terapkan →', '应用 →')}
+                      </Link>
+                    </td>
                   </tr>
                 ))}
               </tbody>

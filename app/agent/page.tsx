@@ -16,6 +16,7 @@ import { AutoPilotControlPanel } from '../components/AutoPilotControlPanel';
 import { SignalMarketplacePanel } from '../components/SignalMarketplacePanel';
 import { AiCopilotChatPanel } from '../components/AiCopilotChatPanel';
 import type { CustomAgentProfile } from '@packages/agent/skill-registry';
+import type { AutoPilotPresetDraft } from '@packages/agent/signal-marketplace';
 import { TOP_LIQUID_CEX_PAIRS } from '@packages/shared/market-pairs';
 
 export default function AgentPage() {
@@ -29,6 +30,8 @@ export default function AgentPage() {
   const [selectedLlmProvider, setSelectedLlmProvider] = useState<SelectedLlmProvider>('PLATFORM');
   const [selectedLlmModel, setSelectedLlmModel] = useState<string>('');
   const [activeAgentTab, setActiveAgentTab] = useState<'autopilot' | 'analyst' | 'pro'>('autopilot');
+  const [draftAutoPilotTemplate, setDraftAutoPilotTemplate] = useState<AutoPilotPresetDraft | null>(null);
+  const [highlightedPresetId, setHighlightedPresetId] = useState<string | null>(null);
   const [proposal, setProposal] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,6 +54,10 @@ export default function AgentPage() {
       const qTab = (qs.get('tab') || '').trim().toLowerCase();
       if (qTab === 'autopilot' || qTab === 'analyst' || qTab === 'pro') {
         setActiveAgentTab(qTab);
+      }
+      const qPresetId = (qs.get('presetId') || '').trim();
+      if (qPresetId) {
+        setHighlightedPresetId(qPresetId);
       }
     }
     fetch('/api/billing/plans')
@@ -211,8 +218,12 @@ export default function AgentPage() {
       {activeAgentTab === 'autopilot' && (
         <div className="flex-col gap-lg">
           <AiCopilotChatPanel isConnected={isConnected} />
-          <AutoPilotControlPanel isConnected={isConnected} />
-          <SignalMarketplacePanel isConnected={isConnected} />
+          <AutoPilotControlPanel isConnected={isConnected} draftTemplate={draftAutoPilotTemplate} />
+          <SignalMarketplacePanel
+            isConnected={isConnected}
+            highlightedPresetId={highlightedPresetId}
+            onApplyTemplate={(draft) => setDraftAutoPilotTemplate(draft)}
+          />
           <AutonomousAgentTerminalCard isConnected={isConnected} />
         </div>
       )}

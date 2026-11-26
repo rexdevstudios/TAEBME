@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Bot, Lock, ShieldCheck, Sparkles } from 'lucide-react';
 import { formatScoutCacheAgeLabel } from '@packages/agent/autonomous-terminal-engine';
 import { AUTOPILOT_STRATEGY_PRESETS } from '@packages/agent/autopilot-policy';
+import type { AutoPilotPresetDraft } from '@packages/agent/signal-marketplace';
 
 interface AutoPilotApiPayload {
   planId: 'FREE' | 'CREATOR' | 'TRADER' | 'AGENT';
@@ -38,9 +39,10 @@ interface AutoPilotApiPayload {
 
 interface AutoPilotControlPanelProps {
   isConnected: boolean;
+  draftTemplate?: AutoPilotPresetDraft | null;
 }
 
-export function AutoPilotControlPanel({ isConnected }: AutoPilotControlPanelProps) {
+export function AutoPilotControlPanel({ isConnected, draftTemplate }: AutoPilotControlPanelProps) {
   const [data, setData] = useState<AutoPilotApiPayload | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -84,6 +86,21 @@ export function AutoPilotControlPanel({ isConnected }: AutoPilotControlPanelProp
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [isConnected]);
+
+  // Phase EZ: Non-custodial 1-click Draft Pre-Fill from Signal Marketplace (never auto-enables trading)
+  useEffect(() => {
+    if (!draftTemplate) return;
+    setRail(draftTemplate.rail === 'DEX_SESSION' ? 'DEX_SESSION' : 'CEX_AUTO');
+    setTakeProfitPct(draftTemplate.takeProfitPct);
+    setStopLossPct(draftTemplate.stopLossPct);
+    setTrailingStopPct(draftTemplate.trailingStopPct);
+    if (draftTemplate.allowedSymbols.length > 0) {
+      setSymbolsText(draftTemplate.allowedSymbols.join(', '));
+    }
+    setFeedback(
+      `OK: Draft template "${draftTemplate.sourcePresetTitle}" loaded (${draftTemplate.rail} · TP +${draftTemplate.takeProfitPct}% / SL -${draftTemplate.stopLossPct}% / Trail ${draftTemplate.trailingStopPct}%). Review Risk Gate limits & click Save Config to apply.`
+    );
+  }, [draftTemplate]);
 
   if (!isConnected) return null;
 
