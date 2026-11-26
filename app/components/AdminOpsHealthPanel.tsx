@@ -31,6 +31,7 @@ interface OpsSummaryData {
     workerOnline: boolean;
     mode?: 'CLOUDFLARE_CRON' | 'VPS_WORKER' | 'STANDBY';
     pendingExecutionCount: number;
+    staleUnexecutableCount?: number;
     lastExecutedAt: string | null;
     lastPulseAt?: string | null;
   };
@@ -511,6 +512,9 @@ export function AdminOpsHealthPanel() {
                 {data.executionPlane.lastPulseAt
                   ? new Date(data.executionPlane.lastPulseAt).toLocaleString()
                   : 'Awaiting Cloudflare Cron'}
+                {typeof data.executionPlane.staleUnexecutableCount === 'number' &&
+                  data.executionPlane.staleUnexecutableCount > 0 &&
+                  ` · Stale/Non-CEX: ${data.executionPlane.staleUnexecutableCount}`}
               </div>
             </div>
           )}
