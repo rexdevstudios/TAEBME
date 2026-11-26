@@ -72,12 +72,12 @@ describe('Phase CU & CV: Swiss Fintech Minimalist UI, Zero-Emoji & Pons Shell Gu
     expect(cssSrc).toContain('.pons-mobile-bottom-nav');
   });
 
-  test('[CU1.3] LocaleContext exposes tr(en, id) helper for full-page bilingual coverage', () => {
+  test('[CU1.3] LocaleContext exposes tr(en, id, cn?) helper for full-page multilingual coverage', () => {
     const localeSrc = fs.readFileSync(
       path.resolve(process.cwd(), 'app/context/LocaleContext.tsx'),
       'utf8'
     );
-    expect(localeSrc).toContain('tr: (enText: string, idText: string) => string');
-    expect(localeSrc).toContain("locale === 'id' ? idText : enText");
+    expect(localeSrc).toContain('tr: (enText: string, idText: string, cnText?: string) => string');
+    expect(localeSrc).toContain('resolveLocalizedText(locale, enText, idText, cnText)');
   });
 });

@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
+import { useLocale } from '../context/LocaleContext';
 
 export interface CollapsibleSectionProps {
   title: string;
@@ -24,6 +25,7 @@ export function CollapsibleSection({
   children,
 }: CollapsibleSectionProps) {
   const [open, setOpen] = useState<boolean>(defaultOpen);
+  const { tr } = useLocale();
 
   return (
     <div
@@ -82,7 +84,7 @@ export function CollapsibleSection({
           )}
         </div>
         <span className="text-muted" style={{ fontSize: '11px', fontWeight: 700, flexShrink: 0 }}>
-          {open ? 'Hide' : 'Show'}
+          {open ? tr('Hide', 'Tutup', '收起') : tr('Show', 'Buka', '展开')}
         </span>
       </button>
 

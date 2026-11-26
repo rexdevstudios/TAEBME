@@ -46,7 +46,7 @@ export default function HeaderNav() {
   const [isSwitchingChain, setIsSwitchingChain] = React.useState(false);
   const [theme, setTheme] = React.useState<'dark' | 'light'>('dark');
   const [sidebarPinned, setSidebarPinned] = React.useState<boolean>(false);
-  const { locale, toggleLocale, t, tr } = useLocale();
+  const { locale, setLocale, t, tr } = useLocale();
 
   React.useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -313,12 +313,10 @@ export default function HeaderNav() {
 
       {/* Account & Session Controls */}
       <div className="flex-row items-center" style={{ gap: '6px', flexShrink: 0 }}>
-        <button
-          type="button"
-          onClick={toggleLocale}
+        <div
           className="btn-secondary"
           style={{
-            padding: '5px 8px',
+            padding: '4px 7px',
             borderRadius: '9999px',
             display: 'inline-flex',
             alignItems: 'center',
@@ -328,11 +326,33 @@ export default function HeaderNav() {
             flexShrink: 0,
           }}
           title={t('nav.switchLang')}
-          aria-label={t('nav.switchLang')}
         >
-          <Globe size={12} />
-          <span>{locale.toUpperCase()}</span>
-        </button>
+          <Globe size={12} style={{ flexShrink: 0 }} />
+          <select
+            aria-label={t('nav.switchLang')}
+            value={locale}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val === 'en' || val === 'id' || val === 'cn') {
+                setLocale(val);
+              }
+            }}
+            style={{
+              backgroundColor: 'transparent',
+              border: 'none',
+              outline: 'none',
+              color: 'inherit',
+              fontSize: '11px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              paddingRight: '2px',
+            }}
+          >
+            <option value="en" style={{ backgroundColor: 'var(--color-surface)', color: 'var(--color-foreground)' }}>EN</option>
+            <option value="id" style={{ backgroundColor: 'var(--color-surface)', color: 'var(--color-foreground)' }}>ID</option>
+            <option value="cn" style={{ backgroundColor: 'var(--color-surface)', color: 'var(--color-foreground)' }}>中文</option>
+          </select>
+        </div>
         <button
           type="button"
           onClick={toggleTheme}

@@ -575,7 +575,7 @@ export function AiCopilotChatPanel({ isConnected }: AiCopilotChatPanelProps) {
                               setInput(
                                 buildDeployerFeeSweepPrompt({
                                   destinationWallet: m.ownedWallets![0],
-                                  locale,
+                                  locale: locale === 'id' ? 'id' : 'en',
                                   estimatedEth: estEth > 0 ? estEth : undefined,
                                 })
                               );

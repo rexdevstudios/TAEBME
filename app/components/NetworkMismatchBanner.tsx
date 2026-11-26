@@ -54,7 +54,8 @@ export function NetworkMismatchBanner({
       <span style={{ color: 'var(--color-accent-amber)', fontWeight: 700 }}>
         {tr(
           `Wallet is on ${walletMeta.label}, while this action${scopeText} uses ${resolvedTargetLabel}.`,
-          `Wallet Anda di ${walletMeta.label}, sedangkan aksi ini${scopeText} memakai ${resolvedTargetLabel}.`
+          `Wallet Anda di ${walletMeta.label}, sedangkan aksi ini${scopeText} memakai ${resolvedTargetLabel}.`,
+          `当前钱包网络为 ${walletMeta.label}，此操作${scopeText}需要切换至 ${resolvedTargetLabel}。`
         )}
       </span>
       <button
@@ -72,8 +73,12 @@ export function NetworkMismatchBanner({
         style={{ fontSize: '10px', padding: '4px 10px', whiteSpace: 'nowrap' }}
       >
         {switching
-          ? tr('Switching...', 'Memindah...')
-          : tr(`Switch to ${resolvedTargetLabel}`, `Pindah ke ${resolvedTargetLabel}`)}
+          ? tr('Switching...', 'Memindah...', '切换中...')
+          : tr(
+              `Switch to ${resolvedTargetLabel}`,
+              `Pindah ke ${resolvedTargetLabel}`,
+              `切换至 ${resolvedTargetLabel}`
+            )}
       </button>
     </div>
   );

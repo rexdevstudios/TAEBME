@@ -17,7 +17,7 @@ describe('Batch EQ — UI Information Hierarchy & Collapsible Grouping', () => {
     const bannerPath = path.join(root, 'app', 'components', 'PageWorkflowBanner.tsx');
     const src = fs.readFileSync(bannerPath, 'utf8');
     expect(src).toContain('useState<boolean>(false)');
-    expect(src).toContain('Steps ({steps.length})');
+    expect(src).toContain('Steps (${steps.length})');
   });
 
   it('3. /trading places Trade Ticket above-the-fold and unifies Orderbook + AI Signal + Alerts into 1 tabbed panel', () => {

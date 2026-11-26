@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import {
+  resolveLocalizedText,
   translateKey,
   type AppLocale,
 } from '@packages/shared/i18n-dictionary';
@@ -13,7 +14,7 @@ interface LocaleContextValue {
   setLocale: (next: AppLocale) => void;
   toggleLocale: () => void;
   t: (key: string) => string;
-  tr: (enText: string, idText: string) => string;
+  tr: (enText: string, idText: string, cnText?: string) => string;
 }
 
 const LocaleContext = createContext<LocaleContextValue>({
@@ -24,15 +25,19 @@ const LocaleContext = createContext<LocaleContextValue>({
   tr: (enText) => enText,
 });
 
+function toHtmlLang(loc: AppLocale): string {
+  return loc === 'cn' ? 'zh-CN' : loc;
+}
+
 export function LocaleProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState<AppLocale>('en');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const saved = window.localStorage.getItem('poolnet_locale');
-    if (saved === 'id' || saved === 'en') {
+    if (saved === 'id' || saved === 'en' || saved === 'cn') {
       setLocaleState(saved);
-      document.documentElement.lang = saved;
+      document.documentElement.lang = toHtmlLang(saved);
     }
   }, []);
 
@@ -40,16 +45,18 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
     setLocaleState(next);
     if (typeof window !== 'undefined') {
       window.localStorage.setItem('poolnet_locale', next);
-      document.documentElement.lang = next;
+      document.documentElement.lang = toHtmlLang(next);
     }
   };
 
   const toggleLocale = () => {
-    setLocale(locale === 'en' ? 'id' : 'en');
+    const next: AppLocale = locale === 'en' ? 'id' : locale === 'id' ? 'cn' : 'en';
+    setLocale(next);
   };
 
   const t = (key: string) => translateKey(locale, key);
-  const tr = (enText: string, idText: string) => (locale === 'id' ? idText : enText);
+  const tr = (enText: string, idText: string, cnText?: string) =>
+    resolveLocalizedText(locale, enText, idText, cnText);
 
   return (
     <LocaleContext.Provider value={{ locale, setLocale, toggleLocale, t, tr }}>

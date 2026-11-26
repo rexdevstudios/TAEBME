@@ -1059,21 +1059,21 @@ export default function TradingPage() {
                   onClick={() => setIntelPanelTab('orderbook')}
                   className={`btn-pill ${intelPanelTab === 'orderbook' ? 'active' : ''}`}
                 >
-                  <BarChart3 size={13} /> Orderbook
+                  <BarChart3 size={13} /> {tr('Orderbook', 'Orderbook', '订单簿')}
                 </button>
                 <button
                   type="button"
                   onClick={() => setIntelPanelTab('signal')}
                   className={`btn-pill ${intelPanelTab === 'signal' ? 'active' : ''}`}
                 >
-                  <BrainCircuit size={13} /> AI Signal ({signal ? `${(signal.computedConfidenceScore * 100).toFixed(0)}%` : '85%'})
+                  <BrainCircuit size={13} /> {tr('AI Signal', 'Sinyal AI', 'AI 信号')} ({signal ? `${(signal.computedConfidenceScore * 100).toFixed(0)}%` : '85%'})
                 </button>
                 <button
                   type="button"
                   onClick={() => setIntelPanelTab('alerts')}
                   className={`btn-pill ${intelPanelTab === 'alerts' ? 'active' : ''}`}
                 >
-                  <AlertTriangle size={13} /> Alerts ({tradingAnalysis?.alerts?.length ?? 0})
+                  <AlertTriangle size={13} /> {tr('Alerts', 'Peringatan', '预警')} ({tradingAnalysis?.alerts?.length ?? 0})
                 </button>
               </div>
               {intelPanelTab === 'orderbook' && (
@@ -1718,12 +1718,12 @@ export default function TradingPage() {
                     aria-label="Approve trade proposal and submit as trade intent"
                   >
                     {executionMode === 'DEX_NON_CUSTODIAL' && dexTokenSafety?.hardBlocked
-                      ? 'Diblokir (Honeypot)'
+                      ? tr('Blocked (Honeypot)', 'Diblokir (Honeypot)', '已拦截（貔貅盘）')
                       : isSubmitting
-                      ? 'Processing...'
+                      ? tr('Processing...', 'Memproses...', '处理中...')
                       : proposalStatus === 'APPROVED'
-                      ? 'Approved ✓'
-                      : 'Approve Proposal'}
+                      ? tr('Approved ✓', 'Disetujui ✓', '已确认 ✓')
+                      : tr('Approve Proposal', 'Setujui Order', '确认下单')}
                   </button>
 
                   <button
@@ -1733,7 +1733,9 @@ export default function TradingPage() {
                     style={{ flex: 1, justifyContent: 'center', opacity: proposalStatus === 'REJECTED' ? 0.5 : 1 }}
                     aria-label="Reject trade proposal"
                   >
-                    {proposalStatus === 'REJECTED' ? 'Rejected ✗' : 'Reject Proposal'}
+                    {proposalStatus === 'REJECTED'
+                      ? tr('Rejected ✗', 'Ditolak ✗', '已拒绝 ✗')
+                      : tr('Reject Proposal', 'Tolak Order', '拒绝')}
                   </button>
                 </div>
               </div>

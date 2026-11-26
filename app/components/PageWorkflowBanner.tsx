@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { CheckCircle2, Lock, ArrowRight, Coins, ChevronDown, ChevronRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useLocale } from '../context/LocaleContext';
 
 export interface WorkflowStepItem {
   step: string;
@@ -34,6 +35,7 @@ export function PageWorkflowBanner({
   creditSummary,
 }: PageWorkflowBannerProps) {
   const { isConnected, planId, userRole, credits } = useAuth();
+  const { tr } = useLocale();
   const [showSteps, setShowSteps] = useState<boolean>(false);
   const activePlan = (planId || 'FREE').toUpperCase();
 
@@ -77,7 +79,11 @@ export function PageWorkflowBanner({
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           {!isConnected ? (
             <span style={{ fontSize: '11px', color: 'var(--color-muted)' }}>
-              Mode Pengunjung (Hubungkan Dompet MetaMask untuk akses penuh)
+              {tr(
+                'Guest Mode (Connect MetaMask for full access)',
+                'Mode Pengunjung (Hubungkan Dompet MetaMask untuk akses penuh)',
+                '访客模式（连接 MetaMask 以解锁完整功能）'
+              )}
             </span>
           ) : isUnlocked ? (
             <span
@@ -96,7 +102,12 @@ export function PageWorkflowBanner({
               }}
             >
               <CheckCircle2 size={12} />
-              {unlockedLabel || `Aktif: Paket ${activePlan} (${userRole}) · ${credits.toLocaleString()} cr`}
+              {unlockedLabel ||
+                tr(
+                  `Active: ${activePlan} (${userRole}) · ${credits.toLocaleString()} cr`,
+                  `Aktif: Paket ${activePlan} (${userRole}) · ${credits.toLocaleString()} cr`,
+                  `当前套餐: ${activePlan} (${userRole}) · ${credits.toLocaleString()} 积分`
+                )}
             </span>
           ) : (
             <Link
@@ -117,7 +128,11 @@ export function PageWorkflowBanner({
               }}
             >
               <Lock size={12} />
-              Paket {activePlan} — Upgrade ke {requiredPlanLabel} →
+              {tr(
+                `${activePlan} Plan — Upgrade to ${requiredPlanLabel} →`,
+                `Paket ${activePlan} — Upgrade ke ${requiredPlanLabel} →`,
+                `${activePlan} 套餐 — 升级至 ${requiredPlanLabel} →`
+              )}
             </Link>
           )}
           <button
@@ -139,7 +154,7 @@ export function PageWorkflowBanner({
             }}
           >
             {showSteps ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-            Steps ({steps.length})
+            {tr(`Steps (${steps.length})`, `Langkah (${steps.length})`, `步骤 (${steps.length})`)}
           </button>
         </div>
       </div>
