@@ -18,6 +18,7 @@ import { AdminWhiteLabelPartnersPanel } from '../components/AdminWhiteLabelPartn
 import { AdminGenesisSnapshotPanel } from '../components/AdminGenesisSnapshotPanel';
 import { AdminKolVerificationPanel } from '../components/AdminKolVerificationPanel';
 import { OwnedWalletsAllowlistPanel } from '../components/OwnedWalletsAllowlistPanel';
+import { CollapsibleSection } from '../components/CollapsibleSection';
 
 interface LedgerEntry {
   id: string;
@@ -1008,14 +1009,33 @@ export default function BillingPage() {
         </div>
       </div>
 
-      {/* Live Modular Provider & AI Engine Registry (GET /api/providers/registry) */}
-      <ProviderRegistryStatusPanel />
+      {/* Grouped Secondary Vault & Security Panels (Progressive Disclosure — Phase EQ) */}
+      <CollapsibleSection
+        title="Owned Sub-Wallet Allowlist (AI Copilot Transfer Guard)"
+        badge="ECDSA Verified"
+        subtitle="Whitelist wallet milik sendiri untuk transfer & fee sweep"
+        defaultOpen={false}
+      >
+        <OwnedWalletsAllowlistPanel isConnected={isConnected} />
+      </CollapsibleSection>
 
-      {/* Outbound Alert Webhooks (SSRF-Safe HTTPS · Discord / Custom Endpoint + Test Ping) */}
-      <UserWebhookVaultPanel isConnected={isConnected} />
+      <CollapsibleSection
+        title="Outbound Alert Webhooks (Discord / Custom HTTPS)"
+        badge="SSRF-Safe"
+        subtitle="Notifikasi trade & launch otomatis ke webhook Anda"
+        defaultOpen={false}
+      >
+        <UserWebhookVaultPanel isConnected={isConnected} />
+      </CollapsibleSection>
 
-      {/* Multi-Owned Sub-Wallet Allowlist (ECDSA Proof-of-Ownership · AI Copilot Transfer Guard) */}
-      <OwnedWalletsAllowlistPanel isConnected={isConnected} />
+      <CollapsibleSection
+        title="Modular Provider & AI Engine Registry"
+        badge="System Status"
+        subtitle="BytePlus ModelArk, 0x v2, CEX & Launchpad status"
+        defaultOpen={false}
+      >
+        <ProviderRegistryStatusPanel />
+      </CollapsibleSection>
         </div>
       )}
 
@@ -1275,9 +1295,30 @@ export default function BillingPage() {
           </div>
 
           <AdminOpsHealthPanel />
-          <AdminWhiteLabelPartnersPanel />
-          <AdminGenesisSnapshotPanel />
-          <AdminKolVerificationPanel />
+          <CollapsibleSection
+            title="White-Label B2B Partners"
+            badge="Admin"
+            subtitle="Manage B2B partner API keys & revenue share"
+            defaultOpen={false}
+          >
+            <AdminWhiteLabelPartnersPanel />
+          </CollapsibleSection>
+          <CollapsibleSection
+            title="Genesis SBT Snapshot & Merkle Export"
+            badge="Admin"
+            subtitle="Snapshot eligible wallets & generate proof trees"
+            defaultOpen={false}
+          >
+            <AdminGenesisSnapshotPanel />
+          </CollapsibleSection>
+          <CollapsibleSection
+            title="KOL Verification Queue & Dataset Snapshots"
+            badge="Admin"
+            subtitle="Review KOL applications & consensus archives"
+            defaultOpen={false}
+          >
+            <AdminKolVerificationPanel />
+          </CollapsibleSection>
 
           <div className="grid-4">
             <div className="bg-panel" style={{ border: '1px solid var(--color-border)', padding: '16px', borderRadius: '6px' }}>

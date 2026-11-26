@@ -11,6 +11,7 @@ import { AdminMerkleSnapshotPanel } from '../components/AdminMerkleSnapshotPanel
 import { CreatorStudioPanel } from '../components/CreatorStudioPanel';
 import { PageWorkflowBanner } from '../components/PageWorkflowBanner';
 import { NetworkMismatchBanner } from '../components/NetworkMismatchBanner';
+import { CollapsibleSection } from '../components/CollapsibleSection';
 import { resolveLaunchpadChainHex } from '@packages/trading/paper-wallet';
 import { TokenAvatar } from '../components/TokenAvatar';
 import { BankrKeyVaultPanel } from '../components/BankrKeyVaultPanel';
@@ -1303,35 +1304,42 @@ export default function LaunchpadPage() {
                   <Zap size={14} /> Settlement Layer: {selectedChain === 'robinhood' ? 'Robinhood Chain L2' : 'Base Blockchain'}
                 </div>
                 {userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN' ? (
-                  <div>
-                    <p style={{ fontSize: '11px', color: 'var(--color-muted)', marginBottom: '10px' }}>
-                      Sebagai <strong>Protocol Admin</strong>, Anda dapat mendaftarkan token ini langsung ke smart contract <code>BondingCurveLaunchpad.sol</code> (<code>onlyOwner</code>).
-                    </p>
-                    <input
-                      type="text"
-                      placeholder="Deployed ERC-20 Token Address (0x...)"
-                      value={onChainTokenAddress}
-                      onChange={(e) => setOnChainTokenAddress(e.target.value)}
-                      className="input"
-                      style={{ width: '100%', padding: '8px 10px', fontSize: '11px', fontFamily: 'var(--font-mono)', marginBottom: '8px' }}
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-primary w-full"
-                      onClick={handleRegisterOnChain}
-                      disabled={isRegisteringOnChain || !!publishedTxHash}
-                      style={{ padding: '10px', fontSize: '12px', justifyContent: 'center' }}
+                  <div style={{ marginBottom: '10px' }}>
+                    <CollapsibleSection
+                      title="BondingCurveLaunchpad.sol On-Chain Registration"
+                      badge={getContractConfiguration(ssotFactoryAddress).isConfigured ? 'Admin · Active' : 'Admin · Optional'}
+                      subtitle="onlyOwner direct factory registration"
+                      defaultOpen={false}
                     >
-                      {isRegisteringOnChain
-                        ? `Memproses di Blockchain ${selectedChain === 'robinhood' ? 'Robinhood L2' : 'Base'}...`
-                        : publishedTxHash
-                        ? 'OK: Terdaftar On-Chain'
-                        : 'Register Token Launch On-Chain'}
-                    </button>
+                      <p style={{ fontSize: '11px', color: 'var(--color-muted)', marginBottom: '10px' }}>
+                        Sebagai <strong>Protocol Admin</strong>, Anda dapat mendaftarkan token ini langsung ke smart contract <code>BondingCurveLaunchpad.sol</code> (<code>onlyOwner</code>).
+                      </p>
+                      <input
+                        type="text"
+                        placeholder="Deployed ERC-20 Token Address (0x...)"
+                        value={onChainTokenAddress}
+                        onChange={(e) => setOnChainTokenAddress(e.target.value)}
+                        className="input"
+                        style={{ width: '100%', padding: '8px 10px', fontSize: '11px', fontFamily: 'var(--font-mono)', marginBottom: '8px' }}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-primary w-full"
+                        onClick={handleRegisterOnChain}
+                        disabled={isRegisteringOnChain || !!publishedTxHash}
+                        style={{ padding: '10px', fontSize: '12px', justifyContent: 'center' }}
+                      >
+                        {isRegisteringOnChain
+                          ? `Memproses di Blockchain ${selectedChain === 'robinhood' ? 'Robinhood L2' : 'Base'}...`
+                          : publishedTxHash
+                          ? 'OK: Terdaftar On-Chain'
+                          : 'Register Token Launch On-Chain'}
+                      </button>
+                    </CollapsibleSection>
                   </div>
                 ) : (
                   <div style={{ fontSize: '11px', color: 'var(--color-muted)', lineHeight: '1.5' }}>
-                    Fungsi on-chain langsung (<code>registerTokenLaunch</code>) diproteksi modifier <code>onlyOwner</code>. Sebagai <strong>Creator</strong>, Anda dapat langsung menggunakan jalur <strong>Bankr Gas-Sponsored Pipeline</strong> di bawah:
+                    Gunakan jalur utama <strong>Bankr / Doppler Gas-Sponsored Pipeline</strong> di bawah untuk langsung men-deploy token Anda:
                   </div>
                 )}
 

@@ -1,8 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
-import { CheckCircle2, Lock, ArrowRight, Coins } from 'lucide-react';
+import { CheckCircle2, Lock, ArrowRight, Coins, ChevronDown, ChevronRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export interface WorkflowStepItem {
@@ -34,6 +34,7 @@ export function PageWorkflowBanner({
   creditSummary,
 }: PageWorkflowBannerProps) {
   const { isConnected, planId, userRole, credits } = useAuth();
+  const [showSteps, setShowSteps] = useState<boolean>(false);
   const activePlan = (planId || 'FREE').toUpperCase();
 
   return (
@@ -41,11 +42,11 @@ export function PageWorkflowBanner({
       className="bg-panel"
       style={{
         borderRadius: '8px',
-        padding: '12px 16px',
+        padding: '9px 14px',
         border: `1px solid ${isUnlocked ? 'rgba(34, 197, 94, 0.25)' : 'rgba(245, 158, 11, 0.35)'}`,
         display: 'flex',
         flexDirection: 'column',
-        gap: '10px',
+        gap: showSteps ? '10px' : '0px',
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
@@ -119,10 +120,32 @@ export function PageWorkflowBanner({
               Paket {activePlan} — Upgrade ke {requiredPlanLabel} →
             </Link>
           )}
+          <button
+            type="button"
+            onClick={() => setShowSteps((v) => !v)}
+            aria-expanded={showSteps}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '3px 8px',
+              borderRadius: '6px',
+              border: '1px solid var(--color-border)',
+              backgroundColor: 'var(--color-surface-subtle)',
+              color: 'var(--color-muted)',
+              fontSize: '11px',
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            {showSteps ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+            Steps ({steps.length})
+          </button>
         </div>
       </div>
 
-      {/* Horizontal Stepper */}
+      {/* Horizontal Stepper (Collapsed by default to reduce visual clutter) */}
+      {showSteps && (
       <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
         {steps.map((item, idx) => (
           <React.Fragment key={item.step}>
@@ -160,6 +183,7 @@ export function PageWorkflowBanner({
           </React.Fragment>
         ))}
       </div>
+      )}
     </div>
   );
 }

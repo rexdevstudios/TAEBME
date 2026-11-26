@@ -384,6 +384,7 @@ export default function TradingPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [historyRefreshTick, setHistoryRefreshTick] = useState(0);
   const [activeTradingTab, setActiveTradingTab] = useState<'trade' | 'history' | 'vault'>('trade');
+  const [intelPanelTab, setIntelPanelTab] = useState<'orderbook' | 'signal' | 'alerts'>('orderbook');
 
   // Controlled order parameters & deep-link context (Launchpad ?token= & Agent ?proposalId=)
   const [executionMode, setExecutionMode] = useState<'PAPER' | 'DEX_NON_CUSTODIAL' | 'CEX_SINGLE_SHOT'>('PAPER');
@@ -1048,148 +1049,165 @@ export default function TradingPage() {
             </div>
           </div>
 
-          {/* Multi-Factor Market Alerts Banner */}
-          {tradingAnalysis && tradingAnalysis.alerts.length > 0 && (
-            <div className="bg-panel" style={{ padding: '16px', borderRadius: '8px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: 'var(--color-foreground)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <AlertTriangle size={16} className="text-accent" /> Multi-Factor Market Alerts ({tradingAnalysis.alerts.length})
-                </h3>
-                {tradingAnalysis.tradingPaused && (
-                  <span className="badge badge-admin">
-                    TRADING PAUSED BY ALERT ENGINE
+          {/* Unified Market Intelligence & Depth Panel (Orderbook · AI Signal · Alerts — Phase EQ) */}
+          <div className="bg-panel" style={{ padding: '14px 16px', borderRadius: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => setIntelPanelTab('orderbook')}
+                  className={intelPanelTab === 'orderbook' ? 'btn-primary' : 'btn-secondary'}
+                  style={{ padding: '5px 10px', fontSize: '11px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                >
+                  <BarChart3 size={13} /> Orderbook
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIntelPanelTab('signal')}
+                  className={intelPanelTab === 'signal' ? 'btn-primary' : 'btn-secondary'}
+                  style={{ padding: '5px 10px', fontSize: '11px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                >
+                  <BrainCircuit size={13} /> AI Signal ({signal ? `${(signal.computedConfidenceScore * 100).toFixed(0)}%` : '85%'})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIntelPanelTab('alerts')}
+                  className={intelPanelTab === 'alerts' ? 'btn-primary' : 'btn-secondary'}
+                  style={{ padding: '5px 10px', fontSize: '11px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                >
+                  <AlertTriangle size={13} /> Alerts ({tradingAnalysis?.alerts?.length ?? 0})
+                </button>
+              </div>
+              {intelPanelTab === 'orderbook' && (
+                <span style={{ color: 'var(--color-accent)', fontSize: '11px', fontWeight: 800, fontFamily: 'var(--font-mono)' }}>
+                  Spread: {orderbook ? `${orderbook.spreadPct}%` : '0.02%'}
+                </span>
+              )}
+              {tradingAnalysis?.tradingPaused && (
+                <span className="badge badge-admin">TRADING PAUSED BY ALERT ENGINE</span>
+              )}
+            </div>
+
+            {intelPanelTab === 'orderbook' && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', fontFamily: 'var(--font-mono)' }}>
+                <div className="flex-col gap-xs">
+                  <div className="text-muted" style={{ fontSize: '10px', fontWeight: 800, marginBottom: '2px' }}>ASKS (SELL WALLS)</div>
+                  {orderbook?.asks.slice(0, 4).reverse().map(([p, q], i) => (
+                    <div
+                      key={i}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        color: 'var(--color-destructive)',
+                        fontSize: '12px',
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        backgroundColor: q > 10 ? 'rgba(239, 68, 68, 0.1)' : 'transparent',
+                      }}
+                    >
+                      <span>${p.toLocaleString()}</span>
+                      <span>{q.toFixed(2)} {symbol.replace('USDT', '')}</span>
+                    </div>
+                  )) || (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--color-destructive)', fontSize: '12px', padding: '4px 8px' }}>
+                      <span>$65,405.00</span>
+                      <span>15.00 BTC</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex-col gap-xs">
+                  <div className="text-muted" style={{ fontSize: '10px', fontWeight: 800, marginBottom: '2px' }}>
+                    BIDS (BUY WALLS) · Mid: ${((orderbook?.bestBid || 65400) + (orderbook?.bestAsk || 65405)) / 2}
+                  </div>
+                  {orderbook?.bids.slice(0, 4).map(([p, q], i) => (
+                    <div
+                      key={i}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        color: 'var(--color-accent)',
+                        fontSize: '12px',
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        backgroundColor: q > 10 ? 'rgba(16, 185, 129, 0.1)' : 'transparent',
+                      }}
+                    >
+                      <span>${p.toLocaleString()}</span>
+                      <span>{q.toFixed(2)} {symbol.replace('USDT', '')}</span>
+                    </div>
+                  )) || (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--color-accent)', fontSize: '12px', padding: '4px 8px' }}>
+                      <span>$65,400.00</span>
+                      <span>12.80 BTC</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {intelPanelTab === 'signal' && (
+              <div>
+                <div className="bg-panel" style={{ padding: '10px 12px', borderRadius: '6px', marginBottom: '10px', border: '1px solid var(--color-border)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <span className="text-muted" style={{ fontSize: '12px' }}>AI Feature Engine Confidence</span>
+                    <span style={{ color: 'var(--color-accent)', fontSize: '15px', fontWeight: 900, fontFamily: 'var(--font-mono)' }}>
+                      {signal ? `${(signal.computedConfidenceScore * 100).toFixed(1)}%` : '85.0%'}
+                    </span>
+                  </div>
+                  <div style={{ backgroundColor: 'var(--color-border)', height: '6px', borderRadius: '3px', overflow: 'hidden' }}>
+                    <div
+                      style={{
+                        backgroundColor: 'var(--color-accent)',
+                        height: '100%',
+                        width: `${(signal?.computedConfidenceScore || 0.85) * 100}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--color-foreground)', lineHeight: '1.5', marginBottom: '10px' }}>
+                  <strong className="text-muted">Rationale:</strong> {signal?.rationale || 'Counterparty cleared by On-Chain Guard (GoPlus + RPC) | Volatility LOW | Spread normal'}
+                </div>
+                <div className="flex-row gap-xs" style={{ flexWrap: 'wrap' }}>
+                  <span className="badge badge-trader">✓ On-Chain Guard {signal?.inputs.counterpartyRisk || 'CLEAR'}</span>
+                  <span className="badge badge-trader" style={{ border: '1px solid var(--color-badge-info-border)', color: 'var(--color-badge-info-text)', backgroundColor: 'var(--color-badge-info-bg)' }}>
+                    ✓ Sentiment {signal?.inputs.webSentiment || 'NEUTRAL'}
                   </span>
+                </div>
+              </div>
+            )}
+
+            {intelPanelTab === 'alerts' && (
+              <div className="flex-col gap-sm">
+                {tradingAnalysis && tradingAnalysis.alerts.length > 0 ? (
+                  tradingAnalysis.alerts.map((alert) => {
+                    const isCritical = alert.severity === 'CRITICAL' || alert.severity === 'WARNING';
+                    return (
+                      <div key={alert.alertId} className={isCritical ? 'bg-panel border-destructive' : 'bg-panel'} style={{ border: '1px solid ' + (isCritical ? 'var(--color-destructive)' : 'var(--color-accent)'), borderRadius: '6px', padding: '10px 12px' }}>
+                        <div style={{ fontWeight: 800, color: isCritical ? 'var(--color-destructive)' : 'var(--color-accent)', marginBottom: '4px', fontSize: '12px' }}>
+                          {alert.title}
+                        </div>
+                        <div className="text-muted" style={{ marginBottom: '6px', fontSize: '11px' }}>
+                          {alert.description}
+                        </div>
+                        <div style={{ color: 'var(--color-foreground)', fontSize: '11px', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Lightbulb size={12} /> Hint: {alert.actionableHint}
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="text-muted" style={{ fontSize: '12px', padding: '8px 0' }}>
+                    {tr('No active market risk alerts for this pair.', 'Tidak ada peringatan risiko pasar aktif untuk pair ini.')}
+                  </div>
                 )}
               </div>
-              <div className="flex-col gap-sm">
-                {tradingAnalysis.alerts.map((alert) => {
-                  const isCritical = alert.severity === 'CRITICAL' || alert.severity === 'WARNING';
-                  return (
-                    <div key={alert.alertId} className={isCritical ? 'bg-panel border-destructive' : 'bg-panel'} style={{ border: '1px solid ' + (isCritical ? 'var(--color-destructive)' : 'var(--color-accent)'), borderRadius: '6px', padding: '12px' }}>
-                      <div style={{ fontWeight: 800, color: isCritical ? 'var(--color-destructive)' : 'var(--color-accent)', marginBottom: '4px' }}>
-                        {alert.title}
-                      </div>
-                      <div className="text-muted" style={{ marginBottom: '8px', fontSize: '12px' }}>
-                        {alert.description}
-                      </div>
-                      <div style={{ color: 'var(--color-foreground)', fontSize: '11px', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Lightbulb size={12} /> Hint: {alert.actionableHint}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
-        {/* Right Column: AI Signal Overlay & Orderbook Depth */}
+        {/* Right Column: Trade Ticket Above-the-Fold (Exchange Standard — Phase EQ) */}
         <div className="flex-col gap-md">
-          {/* AI Intelligence Signal Overlay Panel */}
-          <div className="bg-panel" style={{ padding: '16px', borderRadius: '8px' }}>
-            <h3 style={{ fontSize: '14px', fontWeight: 800, margin: '0 0 12px 0', color: 'var(--color-accent-purple)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <BrainCircuit size={16} /> AI Feature Engine Signal
-            </h3>
-
-            <div className="bg-panel" style={{ padding: '12px', borderRadius: '6px', marginBottom: '12px', border: '1px solid var(--color-border)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <span className="text-muted" style={{ fontSize: '12px' }}>Confidence Score</span>
-                <span style={{ color: 'var(--color-accent)', fontSize: '16px', fontWeight: 900, fontFamily: 'var(--font-mono)' }}>
-                  {signal ? `${(signal.computedConfidenceScore * 100).toFixed(1)}%` : '85.0%'}
-                </span>
-              </div>
-              <div style={{ backgroundColor: 'var(--color-border)', height: '6px', borderRadius: '3px', overflow: 'hidden' }}>
-                <div
-                  style={{
-                    backgroundColor: 'var(--color-accent)',
-                    height: '100%',
-                    width: `${(signal?.computedConfidenceScore || 0.85) * 100}%`,
-                  }}
-                />
-              </div>
-            </div>
-
-            <div style={{ fontSize: '12px', color: 'var(--color-foreground)', lineHeight: '1.5', marginBottom: '12px' }}>
-              <strong className="text-muted">Rationale:</strong> {signal?.rationale || 'Counterparty cleared by On-Chain Guard (GoPlus + RPC) | Volatility LOW | Spread normal'}
-            </div>
-
-            <div className="flex-row gap-xs" style={{ flexWrap: 'wrap' }}>
-              <span className="badge badge-trader">
-                ✓ On-Chain Guard {signal?.inputs.counterpartyRisk || 'CLEAR'}
-              </span>
-              <span className="badge badge-trader" style={{ border: '1px solid var(--color-badge-info-border)', color: 'var(--color-badge-info-text)', backgroundColor: 'var(--color-badge-info-bg)' }}>
-                ✓ Sentiment {signal?.inputs.webSentiment || 'NEUTRAL'}
-              </span>
-            </div>
-          </div>
-
-          {/* High-Density Orderbook Depth & Whale Wall Panel */}
-          <div className="bg-panel" style={{ padding: '16px', borderRadius: '8px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <h3 style={{ fontSize: '14px', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <BarChart3 size={16} className="text-accent" /> Orderbook Depth
-              </h3>
-              <span style={{ color: 'var(--color-accent)', fontSize: '12px', fontWeight: 800, fontFamily: 'var(--font-mono)' }}>
-                Spread: {orderbook ? `${orderbook.spreadPct}%` : '0.02%'}
-              </span>
-            </div>
-
-            {/* Asks (Sells) */}
-            <div className="flex-col gap-xs" style={{ fontFamily: 'var(--font-mono)' }}>
-              {orderbook?.asks.slice(0, 4).reverse().map(([p, q], i) => (
-                <div
-                  key={i}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    color: 'var(--color-destructive)',
-                    fontSize: '12px',
-                    padding: '4px 8px',
-                    borderRadius: '4px',
-                    backgroundColor: q > 10 ? 'rgba(239, 68, 68, 0.1)' : 'transparent',
-                  }}
-                >
-                  <span>${p.toLocaleString()} {q > 10 ? '' : ''}</span>
-                  <span>{q.toFixed(2)} {symbol.replace('USDT', '')}</span>
-                </div>
-              )) || (
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--color-destructive)', fontSize: '12px', padding: '4px 8px' }}>
-                  <span>$65,405.00 </span>
-                  <span>15.00 BTC</span>
-                </div>
-              )}
-            </div>
-
-            <div style={{ textAlign: 'center', color: 'var(--color-muted)', fontSize: '12px', padding: '8px 0', borderTop: '1px dashed var(--color-border)', borderBottom: '1px dashed var(--color-border)', margin: '8px 0', fontFamily: 'var(--font-mono)' }}>
-              Midpoint: ${((orderbook?.bestBid || 65400) + (orderbook?.bestAsk || 65405)) / 2}
-            </div>
-
-            {/* Bids (Buys) */}
-            <div className="flex-col gap-xs" style={{ fontFamily: 'var(--font-mono)' }}>
-              {orderbook?.bids.slice(0, 4).map(([p, q], i) => (
-                <div
-                  key={i}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    color: 'var(--color-accent)',
-                    fontSize: '12px',
-                    padding: '4px 8px',
-                    borderRadius: '4px',
-                    backgroundColor: q > 10 ? 'rgba(16, 185, 129, 0.1)' : 'transparent',
-                  }}
-                >
-                  <span>${p.toLocaleString()} {q > 10 ? '' : ''}</span>
-                  <span>{q.toFixed(2)} {symbol.replace('USDT', '')}</span>
-                </div>
-              )) || (
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--color-accent)', fontSize: '12px', padding: '4px 8px' }}>
-                  <span>$65,400.00 </span>
-                  <span>12.80 BTC</span>
-                </div>
-              )}
-            </div>
-          </div>
 
           {/* Clean Trade Ticket (Beli / Jual) with Real-Time Balance & Network Sync */}
           <div className="bg-panel" style={{ padding: '16px', borderRadius: '8px', border: (userRole === 'SYSTEM_ADMIN' || userRole === 'SUPER_ADMIN') ? '1px solid var(--color-accent-amber)' : '1px solid var(--color-accent)' }}>
