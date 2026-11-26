@@ -7,6 +7,7 @@ import { useLocale } from '../context/LocaleContext';
 import { PageWorkflowBanner } from '../components/PageWorkflowBanner';
 import { NetworkMismatchBanner } from '../components/NetworkMismatchBanner';
 import { resolveDefaultBaseChainHex } from '@packages/trading/paper-wallet';
+import { buildAirdropReferralShareUrl } from '@packages/shared/airdrop-referral';
 import { WalletRiskBadgeCard } from '../components/WalletRiskBadgeCard';
 import {
   Award,
@@ -41,6 +42,7 @@ interface BountyCampaignView {
   creatorId: string;
   title: string;
   requiredHashtag: string;
+  requiredFollowHandle?: string | null;
   minFollowers: number;
   rewardPerKol: string;
   maxParticipants: number;
@@ -91,10 +93,13 @@ export default function KolHubPage() {
   // Creator form
   const [newTitle, setNewTitle] = useState('');
   const [newHashtag, setNewHashtag] = useState('#DegenMoon');
+  const [newFollowHandle, setNewFollowHandle] = useState('');
   const [newReward, setNewReward] = useState('1000');
   const [newMinFollowers, setNewMinFollowers] = useState(500);
   const [requiresHumanityProof, setRequiresHumanityProof] = useState(false);
   const [creatorFeedback, setCreatorFeedback] = useState<string | null>(null);
+  const [referrerWallet, setReferrerWallet] = useState<string | null>(null);
+  const [copiedRefCampaignId, setCopiedRefCampaignId] = useState<string | null>(null);
 
   // Load existing profile & campaigns with URL deep-linking support
   useEffect(() => {
@@ -104,6 +109,7 @@ export default function KolHubPage() {
       const tabParam = params.get('tab');
       const launchIdParam = params.get('launchId');
       const campaignIdParam = params.get('campaignId');
+      const refParam = params.get('ref');
 
       if (tabParam && ['PASSPORT', 'MARKET', 'CLAIM', 'CREATOR'].includes(tabParam.toUpperCase())) {
         setActiveTab(tabParam.toUpperCase() as any);
@@ -114,6 +120,9 @@ export default function KolHubPage() {
       }
       if (campaignIdParam) {
         setSelectedCampaignId(campaignIdParam);
+      }
+      if (refParam && /^0x[a-fA-F0-9]{40}$/.test(refParam.trim())) {
+        setReferrerWallet(refParam.trim());
       }
     }
 
@@ -275,6 +284,7 @@ export default function KolHubPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           campaignId: selectedCampaignId,
+          ...(referrerWallet ? { referrerWallet } : {}),
           proofUrl: proofPayload,
           walletAddress,
           twitterHandle: twitterHandle || 'rtrader_kol',
@@ -461,6 +471,7 @@ export default function KolHubPage() {
         body: JSON.stringify({
           title: newTitle,
           requiredHashtag: newHashtag,
+          ...(newFollowHandle.trim() ? { requiredFollowHandle: newFollowHandle.trim() } : {}),
           rewardPerKol: (BigInt(newReward) * 10n ** 18n).toString(),
           minFollowers: newMinFollowers,
           requiresHumanityProof,
@@ -471,6 +482,7 @@ export default function KolHubPage() {
         setCreatorFeedback('KAMPANYE BOUNTY DIBUAT! Alokasi token telah dicadangkan.');
         fetchCampaigns();
         setNewTitle('');
+        setNewFollowHandle('');
       } else {
         setCreatorFeedback(`Error: Gagal: ${json.error?.message}`);
       }
@@ -897,7 +909,14 @@ export default function KolHubPage() {
                         ) : isHold ? (
                           <span>Pegang token minimal di wallet tanpa menjual selama periode kampanye.</span>
                         ) : (
-                          <span>Wajib menyertakan hashtag resmi: <strong style={{ color: 'var(--color-accent-info)' }}>{c.requiredHashtag}</strong></span>
+                          <span>
+                            Wajib menyertakan hashtag resmi: <strong style={{ color: 'var(--color-accent-info)' }}>{c.requiredHashtag}</strong>
+                            {c.requiredFollowHandle && (
+                              <>
+                                {' '}· Follow <strong style={{ color: 'var(--color-accent-info)' }}>{c.requiredFollowHandle}</strong>
+                              </>
+                            )}
+                          </span>
                         )}
                       </p>
 
@@ -909,21 +928,45 @@ export default function KolHubPage() {
                         </div>
                       )}
 
-                      <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                         <span className="text-muted" style={{ fontSize: '12px' }}>
                           Min. Follower: {c.minFollowers.toLocaleString()}
                         </span>
-                        <button
-                          onClick={() => {
-                            setSelectedCampaignId(c.id);
-                            setActiveTab('CLAIM');
-                            checkMerkleProof();
-                          }}
-                          className="btn-primary"
-                          style={{ padding: '6px 12px', fontSize: '12px' }}
-                        >
-                          {isStake ? 'Mulai Staking' : isHold ? 'Ikuti Hold Loyalty' : 'Kerjakan Bounty'}
-                        </button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const shareUrl = buildAirdropReferralShareUrl({
+                                campaignId: c.id,
+                                referrerWallet: walletAddress,
+                                siteOrigin: typeof window !== 'undefined' ? window.location.origin : 'https://pndigi.site',
+                              });
+                              if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                                navigator.clipboard.writeText(shareUrl).catch(() => {});
+                              }
+                              setCopiedRefCampaignId(c.id);
+                              setTimeout(() => setCopiedRefCampaignId(null), 2200);
+                            }}
+                            className="btn-pill"
+                            style={{ padding: '5px 9px', fontSize: '11px' }}
+                            title={tr('Copy Airdrop Referral Link (+15 cr per verified claim)', 'Salin Link Referral Airdrop (+15 cr per klaim)', '复制空投邀请链接（每次验证奖励 +15 积分）')}
+                          >
+                            {copiedRefCampaignId === c.id
+                              ? tr('Copied ✓', 'Tersalin ✓', '已复制 ✓')
+                              : tr('Copy Ref (+15 cr)', 'Salin Ref (+15 cr)', '复制邀请 (+15 积分)')}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedCampaignId(c.id);
+                              setActiveTab('CLAIM');
+                              checkMerkleProof();
+                            }}
+                            className="btn-primary"
+                            style={{ padding: '6px 12px', fontSize: '12px' }}
+                          >
+                            {isStake ? 'Mulai Staking' : isHold ? 'Ikuti Hold Loyalty' : 'Kerjakan Bounty'}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -1346,6 +1389,19 @@ export default function KolHubPage() {
                 onChange={(e) => setNewHashtag(e.target.value)}
                 className="input"
                 required
+              />
+            </div>
+
+            <div>
+              <label className="text-muted" style={{ fontSize: '12px', display: 'block', marginBottom: '6px' }}>
+                {tr('Required X/Twitter Follow (Optional)', 'Wajib Follow Akun X/Twitter (Opsional)', '必关注 X/Twitter 账号（可选）')}
+              </label>
+              <input
+                type="text"
+                placeholder="@poolnet_xyz"
+                value={newFollowHandle}
+                onChange={(e) => setNewFollowHandle(e.target.value)}
+                className="input"
               />
             </div>
 

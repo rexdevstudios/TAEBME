@@ -360,14 +360,16 @@ export async function notifyPublicTelegramChannelBestEffort(
 export interface TelegramAirdropCampaignSummary {
   id: string;
   title: string;
+  description?: string;
   requiredHashtag?: string;
+  requiredFollowHandle?: string | null;
   currentParticipants?: number;
   maxParticipants?: number;
   isActive?: boolean;
 }
 
 /**
- * Pure, deterministic Telegram /airdrop command reply formatter (Phase EV).
+ * Pure, deterministic Telegram /airdrop command reply formatter (Phase EV + Phase EX).
  * Lists active non-custodial bounty/airdrop campaigns + Free-Mint Genesis SBT claim links.
  */
 export function formatTelegramAirdropListReply(params: {
@@ -395,7 +397,10 @@ export function formatTelegramAirdropListReply(params: {
       const max = Number(c.maxParticipants || 0);
       const slots = max > 0 ? ` [${cur}/${max} slots]` : '';
       const tag = c.requiredHashtag ? ` ${c.requiredHashtag}` : '';
-      lines.push(`- ${c.title}${tag}${slots}\n  Claim: ${origin}/kol?campaignId=${encodeURIComponent(c.id)}&tab=CLAIM`);
+      const followMatch = (c.description || '').match(/\[FOLLOW:@([A-Za-z0-9_]{1,30})\]/i);
+      const followHandle = c.requiredFollowHandle || (followMatch?.[1] ? `@${followMatch[1]}` : null);
+      const followStr = followHandle ? ` · Follow ${followHandle}` : '';
+      lines.push(`- ${c.title}${tag}${followStr}${slots}\n  Claim: ${origin}/kol?campaignId=${encodeURIComponent(c.id)}&tab=CLAIM`);
     }
   }
 

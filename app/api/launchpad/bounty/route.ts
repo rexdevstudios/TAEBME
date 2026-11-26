@@ -4,6 +4,11 @@ import { BountyCampaign } from '@packages/shared/types/domain';
 import { isValidCampaignTrustTier, CampaignTrustTier } from '@packages/shared/types/trust';
 import { defaultBountyDbAdapter } from '@packages/shared/db-pool';
 import { notifyPublicTelegramChannelBestEffort } from '@packages/notifications/webhook-dispatcher';
+import {
+  encodeRequiredFollowInDescription,
+  normalizeFollowHandle,
+  parseRequiredFollowFromDescription,
+} from '@packages/shared/airdrop-referral';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -13,6 +18,7 @@ export async function GET(req: NextRequest) {
   const serialized = campaigns.map((c) => ({
     ...c,
     rewardPerKol: c.rewardPerKol.toString(),
+    requiredFollowHandle: parseRequiredFollowFromDescription((c as any).description),
   }));
 
   const response: ApiResponse<typeof serialized> = {
@@ -78,11 +84,18 @@ export async function POST(req: NextRequest) {
       validatedMinTrustTier = minTrustTier;
     }
 
-    const newCampaign: BountyCampaign = {
+    const requiredFollowHandle = normalizeFollowHandle(body?.requiredFollowHandle);
+    const encodedDescription = encodeRequiredFollowInDescription(
+      typeof body?.description === 'string' ? body.description : '',
+      requiredFollowHandle
+    );
+
+    const newCampaign: BountyCampaign & { description?: string } = {
       id: `campaign-${Date.now()}`,
       launchId: launchId || `launch-${Date.now()}`,
       creatorId: session.user.userId,
       title,
+      description: encodedDescription,
       campaignType: 'BOUNTY',
       minTrustTier: validatedMinTrustTier,
       requiredHashtag: requiredHashtag.startsWith('#') ? requiredHashtag : `#${requiredHashtag}`,
@@ -99,17 +112,19 @@ export async function POST(req: NextRequest) {
     await notifyPublicTelegramChannelBestEffort({
       event: 'AIRDROP_CAMPAIGN_CREATED',
       title: `New Airdrop / KOL Bounty: ${newCampaign.title}`,
-      message: `Hashtag: ${newCampaign.requiredHashtag} · Slots: ${newCampaign.maxParticipants}\nJoin & Claim (SIWE + GoPlus Verified): https://pndigi.site/kol?campaignId=${encodeURIComponent(savedId)}&tab=CLAIM`,
+      message: `Hashtag: ${newCampaign.requiredHashtag}${requiredFollowHandle ? ` · Follow: ${requiredFollowHandle}` : ''} · Slots: ${newCampaign.maxParticipants}\nJoin & Claim (SIWE + GoPlus Verified): https://pndigi.site/kol?campaignId=${encodeURIComponent(savedId)}&tab=CLAIM`,
       metadata: {
         campaignId: savedId,
         maxParticipants: newCampaign.maxParticipants,
         hashtag: newCampaign.requiredHashtag,
+        ...(requiredFollowHandle ? { requiredFollowHandle } : {}),
       },
     });
 
     const serialized = {
       ...newCampaign,
       rewardPerKol: newCampaign.rewardPerKol.toString(),
+      requiredFollowHandle,
     };
 
     const response: ApiResponse<typeof serialized> = {
