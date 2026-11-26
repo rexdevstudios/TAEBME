@@ -1456,7 +1456,7 @@ export default function LaunchpadPage() {
           </h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <span className="badge" style={{ backgroundColor: 'var(--color-badge-info-bg)', color: 'var(--color-badge-info-text)', border: '1px solid var(--color-badge-info-border)', fontSize: '11px', fontWeight: 800 }}>
-              {filteredTokens.length} / {activeTokens.length} TOKEN AKTIF
+              {filteredTokens.length} / {activeTokens.length} {tr('ACTIVE TOKENS', 'TOKEN AKTIF', '活跃代币')}
             </span>
             <button
               type="button"
@@ -1465,7 +1465,9 @@ export default function LaunchpadPage() {
               style={{ padding: '6px 12px', fontSize: '11px' }}
               disabled={isLoadingTokens}
             >
-              {isLoadingTokens ? 'Memuat...' : 'Refresh Daftar'}
+              {isLoadingTokens
+                ? tr('Loading...', 'Memuat...', '加载中...')
+                : tr('Refresh List', 'Refresh Daftar', '刷新列表')}
             </button>
           </div>
         </div>
@@ -1501,7 +1503,11 @@ export default function LaunchpadPage() {
                 type="text"
                 value={tokenSearch}
                 onChange={(e) => setTokenSearch(e.target.value)}
-                placeholder="Cari nama token, $TICKER, atau 0x..."
+                placeholder={tr(
+                  'Search token name, $TICKER, @kol, or 0x...',
+                  'Cari nama token, $TICKER, @kol, atau 0x...',
+                  '搜索代币名称、$TICKER、@kol 或 0x...'
+                )}
                 className="input"
                 style={{ width: '100%', padding: '7px 12px 7px 32px', fontSize: '12px', borderRadius: '9999px' }}
               />
@@ -1510,10 +1516,10 @@ export default function LaunchpadPage() {
             {/* Sort / Category Tabs */}
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
               {[
-                { id: 'trending' as LaunchpadSortMode, label: 'Sedang Ramai' },
-                { id: 'newest' as LaunchpadSortMode, label: 'Terbaru' },
-                { id: 'graduating' as LaunchpadSortMode, label: 'Hampir Graduasi' },
-                { id: 'safest' as LaunchpadSortMode, label: 'Skor Aman' },
+                { id: 'trending' as LaunchpadSortMode, label: tr('Trending', 'Sedang Ramai', '热门') },
+                { id: 'newest' as LaunchpadSortMode, label: tr('Newest', 'Terbaru', '最新') },
+                { id: 'graduating' as LaunchpadSortMode, label: tr('Near Graduation', 'Hampir Graduasi', '即将毕业') },
+                { id: 'safest' as LaunchpadSortMode, label: tr('Safest Score', 'Skor Aman', '安全评分') },
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -1553,10 +1559,10 @@ export default function LaunchpadPage() {
           {/* Chain Filter Pills */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '11px', color: 'var(--color-muted)', fontWeight: 700, marginRight: '4px' }}>
-              Jaringan:
+              {tr('Network:', 'Jaringan:', '网络：')}
             </span>
             {[
-              { id: 'all', label: 'Semua' },
+              { id: 'all', label: tr('All', 'Semua', '全部') },
               { id: 'base', label: 'Base' },
               { id: 'robinhood', label: 'Robinhood' },
               { id: 'solana', label: 'Solana' },
@@ -1998,7 +2004,7 @@ export default function LaunchpadPage() {
                   className="btn-secondary"
                   style={{ padding: '6px 14px', fontSize: '11px' }}
                 >
-                  Tampilkan Semua Token ({activeTokens.length})
+                  {tr('Show All Tokens', 'Tampilkan Semua Token', '显示全部代币')} ({activeTokens.length})
                 </button>
               </div>
             ) : (

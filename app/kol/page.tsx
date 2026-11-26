@@ -762,11 +762,11 @@ export default function KolHubPage() {
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span style={{ fontSize: '20px', fontWeight: 800 }}>
-                    {kolProfile?.twitterHandle ? `@${kolProfile.twitterHandle}` : 'Belum Ditautkan'}
+                    {kolProfile?.twitterHandle ? `@${kolProfile.twitterHandle}` : tr('Not Linked', 'Belum Ditautkan', '未绑定')}
                   </span>
                   {kolProfile?.isVerified && (
                     <span className="badge badge-trader" style={{ fontSize: '11px' }}>
-                      <CheckCircle2 size={12} style={{ display: 'inline', marginRight: '4px' }} /> TERVERIFIKASI
+                      <CheckCircle2 size={12} style={{ display: 'inline', marginRight: '4px' }} /> {tr('VERIFIED', 'TERVERIFIKASI', '已验证')}
                     </span>
                   )}
                 </div>
@@ -803,11 +803,15 @@ export default function KolHubPage() {
 
             <div style={{ marginTop: '20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
-                <span className="text-muted" style={{ fontSize: '11px', display: 'block' }}>Klaim Bounty Selesai</span>
+                <span className="text-muted" style={{ fontSize: '11px', display: 'block' }}>
+                  {tr('Completed Bounty Claims', 'Klaim Bounty Selesai', '已完成赏金领取')}
+                </span>
                 <strong style={{ fontSize: '18px' }}>{kolProfile?.completedBounties || 0}</strong>
               </div>
               <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
-                <span className="text-muted" style={{ fontSize: '11px', display: 'block' }}>Total Reward Didapat</span>
+                <span className="text-muted" style={{ fontSize: '11px', display: 'block' }}>
+                  {tr('Total Rewards Earned', 'Total Reward Didapat', '累计获得奖励')}
+                </span>
                 <strong style={{ fontSize: '18px', color: '#10B981' }}>${kolProfile?.totalEarnedUsd || 0}</strong>
               </div>
               <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
@@ -947,7 +951,7 @@ export default function KolHubPage() {
                   className="btn-secondary"
                   style={{ padding: '4px 10px', fontSize: '11px', color: 'var(--color-foreground)' }}
                 >
-                  Tampilkan Semua Kampanye ✕
+                  {tr('Show All Campaigns', 'Tampilkan Semua Kampanye', '显示全部活动')} ✕
                 </button>
               </div>
             )}
@@ -960,7 +964,7 @@ export default function KolHubPage() {
                 className={campaignTypeFilter === 'ALL' ? 'btn-primary' : 'btn-secondary'}
                 style={{ padding: '6px 14px', fontSize: '12px', borderRadius: '20px' }}
               >
-                Semua Kampanye ({campaigns.length})
+                {tr('All Campaigns', 'Semua Kampanye', '全部活动')} ({campaigns.length})
               </button>
               <button
                 type="button"

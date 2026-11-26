@@ -262,7 +262,7 @@ export default function OverviewPage() {
           textAlign: 'center',
         }}>
           <h2 style={{ fontSize: '28px', fontWeight: 800, margin: '0 0 var(--space-xl) 0', letterSpacing: '-0.5px' }}>
-            Start in 3 steps
+            {tr('Start in 3 steps', 'Mulai dalam 3 langkah', '三步快速开始')}
           </h2>
           <div style={{
             display: 'grid',
@@ -272,9 +272,36 @@ export default function OverviewPage() {
             margin: '0 auto',
           }}>
             {[
-              { n: '1', title: 'Connect Wallet', desc: 'Sign-In with Ethereum (EIP-4361 SIWE) for non-custodial authentication.', color: 'var(--color-accent-info)' },
-              { n: '2', title: 'Launch / Pick Pool', desc: 'Create your token on a bonding curve, or explore existing KOL deal rooms.', color: '#22C55E' },
-              { n: '3', title: 'Trade & Graduate', desc: 'Buy tokens on the curve. At 24 ETH, liquidity auto-migrates to Aerodrome DEX.', color: 'var(--color-accent-purple)' },
+              {
+                n: '1',
+                title: tr('Connect Wallet', 'Hubungkan Dompet', '连接钱包'),
+                desc: tr(
+                  'Sign-In with Ethereum (EIP-4361 SIWE) for non-custodial authentication.',
+                  'Sign-In with Ethereum (EIP-4361 SIWE) untuk otentikasi 100% non-custodial.',
+                  '使用以太坊登录（EIP-4361 SIWE）进行 100% 非托管认证。'
+                ),
+                color: 'var(--color-accent-info)',
+              },
+              {
+                n: '2',
+                title: tr('Launch / Pick Pool', 'Luncurkan / Pilih Pool', '发行或选择池子'),
+                desc: tr(
+                  'Create your token on a bonding curve, or explore existing KOL deal rooms.',
+                  'Buat token di kurva bonding, atau jelajahi deal room KOL yang tersedia.',
+                  '在联合曲线上创建代币，或探索已有的 KOL 合作房间。'
+                ),
+                color: '#22C55E',
+              },
+              {
+                n: '3',
+                title: tr('Trade & Graduate', 'Trading & Graduasi DEX', '交易并自动毕业'),
+                desc: tr(
+                  'Buy tokens on the curve. At 24 ETH, liquidity auto-migrates to Aerodrome DEX.',
+                  'Beli token di kurva. Saat mencapai 24 ETH, likuiditas otomatis migrasi ke Aerodrome DEX.',
+                  '在联合曲线交易代币。达到 24 ETH 后，流动性自动迁移至 Aerodrome DEX。'
+                ),
+                color: 'var(--color-accent-purple)',
+              },
             ].map(step => (
               <div key={step.n} className="glass-panel" style={{ padding: '28px 24px' }}>
                 <div style={{
@@ -306,7 +333,9 @@ export default function OverviewPage() {
               style={{ fontSize: '16px', padding: '16px 40px' }}
             >
               <Wallet size={20} />
-              {isConnecting ? 'Menghubungkan...' : 'Get Started — Connect Wallet'}
+              {isConnecting
+                ? tr('Connecting...', 'Menghubungkan...', '连接中...')
+                : tr('Get Started — Connect Wallet', 'Mulai Sekarang — Hubungkan Dompet', '立即开始 — 连接钱包')}
             </button>
             {connectError && (
               <p className="text-destructive" style={{ marginTop: 'var(--space-md)', fontWeight: 600 }}>

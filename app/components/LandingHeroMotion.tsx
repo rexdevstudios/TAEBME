@@ -5,6 +5,7 @@ import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useGSAP } from '@gsap/react';
 import { Rocket, Network, Wallet, Lock, Zap, Activity, ShieldAlert, Award, ArrowUpRight } from 'lucide-react';
+import { useLocale } from '../context/LocaleContext';
 
 gsap.registerPlugin(ScrollTrigger, useGSAP);
 
@@ -27,6 +28,7 @@ export function LandingHeroMotion({
   connectError,
   onConnectMetaMask,
 }: LandingHeroMotionProps) {
+  const { tr } = useLocale();
   const containerRef = useRef<HTMLDivElement>(null);
   const [liveTokens, setLiveTokens] = useState<Array<{ ticker: string; name: string; chain: string; contractAddress: string }>>([]);
 
@@ -188,7 +190,11 @@ export function LandingHeroMotion({
                 fontSize: '12px',
               }}
             >
-              ✦ AI-Powered Social Liquidity &amp; Launchpad on Base
+              {tr(
+                'AI-Powered Social Liquidity & Launchpad on Base',
+                'Likuiditas Sosial & Launchpad Berbasis AI di Base',
+                'Base 链上 AI 社交流动性与发行平台'
+              )}
             </span>
           </div>
 
@@ -203,7 +209,13 @@ export function LandingHeroMotion({
               letterSpacing: '-1.5px',
             }}
           >
-            <span className="hero-headline">The Autonomous Social Liquidity</span>
+            <span className="hero-headline">
+              {tr(
+                'The Autonomous Social Liquidity',
+                'Mesin Likuiditas Sosial Otonom',
+                '自主社交流动性引擎'
+              )}
+            </span>
             <br />
             <span
               style={{
@@ -213,7 +225,11 @@ export function LandingHeroMotion({
                 backgroundClip: 'text',
               }}
             >
-              &amp; Bonding Curve Engine on Base
+              {tr(
+                '& Bonding Curve Engine on Base',
+                '& Kurva Bonding di Base',
+                '与 Base 联合曲线发行协议'
+              )}
             </span>
           </h1>
 
@@ -227,17 +243,20 @@ export function LandingHeroMotion({
               margin: '0 auto var(--space-lg) auto',
             }}
           >
-            Luncurkan token dengan kurva likuiditas otomatis, kolaborasi bersama KOL terverifikasi,
-            dan trading dengan perlindungan risiko real-time — 100% non-custodial.
+            {tr(
+              'Launch tokens with automated bonding curves, collaborate with verified KOLs, and trade with real-time risk protection — 100% non-custodial.',
+              'Luncurkan token dengan kurva likuiditas otomatis, kolaborasi bersama KOL terverifikasi, dan trading dengan perlindungan risiko real-time — 100% non-custodial.',
+              '使用自动化联合曲线发行代币，与已验证 KOL 协作，并在实时风控保护下交易 — 100% 非托管。'
+            )}
           </p>
 
           {/* CTA Buttons (Preserved 100%) */}
           <div className="hero-anim flex-row" style={{ justifyContent: 'center', gap: 'var(--space-md)', flexWrap: 'wrap' }}>
             <a href="/launchpad" className="btn-primary" style={{ textDecoration: 'none', padding: '13px 26px', fontSize: '15px' }}>
-              <Rocket size={18} /> Launch Token
+              <Rocket size={18} /> {tr('Launch Token', 'Luncurkan Token', '发行代币')}
             </a>
             <a href="/kol" className="btn-secondary" style={{ textDecoration: 'none', padding: '13px 24px', fontSize: '15px' }}>
-              <Network size={18} /> Explore Deal Rooms
+              <Network size={18} /> {tr('Explore Deal Rooms', 'Jelajahi Deal Room', '探索 KOL 合作')}
             </a>
             <button
               onClick={onConnectMetaMask}
@@ -246,7 +265,9 @@ export function LandingHeroMotion({
               style={{ fontSize: '15px', padding: '13px 24px' }}
             >
               <Wallet size={18} />
-              {isConnecting ? 'Menghubungkan...' : 'Connect Wallet'}
+              {isConnecting
+                ? tr('Connecting...', 'Menghubungkan...', '连接中...')
+                : tr('Connect Wallet', 'Hubungkan Dompet', '连接钱包')}
             </button>
           </div>
 
@@ -258,7 +279,11 @@ export function LandingHeroMotion({
 
           {/* Secondary auth entry */}
           <p className="hero-anim text-muted" style={{ marginTop: 'var(--space-md)', fontSize: '13px' }}>
-            Ingin verifikasi dompet secara manual?{' '}
+            {tr(
+              'Prefer manual wallet verification?',
+              'Ingin verifikasi dompet secara manual?',
+              '需要手动验证钱包？'
+            )}{' '}
             <a
               href="/auth/login"
               style={{
@@ -270,7 +295,7 @@ export function LandingHeroMotion({
                 gap: '4px',
               }}
             >
-              <Lock size={12} /> Portal Login
+              <Lock size={12} /> {tr('Login Portal', 'Portal Login', '登录入口')}
             </a>
           </p>
 
@@ -379,10 +404,10 @@ export function LandingHeroMotion({
           }}
         >
           {[
-            { icon: <Zap size={26} style={{ color: '#4285F4' }} />, stat: '0%', label: 'Modal Likuiditas Awal' },
-            { icon: <Activity size={26} style={{ color: 'var(--color-text-positive)' }} />, stat: 'Auto', label: 'Migrasi Likuiditas DEX' },
-            { icon: <ShieldAlert size={26} style={{ color: '#9B72CB' }} />, stat: 'Anti-Sybil', label: 'Verifikasi KOL & Bounty' },
-            { icon: <Lock size={26} style={{ color: '#F59E0B' }} />, stat: '100%', label: 'Non-Custodial Wallet' },
+            { icon: <Zap size={26} style={{ color: '#4285F4' }} />, stat: '0%', label: tr('Initial Liquidity Needed', 'Modal Likuiditas Awal', '初始流动性需求') },
+            { icon: <Activity size={26} style={{ color: 'var(--color-text-positive)' }} />, stat: tr('Auto', 'Otomatis', '自动'), label: tr('DEX Liquidity Migration', 'Migrasi Likuiditas DEX', 'DEX 流动性自动迁移') },
+            { icon: <ShieldAlert size={26} style={{ color: '#9B72CB' }} />, stat: 'Anti-Sybil', label: tr('KOL & Bounty Verification', 'Verifikasi KOL & Bounty', 'KOL 与赏金反女巫验证') },
+            { icon: <Lock size={26} style={{ color: '#F59E0B' }} />, stat: '100%', label: tr('Non-Custodial Wallet', 'Dompet Non-Custodial', '非托管钱包') },
           ].map((item, i) => (
             <div
               key={i}
@@ -404,10 +429,18 @@ export function LandingHeroMotion({
       <section className="bento-section" style={{ padding: 'var(--space-lg) 0 var(--space-2xl) 0' }}>
         <div style={{ textAlign: 'center', marginBottom: 'var(--space-xl)' }}>
           <h2 style={{ fontSize: '30px', fontWeight: 800, margin: '0 0 10px 0', letterSpacing: '-0.5px' }}>
-            Semua yang Anda butuhkan untuk meluncurkan &amp; trading token
+            {tr(
+              'Everything you need to launch & trade tokens',
+              'Semua yang Anda butuhkan untuk meluncurkan & trading token',
+              '发行与交易代币所需的一切工具'
+            )}
           </h2>
           <p className="text-muted" style={{ fontSize: '15px', margin: 0 }}>
-            Terintegrasi penuh dengan 5 Agen AI, Bonding Curve Launchpad, dan KOL Bounty Hub.
+            {tr(
+              'Fully integrated with 5-Agent AI Desk, Bonding Curve Launchpad, and KOL Bounty Hub.',
+              'Terintegrasi penuh dengan 5 Agen AI, Bonding Curve Launchpad, dan KOL Bounty Hub.',
+              '全面集成 5 智能体 AI 投研台、联合曲线 Launchpad 与 KOL 赏金中心。'
+            )}
           </p>
         </div>
 
@@ -423,10 +456,14 @@ export function LandingHeroMotion({
               <Rocket size={30} style={{ color: '#4285F4' }} />
             </div>
             <h3 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 10px 0', color: 'var(--color-foreground)' }}>
-              Bonding Curve Launchpad
+              {tr('Bonding Curve Launchpad', 'Bonding Curve Launchpad', '联合曲线发射台')}
             </h3>
             <p className="text-muted" style={{ fontSize: '14px', lineHeight: 1.6, margin: '0 0 16px 0' }}>
-              Luncurkan token dalam hitungan menit dengan 0% pajak beli/jual dan migrasi otomatis ke DEX setelah target tercapai.
+              {tr(
+                'Launch tokens in minutes with 0% buy/sell tax and automatic DEX migration once the curve target is reached.',
+                'Luncurkan token dalam hitungan menit dengan 0% pajak beli/jual dan migrasi otomatis ke DEX setelah target tercapai.',
+                '数分钟内发行代币，0% 买卖税，达成目标后自动迁移流动性至 DEX。'
+              )}
             </p>
             <div
               style={{
@@ -439,7 +476,11 @@ export function LandingHeroMotion({
                 fontWeight: 600,
               }}
             >
-              Target 24 ETH · Fee 1% (0.5% Kreator) · 0% Tax
+              {tr(
+                '24 ETH Target · 1% Fee (0.5% Creator) · 0% Tax',
+                'Target 24 ETH · Fee 1% (0.5% Kreator) · 0% Tax',
+                '24 ETH 目标 · 1% 手续费（0.5% 创作者）· 0% 税'
+              )}
             </div>
           </div>
 
@@ -448,10 +489,14 @@ export function LandingHeroMotion({
               <Award size={30} style={{ color: 'var(--color-text-positive)' }} />
             </div>
             <h3 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 10px 0', color: 'var(--color-foreground)' }}>
-              KOL Hub &amp; Angel Deal Room
+              {tr('KOL Hub & Angel Deal Room', 'KOL Hub & Angel Deal Room', 'KOL 中心与天使合作室')}
             </h3>
             <p className="text-muted" style={{ fontSize: '14px', lineHeight: 1.6, margin: '0 0 16px 0' }}>
-              Bangun kampanye viral bersama KOL terverifikasi X, Farcaster, dan Lens dengan pembagian reward transparan.
+              {tr(
+                'Run viral campaigns with verified X, Farcaster, and Lens KOLs with transparent on-chain reward distribution.',
+                'Bangun kampanye viral bersama KOL terverifikasi X, Farcaster, dan Lens dengan pembagian reward transparan.',
+                '与已验证的 X、Farcaster 和 Lens KOL 合作开展病毒式推广，链上透明分配奖励。'
+              )}
             </p>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               {['Twitter/X ✓', 'Farcaster ✓', 'Lens ✓', '0.25% Referral ✓'].map((p) => (
@@ -478,10 +523,14 @@ export function LandingHeroMotion({
               <ShieldAlert size={30} style={{ color: '#9B72CB' }} />
             </div>
             <h3 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 10px 0', color: 'var(--color-foreground)' }}>
-              AI Desk &amp; Perlindungan Risiko
+              {tr('AI Desk & Risk Protection', 'AI Desk & Perlindungan Risiko', 'AI 投研台与风险保护')}
             </h3>
             <p className="text-muted" style={{ fontSize: '14px', lineHeight: 1.6, margin: '0 0 16px 0' }}>
-              Analisis token Launchpad maupun GeckoTerminal/DexScreener dengan 5 Agen AI, lengkap dengan batas slippage &amp; Risk Guard.
+              {tr(
+                'Analyze Launchpad, GeckoTerminal, and DexScreener tokens with 5 AI Agents, complete with slippage caps & Risk Guard.',
+                'Analisis token Launchpad maupun GeckoTerminal/DexScreener dengan 5 Agen AI, lengkap dengan batas slippage & Risk Guard.',
+                '通过 5 智能体 AI 分析 Launchpad 与 DexScreener 代币，内置滑点上限与风控闸门。'
+              )}
             </p>
             <div
               style={{
@@ -494,7 +543,11 @@ export function LandingHeroMotion({
                 fontWeight: 600,
               }}
             >
-              4 Profil Strategi · Slippage Cap · Persetujuan Manual
+              {tr(
+                '4 Strategy Profiles · Slippage Cap · Manual Approval',
+                '4 Profil Strategi · Slippage Cap · Persetujuan Manual',
+                '4 套策略模板 · 滑点上限 · 手动确认'
+              )}
             </div>
           </div>
         </div>
