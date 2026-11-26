@@ -46,7 +46,37 @@ export async function GET(req: NextRequest) {
     };
 
     const pool = getDbPool();
-    if (!pool || !session.user?.userId) {
+    if (!pool) {
+      return NextResponse.json({
+        success: true,
+        data: {
+          walletAddress: session.walletAddress,
+          ...emptySummary,
+        },
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Resolve canonical Postgres users.id UUID from wallets table (session.user.userId can be synthetic `usr-0x...`)
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    let dbUserId: string | null = null;
+    try {
+      const wRes = await pool.query(
+        `SELECT user_id FROM wallets WHERE LOWER(address) = LOWER($1) LIMIT 1`,
+        [session.walletAddress]
+      );
+      const found = wRes.rows[0]?.user_id;
+      if (typeof found === 'string' && UUID_RE.test(found)) {
+        dbUserId = found;
+      }
+    } catch {
+      // Fallback below
+    }
+    if (!dbUserId && typeof session.user?.userId === 'string' && UUID_RE.test(session.user.userId)) {
+      dbUserId = session.user.userId;
+    }
+
+    if (!dbUserId) {
       return NextResponse.json({
         success: true,
         data: {
@@ -67,7 +97,7 @@ export async function GET(req: NextRequest) {
            AND currency = 'CREDITS'
            AND type = 'CREDIT'
            AND reference_id LIKE $2`,
-        [session.user.userId, likePattern]
+        [dbUserId, likePattern]
       ),
       pool.query(
         `SELECT id, amount::numeric AS amount, reference_id AS "referenceId",
@@ -79,7 +109,7 @@ export async function GET(req: NextRequest) {
            AND reference_id LIKE $2
          ORDER BY created_at DESC
          LIMIT 10`,
-        [session.user.userId, likePattern]
+        [dbUserId, likePattern]
       ),
     ]);
 

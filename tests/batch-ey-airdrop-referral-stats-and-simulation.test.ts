@@ -86,6 +86,7 @@ describe('Phase EY: My Referral Stats API, /kol Passport UI & E2E Simulation', (
     expect(src).toContain('status: isForbidden ? 403 : 401');
     expect(src).toContain('FROM ledger_entries');
     expect(src).toContain('WHERE user_id = $1::uuid');
+    expect(src).toContain('FROM wallets WHERE LOWER(address) = LOWER($1)');
     expect(src).toContain('reference_id LIKE $2');
   });
 

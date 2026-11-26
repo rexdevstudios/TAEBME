@@ -240,6 +240,17 @@ async function runFullTestnetUsecase() {
       `GET /api/launchpad/featured-boost returned public boost tiers & treasuryWallet (HTTP 200)`
     );
 
+    // Phase EW: Launchpad KOL Verified creator metadata contract
+    const launchTokensRes = await fetch(`${BASE_URL}/api/launchpad/tokens`);
+    const launchTokensJson: any = await launchTokensRes.json();
+    const launchTokensArr = Array.isArray(launchTokensJson?.data) ? launchTokensJson.data : [];
+    assert(
+      launchTokensRes.status === 200 &&
+        launchTokensJson?.success === true &&
+        (launchTokensArr.length === 0 || typeof launchTokensArr[0]?.creatorKolVerified === 'boolean'),
+      `GET /api/launchpad/tokens exposed creatorKolVerified metadata (count=${launchTokensArr.length})`
+    );
+
     // =========================================================================
     // STAGE 5: Spot/Paper Trade, 6-Chain Live DEX 0x v2 & GoPlus Safety
     // =========================================================================
@@ -433,6 +444,13 @@ async function runFullTestnetUsecase() {
       `POST /api/agent/copilot/chat exposed per-user 24h rolling transferCap ($${ownedTransferJson?.data?.riskLimits?.transferCap?.dailyCapUsd})`
     );
 
+    // Phase EZ: AI Copilot liveHighlights exposes marketplaceDataset grounding key
+    assert(
+      ownedTransferJson?.data?.liveHighlights &&
+        'marketplaceDataset' in ownedTransferJson.data.liveHighlights,
+      `POST /api/agent/copilot/chat exposed liveHighlights.marketplaceDataset grounding field`
+    );
+
     await fetch(
       `${BASE_URL}/api/user/owned-wallets?address=${encodeURIComponent(subWallet.address)}`,
       { method: 'DELETE', headers: authHeaders() }
@@ -449,6 +467,30 @@ async function runFullTestnetUsecase() {
     const bountyRes = await fetch(`${BASE_URL}/api/launchpad/bounty`, { headers: authHeaders() });
     const bountyJson: any = await bountyRes.json();
     assert(bountyRes.status === 200 && bountyJson?.success === true, `GET /api/launchpad/bounty loaded active campaigns (HTTP 200)`);
+
+    // Phase EX: Verify requiredFollowHandle field on active bounty campaigns
+    const bountyList = Array.isArray(bountyJson?.data) ? bountyJson.data : [];
+    assert(
+      bountyList.length === 0 || 'requiredFollowHandle' in bountyList[0],
+      `GET /api/launchpad/bounty exposed requiredFollowHandle field (campaigns=${bountyList.length})`
+    );
+
+    // Phase EY: /api/launchpad/bounty/referrals fail-closed 401 & authenticated stats 200
+    const unauthRefRes = await fetch(`${BASE_URL}/api/launchpad/bounty/referrals`);
+    assert(
+      unauthRefRes.status === 401,
+      `GET /api/launchpad/bounty/referrals strictly rejected unauthenticated call (HTTP ${unauthRefRes.status})`
+    );
+
+    const authRefRes = await fetch(`${BASE_URL}/api/launchpad/bounty/referrals`, { headers: authHeaders() });
+    const authRefJson: any = await authRefRes.json();
+    assert(
+      authRefRes.status === 200 &&
+        authRefJson?.success === true &&
+        authRefJson?.data?.bonusPerReferral === 15 &&
+        Array.isArray(authRefJson?.data?.recentReferrals),
+      `GET /api/launchpad/bounty/referrals returned authenticated referral stats (bonus=+${authRefJson?.data?.bonusPerReferral} cr)`
+    );
 
     const transRes = await fetch(`${BASE_URL}/api/system/transparency`);
     const transJson: any = await transRes.json();
@@ -530,7 +572,7 @@ async function runFullTestnetUsecase() {
     console.error(`\n[FATAL] ${err?.message || err}`);
     // Best-effort cleanup of any vault keys created before failure
     for (const kid of createdKeyIds) {
-      await fetch(`${BASE_URL}/api/user/provider-keys?id=${encodeURIComponent(kid)}`, {
+      await fetch(`${BASE_URL}/api/user/provider-keys?keyId=${encodeURIComponent(kid)}`, {
         method: 'DELETE',
         headers: authHeaders(),
       }).catch(() => {});
