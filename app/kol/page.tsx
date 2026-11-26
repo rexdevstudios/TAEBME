@@ -7,7 +7,11 @@ import { useLocale } from '../context/LocaleContext';
 import { PageWorkflowBanner } from '../components/PageWorkflowBanner';
 import { NetworkMismatchBanner } from '../components/NetworkMismatchBanner';
 import { resolveDefaultBaseChainHex } from '@packages/trading/paper-wallet';
-import { buildAirdropReferralShareUrl } from '@packages/shared/airdrop-referral';
+import {
+  AIRDROP_REFERRAL_BONUS_CREDITS,
+  buildAirdropReferralShareUrl,
+  type AirdropReferralStatsSummary,
+} from '@packages/shared/airdrop-referral';
 import { WalletRiskBadgeCard } from '../components/WalletRiskBadgeCard';
 import {
   Award,
@@ -100,6 +104,13 @@ export default function KolHubPage() {
   const [creatorFeedback, setCreatorFeedback] = useState<string | null>(null);
   const [referrerWallet, setReferrerWallet] = useState<string | null>(null);
   const [copiedRefCampaignId, setCopiedRefCampaignId] = useState<string | null>(null);
+  const [referralStats, setReferralStats] = useState<AirdropReferralStatsSummary>({
+    totalReferrals: 0,
+    totalCreditsEarned: 0,
+    bonusPerReferral: AIRDROP_REFERRAL_BONUS_CREDITS,
+    recentReferrals: [],
+  });
+  const [copiedPassportRef, setCopiedPassportRef] = useState(false);
 
   // Load existing profile & campaigns with URL deep-linking support
   useEffect(() => {
@@ -129,8 +140,27 @@ export default function KolHubPage() {
     fetchCampaigns(urlLaunchId || undefined);
     if (walletAddress) {
       fetchProfile(walletAddress);
+      fetchReferralStats();
     }
   }, [walletAddress]);
+
+  const fetchReferralStats = async () => {
+    try {
+      const res = await fetch('/api/launchpad/bounty/referrals');
+      if (!res.ok) return;
+      const json = await res.json();
+      if (json.success && json.data) {
+        setReferralStats({
+          totalReferrals: Number(json.data.totalReferrals || 0),
+          totalCreditsEarned: Number(json.data.totalCreditsEarned || 0),
+          bonusPerReferral: Number(json.data.bonusPerReferral || AIRDROP_REFERRAL_BONUS_CREDITS),
+          recentReferrals: Array.isArray(json.data.recentReferrals) ? json.data.recentReferrals : [],
+        });
+      }
+    } catch {
+      // Non-blocking stats fetch
+    }
+  };
 
   const fetchProfile = async (address: string) => {
     try {
@@ -780,6 +810,95 @@ export default function KolHubPage() {
                 <span className="text-muted" style={{ fontSize: '11px', display: 'block' }}>Total Reward Didapat</span>
                 <strong style={{ fontSize: '18px', color: '#10B981' }}>${kolProfile?.totalEarnedUsd || 0}</strong>
               </div>
+              <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+                <span className="text-muted" style={{ fontSize: '11px', display: 'block' }}>
+                  {tr('Airdrop Referrals', 'Referral Airdrop', '空投邀请数')}
+                </span>
+                <strong style={{ fontSize: '18px' }}>{referralStats.totalReferrals}</strong>
+              </div>
+              <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+                <span className="text-muted" style={{ fontSize: '11px', display: 'block' }}>
+                  {tr('Referral Credits', 'Kredit Referral', '邀请奖励积分')}
+                </span>
+                <strong style={{ fontSize: '18px', color: 'var(--color-text-positive)' }}>
+                  +{referralStats.totalCreditsEarned} cr
+                </strong>
+              </div>
+            </div>
+
+            {/* Phase EY: My Referral Stats Quick Share & Recent Ledger Activity */}
+            <div
+              style={{
+                marginTop: '14px',
+                padding: '12px',
+                borderRadius: '8px',
+                border: '1px solid var(--color-border)',
+                backgroundColor: 'rgba(255,255,255,0.02)',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-foreground)' }}>
+                    {tr('My Referral Stats', 'Statistik Referral Saya', '我的邀请统计')}
+                  </div>
+                  <div className="text-muted" style={{ fontSize: '11px', marginTop: '2px' }}>
+                    {tr(
+                      `Earn +${referralStats.bonusPerReferral} cr per verified airdrop claim via your link.`,
+                      `Dapatkan +${referralStats.bonusPerReferral} cr per klaim airdrop terverifikasi via tautan Anda.`,
+                      `每通过您的链接完成 1 次验证空投领取，获得 +${referralStats.bonusPerReferral} cr。`
+                    )}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="btn-pill"
+                  disabled={!walletAddress}
+                  onClick={() => {
+                    const targetCampaignId = selectedCampaignId || campaigns[0]?.id || 'featured';
+                    const shareUrl = buildAirdropReferralShareUrl({
+                      campaignId: targetCampaignId,
+                      referrerWallet: walletAddress,
+                      siteOrigin: typeof window !== 'undefined' ? window.location.origin : 'https://pndigi.site',
+                    });
+                    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                      navigator.clipboard.writeText(shareUrl).catch(() => {});
+                    }
+                    setCopiedPassportRef(true);
+                    setTimeout(() => setCopiedPassportRef(false), 2200);
+                  }}
+                  style={{ fontSize: '11px', padding: '5px 10px' }}
+                >
+                  {copiedPassportRef
+                    ? tr('Copied Ref Link', 'Tautan Tersalin', '已复制链接')
+                    : tr(
+                        `Copy Ref (+${referralStats.bonusPerReferral} cr)`,
+                        `Salin Ref (+${referralStats.bonusPerReferral} cr)`,
+                        `复制邀请 (+${referralStats.bonusPerReferral} cr)`
+                      )}
+                </button>
+              </div>
+              {referralStats.recentReferrals.length > 0 && (
+                <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {referralStats.recentReferrals.slice(0, 5).map((item) => (
+                    <div
+                      key={item.id}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        fontSize: '11px',
+                        paddingTop: '6px',
+                        borderTop: '1px solid var(--color-border)',
+                      }}
+                    >
+                      <span className="text-muted" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '72%' }}>
+                        {item.campaignId}
+                      </span>
+                      <strong style={{ color: 'var(--color-text-positive)' }}>+{item.amount} cr</strong>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -9,7 +9,10 @@ import { requireActiveSession } from '@packages/auth/session';
 import { BountyMerkleSnapshotService } from '@packages/launchpad/bounty-merkle-snapshot-service';
 import { MerkleProofService, OnChainVerificationProvider } from '@packages/launchpad/merkle-proof-service';
 import { normalizeReferrerWallet } from '@packages/billing/genesis-sbt';
-import { AIRDROP_REFERRAL_BONUS_CREDITS } from '@packages/shared/airdrop-referral';
+import {
+  AIRDROP_REFERRAL_BONUS_CREDITS,
+  buildAirdropReferralReferenceId,
+} from '@packages/shared/airdrop-referral';
 
 // ── Singleton services (safe for Vercel serverless — stateless, DB-read-only) ─
 const _snapshotSvc = new BountyMerkleSnapshotService(defaultBountyMerkleSnapshotDbAdapter);
@@ -361,7 +364,7 @@ export async function POST(req: NextRequest) {
             );
             const refUserId = refUserRes.rows[0]?.user_id;
             if (refUserId) {
-              const refId = `bounty_ref:${campaignId}:${result.claim.id}`;
+              const refId = buildAirdropReferralReferenceId(campaignId, result.claim.id);
               const ins = await pool.query(
                 `INSERT INTO ledger_entries (user_id, amount, currency, type, reference_id, description, created_at)
                  SELECT $1::uuid, $2::numeric, 'CREDITS', 'CREDIT', $3::varchar, $4::text, NOW()

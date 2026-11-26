@@ -62,7 +62,7 @@ describe('Batch EX — Viral Airdrop Referral (?ref=0x...) & Required Follow (@h
     const kolSrc = fs.readFileSync(path.join(root, 'app', 'kol', 'page.tsx'), 'utf8');
 
     expect(claimSrc).toContain('normalizeReferrerWallet');
-    expect(claimSrc).toContain('bounty_ref:${campaignId}:${result.claim.id}');
+    expect(claimSrc).toContain('buildAirdropReferralReferenceId(campaignId, result.claim.id)');
     expect(kolSrc).toContain('buildAirdropReferralShareUrl');
     expect(kolSrc).toContain('newFollowHandle');
   });

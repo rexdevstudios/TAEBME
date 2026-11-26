@@ -7,6 +7,100 @@
  */
 
 export const AIRDROP_REFERRAL_BONUS_CREDITS = 15;
+export const AIRDROP_REFERRAL_REFERENCE_PREFIX = 'bounty_ref:';
+
+export interface AirdropReferralLedgerEntry {
+  id?: string;
+  amount: number;
+  currency?: string;
+  type?: string;
+  referenceId: string | null | undefined;
+  description?: string;
+  createdAt?: string;
+}
+
+export interface AirdropReferralRecentItem {
+  id: string;
+  campaignId: string;
+  claimId: string;
+  amount: number;
+  description: string;
+  createdAt: string;
+}
+
+export interface AirdropReferralStatsSummary {
+  totalReferrals: number;
+  totalCreditsEarned: number;
+  bonusPerReferral: number;
+  recentReferrals: AirdropReferralRecentItem[];
+}
+
+/**
+ * Builds canonical idempotent reference_id for ledger_entries airdrop referral credits.
+ */
+export function buildAirdropReferralReferenceId(campaignId: string, claimId: string): string {
+  return `${AIRDROP_REFERRAL_REFERENCE_PREFIX}${campaignId.trim()}:${claimId.trim()}`;
+}
+
+/**
+ * Parses a canonical `bounty_ref:<campaignId>:<claimId>` reference_id.
+ */
+export function parseAirdropReferralReferenceId(
+  referenceId: string | null | undefined
+): { campaignId: string; claimId: string } | null {
+  if (!referenceId || typeof referenceId !== 'string') return null;
+  if (!referenceId.startsWith(AIRDROP_REFERRAL_REFERENCE_PREFIX)) return null;
+  const rest = referenceId.slice(AIRDROP_REFERRAL_REFERENCE_PREFIX.length);
+  const sep = rest.indexOf(':');
+  if (sep <= 0 || sep >= rest.length - 1) return null;
+  const campaignId = rest.slice(0, sep).trim();
+  const claimId = rest.slice(sep + 1).trim();
+  if (!campaignId || !claimId) return null;
+  return { campaignId, claimId };
+}
+
+/**
+ * Aggregates and deduplicates airdrop referral ledger entries by referenceId.
+ */
+export function summarizeAirdropReferralLedger(
+  entries: AirdropReferralLedgerEntry[],
+  maxRecent = 10
+): AirdropReferralStatsSummary {
+  const seenRefs = new Set<string>();
+  const validRows: AirdropReferralRecentItem[] = [];
+  let totalCreditsEarned = 0;
+
+  for (const entry of entries || []) {
+    if (!entry || typeof entry !== 'object') continue;
+    if (entry.currency && entry.currency.toUpperCase() !== 'CREDITS') continue;
+    if (entry.type && entry.type.toUpperCase() !== 'CREDIT') continue;
+    const refId = typeof entry.referenceId === 'string' ? entry.referenceId.trim() : '';
+    const parsed = parseAirdropReferralReferenceId(refId);
+    if (!parsed || seenRefs.has(refId)) continue;
+    const amount = Number(entry.amount);
+    if (!Number.isFinite(amount) || amount <= 0) continue;
+
+    seenRefs.add(refId);
+    totalCreditsEarned += amount;
+    validRows.push({
+      id: entry.id || refId,
+      campaignId: parsed.campaignId,
+      claimId: parsed.claimId,
+      amount,
+      description: entry.description || `Airdrop Referral Bonus (+${amount} cr)`,
+      createdAt: entry.createdAt || '',
+    });
+  }
+
+  validRows.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+
+  return {
+    totalReferrals: validRows.length,
+    totalCreditsEarned: Math.round(totalCreditsEarned * 100) / 100,
+    bonusPerReferral: AIRDROP_REFERRAL_BONUS_CREDITS,
+    recentReferrals: validRows.slice(0, Math.max(1, maxRecent)),
+  };
+}
 
 const FOLLOW_TAG_REGEX = /\[FOLLOW:@([A-Za-z0-9_]{1,30})\]/i;
 

@@ -48,6 +48,16 @@ import {
 } from '../packages/shared/transparency-metrics';
 import { I18N_DICTIONARY, translateKey } from '../packages/shared/i18n-dictionary';
 import {
+  AIRDROP_REFERRAL_BONUS_CREDITS,
+  buildAirdropReferralReferenceId,
+  buildAirdropReferralShareUrl,
+  encodeRequiredFollowInDescription,
+  parseAirdropReferralReferenceId,
+  parseRequiredFollowFromDescription,
+  summarizeAirdropReferralLedger,
+} from '../packages/shared/airdrop-referral';
+import { normalizeReferrerWallet } from '../packages/billing/genesis-sbt';
+import {
   clearAutoPilotPeakPrice,
   computeDynamicSignalConfidence,
   computeUpdatedPeakPrice,
@@ -1179,6 +1189,43 @@ async function runSimulationSuite() {
       translateKey('en', 'billing.tabPlans') === 'Plans & Pricing' &&
       translateKey('id', 'billing.tabPlans') === 'Paket & Harga',
     'Multi-language EN/ID dictionary maintains 100% key parity across all 7 core pages'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 47: Viral Airdrop Referral, Follow Tag & Ledger Stats (Phase EX+EY)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 47: Viral Airdrop Referral, Follow Tag & Ledger Stats] ---');
+  const walletA = '0x1111111111111111111111111111111111111111';
+  const walletB = '0x2222222222222222222222222222222222222222';
+  const encodedDesc = encodeRequiredFollowInDescription('Raid & earn tokens', 'rtrader_hq');
+  const parsedFollow = parseRequiredFollowFromDescription(encodedDesc);
+  const shareUrl = buildAirdropReferralShareUrl({
+    campaignId: 'camp-viral-1',
+    referrerWallet: walletA,
+    siteOrigin: 'https://pndigi.site',
+  });
+  const validRef = normalizeReferrerWallet(walletA, walletB);
+  const selfRefBlocked = normalizeReferrerWallet(walletA, walletA);
+  const refKey1 = buildAirdropReferralReferenceId('camp-viral-1', 'claim-101');
+  const refKey2 = buildAirdropReferralReferenceId('camp-viral-1', 'claim-102');
+  const parsedRef1 = parseAirdropReferralReferenceId(refKey1);
+  const refSummary = summarizeAirdropReferralLedger([
+    { id: 'r1', amount: AIRDROP_REFERRAL_BONUS_CREDITS, currency: 'CREDITS', type: 'CREDIT', referenceId: refKey1, createdAt: '2026-11-26T10:00:00Z' },
+    { id: 'r1-dup', amount: AIRDROP_REFERRAL_BONUS_CREDITS, currency: 'CREDITS', type: 'CREDIT', referenceId: refKey1, createdAt: '2026-11-26T10:01:00Z' },
+    { id: 'r2', amount: AIRDROP_REFERRAL_BONUS_CREDITS, currency: 'CREDITS', type: 'CREDIT', referenceId: refKey2, createdAt: '2026-11-26T11:00:00Z' },
+    { id: 'other', amount: 50, currency: 'CREDITS', type: 'CREDIT', referenceId: 'genesis_sbt_welcome', createdAt: '2026-11-26T12:00:00Z' },
+  ]);
+  assert(
+    parsedFollow === '@rtrader_hq' &&
+      shareUrl.includes(`ref=${walletA}`) &&
+      validRef === walletA.toLowerCase() &&
+      selfRefBlocked === null &&
+      parsedRef1?.campaignId === 'camp-viral-1' &&
+      parsedRef1?.claimId === 'claim-101' &&
+      refSummary.totalReferrals === 2 &&
+      refSummary.totalCreditsEarned === 30 &&
+      refSummary.recentReferrals[0]?.claimId === 'claim-102',
+    'Viral airdrop referral flow encodes Follow @handle, blocks self-referral, deduplicates bounty_ref ledger rows & aggregates +15 cr accurately'
   );
 
   console.log('\n================================================================');
