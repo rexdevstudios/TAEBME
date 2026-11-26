@@ -8,6 +8,7 @@ import { Activity, ShieldAlert, Zap, Rocket, Award, Server, Cpu, Lock, Network, 
 import { executeKillSwitchToggle } from './lib/kill-switch-admin-client';
 import { LandingHeroMotion } from './components/LandingHeroMotion';
 import { GenesisSbtCard } from './components/GenesisSbtCard';
+import { CollapsibleSection } from './components/CollapsibleSection';
 
 interface OverviewData {
   status: string;
@@ -482,22 +483,30 @@ export default function OverviewPage() {
                     <a href={`/trading?token=${t.contractAddress || ''}`} style={{ color: 'var(--color-accent-info)' }}>{tr('Trade →', 'Trade →')}</a>
                   </div>
                 ))}
-                <a href="/launchpad" className="text-accent" style={{ textDecoration: 'underline', fontSize: '12px', marginTop: '6px', display: 'inline-block' }}>
-                  {tr('Explore All Launches →', 'Lihat Semua Launch →')}
-                </a>
+                <Link href="/launchpad" className="text-accent" style={{ textDecoration: 'underline', fontSize: '12px', marginTop: '6px', display: 'inline-block' }}>
+                  {tr('Explore All Launches →', 'Lihat Semua Launch →', '查看全部发行 →')}
+                </Link>
               </div>
             ) : (
               <div className="flex-col gap-sm text-muted" style={{ fontSize: '12px' }}>
-                <p style={{ margin: 0 }}>{tr('Ready to run the 5-Agent Trading Desk or deploy your first token.', 'Siap menjalankan 5-Agent Trading Desk atau meluncurkan token pertama Anda.')}</p>
+                <p style={{ margin: 0 }}>{tr('Ready to run the 5-Agent Trading Desk or deploy your first token.', 'Siap menjalankan 5-Agent Trading Desk atau meluncurkan token pertama Anda.', '准备就绪：立即启动五智能体交易台或发行您的首个代币。')}</p>
                 <div style={{ display: 'flex', gap: '12px', marginTop: '6px' }}>
-                  <a href="/agent" className="text-accent" style={{ textDecoration: 'underline' }}>{tr('Run 5-Agent Desk →', 'Jalankan 5-Agent Desk →')}</a>
-                  <a href="/launchpad" style={{ color: 'var(--color-accent-info)', textDecoration: 'underline' }}>{tr('Open Launchpad →', 'Buka Launchpad →')}</a>
+                  <Link href="/agent" className="text-accent" style={{ textDecoration: 'underline' }}>{tr('Run 5-Agent Desk →', 'Jalankan 5-Agent Desk →', '运行五智能体分析台 →')}</Link>
+                  <Link href="/launchpad" style={{ color: 'var(--color-accent-info)', textDecoration: 'underline' }}>{tr('Open Launchpad →', 'Buka Launchpad →', '打开发射台 →')}</Link>
                 </div>
               </div>
             )}
           </div>
         </div>
 
+        {/* Grouped Onboarding Checklist, Genesis SBT & GameFi Quests (Phase EU) */}
+        <CollapsibleSection
+          title={tr('Onboarding Checklist, Genesis SBT & Quests', 'Checklist Pemula, Genesis SBT & Quest', '新手引导、创世 SBT 与任务')}
+          badge="XP & Rewards"
+          subtitle={tr('Earn free credits & Pioneer SBT', 'Kumpulkan kredit gratis & SBT Perintis', '赚取免费积分与创世 SBT')}
+          defaultOpen={false}
+        >
+        <div className="flex-col gap-md">
         {/* 3-Minute Interactive Beginner Onboarding Checklist (Phase CG2) */}
         {(() => {
           const step1Done = Boolean(isConnected && walletAddress);
@@ -718,6 +727,8 @@ export default function OverviewPage() {
             })}
           </div>
         </div>
+        </div>
+        </CollapsibleSection>
       </div>
     );
   }
@@ -793,7 +804,13 @@ export default function OverviewPage() {
         </div>
       </div>
 
-      {/* SYSTEM ADMIN EXCLUSIVE CONTROL CONSOLE */}
+      {/* SYSTEM ADMIN EXCLUSIVE CONTROL CONSOLE (Grouped — Phase EU) */}
+      <CollapsibleSection
+        title={tr('System Admin Governance & Kill-Switch Console', 'Konsol Tata Kelola & Kill-Switch Admin', '系统管理员治理与熔断控制台')}
+        badge="Admin"
+        subtitle={tr('Kill-switch, AES-256 vault, audit logs & RBAC matrix', 'Kill-switch, vault AES-256, audit log & matriks RBAC', '熔断开关、AES-256 金库、审计日志与权限矩阵')}
+        defaultOpen={false}
+      >
       <div className="bg-panel" style={{ borderRadius: '8px', padding: '24px', border: '1px solid #FF9100' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
           <h2 style={{ fontSize: '18px', fontWeight: 900, margin: 0, color: 'var(--color-accent-amber)' }}>
@@ -971,8 +988,15 @@ export default function OverviewPage() {
           </div>
         </div>
       </div>
+      </CollapsibleSection>
 
-      {/* Data-Dense Active Domains Subsystem Grid */}
+      {/* Data-Dense Active Domains Subsystem Grid (Grouped — Phase EU) */}
+      <CollapsibleSection
+        title={tr('Infrastructure Telemetry & Active Domains', 'Telemetri Infrastruktur & Domain Aktif', '基础设施遥测与活跃域名')}
+        badge="Zero-VPS"
+        subtitle={tr('Active domain boundaries & execution plane workers', 'Isolasi domain aktif & worker eksekusi', '活跃业务域隔离与执行工作器')}
+        defaultOpen={false}
+      >
       <div className="bg-panel" style={{ padding: '24px', borderRadius: '8px' }}>
         <div className="flex-row justify-between items-center" style={{ marginBottom: '24px' }}>
           <h3 style={{ fontSize: '18px', fontWeight: 800, margin: 0 }}>
@@ -1002,6 +1026,7 @@ export default function OverviewPage() {
           </div>
         </div>
       </div>
+      </CollapsibleSection>
     </div>
   );
 }

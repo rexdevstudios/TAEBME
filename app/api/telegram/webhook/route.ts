@@ -8,6 +8,7 @@
  * - 100% read-only SSOT queries, zero private keys, zero persistent polling loops.
  */
 
+import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { rateLimiter } from '@packages/auth/rate-limiter';
 import { defaultDraftDbAdapter, defaultBillingDbAdapter } from '@packages/shared/db-pool';
@@ -33,7 +34,10 @@ function isTelegramWebhookAuthorized(req: NextRequest): boolean {
   const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET?.trim();
   if (!expectedSecret || expectedSecret.length < 16) return false;
   const headerSecret = req.headers.get('x-telegram-bot-api-secret-token')?.trim();
-  return Boolean(headerSecret && headerSecret === expectedSecret);
+  if (!headerSecret) return false;
+  const a = crypto.createHash('sha256').update(headerSecret).digest();
+  const b = crypto.createHash('sha256').update(expectedSecret).digest();
+  return crypto.timingSafeEqual(a, b);
 }
 
 async function sendTelegramReply(chatId: number | string, text: string): Promise<boolean> {
