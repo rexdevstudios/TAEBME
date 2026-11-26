@@ -237,11 +237,15 @@ export class PostgresDraftDbAdapter implements LaunchDraftDbAdapter {
             ld.description,
             ld.image_url,
             ld.launch_mode,
-            w.address as creator_wallet
+            w.address as creator_wallet,
+            kp.is_verified as creator_kol_verified,
+            kp.twitter_handle as creator_kol_handle,
+            kp.trust_score as creator_trust_score
           FROM token_launches tl
           JOIN launch_drafts ld ON ld.id = tl.draft_id
           LEFT JOIN users u ON u.id = ld.creator_id
           LEFT JOIN wallets w ON w.user_id = u.id AND w.is_primary = true
+          LEFT JOIN kol_profiles kp ON kp.user_id = ld.creator_id
           ORDER BY tl.published_at DESC
           LIMIT 50
         `;
@@ -265,6 +269,12 @@ export class PostgresDraftDbAdapter implements LaunchDraftDbAdapter {
             imageUrl: r.image_url,
             launchMode: r.launch_mode,
             creatorWallet: r.creator_wallet || '0x000000000000000000000000000000000000dEaD',
+            creatorKolVerified: Boolean(r.creator_kol_verified),
+            creatorKolHandle: r.creator_kol_handle ? String(r.creator_kol_handle) : null,
+            creatorTrustScore:
+              r.creator_trust_score !== null && r.creator_trust_score !== undefined
+                ? Number(r.creator_trust_score)
+                : null,
           }));
         }
       } catch (err: any) {

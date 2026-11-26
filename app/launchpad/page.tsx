@@ -107,7 +107,11 @@ export default function LaunchpadPage() {
     return counts;
   }, [activeTokens]);
 
-  const [statusFilter, setStatusFilter] = useState<'all' | 'curve' | 'graduated'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'curve' | 'graduated' | 'kol_verified'>('all');
+  const kolVerifiedCount = useMemo(
+    () => activeTokens.filter((t) => Boolean(t.creatorKolVerified)).length,
+    [activeTokens]
+  );
   const [visiblePoolCount, setVisiblePoolCount] = useState<number>(12);
   const [featuredBoosts, setFeaturedBoosts] = useState<FeaturedBoostRecord[]>([]);
   const [boostingAddress, setBoostingAddress] = useState<string | null>(null);
@@ -124,6 +128,7 @@ export default function LaunchpadPage() {
       search: tokenSearch,
       chain: chainFilter,
       sort: sortMode,
+      onlyKolVerified: statusFilter === 'kol_verified',
     });
     const byStatus =
       statusFilter === 'graduated'
@@ -1605,9 +1610,13 @@ export default function LaunchpadPage() {
             </span>
             {(
               [
-                { id: 'all', label: tr('All', 'Semua') },
-                { id: 'curve', label: tr('Bonding Curve', 'Bonding Curve') },
-                { id: 'graduated', label: tr('Graduated DEX', 'Graduated DEX') },
+                { id: 'all', label: tr('All', 'Semua', '全部') },
+                { id: 'curve', label: tr('Bonding Curve', 'Bonding Curve', '联合曲线') },
+                { id: 'graduated', label: tr('Graduated DEX', 'Graduated DEX', '已毕业 DEX') },
+                {
+                  id: 'kol_verified',
+                  label: `${tr('KOL Verified', 'KOL Terverifikasi', '认证 KOL')} (${kolVerifiedCount})`,
+                },
               ] as const
             ).map((st) => (
               <button
@@ -1706,6 +1715,33 @@ export default function LaunchpadPage() {
                           {featuredAddressSet.has((token.contractAddress || '').toLowerCase()) && (
                             <span style={{ fontSize: '9px', fontWeight: 900, padding: '1px 6px', borderRadius: '4px', backgroundColor: 'var(--color-badge-success-bg)', color: 'var(--color-badge-success-text)', border: '1px solid var(--color-badge-success-border)' }}>
                               FEATURED
+                            </span>
+                          )}
+                          {token.creatorKolVerified && (
+                            <span
+                              title={
+                                token.creatorKolHandle
+                                  ? `Verified KOL @${String(token.creatorKolHandle).replace(/^@/, '')}${typeof token.creatorTrustScore === 'number' ? ` · Trust ${token.creatorTrustScore}` : ''}`
+                                  : 'Verified KOL Creator'
+                              }
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '3px',
+                                fontSize: '9px',
+                                fontWeight: 900,
+                                padding: '1px 6px',
+                                borderRadius: '4px',
+                                backgroundColor: 'var(--color-badge-info-bg)',
+                                color: 'var(--color-badge-info-text)',
+                                border: '1px solid var(--color-badge-info-border)',
+                              }}
+                            >
+                              <CheckCircle2 size={10} />
+                              {token.creatorKolHandle
+                                ? `KOL @${String(token.creatorKolHandle).replace(/^@/, '')}`
+                                : 'KOL VERIFIED'}
+                              {typeof token.creatorTrustScore === 'number' ? ` · ${token.creatorTrustScore}` : ''}
                             </span>
                           )}
                           {token.isGraduated ? (

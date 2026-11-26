@@ -23,6 +23,9 @@ export interface LaunchpadTokenItem {
   riskScore?: number | string;
   publishedAt?: string | Date;
   launchMode?: string;
+  creatorKolVerified?: boolean;
+  creatorKolHandle?: string | null;
+  creatorTrustScore?: number | null;
 }
 
 export function normalizeDiscoveryChain(rawChain?: string): string {
@@ -50,6 +53,7 @@ export function filterAndSortLaunchTokens<T extends LaunchpadTokenItem>(
     chain?: string;
     sort?: LaunchpadSortMode;
     onlyGraduated?: boolean;
+    onlyKolVerified?: boolean;
   }
 ): T[] {
   const query = (options.search || '').trim().toLowerCase();
@@ -58,6 +62,7 @@ export function filterAndSortLaunchTokens<T extends LaunchpadTokenItem>(
 
   const filtered = tokens.filter((t) => {
     if (options.onlyGraduated && !t.isGraduated) return false;
+    if (options.onlyKolVerified && !t.creatorKolVerified) return false;
 
     if (targetChain !== 'all') {
       const norm = normalizeDiscoveryChain(t.chain);
@@ -68,7 +73,8 @@ export function filterAndSortLaunchTokens<T extends LaunchpadTokenItem>(
       const name = (t.name || '').toLowerCase();
       const ticker = (t.ticker || '').toLowerCase();
       const addr = (t.contractAddress || '').toLowerCase();
-      if (!name.includes(query) && !ticker.includes(query) && !addr.includes(query)) {
+      const kolHandle = (t.creatorKolHandle || '').toLowerCase();
+      if (!name.includes(query) && !ticker.includes(query) && !addr.includes(query) && !kolHandle.includes(query.replace(/^@/, ''))) {
         return false;
       }
     }
