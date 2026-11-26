@@ -17,7 +17,8 @@ export type AlertEventType =
   | 'KEY_FROZEN_OVER_QUOTA'
   | 'GENESIS_WEEKLY_DIGEST'
   | 'GENESIS_SBT_MINTED'
-  | 'PROP_CHALLENGE_PASSED';
+  | 'PROP_CHALLENGE_PASSED'
+  | 'AIRDROP_CAMPAIGN_CREATED';
 
 export interface OutboundAlertPayload {
   event: AlertEventType;
@@ -76,6 +77,7 @@ const EVENT_EMOJI: Record<AlertEventType, string> = {
   GENESIS_WEEKLY_DIGEST: '🏆',
   GENESIS_SBT_MINTED: '🎖️',
   PROP_CHALLENGE_PASSED: '🥇',
+  AIRDROP_CAMPAIGN_CREATED: '🎁',
 };
 
 /**
@@ -353,4 +355,50 @@ export async function notifyPublicTelegramChannelBestEffort(
       error: err?.message || 'PUBLIC_TELEGRAM_NOTIFY_ERROR',
     };
   }
+}
+
+export interface TelegramAirdropCampaignSummary {
+  id: string;
+  title: string;
+  requiredHashtag?: string;
+  currentParticipants?: number;
+  maxParticipants?: number;
+  isActive?: boolean;
+}
+
+/**
+ * Pure, deterministic Telegram /airdrop command reply formatter (Phase EV).
+ * Lists active non-custodial bounty/airdrop campaigns + Free-Mint Genesis SBT claim links.
+ */
+export function formatTelegramAirdropListReply(params: {
+  campaigns: TelegramAirdropCampaignSummary[];
+  genesisMinted?: number;
+  genesisCap?: number;
+  siteOrigin?: string;
+}): string {
+  const origin = (params.siteOrigin || 'https://pndigi.site').replace(/\/+$/, '');
+  const active = (params.campaigns || []).filter((c) => c.isActive !== false);
+  const lines: string[] = ['POOLNET Active Airdrops & KOL Bounties (100% Non-Custodial)'];
+
+  if (typeof params.genesisMinted === 'number' && typeof params.genesisCap === 'number') {
+    lines.push(
+      `• Free-Mint Genesis Pioneer SBT: ${params.genesisMinted}/${params.genesisCap} minted (+150 XP & 0.25% referral) -> ${origin}/kol`
+    );
+  }
+
+  if (active.length === 0) {
+    lines.push('No active token bounty campaigns right now. Check back soon or create one at ' + `${origin}/kol`);
+  } else {
+    lines.push(`Active Campaigns (${active.length}):`);
+    for (const c of active.slice(0, 5)) {
+      const cur = Number(c.currentParticipants || 0);
+      const max = Number(c.maxParticipants || 0);
+      const slots = max > 0 ? ` [${cur}/${max} slots]` : '';
+      const tag = c.requiredHashtag ? ` ${c.requiredHashtag}` : '';
+      lines.push(`- ${c.title}${tag}${slots}\n  Claim: ${origin}/kol?campaignId=${encodeURIComponent(c.id)}&tab=CLAIM`);
+    }
+  }
+
+  lines.push(`Explore all quests & claim via SIWE + GoPlus Anti-Sybil: ${origin}/kol`);
+  return lines.join('\n');
 }

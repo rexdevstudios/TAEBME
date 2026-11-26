@@ -3,6 +3,7 @@ import { ApiResponse } from '@packages/shared/contracts/api-contracts';
 import { BountyCampaign } from '@packages/shared/types/domain';
 import { isValidCampaignTrustTier, CampaignTrustTier } from '@packages/shared/types/trust';
 import { defaultBountyDbAdapter } from '@packages/shared/db-pool';
+import { notifyPublicTelegramChannelBestEffort } from '@packages/notifications/webhook-dispatcher';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -94,6 +95,17 @@ export async function POST(req: NextRequest) {
 
     const savedId = await defaultBountyDbAdapter.createCampaign(newCampaign);
     newCampaign.id = savedId;
+
+    await notifyPublicTelegramChannelBestEffort({
+      event: 'AIRDROP_CAMPAIGN_CREATED',
+      title: `New Airdrop / KOL Bounty: ${newCampaign.title}`,
+      message: `Hashtag: ${newCampaign.requiredHashtag} · Slots: ${newCampaign.maxParticipants}\nJoin & Claim (SIWE + GoPlus Verified): https://pndigi.site/kol?campaignId=${encodeURIComponent(savedId)}&tab=CLAIM`,
+      metadata: {
+        campaignId: savedId,
+        maxParticipants: newCampaign.maxParticipants,
+        hashtag: newCampaign.requiredHashtag,
+      },
+    });
 
     const serialized = {
       ...newCampaign,

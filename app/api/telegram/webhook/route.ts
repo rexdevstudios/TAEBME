@@ -11,7 +11,7 @@
 import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { rateLimiter } from '@packages/auth/rate-limiter';
-import { defaultDraftDbAdapter, defaultBillingDbAdapter } from '@packages/shared/db-pool';
+import { defaultDraftDbAdapter, defaultBillingDbAdapter, defaultBountyDbAdapter } from '@packages/shared/db-pool';
 import {
   appendWhiteLabelTelegramFooter,
   resolvePartnerByTelegramChatId,
@@ -19,6 +19,7 @@ import {
 import { fetchOnChainTokenSecurity, isValidEvmAddress } from '@packages/intelligence/onchain-insider-guard';
 import { fetchFreeWalletProfile } from '@packages/intelligence/free-wallet-intelligence';
 import {
+  formatTelegramAirdropListReply,
   formatTelegramTokenSafetyReply,
   formatTelegramWalletRiskReply,
 } from '@packages/notifications/webhook-dispatcher';
@@ -87,7 +88,7 @@ export async function POST(req: NextRequest) {
     const cmd = parts[0].toLowerCase().split('@')[0];
     let reply =
       'POOLNET Launchpad & AI Scanner Bot.\nCommands:\n' +
-      '/start · /status · /genesis · /prop · /tokens · /chatid\n' +
+      '/start · /status · /airdrop · /genesis · /prop · /tokens · /chatid\n' +
       '/safety <0xContract> [chainId]\n' +
       '/wallet <0xAddress>';
 
@@ -95,6 +96,7 @@ export async function POST(req: NextRequest) {
       reply =
         'POOLNET SocialFi & Launchpad is OPERATIONAL on Vercel + Neon PostgreSQL SSOT.\n' +
         'Commands:\n' +
+        '• /airdrop — Active Airdrops, KOL Bounties & Free-Mint Genesis SBT\n' +
         '• /genesis — Live Free-Mint Genesis SBT & Referral Leaderboard\n' +
         '• /prop — POOLNET Prop Trading Cup Rules & Verified Traders\n' +
         '• /tokens — Live launches\n' +
@@ -102,6 +104,19 @@ export async function POST(req: NextRequest) {
         '• /wallet <0xAddress> — Wallet Risk Audit ($0)\n' +
         '• /chatid — Show current Telegram Chat ID (Admin/Partner helper)\n' +
         'Visit https://pndigi.site';
+    } else if (cmd === '/airdrop' || cmd === '/bounties') {
+      const [campaigns, genesisState] = await Promise.all([
+        defaultBountyDbAdapter.listCampaigns().catch(() => []),
+        defaultBillingDbAdapter
+          .getGenesisSbtState()
+          .catch(() => ({ totalMinted: 0, userPass: null, leaderboard: [] })),
+      ]);
+      reply = formatTelegramAirdropListReply({
+        campaigns,
+        genesisMinted: genesisState.totalMinted,
+        genesisCap: GENESIS_SBT_SUPPLY_CAP,
+        siteOrigin: 'https://pndigi.site',
+      });
     } else if (cmd === '/genesis') {
       const [genesisState, propState] = await Promise.all([
         defaultBillingDbAdapter.getGenesisSbtState().catch(() => ({ totalMinted: 0, userPass: null, leaderboard: [] })),

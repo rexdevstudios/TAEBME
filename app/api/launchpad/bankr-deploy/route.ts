@@ -26,7 +26,10 @@ import {
   getDbPool,
 } from '@packages/shared/db-pool';
 import { validateMultiChainFeeRecipient } from '@packages/shared/credential-vault';
-import { notifyUserWebhookBestEffort } from '@packages/notifications/webhook-dispatcher';
+import {
+  notifyPublicTelegramChannelBestEffort,
+  notifyUserWebhookBestEffort,
+} from '@packages/notifications/webhook-dispatcher';
 import { resolveBankrEffectiveFeeRecipient } from '@packages/trading/fee-monetization';
 
 export const dynamic = 'force-dynamic';
@@ -389,6 +392,22 @@ export async function POST(req: NextRequest) {
               txHash: result.txHash || '',
               keySource: resolvedByok ? 'BYOK_VAULT' : 'PLATFORM_ENV',
             },
+          },
+        });
+      }
+
+      if (result.status === 'deployed' && !Boolean(body?.simulateOnly)) {
+        const portalUrl = result.tokenAddress
+          ? `https://pndigi.site/token/${encodeURIComponent(chain)}/${encodeURIComponent(result.tokenAddress)}`
+          : 'https://pndigi.site/launchpad';
+        await notifyPublicTelegramChannelBestEffort({
+          event: 'TOKEN_DEPLOYED',
+          title: `New Live Token Launch: $${tokenSymbol} (${chain.toUpperCase()})`,
+          message: `Token $${tokenSymbol} (${tokenName}) is LIVE on ${chain.toUpperCase()}!\nContract: ${result.tokenAddress || 'confirming'}\nTrade & Audit: ${portalUrl}`,
+          metadata: {
+            symbol: tokenSymbol,
+            chain,
+            tokenAddress: result.tokenAddress || '',
           },
         });
       }
