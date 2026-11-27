@@ -24,7 +24,9 @@ import { TOP_LIQUID_CEX_PAIRS } from '@packages/shared/market-pairs';
 import { fetchAutoPilot24hTickers } from '@packages/agent/autopilot-market-feed';
 import {
   computeAntiManipulationKolConsensus,
+  enrichMarketplacePresetsWithKolStatus,
   loadVerifiedKolSignalsForSymbol,
+  type KolProfileSample,
 } from '@packages/intelligence/kol-chart-overlay';
 import {
   fetchBytePlusInfoQuestCatalystHint,
@@ -231,7 +233,37 @@ export async function POST(req: NextRequest) {
       defaultBillingDbAdapter.getMarketplacePresets().catch(() => []),
     ]);
 
-    const marketplaceDataset = buildMarketplaceDatasetAdvisorySummary(marketplacePresets, parsed.symbol);
+    let enrichedMarketplacePresets = marketplacePresets;
+    if (pool && marketplacePresets.length > 0) {
+      try {
+        const presetWallets = Array.from(
+          new Set(marketplacePresets.map((p) => String(p.creatorWallet || '').trim().toLowerCase()).filter(Boolean))
+        );
+        if (presetWallets.length > 0) {
+          const kRes = await pool.query(
+            `SELECT LOWER(w.address) AS wallet_address, kp.twitter_handle, kp.trust_score, kp.is_verified
+             FROM wallets w
+             JOIN kol_profiles kp ON kp.user_id = w.user_id
+             WHERE LOWER(w.address) = ANY($1::text[])`,
+            [presetWallets]
+          );
+          const kolMap = new Map<string, KolProfileSample>();
+          for (const row of kRes.rows) {
+            kolMap.set(String(row.wallet_address).toLowerCase(), {
+              walletAddress: String(row.wallet_address),
+              twitterHandle: row.twitter_handle,
+              trustScore: Number(row.trust_score ?? 0),
+              isVerified: row.is_verified === false ? false : undefined,
+            });
+          }
+          enrichedMarketplacePresets = enrichMarketplacePresetsWithKolStatus(marketplacePresets, kolMap);
+        }
+      } catch {
+        // Non-blocking KOL enrichment fallback
+      }
+    }
+
+    const marketplaceDataset = buildMarketplaceDatasetAdvisorySummary(enrichedMarketplacePresets, parsed.symbol);
 
     const effectiveLimits = computeEffectiveUserRiskLimits({
       planId: userPlanId,

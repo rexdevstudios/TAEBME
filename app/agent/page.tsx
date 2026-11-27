@@ -15,6 +15,7 @@ import { MultiRailAgentExecutionPanel } from '../components/MultiRailAgentExecut
 import { AutoPilotControlPanel } from '../components/AutoPilotControlPanel';
 import { SignalMarketplacePanel } from '../components/SignalMarketplacePanel';
 import { AiCopilotChatPanel } from '../components/AiCopilotChatPanel';
+import { OwnedWalletsAllowlistPanel } from '../components/OwnedWalletsAllowlistPanel';
 import type { CustomAgentProfile } from '@packages/agent/skill-registry';
 import type { AutoPilotPresetDraft } from '@packages/agent/signal-marketplace';
 import { TOP_LIQUID_CEX_PAIRS } from '@packages/shared/market-pairs';
@@ -439,6 +440,8 @@ export default function AgentPage() {
           />
 
           <UserRiskPolicyPanel isConnected={isConnected} />
+
+          <OwnedWalletsAllowlistPanel isConnected={isConnected} />
 
           <SessionAllowancePanel isConnected={isConnected} />
 

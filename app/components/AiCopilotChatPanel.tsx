@@ -41,6 +41,16 @@ interface CopilotMessage {
     topMovers?: Array<{ symbol: string; lastPrice: number; priceChangePct24h: number }>;
     deployerTokens?: Array<{ contractAddress: string; estimatedCreatorFee: number }>;
     kolConsensus?: { score: number; verdict: string; uniqueVerifiedKols: number };
+    marketplaceDataset?: {
+      totalPresets: number;
+      verifiedPresetsCount: number;
+      avgTakeProfitPct: number;
+      avgStopLossPct: number;
+      avgTrailingStopPct: number;
+      topPresetTitle: string;
+      topPresetSubscribers: number;
+      summaryLine: string;
+    } | null;
   };
   actionDraft?: CopilotActionDraft | null;
   availableAccounts?: CopilotConnectedAccount[];
@@ -520,7 +530,8 @@ export function AiCopilotChatPanel({ isConnected }: AiCopilotChatPanelProps) {
 
                 {m.liveHighlights &&
                   ((m.liveHighlights.topMovers && m.liveHighlights.topMovers.length > 0) ||
-                    m.liveHighlights.kolConsensus) && (
+                    m.liveHighlights.kolConsensus ||
+                    m.liveHighlights.marketplaceDataset) && (
                     <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' }}>
                       {m.liveHighlights.kolConsensus && (
                         <span
@@ -535,6 +546,22 @@ export function AiCopilotChatPanel({ isConnected }: AiCopilotChatPanelProps) {
                           }}
                         >
                           KOL VERIFIED: {m.liveHighlights.kolConsensus.verdict} ({m.liveHighlights.kolConsensus.score}/100)
+                        </span>
+                      )}
+                      {m.liveHighlights.marketplaceDataset && (
+                        <span
+                          style={{
+                            fontSize: '10px',
+                            fontWeight: 800,
+                            fontFamily: 'var(--font-mono)',
+                            padding: '2px 7px',
+                            borderRadius: '4px',
+                            backgroundColor: 'var(--color-badge-success-bg)',
+                            border: '1px solid var(--color-badge-success-border)',
+                            color: 'var(--color-badge-success-text)',
+                          }}
+                        >
+                          SIGNAL DATASET ({m.liveHighlights.marketplaceDataset.totalPresets}): TP +{m.liveHighlights.marketplaceDataset.avgTakeProfitPct}% / SL -{m.liveHighlights.marketplaceDataset.avgStopLossPct}% · Top: {m.liveHighlights.marketplaceDataset.topPresetTitle}
                         </span>
                       )}
                       {(m.liveHighlights.topMovers || []).slice(0, 4).map((mv) => (
