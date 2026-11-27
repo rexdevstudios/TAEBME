@@ -33,6 +33,7 @@ import {
 import { runAutonomousCycleEvaluation } from '../packages/agent/autopilot-cycle-runner';
 import { buildTradeIntentsFromAutoPilotReport } from '../packages/agent/autopilot-intent-bridge';
 import {
+  formatTelegramSignalListReply,
   formatTelegramTokenSafetyReply,
   formatTelegramWalletRiskReply,
   buildSocialShareUrl,
@@ -1301,6 +1302,34 @@ async function runSimulationSuite() {
       dexChains.length === 4 &&
       opBnbEntry?.category === 'wallet_only',
     'Bankr client routes bk_ptr_ to X-Partner-Key, whitelists 5 Base quote tokens & navbar cleanly separates Deployer vs DEX chains'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 50: Telegram /signals Formatter & Auto-Broadcast Growth Loop (Phase FF)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 50: Telegram /signals Formatter & Signal Marketplace Growth] ---');
+  const tgSignalsReply = formatTelegramSignalListReply({
+    presets: [
+      {
+        id: 'preset-top-1',
+        title: 'Base Momentum Pro',
+        rail: 'DEX_SESSION',
+        takeProfitPct: 20,
+        stopLossPct: 5,
+        trailingStopPct: 3,
+        priceCredits: 100,
+        subscribersCount: 12,
+      },
+    ],
+    siteOrigin: 'https://pndigi.site',
+  });
+  const tgSignalsEmpty = formatTelegramSignalListReply({ presets: [], siteOrigin: 'https://pndigi.site' });
+  assert(
+    tgSignalsReply.includes('Base Momentum Pro') &&
+      tgSignalsReply.includes('TP +20% / SL -5% / Trail 3%') &&
+      tgSignalsReply.includes('https://pndigi.site/agent?tab=autopilot&presetId=preset-top-1') &&
+      tgSignalsEmpty.includes('No public signal presets published yet'),
+    'Telegram /signals formatter ranks presets with TP/SL/Trail & direct /agent Apply Draft deep-links'
   );
 
   console.log('\n================================================================');

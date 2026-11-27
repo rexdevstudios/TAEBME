@@ -20,6 +20,7 @@ import { fetchOnChainTokenSecurity, isValidEvmAddress } from '@packages/intellig
 import { fetchFreeWalletProfile } from '@packages/intelligence/free-wallet-intelligence';
 import {
   formatTelegramAirdropListReply,
+  formatTelegramSignalListReply,
   formatTelegramTokenSafetyReply,
   formatTelegramWalletRiskReply,
 } from '@packages/notifications/webhook-dispatcher';
@@ -88,7 +89,7 @@ export async function POST(req: NextRequest) {
     const cmd = parts[0].toLowerCase().split('@')[0];
     let reply =
       'POOLNET Launchpad & AI Scanner Bot.\nCommands:\n' +
-      '/start · /status · /airdrop · /genesis · /prop · /tokens · /chatid\n' +
+      '/start · /status · /airdrop · /signals · /genesis · /prop · /tokens · /chatid\n' +
       '/safety <0xContract> [chainId]\n' +
       '/wallet <0xAddress>';
 
@@ -97,6 +98,7 @@ export async function POST(req: NextRequest) {
         'POOLNET SocialFi & Launchpad is OPERATIONAL on Vercel + Neon PostgreSQL SSOT.\n' +
         'Commands:\n' +
         '• /airdrop — Active Airdrops, KOL Bounties & Free-Mint Genesis SBT\n' +
+        '• /signals — Top Risk-Gated Signal Marketplace Presets (80/20 Rev-Share)\n' +
         '• /genesis — Live Free-Mint Genesis SBT & Referral Leaderboard\n' +
         '• /prop — POOLNET Prop Trading Cup Rules & Verified Traders\n' +
         '• /tokens — Live launches\n' +
@@ -115,6 +117,12 @@ export async function POST(req: NextRequest) {
         campaigns,
         genesisMinted: genesisState.totalMinted,
         genesisCap: GENESIS_SBT_SUPPLY_CAP,
+        siteOrigin: 'https://pndigi.site',
+      });
+    } else if (cmd === '/signals' || cmd === '/presets') {
+      const presets = await defaultBillingDbAdapter.getMarketplacePresets().catch(() => []);
+      reply = formatTelegramSignalListReply({
+        presets,
         siteOrigin: 'https://pndigi.site',
       });
     } else if (cmd === '/genesis') {

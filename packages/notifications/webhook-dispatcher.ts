@@ -18,7 +18,8 @@ export type AlertEventType =
   | 'GENESIS_WEEKLY_DIGEST'
   | 'GENESIS_SBT_MINTED'
   | 'PROP_CHALLENGE_PASSED'
-  | 'AIRDROP_CAMPAIGN_CREATED';
+  | 'AIRDROP_CAMPAIGN_CREATED'
+  | 'SIGNAL_PRESET_PUBLISHED';
 
 export interface OutboundAlertPayload {
   event: AlertEventType;
@@ -78,6 +79,7 @@ const EVENT_EMOJI: Record<AlertEventType, string> = {
   GENESIS_SBT_MINTED: '🎖️',
   PROP_CHALLENGE_PASSED: '🥇',
   AIRDROP_CAMPAIGN_CREATED: '🎁',
+  SIGNAL_PRESET_PUBLISHED: '📈',
 };
 
 /**
@@ -405,5 +407,45 @@ export function formatTelegramAirdropListReply(params: {
   }
 
   lines.push(`Explore all quests & claim via SIWE + GoPlus Anti-Sybil: ${origin}/kol`);
+  return lines.join('\n');
+}
+
+export interface TelegramSignalPresetSummary {
+  id: string;
+  title: string;
+  rail?: string;
+  takeProfitPct: number;
+  stopLossPct: number;
+  trailingStopPct?: number;
+  priceCredits: number;
+  subscribersCount?: number;
+}
+
+/**
+ * Formats Telegram `/signals` command response listing top Risk-Gated Auto-Pilot Signal Presets.
+ */
+export function formatTelegramSignalListReply(params: {
+  presets: TelegramSignalPresetSummary[];
+  siteOrigin?: string;
+}): string {
+  const origin = (params.siteOrigin || 'https://pndigi.site').replace(/\/+$/, '');
+  const list = Array.isArray(params.presets) ? [...params.presets] : [];
+  list.sort((a, b) => Number(b.subscribersCount || 0) - Number(a.subscribersCount || 0));
+
+  const lines: string[] = ['POOLNET Top Signal Marketplace Presets (80/20 Rev-Share · Risk-Gated)'];
+  if (list.length === 0) {
+    lines.push(`No public signal presets published yet. Publish your risk-gated strategy & earn 80% credits at ${origin}/agent`);
+  } else {
+    lines.push(`Top Presets (${list.length} total):`);
+    for (const p of list.slice(0, 5)) {
+      const trail = Number(p.trailingStopPct ?? 3);
+      const subs = Number(p.subscribersCount ?? 0);
+      const rail = p.rail || 'CEX_AUTO';
+      lines.push(
+        `- ${p.title} [${rail}] · TP +${p.takeProfitPct}% / SL -${p.stopLossPct}% / Trail ${trail}% · ${p.priceCredits} cr (${subs} subs)\n  Apply Draft: ${origin}/agent?tab=autopilot&presetId=${encodeURIComponent(p.id)}`
+      );
+    }
+  }
+  lines.push(`Leaderboard & full marketplace: ${origin}/leaderboard`);
   return lines.join('\n');
 }

@@ -21,6 +21,7 @@ import {
   enrichMarketplacePresetsWithKolStatus,
   type KolProfileSample,
 } from '@packages/intelligence/kol-chart-overlay';
+import { notifyPublicTelegramChannelBestEffort } from '@packages/notifications/webhook-dispatcher';
 
 export const dynamic = 'force-dynamic';
 
@@ -110,6 +111,18 @@ export async function POST(req: NextRequest) {
         ...check.sanitized,
         creatorWallet: session.walletAddress,
       });
+
+      await notifyPublicTelegramChannelBestEffort({
+        event: 'SIGNAL_PRESET_PUBLISHED',
+        title: `New Signal Strategy Preset: ${created.title}`,
+        message: `Rail: ${created.rail} · TP +${created.takeProfitPct}% / SL -${created.stopLossPct}% / Trail ${created.trailingStopPct}% · Price: ${created.priceCredits} cr (80/20 Rev-Share)\nApply Draft in Auto-Pilot: https://pndigi.site/agent?tab=autopilot&presetId=${encodeURIComponent(created.id)}`,
+        metadata: {
+          presetId: created.id,
+          rail: created.rail,
+          priceCredits: created.priceCredits,
+        },
+      });
+
       return NextResponse.json(
         { success: true, data: created, timestamp: new Date().toISOString() },
         { status: 201 }
