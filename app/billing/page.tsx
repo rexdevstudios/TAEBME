@@ -804,10 +804,14 @@ export default function BillingPage() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
             <div>
               <h3 style={{ fontSize: '15px', fontWeight: 800, color: 'var(--color-foreground)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <History size={16} color="var(--color-accent)" /> Riwayat Mutasi Kredit
+                <History size={16} color="var(--color-accent)" /> {tr('Credit Ledger History', 'Riwayat Mutasi Kredit', '积分账本记录')}
               </h3>
               <p className="text-muted" style={{ margin: '2px 0 0 0', fontSize: '12px' }}>
-                Catatan lengkap penambahan kredit paket, bonus quest, dan pemakaian fitur AI / peluncuran token.
+                {tr(
+                  'Complete record of plan credit top-ups, quest bonuses, and AI / token launch usage.',
+                  'Catatan lengkap penambahan kredit paket, bonus quest, dan pemakaian fitur AI / peluncuran token.',
+                  '完整记录套餐积分充值、任务奖励以及 AI / 代币发行消耗。'
+                )}
               </p>
             </div>
             <button
@@ -817,13 +821,15 @@ export default function BillingPage() {
               className="btn-secondary"
               style={{ fontSize: '11px', padding: '6px 10px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
             >
-              <RefreshCw size={12} /> {ledgerLoading ? 'Syncing...' : 'Refresh Ledger'}
+              <RefreshCw size={12} /> {ledgerLoading ? tr('Syncing...', 'Menyinkronkan...', '同步中...') : tr('Refresh Ledger', 'Muat Ulang Mutasi', '刷新账本')}
             </button>
           </div>
 
           {ledgerEntries.length === 0 ? (
             <div className="text-muted" style={{ fontSize: '12px', padding: '12px 0' }}>
-              {ledgerLoading ? 'Memuat mutasi kredit dari PostgreSQL...' : 'Belum ada riwayat mutasi kredit tercatat untuk sesi ini.'}
+              {ledgerLoading
+                ? tr('Loading credit ledger from PostgreSQL...', 'Memuat mutasi kredit dari PostgreSQL...', '正在从 PostgreSQL 加载积分账本...')
+                : tr('No credit ledger entries recorded for this session yet.', 'Belum ada riwayat mutasi kredit tercatat untuk sesi ini.', '当前会话暂无积分账本记录。')}
             </div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
@@ -907,7 +913,11 @@ export default function BillingPage() {
               Connected Multi-Account API Vaults (BYOK &amp; Non-Custodial)
             </h3>
             <p className="text-muted" style={{ margin: 0, fontSize: '12px' }}>
-              Kelola banyak API Key terenkripsi AES-256-GCM per akun tanpa pernah menyimpan private key dompet Anda di server.
+              {tr(
+                'Manage multiple AES-256-GCM encrypted API keys per account without ever storing your wallet private keys on the server.',
+                'Kelola banyak API Key terenkripsi AES-256-GCM per akun tanpa pernah menyimpan private key dompet Anda di server.',
+                '使用 AES-256-GCM 加密管理多账户 API Key，服务器绝不存储您的钱包私钥。'
+              )}
             </p>
           </div>
           {vaultSummary && (
@@ -934,7 +944,7 @@ export default function BillingPage() {
                       color: 'var(--color-text-positive)',
                     }}
                   >
-                    {c.active} / {c.maxAllowed} aktif
+                    {c.active} / {c.maxAllowed} {tr('active', 'aktif', '活跃')}
                   </span>
                   {frozen > 0 && (
                     <span
@@ -962,10 +972,14 @@ export default function BillingPage() {
                   </div>
                   {renderCounter(vaultSummary?.vaults.bankr)}
                   <p className="text-muted" style={{ fontSize: '11px', margin: '0 0 10px 0', lineHeight: 1.45 }}>
-                    Simpan hingga 15 (CREATOR) / 25 (AGENT) API Key Bankr (+ Permanent Add-On Slots) dengan isolasi multi-chain (Base, Robinhood, Arbitrum, Arc).
+                    {tr(
+                      'Store up to 15 (CREATOR) / 25 (AGENT) Bankr API keys (+ Permanent Add-On Slots) with multi-chain isolation (Base, Robinhood, Arbitrum, Arc).',
+                      'Simpan hingga 15 (CREATOR) / 25 (AGENT) API Key Bankr (+ Permanent Add-On Slots) dengan isolasi multi-chain (Base, Robinhood, Arbitrum, Arc).',
+                      '支持最多 15 (CREATOR) / 25 (AGENT) 个 Bankr API Key（可叠加永久扩展槽位），支持多链隔离。'
+                    )}
                   </p>
                   <Link href="/launchpad" className="btn-secondary" style={{ fontSize: '11px', padding: '5px 10px', display: 'inline-block', textDecoration: 'none' }}>
-                    Kelola di /launchpad →
+                    {tr('Manage in /launchpad →', 'Kelola di /launchpad →', '前往 /launchpad 管理 →')}
                   </Link>
                 </div>
                 <div style={{ padding: '12px', borderRadius: '12px', border: '1px solid var(--color-border)' }}>
@@ -974,10 +988,14 @@ export default function BillingPage() {
                   </div>
                   {renderCounter(vaultSummary?.vaults.binance)}
                   <p className="text-muted" style={{ fontSize: '11px', margin: '0 0 10px 0', lineHeight: 1.45 }}>
-                    Simpan hingga 5 (TRADER) / 15 (AGENT) akun API Binance Testnet/Mainnet (+ Add-On Slots) dengan No-Withdrawal Guard &amp; Live Ping.
+                    {tr(
+                      'Store up to 5 (TRADER) / 15 (AGENT) Binance Testnet/Mainnet API accounts (+ Add-On Slots) with No-Withdrawal Guard & Live Ping.',
+                      'Simpan hingga 5 (TRADER) / 15 (AGENT) akun API Binance Testnet/Mainnet (+ Add-On Slots) dengan No-Withdrawal Guard & Live Ping.',
+                      '支持最多 5 (TRADER) / 15 (AGENT) 个 Binance 现货账户，内置禁提现守卫与实时检测。'
+                    )}
                   </p>
                   <Link href="/trading" className="btn-secondary" style={{ fontSize: '11px', padding: '5px 10px', display: 'inline-block', textDecoration: 'none' }}>
-                    Kelola di /trading →
+                    {tr('Manage in /trading →', 'Kelola di /trading →', '前往 /trading 管理 →')}
                   </Link>
                 </div>
                 <div style={{ padding: '12px', borderRadius: '12px', border: '1px solid var(--color-border)' }}>
@@ -986,10 +1004,14 @@ export default function BillingPage() {
                   </div>
                   {renderCounter(vaultSummary?.vaults.bybit)}
                   <p className="text-muted" style={{ fontSize: '11px', margin: '0 0 10px 0', lineHeight: 1.45 }}>
-                    Eksekusi Single-Shot Spot Bybit V5 (Testnet/Mainnet) dengan HMAC-SHA256, No-Withdrawal Guard, dan kuota bersama add-on CEX.
+                    {tr(
+                      'Single-Shot Spot Bybit V5 execution (Testnet/Mainnet) with HMAC-SHA256, No-Withdrawal Guard, and shared CEX add-on quota.',
+                      'Eksekusi Single-Shot Spot Bybit V5 (Testnet/Mainnet) dengan HMAC-SHA256, No-Withdrawal Guard, dan kuota bersama add-on CEX.',
+                      '支持 Bybit V5 单次现货执行（测试网/主网），内置 HMAC-SHA256 与禁提现守卫。'
+                    )}
                   </p>
                   <Link href="/trading" className="btn-secondary" style={{ fontSize: '11px', padding: '5px 10px', display: 'inline-block', textDecoration: 'none' }}>
-                    Kelola di /trading →
+                    {tr('Manage in /trading →', 'Kelola di /trading →', '前往 /trading 管理 →')}
                   </Link>
                 </div>
                 <div style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
@@ -998,10 +1020,14 @@ export default function BillingPage() {
                   </div>
                   {renderCounter(vaultSummary?.vaults.byokLlm)}
                   <p className="text-muted" style={{ fontSize: '11px', margin: '0 0 10px 0', lineHeight: 1.45 }}>
-                    Simpan hingga 3 (TRADER) / 5 (AGENT) key Google Gemini, OpenAI GPT-4o, &amp; Anthropic Claude (Sonnet/Haiku/Opus) — hemat 60% credits (2 Cr/run).
+                    {tr(
+                      'Store up to 3 (TRADER) / 5 (AGENT) Google Gemini, OpenAI GPT-4o, & Anthropic Claude keys — save 60% credits (2 Cr/run).',
+                      'Simpan hingga 3 (TRADER) / 5 (AGENT) key Google Gemini, OpenAI GPT-4o, & Anthropic Claude (Sonnet/Haiku/Opus) — hemat 60% credits (2 Cr/run).',
+                      '支持最多 3 (TRADER) / 5 (AGENT) 个 Gemini、OpenAI 与 Claude API Key，节省 60% 积分。'
+                    )}
                   </p>
                   <Link href="/agent" className="btn-secondary" style={{ fontSize: '11px', padding: '5px 10px', display: 'inline-block', textDecoration: 'none' }}>
-                    Kelola di /agent →
+                    {tr('Manage in /agent →', 'Kelola di /agent →', '前往 /agent 管理 →')}
                   </Link>
                 </div>
               </>

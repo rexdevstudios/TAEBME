@@ -1028,12 +1028,25 @@ export default function KolHubPage() {
                       <h3 style={{ fontSize: '16px', fontWeight: 800, margin: '12px 0 6px 0' }}>{c.title}</h3>
                       <p className="text-muted" style={{ fontSize: '13px', margin: 0 }}>
                         {isStake ? (
-                          <span>Stake token di Yield Vault untuk panen fee Flywheel + bonus booster.</span>
+                          <span>
+                            {tr(
+                              'Stake tokens in the Yield Vault to harvest Flywheel fees + booster bonuses.',
+                              'Stake token di Yield Vault untuk panen fee Flywheel + bonus booster.',
+                              '在收益金库质押代币以获取 Flywheel 手续费和加成奖励。'
+                            )}
+                          </span>
                         ) : isHold ? (
-                          <span>Pegang token minimal di wallet tanpa menjual selama periode kampanye.</span>
+                          <span>
+                            {tr(
+                              'Hold the minimum token balance in your wallet without selling during the campaign.',
+                              'Pegang token minimal di wallet tanpa menjual selama periode kampanye.',
+                              '在活动期间于钱包内持有最低余额且不卖出。'
+                            )}
+                          </span>
                         ) : (
                           <span>
-                            Wajib menyertakan hashtag resmi: <strong style={{ color: 'var(--color-accent-info)' }}>{c.requiredHashtag}</strong>
+                            {tr('Required official hashtag:', 'Wajib menyertakan hashtag resmi:', '必须包含官方标签：')}{' '}
+                            <strong style={{ color: 'var(--color-accent-info)' }}>{c.requiredHashtag}</strong>
                             {c.requiredFollowHandle && (
                               <>
                                 {' '}· Follow <strong style={{ color: 'var(--color-accent-info)' }}>{c.requiredFollowHandle}</strong>
@@ -1097,7 +1110,11 @@ export default function KolHubPage() {
               </div>
             ) : (
               <div style={{ textAlign: 'center', padding: '36px', color: 'var(--color-muted)', backgroundColor: 'var(--color-primary)', borderRadius: '12px', border: '1px dashed var(--color-border)' }}>
-                Belum ada kampanye aktif untuk kategori ini. Pilih kategori lain atau buat kampanye baru di tab <strong>Creator Escrow</strong>!
+                {tr(
+                  'No active campaigns in this category yet. Choose another category or create a new campaign in the Creator Escrow tab!',
+                  'Belum ada kampanye aktif untuk kategori ini. Pilih kategori lain atau buat kampanye baru di tab Creator Escrow!',
+                  '该分类暂无活跃活动。请选择其他分类或在 Creator Escrow 标签页创建新活动！'
+                )}
               </div>
             )}
           </div>
@@ -1290,7 +1307,11 @@ export default function KolHubPage() {
               <Lock className="text-accent" size={20} /> Klaim Reward On-Chain (Merkle Proof)
             </h3>
             <p className="text-muted" style={{ fontSize: '13px' }}>
-              Setelah tweet terverifikasi, klaim token reward Anda langsung dari smart contract{' '}
+              {tr(
+                'Once your tweet is verified, claim your reward tokens directly from the smart contract',
+                'Setelah tweet terverifikasi, klaim token reward Anda langsung dari smart contract',
+                '推文验证通过后，直接从智能合约领取您的奖励代币'
+              )}{' '}
               <code>BondingCurveLaunchpad.sol</code>.
             </p>
 
@@ -1301,7 +1322,7 @@ export default function KolHubPage() {
                   ? 'Sudah Diklaim On-Chain (Settled)'
                   : merkleProofData?.isEligible
                   ? 'OK: Terdaftar di Merkle Tree'
-                  : 'Belum Ada Klaim Terverifikasi'}
+                  : tr('No Verified Claims Yet', 'Belum Ada Klaim Terverifikasi', '暂无已验证领取')}
               </strong>
 
               <div style={{ marginTop: '12px' }}>
@@ -1424,7 +1445,7 @@ export default function KolHubPage() {
       {activeTab === 'CREATOR' && (
         <div className="bg-panel" style={{ maxWidth: '600px', margin: '24px auto 0 auto', padding: '24px', borderRadius: '12px' }}>
           <h3 style={{ fontSize: '18px', fontWeight: 800, marginTop: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Flame className="text-accent" size={20} /> Buat Kampanye Promosi Marketing Token
+            <Flame className="text-accent" size={20} /> {tr('Create Token Marketing Bounty Campaign', 'Buat Kampanye Promosi Marketing Token', '创建代币营销赏金活动')}
           </h3>
           <p className="text-muted" style={{ fontSize: '13px' }}>
             Kunci alokasi token promosi untuk merekrut KOL. Sistem akan memverifikasi tweet promosi dan menghasilkan Merkle root secara otomatis.

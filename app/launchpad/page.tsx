@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import Link from 'next/link';
 import { useAuth } from '../context/AuthContext';
 import { useLocale } from '../context/LocaleContext';
 import { Rocket, ShieldAlert, FileText, CheckCircle2, AlertTriangle, TrendingUp, Scale, Wallet, Users, Tag, Sparkles, Coins, Zap, Search, Copy, Check } from 'lucide-react';
@@ -946,7 +947,9 @@ export default function LaunchpadPage() {
                   </span>
                 </button>
                 <span style={{ fontSize: '10px', color: 'var(--color-muted)' }}>
-                  {isDegenMode ? 'Kurva mikro $2,500 mcap awal.' : 'Kurva standar threshold 24 ETH.'}
+                  {isDegenMode
+                    ? tr('Micro curve $2,500 initial mcap.', 'Kurva mikro $2,500 mcap awal.', '微型曲线 $2,500 初始市值。')
+                    : tr('Standard curve 24 ETH threshold.', 'Kurva standar threshold 24 ETH.', '标准曲线 24 ETH 毕业阈值。')}
                 </span>
               </div>
             </div>
@@ -955,10 +958,10 @@ export default function LaunchpadPage() {
             <div className="flex-col gap-xs">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <label style={{ color: 'var(--color-muted)', fontSize: '12px', fontWeight: 700 }}>
-                  Creator Vesting (Local Launchpad Contract)
+                  {tr('Creator Vesting (Local Launchpad Contract)', 'Creator Vesting (Kontrak Launchpad Lokal)', '创作者锁仓（本地发射台合约）')}
                 </label>
                 <span style={{ fontSize: '10px', color: 'var(--color-badge-warning-text)', fontWeight: 700 }}>
-                  Smart contract lokal
+                  {tr('Local smart contract', 'Smart contract lokal', '本地智能合约')}
                 </span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
@@ -968,7 +971,7 @@ export default function LaunchpadPage() {
                   className={creatorVesting === 'NONE' ? 'btn-primary' : 'btn-secondary'}
                   style={{ padding: '8px', justifyContent: 'center', fontSize: '11px' }}
                 >
-                  Tanpa Vesting (0%)
+                  {tr('No Vesting (0%)', 'Tanpa Vesting (0%)', '无锁仓 (0%)')}
                 </button>
                 <button
                   type="button"
@@ -976,11 +979,15 @@ export default function LaunchpadPage() {
                   className={creatorVesting === '15_PERCENT' ? 'btn-primary' : 'btn-secondary'}
                   style={{ padding: '8px', justifyContent: 'center', fontSize: '11px' }}
                 >
-                  15% Creator Vesting
+                  {tr('15% Creator Vesting', '15% Creator Vesting', '15% 创作者锁仓')}
                 </button>
               </div>
               <span style={{ fontSize: '10px', color: 'var(--color-muted)' }}>
-                * Vesting kustom berlaku untuk deploy via Smart Contract Launchpad.
+                {tr(
+                  '* Custom vesting applies to deployments via the Smart Contract Launchpad.',
+                  '* Vesting kustom berlaku untuk deploy via Smart Contract Launchpad.',
+                  '* 自定义锁仓适用于通过智能合约发射台部署的代币。'
+                )}
               </span>
             </div>
 
@@ -988,10 +995,14 @@ export default function LaunchpadPage() {
             <div className="flex-col gap-xs">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '4px' }}>
                 <label style={{ color: 'var(--color-muted)', fontSize: '12px', fontWeight: 700 }}>
-                  Tujuan Royalti Creator (Bankr Fee Recipient Format)
+                  {tr(
+                    'Creator Royalty Recipient (Bankr Fee Recipient Format)',
+                    'Tujuan Royalti Creator (Bankr Fee Recipient Format)',
+                    '创作者版税接收方（Bankr 格式）'
+                  )}
                 </label>
                 <span style={{ fontSize: '10px', color: 'var(--color-badge-info-text)', fontWeight: 700 }}>
-                  Royalti Creator: {billingConfig.creatorFeePct.toFixed(2)}% / Swap
+                  {tr('Creator Royalty:', 'Royalti Creator:', '创作者版税：')} {billingConfig.creatorFeePct.toFixed(2)}% / Swap
                 </span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
@@ -1019,17 +1030,21 @@ export default function LaunchpadPage() {
                   onChange={(e) => setFeeRecipientHandle(e.target.value)}
                   placeholder={
                     feeRecipientType === 'x'
-                      ? 'Handle X penerima royalti (mis. @creator_handle)'
+                      ? tr('Royalty X handle (e.g. @creator_handle)', 'Handle X penerima royalti (mis. @creator_handle)', '版税接收 X 账号（如 @creator_handle）')
                       : feeRecipientType === 'farcaster'
-                      ? 'Handle Farcaster penerima royalti (mis. @creator.eth)'
-                      : 'Nama domain ENS penerima royalti (mis. creator.eth)'
+                      ? tr('Royalty Farcaster handle (e.g. @creator.eth)', 'Handle Farcaster penerima royalti (mis. @creator.eth)', '版税接收 Farcaster 账号（如 @creator.eth）')
+                      : tr('Royalty ENS domain (e.g. creator.eth)', 'Nama domain ENS penerima royalti (mis. creator.eth)', '版税接收 ENS 域名（如 creator.eth）')
                   }
                   className="input"
                   style={{ padding: '8px 10px', fontSize: '11px', fontFamily: 'var(--font-mono)' }}
                 />
               ) : (
                 <span style={{ fontSize: '10px', color: 'var(--color-muted)' }}>
-                  * Menggunakan alamat Creator Wallet Address di bawah sebagai penerima royalti on-chain.
+                  {tr(
+                    '* Uses the Creator Wallet Address below as the on-chain royalty recipient.',
+                    '* Menggunakan alamat Creator Wallet Address di bawah sebagai penerima royalti on-chain.',
+                    '* 使用下方创作者钱包地址作为链上版税接收方。'
+                  )}
                 </span>
               )}
             </div>
@@ -1049,30 +1064,36 @@ export default function LaunchpadPage() {
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
                 <span style={{ fontWeight: 800, color: 'var(--color-foreground)' }}>
-                  Sinkronisasi Paket &amp; Biaya Peluncuran (/billing)
+                  {tr('Plan & Launch Fee Sync (/billing)', 'Sinkronisasi Paket & Biaya Peluncuran (/billing)', '套餐与发行费用同步 (/billing)')}
                 </span>
-                <a
+                <Link
                   href="/billing"
                   style={{ color: 'var(--color-accent)', fontWeight: 700, textDecoration: 'underline', fontSize: '11px' }}
                 >
-                  Kelola Paket &amp; Kredit →
-                </a>
+                  {tr('Manage Plan & Credits →', 'Kelola Paket & Kredit →', '管理套餐与积分 →')}
+                </Link>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))', gap: '8px' }}>
                 <div style={{ padding: '6px 8px', borderRadius: '6px', backgroundColor: 'var(--color-surface-subtle)', border: '1px solid var(--color-border)' }}>
-                  <div style={{ fontSize: '10px', color: 'var(--color-muted)' }}>Paket &amp; Saldo Aktif</div>
+                  <div style={{ fontSize: '10px', color: 'var(--color-muted)' }}>
+                    {tr('Active Plan & Balance', 'Paket & Saldo Aktif', '当前套餐与余额')}
+                  </div>
                   <div style={{ fontWeight: 800, color: 'var(--color-foreground)', fontFamily: 'var(--font-mono)' }}>
                     {planId || 'FREE'} · {(credits ?? 0).toLocaleString()} cr
                   </div>
                 </div>
                 <div style={{ padding: '6px 8px', borderRadius: '6px', backgroundColor: 'var(--color-surface-subtle)', border: '1px solid var(--color-border)' }}>
-                  <div style={{ fontSize: '10px', color: 'var(--color-muted)' }}>Biaya Deploy / Studio</div>
+                  <div style={{ fontSize: '10px', color: 'var(--color-muted)' }}>
+                    {tr('Deploy / Studio Cost', 'Biaya Deploy / Studio', '部署 / 工作室费用')}
+                  </div>
                   <div style={{ fontWeight: 800, color: 'var(--color-badge-info-text)', fontFamily: 'var(--font-mono)' }}>
                     {billingConfig.launchCostCr} cr Launch · {billingConfig.studioCostCr} cr AI
                   </div>
                 </div>
                 <div style={{ padding: '6px 8px', borderRadius: '6px', backgroundColor: 'var(--color-surface-subtle)', border: '1px solid var(--color-border)' }}>
-                  <div style={{ fontSize: '10px', color: 'var(--color-muted)' }}>Bagi Hasil Trading Fee</div>
+                  <div style={{ fontSize: '10px', color: 'var(--color-muted)' }}>
+                    {tr('Trading Fee Split', 'Bagi Hasil Trading Fee', '交易手续费分成')}
+                  </div>
                   <div style={{ fontWeight: 800, color: 'var(--color-badge-success-text)', fontFamily: 'var(--font-mono)' }}>
                     {billingConfig.creatorFeePct.toFixed(2)}% Creator / {billingConfig.treasuryFeePct.toFixed(2)}% Treasury
                   </div>
