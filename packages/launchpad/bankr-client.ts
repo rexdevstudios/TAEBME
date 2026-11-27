@@ -14,6 +14,55 @@ export const BANKR_DEPLOY_URL = 'https://api.bankr.bot/token-launches/deploy';
 
 export type BankrSupportedChain = 'base' | 'robinhood' | 'arbitrum' | 'arc';
 
+export interface BankrQuoteTokenOption {
+  symbol: string;
+  label: string;
+  address: string;
+}
+
+/**
+ * Official Base Quote Tokens supported by Bankr Token Launch API (`docs.bankr.bot`).
+ */
+export const BANKR_BASE_QUOTE_TOKENS: readonly BankrQuoteTokenOption[] = [
+  { symbol: 'BNKR', label: 'BNKR (Bankr)', address: '0x22af33fe49fd1fa80c7149773dde5890d3c76f3b' },
+  { symbol: 'ba3Pump', label: 'ba3Pump', address: '0x5577a294ae5a21446a11b0e4100ca83803995720' },
+  { symbol: 'cbHYPE', label: 'cbHYPE', address: '0xB200000000000000000000451d033a5000cb479e' },
+  { symbol: 'cbZEC', label: 'cbZEC', address: '0xB2000000000000000000008501b13360000cb2EC' },
+  { symbol: 'TAO', label: 'TAO (Bittensor)', address: '0xf3081494b87e8d5fb7960f066e931d1d0e6e3d67' },
+];
+
+/**
+ * Resolves official Bankr authentication headers (`bk_ptr_` -> `X-Partner-Key`, else `X-API-Key`).
+ */
+export function buildBankrAuthHeaders(apiKey: string): Record<string, string> {
+  const trimmed = String(apiKey || '').trim();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+  };
+  if (trimmed.startsWith('bk_ptr_')) {
+    headers['X-Partner-Key'] = trimmed;
+  } else {
+    headers['X-API-Key'] = trimmed;
+  }
+  return headers;
+}
+
+/**
+ * Validates and normalizes `pairedTokenAddress` against the 5 official Base quote tokens.
+ * Returns undefined for non-Base chains or empty/unrecognized addresses (safely falls back to WETH).
+ */
+export function resolveBankrPairedTokenAddress(
+  chain: BankrSupportedChain,
+  rawAddress?: string | null
+): string | undefined {
+  if (chain !== 'base' || !rawAddress || typeof rawAddress !== 'string') return undefined;
+  const norm = rawAddress.trim().toLowerCase();
+  if (!norm) return undefined;
+  const match = BANKR_BASE_QUOTE_TOKENS.find((t) => t.address.toLowerCase() === norm);
+  return match?.address;
+}
+
 export interface BankrDeployRequest {
   tokenName: string;
   tokenSymbol: string;
@@ -22,6 +71,7 @@ export interface BankrDeployRequest {
   websiteUrl?: string;
   tweetUrl?: string;
   chain?: BankrSupportedChain;
+  pairedTokenAddress?: string;
   feeRecipient?: {
     type: 'wallet' | 'x' | 'farcaster' | 'ens';
     value: string;
@@ -61,13 +111,12 @@ export async function deployTokenViaBankrApi(
     };
   }
 
+  const resolvedPairedToken = resolveBankrPairedTokenAddress(chain, payload.pairedTokenAddress);
+
   try {
     const res = await fetch(BANKR_DEPLOY_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': apiKey,
-      },
+      headers: buildBankrAuthHeaders(apiKey),
       body: JSON.stringify({
         tokenName: payload.tokenName.trim().slice(0, 30),
         tokenSymbol: payload.tokenSymbol.trim().toUpperCase().slice(0, 10),
@@ -76,6 +125,7 @@ export async function deployTokenViaBankrApi(
         websiteUrl: payload.websiteUrl,
         tweetUrl: payload.tweetUrl,
         chain,
+        ...(resolvedPairedToken ? { pairedTokenAddress: resolvedPairedToken } : {}),
         feeRecipient: payload.feeRecipient,
         degenMode: payload.degenMode ?? true,
         simulateOnly: payload.simulateOnly ?? false,

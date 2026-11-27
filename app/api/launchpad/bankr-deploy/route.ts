@@ -11,6 +11,7 @@ import { requireCapability } from '@packages/auth/session';
 import { rateLimiter } from '@packages/auth/rate-limiter';
 import {
   deployTokenViaBankrApi,
+  resolveBankrPairedTokenAddress,
   validateBankrMultiAccountBatch,
   type BankrSupportedChain,
 } from '@packages/launchpad/bankr-client';
@@ -68,6 +69,11 @@ export async function POST(req: NextRequest) {
         ? body.providerKeyId.trim()
         : undefined;
     const draftId = typeof body?.draftId === 'string' ? body.draftId.trim() : undefined;
+    const isSimulateOnly = Boolean(body?.simulateOnly);
+    const pairedTokenAddress = resolveBankrPairedTokenAddress(
+      chain,
+      typeof body?.pairedTokenAddress === 'string' ? body.pairedTokenAddress : undefined
+    );
 
     if (tokenName.length < 2 || tokenSymbol.length < 2) {
       return NextResponse.json(
@@ -108,7 +114,7 @@ export async function POST(req: NextRequest) {
           : Promise.resolve(null),
       ]);
 
-      const launchCostCr = Math.max(0, Number(platformCfg?.launchCostCr ?? 50));
+      const launchCostCr = isSimulateOnly ? 0 : Math.max(0, Number(platformCfg?.launchCostCr ?? 50));
       const batchCheck = validateBankrMultiAccountBatch({
         providerKeyIds: rawBatchIds,
         planId: userPlan,
@@ -195,16 +201,17 @@ export async function POST(req: NextRequest) {
           websiteUrl: typeof body?.websiteUrl === 'string' ? body.websiteUrl : undefined,
           tweetUrl: typeof body?.tweetUrl === 'string' ? body.tweetUrl : undefined,
           chain,
+          pairedTokenAddress,
           feeRecipient: effectiveFeeRecipient as any,
           degenMode: body?.degenMode !== false,
-          simulateOnly: Boolean(body?.simulateOnly),
+          simulateOnly: isSimulateOnly,
           apiKeyOverride: resolved.apiKey,
         });
 
         const ok = resItem.status === 'deployed' || resItem.status === 'simulated';
         if (ok) {
           succeededCount += 1;
-          if (getDbPool() && launchCostCr > 0) {
+          if (!isSimulateOnly && resItem.status === 'deployed' && getDbPool() && launchCostCr > 0) {
             try {
               await SubscriptionsEngine.deductMeteredCredits(
                 auth.walletAddress,
@@ -305,6 +312,25 @@ export async function POST(req: NextRequest) {
     }
 
     const platformCfg = await defaultBillingDbAdapter.getPlatformFeeAndRiskConfig().catch(() => null);
+    const launchCostCr = Math.max(0, Number(platformCfg?.launchCostCr ?? 50));
+
+    // Phase FE: Pre-check credits BEFORE calling Bankr API on live single deploy (simulateOnly is free = 0 cr)
+    if (!isSimulateOnly && getDbPool() && auth?.walletAddress && launchCostCr > 0) {
+      const currentCredits = await defaultBillingDbAdapter
+        .getUserCreditBalance(auth.walletAddress)
+        .catch(() => null);
+      if (typeof currentCredits === 'number' && currentCredits < launchCostCr) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `INSUFFICIENT_CREDITS: Required ${launchCostCr} cr for live deploy, available ${currentCredits} cr. Top up in /billing or use free Simulation mode (0 cr).`,
+            timestamp: new Date().toISOString(),
+          },
+          { status: 402 }
+        );
+      }
+    }
+
     const effectiveFeeRecipient = resolveBankrEffectiveFeeRecipient({
       requestedFeeRecipient: body?.feeRecipient,
       usingPlatformDefaultKey: !resolvedByok,
@@ -319,9 +345,10 @@ export async function POST(req: NextRequest) {
       websiteUrl: typeof body?.websiteUrl === 'string' ? body.websiteUrl : undefined,
       tweetUrl: typeof body?.tweetUrl === 'string' ? body.tweetUrl : undefined,
       chain,
+      pairedTokenAddress,
       feeRecipient: effectiveFeeRecipient as any,
       degenMode: body?.degenMode !== false,
-      simulateOnly: Boolean(body?.simulateOnly),
+      simulateOnly: isSimulateOnly,
       apiKeyOverride: resolvedByok?.apiKey,
     });
 
@@ -333,9 +360,9 @@ export async function POST(req: NextRequest) {
         : 422;
 
     const isSuccess = result.status === 'deployed' || result.status === 'simulated';
+    const shouldChargeCredits = !isSimulateOnly && result.status === 'deployed' && launchCostCr > 0;
     let remainingCredits: number | undefined;
     let persistedLaunchId: string | undefined;
-    const launchCostCr = Math.max(0, Number(platformCfg?.launchCostCr ?? 50));
 
     if (isSuccess) {
       // Auto-sync live Bankr deployed token to PostgreSQL SSOT `token_launches`
@@ -355,7 +382,7 @@ export async function POST(req: NextRequest) {
       }
 
       try {
-        if (getDbPool() && auth?.walletAddress && launchCostCr > 0) {
+        if (shouldChargeCredits && getDbPool() && auth?.walletAddress) {
           await SubscriptionsEngine.deductMeteredCredits(
             auth.walletAddress,
             launchCostCr,
@@ -422,7 +449,7 @@ export async function POST(req: NextRequest) {
           usedKeyLabel: resolvedByok?.label,
           usedKeyMasked: resolvedByok?.maskedKey,
           launchId: persistedLaunchId,
-          creditsBurned: isSuccess ? launchCostCr : 0,
+          creditsBurned: shouldChargeCredits ? launchCostCr : 0,
           remainingCredits,
         },
         error: result.status === 'failed' || result.status === 'unknown' ? result.message : undefined,

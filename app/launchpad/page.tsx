@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import { BANKR_BASE_QUOTE_TOKENS } from '@packages/launchpad/bankr-client';
 import { useAuth } from '../context/AuthContext';
 import { useLocale } from '../context/LocaleContext';
 import { Rocket, ShieldAlert, FileText, CheckCircle2, AlertTriangle, TrendingUp, Scale, Wallet, Users, Tag, Sparkles, Coins, Zap, Search, Copy, Check } from 'lucide-react';
@@ -148,6 +149,7 @@ export default function LaunchpadPage() {
   // 4 Launchpad Alignment Dimensions (Chain, Pairing, Degen Mode, Vesting)
   const [selectedChain, setSelectedChain] = useState<'base' | 'robinhood' | 'arbitrum' | 'arc'>('base');
   const [poolPairing, setPoolPairing] = useState<'WETH' | 'MORE_TOKENS' | 'STOCKS'>('WETH');
+  const [selectedBaseQuoteToken, setSelectedBaseQuoteToken] = useState<string>(BANKR_BASE_QUOTE_TOKENS[0].address);
   const [isDegenMode, setIsDegenMode] = useState<boolean>(true);
   const [creatorVesting, setCreatorVesting] = useState<'NONE' | '15_PERCENT'>('NONE');
   const [showAdvancedOptions, setShowAdvancedOptions] = useState<boolean>(false);
@@ -342,6 +344,9 @@ export default function LaunchpadPage() {
           tokenName: draftResult.name || tokenName,
           tokenSymbol: draftResult.ticker || draftResult.symbol || tokenSymbol,
           chain: selectedChain,
+          ...(selectedChain === 'base' && poolPairing === 'MORE_TOKENS'
+            ? { pairedTokenAddress: selectedBaseQuoteToken }
+            : {}),
           feeRecipient: resolvedFeeRecipient,
           degenMode: isDegenMode,
           simulateOnly,
@@ -835,7 +840,7 @@ export default function LaunchpadPage() {
                   style={{ padding: '8px 4px', justifyContent: 'center', fontSize: '11px', flexDirection: 'column', gap: '2px' }}
                 >
                   <span style={{ fontWeight: 800 }}>Robinhood</span>
-                  <span style={{ fontSize: '9px', color: 'var(--color-destructive)' }}>Blocked in Live</span>
+                  <span style={{ fontSize: '9px', color: 'var(--color-badge-info-text)' }}>Bankr API</span>
                 </button>
                 <button
                   type="button"
@@ -844,7 +849,7 @@ export default function LaunchpadPage() {
                   style={{ padding: '8px 4px', justifyContent: 'center', fontSize: '11px', flexDirection: 'column', gap: '2px' }}
                 >
                   <span style={{ fontWeight: 800 }}>Arbitrum</span>
-                  <span style={{ fontSize: '9px', color: 'var(--color-destructive)' }}>Blocked in Live</span>
+                  <span style={{ fontSize: '9px', color: 'var(--color-badge-info-text)' }}>Bankr API</span>
                 </button>
                 <button
                   type="button"
@@ -853,7 +858,7 @@ export default function LaunchpadPage() {
                   style={{ padding: '8px 4px', justifyContent: 'center', fontSize: '11px', flexDirection: 'column', gap: '2px' }}
                 >
                   <span style={{ fontWeight: 800 }}>Arc Network</span>
-                  <span style={{ fontSize: '9px', color: 'var(--color-accent-info)' }}>ArcPad Ready</span>
+                  <span style={{ fontSize: '9px', color: 'var(--color-badge-info-text)' }}>Bankr API</span>
                 </button>
               </div>
 
@@ -920,9 +925,19 @@ export default function LaunchpadPage() {
                     Stocks                   </button>
                 </div>
                 {poolPairing === 'MORE_TOKENS' && (
-                  <span style={{ fontSize: '10px', color: 'var(--color-accent)' }}>
-                    Base Quotes: BNKR, ba3Pump, cbHYPE, cbZEC, TAO.
-                  </span>
+                  <select
+                    value={selectedBaseQuoteToken}
+                    onChange={(e) => setSelectedBaseQuoteToken(e.target.value)}
+                    className="input"
+                    style={{ marginTop: '4px', padding: '6px 8px', fontSize: '11px', fontFamily: 'var(--font-mono)' }}
+                    aria-label="Select Official Base Quote Token"
+                  >
+                    {BANKR_BASE_QUOTE_TOKENS.map((qt) => (
+                      <option key={qt.address} value={qt.address}>
+                        {qt.label} ({qt.address.slice(0, 6)}...{qt.address.slice(-4)})
+                      </option>
+                    ))}
+                  </select>
                 )}
               </div>
 
@@ -1591,6 +1606,7 @@ export default function LaunchpadPage() {
               { id: 'arc', label: 'Arc' },
             ].map((ch) => {
               const count = chainCounts[ch.id] || 0;
+              if (ch.id === 'solana' && count === 0) return null;
               return (
                 <button
                   key={ch.id}

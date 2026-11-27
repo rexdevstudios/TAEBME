@@ -7,24 +7,27 @@
  * - Manages Virtual Paper Trading Balance ($10,000 default) with strict insufficient-balance guard on BUY.
  */
 
+export type NavbarChainCategory = 'deployer' | 'dex' | 'wallet_only';
+
 export interface NavbarChainOption {
   hex: string;
   chainId: number;
   label: string;
   nativeSymbol: string;
+  category: NavbarChainCategory;
 }
 
 export const KNOWN_NAVBAR_CHAINS: readonly NavbarChainOption[] = [
-  { hex: '0x2105', chainId: 8453, label: 'Base Mainnet', nativeSymbol: 'ETH' },
-  { hex: '0x14a34', chainId: 84532, label: 'Base Sepolia', nativeSymbol: 'ETH' },
-  { hex: '0x1', chainId: 1, label: 'Ethereum', nativeSymbol: 'ETH' },
-  { hex: '0xa4b1', chainId: 42161, label: 'Arbitrum One', nativeSymbol: 'ETH' },
-  { hex: '0xa', chainId: 10, label: 'Optimism', nativeSymbol: 'ETH' },
-  { hex: '0x89', chainId: 137, label: 'Polygon PoS', nativeSymbol: 'POL' },
-  { hex: '0x38', chainId: 56, label: 'BNB Chain', nativeSymbol: 'BNB' },
-  { hex: '0xcc', chainId: 204, label: 'opBNB', nativeSymbol: 'BNB' },
-  { hex: '0x1237', chainId: 4663, label: 'Robinhood L2', nativeSymbol: 'ETH' },
-  { hex: '0x13b2', chainId: 5042, label: 'Arc Network', nativeSymbol: 'USDC' },
+  { hex: '0x2105', chainId: 8453, label: 'Base Mainnet', nativeSymbol: 'ETH', category: 'deployer' },
+  { hex: '0x14a34', chainId: 84532, label: 'Base Sepolia', nativeSymbol: 'ETH', category: 'deployer' },
+  { hex: '0xa4b1', chainId: 42161, label: 'Arbitrum One', nativeSymbol: 'ETH', category: 'deployer' },
+  { hex: '0x1237', chainId: 4663, label: 'Robinhood L2', nativeSymbol: 'ETH', category: 'deployer' },
+  { hex: '0x13b2', chainId: 5042, label: 'Arc Network', nativeSymbol: 'USDC', category: 'deployer' },
+  { hex: '0x1', chainId: 1, label: 'Ethereum', nativeSymbol: 'ETH', category: 'dex' },
+  { hex: '0xa', chainId: 10, label: 'Optimism', nativeSymbol: 'ETH', category: 'dex' },
+  { hex: '0x89', chainId: 137, label: 'Polygon PoS', nativeSymbol: 'POL', category: 'dex' },
+  { hex: '0x38', chainId: 56, label: 'BNB Chain', nativeSymbol: 'BNB', category: 'dex' },
+  { hex: '0xcc', chainId: 204, label: 'opBNB', nativeSymbol: 'BNB', category: 'wallet_only' },
 ];
 
 export function resolveChainDisplayMeta(chainIdHex: string | null | undefined): {

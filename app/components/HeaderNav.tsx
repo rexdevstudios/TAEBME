@@ -272,11 +272,25 @@ export default function HeaderNav() {
                   Other ({parseInt(normChainHex, 16) || normChainHex})
                 </option>
               )}
-              {CHAIN_OPTIONS.map((c) => (
-                <option key={c.hex} value={c.hex} style={{ backgroundColor: 'var(--color-surface-elevated)', color: 'var(--color-foreground)' }}>
-                  {c.label}
+              {CHAIN_OPTIONS.filter((c) => c.category === 'wallet_only' && c.hex === normChainHex).map((c) => (
+                <option key={c.hex} value={c.hex} style={{ backgroundColor: 'var(--color-surface-elevated)', color: 'var(--color-badge-warning-text)' }}>
+                  {c.label} (Wallet Only)
                 </option>
               ))}
+              <optgroup label={tr('Launchpad & Deployer', 'Launchpad & Deployer', '发射台与部署链')}>
+                {CHAIN_OPTIONS.filter((c) => c.category === 'deployer').map((c) => (
+                  <option key={c.hex} value={c.hex} style={{ backgroundColor: 'var(--color-surface-elevated)', color: 'var(--color-foreground)' }}>
+                    {c.label}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label={tr('DEX Swap Only (/trading)', 'Khusus Swap DEX (/trading)', '仅限 DEX 交易 (/trading)')}>
+                {CHAIN_OPTIONS.filter((c) => c.category === 'dex').map((c) => (
+                  <option key={c.hex} value={c.hex} style={{ backgroundColor: 'var(--color-surface-elevated)', color: 'var(--color-foreground)' }}>
+                    {c.label}
+                  </option>
+                ))}
+              </optgroup>
             </select>
           </div>
         </div>

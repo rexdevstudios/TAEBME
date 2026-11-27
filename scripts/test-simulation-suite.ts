@@ -73,7 +73,13 @@ import {
 } from '../packages/agent/autopilot-market-feed';
 import { analyzeGoPlusTokenSecurity } from '../packages/intelligence/onchain-insider-guard';
 import { analyzeFreeWalletIntelligence } from '../packages/intelligence/free-wallet-intelligence';
-import { validateBankrMultiAccountBatch } from '../packages/launchpad/bankr-client';
+import {
+  BANKR_BASE_QUOTE_TOKENS,
+  buildBankrAuthHeaders,
+  resolveBankrPairedTokenAddress,
+  validateBankrMultiAccountBatch,
+} from '../packages/launchpad/bankr-client';
+import { KNOWN_NAVBAR_CHAINS } from '../packages/trading/paper-wallet';
 import { runScheduledPulses } from '../workers/cloudflare-autopilot-cron/src/index';
 import { buildRetentionCleanupQueries } from '../packages/db/data-retention';
 import { TradingRiskGate, compute24hRiskExposure } from '../packages/trading/risk-gate';
@@ -1272,6 +1278,29 @@ async function runSimulationSuite() {
       datasetHint.verifiedPresetsCount === 1 &&
       datasetHint.summaryLine.includes('KOL Momentum Guard'),
     'Hybrid Signal Marketplace enforces anti-double-charge idempotency (0 cr re-apply), non-custodial autoEnable=false draft pre-fill & AI dataset grounding'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 49: Bankr Auth Headers, Official Base Quote Tokens & Navbar Grouping (Phase FE)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 49: Bankr Partner Header, Base Quote Tokens & Navbar Grouping] ---');
+  const ptrHeaders = buildBankrAuthHeaders('bk_ptr_demo_key');
+  const usrHeaders = buildBankrAuthHeaders('bk_usr_demo_key');
+  const bnkrAddr = resolveBankrPairedTokenAddress('base', BANKR_BASE_QUOTE_TOKENS[0].address.toUpperCase());
+  const nonBasePair = resolveBankrPairedTokenAddress('arbitrum', BANKR_BASE_QUOTE_TOKENS[0].address);
+  const deployerChains = KNOWN_NAVBAR_CHAINS.filter((c) => c.category === 'deployer');
+  const dexChains = KNOWN_NAVBAR_CHAINS.filter((c) => c.category === 'dex');
+  const opBnbEntry = KNOWN_NAVBAR_CHAINS.find((c) => c.chainId === 204);
+  assert(
+    ptrHeaders['X-Partner-Key'] === 'bk_ptr_demo_key' &&
+      !ptrHeaders['X-API-Key'] &&
+      usrHeaders['X-API-Key'] === 'bk_usr_demo_key' &&
+      bnkrAddr === BANKR_BASE_QUOTE_TOKENS[0].address &&
+      nonBasePair === undefined &&
+      deployerChains.length === 5 &&
+      dexChains.length === 4 &&
+      opBnbEntry?.category === 'wallet_only',
+    'Bankr client routes bk_ptr_ to X-Partner-Key, whitelists 5 Base quote tokens & navbar cleanly separates Deployer vs DEX chains'
   );
 
   console.log('\n================================================================');
