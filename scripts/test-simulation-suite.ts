@@ -73,6 +73,10 @@ import {
   resolveEvmRpcUrls,
   simulateEvmTransactionPreflight,
 } from '../packages/launchpad/evm-verifier';
+import {
+  computeDeterministicChainEventId,
+  computeIncrementalBlockWindow,
+} from '../packages/launchpad/chain-event-mirror';
 import { PostgresBillingDbAdapter } from '../packages/db/billing-repo';
 import {
   clearAutoPilotPeakPrice,
@@ -1508,6 +1512,33 @@ async function runSimulationSuite() {
       preflightRev.status === 'LIKELY_REVERT' &&
       Boolean(preflightRev.revertReason?.includes('INSUFFICIENT_FUNDS')),
     'Multi-RPC pool provides fallback redundancy and stateless Pre-Flight EVM simulator catches reverts before wallet sign'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 56: Incremental On-Chain Event Mirror Cursor & Idempotency (Phase FN)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 56: Incremental On-Chain Event Mirror Cursor & Idempotency] ---');
+  const fnTx = '0x' + 'ef'.repeat(32);
+  const fnUuid1 = computeDeterministicChainEventId('base-mainnet', fnTx, 3);
+  const fnUuid2 = computeDeterministicChainEventId('BASE-MAINNET', fnTx.toUpperCase(), 3);
+  const fnWindow = computeIncrementalBlockWindow({
+    lastIndexedBlock: 1000n,
+    latestBlock: 5000n,
+    maxBlockSpan: 2000n,
+    finalityLag: 1n,
+  });
+  const fnCaughtUp = computeIncrementalBlockWindow({
+    lastIndexedBlock: 4999n,
+    latestBlock: 5000n,
+    maxBlockSpan: 2000n,
+    finalityLag: 1n,
+  });
+  assert(
+    fnUuid1 === fnUuid2 &&
+      fnWindow?.fromBlock === 1001n &&
+      fnWindow?.toBlock === 3000n &&
+      fnCaughtUp === null,
+    'Incremental chain-event mirror generates deterministic idempotent UUIDs and respects finality lag & maxBlockSpan'
   );
 
   console.log('\n================================================================');
