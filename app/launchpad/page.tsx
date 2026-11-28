@@ -1891,11 +1891,50 @@ export default function LaunchpadPage() {
                     boxShadow: 'var(--shadow-sm)',
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', marginBottom: '10px' }}>
+                  <div data-card-header="two-row" style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '10px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                      <span
+                        style={{
+                          padding: '2px 8px',
+                          borderRadius: '6px',
+                          fontSize: '10px',
+                          fontWeight: 800,
+                          backgroundColor: 'var(--color-badge-info-bg)',
+                          color: 'var(--color-badge-info-text)',
+                          border: '1px solid var(--color-badge-info-border)',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {token.chain?.toUpperCase() || 'BASE'}
+                      </span>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                        <button
+                          type="button"
+                          disabled={boostingAddress !== null}
+                          onClick={() => handleFeaturedBoost24h(token.contractAddress, token.chain)}
+                          className="btn-secondary"
+                          style={{ padding: '4px 7px', fontSize: '10px', fontWeight: 700, whiteSpace: 'nowrap' }}
+                          title={tr('Sponsor 24h Featured Boost (0.005 ETH Base L2)', 'Aktifkan Featured Boost 24 Jam (0.005 ETH Base L2)')}
+                        >
+                          {boostingAddress === token.contractAddress ? '...' : tr('Boost 24h', 'Boost 24j', '置顶 24h')}
+                        </button>
+                        <PinWatchlistButton
+                          pinned={isWatchlistItemPinned(8453, token.contractAddress || token.ticker)}
+                          onClick={() =>
+                            toggleWatchlistPin({
+                              symbol: token.ticker,
+                              name: token.name,
+                              chainId: 8453,
+                              address: token.contractAddress,
+                            })
+                          }
+                        />
+                      </div>
+                    </div>
                     <a
                       href={portalUrl}
-                      style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}
-                      title={`Buka Portal Token ${token.name}`}
+                      style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, width: '100%' }}
+                      title={`Open Token Portal ${token.name}`}
                     >
                       <TokenAvatar
                         src={token.imageUrl}
@@ -1905,12 +1944,12 @@ export default function LaunchpadPage() {
                         size={42}
                         borderRadius={11}
                       />
-                      <div style={{ minWidth: 0 }}>
+                      <div style={{ minWidth: 0, flex: 1 }}>
                         <div style={{ fontWeight: 900, color: 'var(--color-foreground)', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          <span>{token.name}</span>
-                          <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>↗</span>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{token.name}</span>
+                          <span style={{ fontSize: '11px', color: 'var(--color-accent)', flexShrink: 0 }}>↗</span>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px', flexWrap: 'wrap' }}>
                           <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, color: 'var(--color-accent)', fontSize: '12px' }}>
                             ${token.ticker}
                           </span>
@@ -1963,43 +2002,6 @@ export default function LaunchpadPage() {
                         </div>
                       </div>
                     </a>
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-                      <button
-                        type="button"
-                        disabled={boostingAddress !== null}
-                        onClick={() => handleFeaturedBoost24h(token.contractAddress, token.chain)}
-                        className="btn-secondary"
-                        style={{ padding: '4px 7px', fontSize: '10px', fontWeight: 700 }}
-                        title={tr('Sponsor 24h Featured Boost (0.005 ETH Base L2)', 'Aktifkan Featured Boost 24 Jam (0.005 ETH Base L2)')}
-                      >
-                        {boostingAddress === token.contractAddress ? '...' : tr('Boost 24h', 'Boost 24j')}
-                      </button>
-                      <PinWatchlistButton
-                        pinned={isWatchlistItemPinned(8453, token.contractAddress || token.ticker)}
-                        onClick={() =>
-                          toggleWatchlistPin({
-                            symbol: token.ticker,
-                            name: token.name,
-                            chainId: 8453,
-                            address: token.contractAddress,
-                          })
-                        }
-                      />
-                    </div>
-                    <span
-                      style={{
-                        padding: '2px 8px',
-                        borderRadius: '6px',
-                        fontSize: '10px',
-                        fontWeight: 800,
-                        backgroundColor: 'var(--color-badge-info-bg)',
-                        color: 'var(--color-badge-info-text)',
-                        border: '1px solid var(--color-badge-info-border)',
-                        flexShrink: 0,
-                      }}
-                    >
-                      {token.chain?.toUpperCase() || 'BASE'}
-                    </span>
                   </div>
 
                   <div style={{ fontSize: '11px', color: 'var(--color-muted)', marginBottom: '8px', fontFamily: 'var(--font-mono)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>

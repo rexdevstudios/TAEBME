@@ -426,6 +426,19 @@ async function runFullTestnetUsecase() {
       `POST /api/user/owned-wallets linked ECDSA-verified sub-wallet (HTTP ${linkSubRes.status})`
     );
 
+    // Phase FK: On-demand read-only Base ETH balance check on /api/user/owned-wallets?includeBalances=1
+    const ownedBalRes = await fetch(`${BASE_URL}/api/user/owned-wallets?includeBalances=1`, {
+      headers: authHeaders(),
+    });
+    const ownedBalJson: any = await ownedBalRes.json().catch(() => ({}));
+    assert(
+      ownedBalRes.status === 200 &&
+        ownedBalJson?.success === true &&
+        ownedBalJson?.data?.balancesIncluded === true &&
+        Array.isArray(ownedBalJson?.data?.wallets),
+      `GET /api/user/owned-wallets?includeBalances=1 returned read-only balance telemetry (count=${ownedBalJson?.data?.count ?? 0})`
+    );
+
     const ownedTransferRes = await fetch(`${BASE_URL}/api/agent/copilot/chat`, {
       method: 'POST',
       headers: authHeaders(),
@@ -512,6 +525,14 @@ async function runFullTestnetUsecase() {
         authRefJson?.data?.bonusPerReferral === 15 &&
         Array.isArray(authRefJson?.data?.recentReferrals),
       `GET /api/launchpad/bounty/referrals returned authenticated referral stats (bonus=+${authRefJson?.data?.bonusPerReferral} cr)`
+    );
+
+    // Phase FK: Unified Creator Earnings summary (airdrop referrals + 80% Signal Marketplace)
+    assert(
+      authRefJson?.data?.creatorEarnings &&
+        typeof authRefJson.data.creatorEarnings.totalCreatorCredits === 'number' &&
+        typeof authRefJson.data.creatorEarnings.signalMarketplaceCredits === 'number',
+      `GET /api/launchpad/bounty/referrals exposed unified creatorEarnings (total=+${authRefJson?.data?.creatorEarnings?.totalCreatorCredits ?? 0} cr)`
     );
 
     const transRes = await fetch(`${BASE_URL}/api/system/transparency`);

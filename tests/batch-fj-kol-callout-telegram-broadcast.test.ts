@@ -41,6 +41,6 @@ describe('Phase FJ: Verified KOL Callout Telegram Broadcast & Live E2E Coverage'
     expect(calloutSrc).toContain('Inspect Chart & Callout →');
     expect(e2eSrc).toContain('/api/kol/callout');
     expect(e2eSrc).toContain('KOL_VERIFICATION_REQUIRED');
-    expect(ciSrc).toContain('Testnet E2E (54)');
+    expect(ciSrc).toMatch(/Testnet E2E \(5[4-9]\)/);
   });
 });

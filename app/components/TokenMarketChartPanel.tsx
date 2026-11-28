@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { BarChart2, ExternalLink, MessageSquarePlus, RefreshCw } from 'lucide-react';
 import { InteractiveCandlestickChart, OhlcvCandle } from './InteractiveCandlestickChart';
+import { useLocale } from '../context/LocaleContext';
 import type { ChartCandleMarker, KolConsensusReport } from '@packages/intelligence/kol-chart-overlay';
 
 interface TokenMarketChartPanelProps {
@@ -26,6 +27,7 @@ export function TokenMarketChartPanel({
   graduationThreshold,
   isGraduated,
 }: TokenMarketChartPanelProps) {
+  const { tr } = useLocale();
   const [chartMode, setChartMode] = useState<'NATIVE' | 'DEXSCREENER'>('NATIVE');
   const [interval, setIntervalVal] = useState<(typeof TIMEFRAMES)[number]>('1h');
   const [candles, setCandles] = useState<OhlcvCandle[]>([]);
@@ -168,8 +170,16 @@ export function TokenMarketChartPanel({
           </div>
           <p className="text-muted" style={{ margin: '4px 0 0', fontSize: '12px' }}>
             {chartSource === 'LIVE_DEX'
-              ? 'Data candlestick real-time tersinkronisasi dari DEX pair publik.'
-              : 'Grafik candlestick interaktif native dari kurva bonding (langsung tampil tanpa menunggu indeks DexScreener).'}
+              ? tr(
+                  'Real-time candlestick data synchronized from public DEX liquidity pairs.',
+                  'Data candlestick real-time tersinkronisasi dari DEX pair publik.',
+                  '与公开 DEX 流动性交易对实时同步的 K 线数据。'
+                )
+              : tr(
+                  'Interactive native bonding curve candlestick chart (instant display before DexScreener indexing).',
+                  'Grafik candlestick interaktif native dari kurva bonding (langsung tampil tanpa menunggu indeks DexScreener).',
+                  '原生联合曲线交互式 K 线图（无需等待 DexScreener 索引即可查看）。'
+                )}
           </p>
         </div>
 
@@ -227,7 +237,7 @@ export function TokenMarketChartPanel({
             className="btn-secondary"
             style={{ fontSize: '11px', padding: '6px 12px', display: 'inline-flex', alignItems: 'center', gap: '5px', textDecoration: 'none' }}
           >
-            <span>Buka DexScreener</span>
+            <span>{tr('Open DexScreener', 'Buka DexScreener', '打开 DexScreener')}</span>
             <ExternalLink size={12} />
           </a>
         </div>
@@ -257,7 +267,9 @@ export function TokenMarketChartPanel({
               style={{ padding: '4px 10px', fontSize: '11px', gap: '5px', display: 'inline-flex', alignItems: 'center' }}
             >
               <MessageSquarePlus size={11} />
-              {showCalloutForm ? 'Tutup Callout' : 'Post KOL Callout'}
+              {showCalloutForm
+                ? tr('Close Callout', 'Tutup Callout', '收起喊单')
+                : tr('Post KOL Callout', 'Posting KOL Callout', '发布 KOL 喊单')}
             </button>
             <button
               type="button"
@@ -267,7 +279,7 @@ export function TokenMarketChartPanel({
               disabled={loading}
             >
               <RefreshCw size={11} />
-              {loading ? 'Memuat...' : 'Refresh'}
+              {loading ? tr('Loading...', 'Memuat...', '加载中...') : tr('Refresh', 'Muat Ulang', '刷新')}
             </button>
           </div>
         </div>
