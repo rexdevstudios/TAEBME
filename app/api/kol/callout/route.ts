@@ -18,6 +18,7 @@ import {
   isVerifiedKol,
   validateKolCalloutInput,
 } from '@packages/intelligence/kol-chart-overlay';
+import { notifyPublicTelegramChannelBestEffort } from '@packages/notifications/webhook-dispatcher';
 
 export const dynamic = 'force-dynamic';
 
@@ -147,6 +148,26 @@ export async function POST(req: NextRequest) {
        VALUES ($1::uuid, $2, 'kol_callout', $3, $3, $4::jsonb, NOW())`,
       [id, targetUrl, data.quoteText, JSON.stringify(metadata)]
     );
+
+    const chartUrl = data.tokenAddress
+      ? `https://pndigi.site/token/${encodeURIComponent(data.chain)}/${encodeURIComponent(data.tokenAddress)}`
+      : `https://pndigi.site/trading?symbol=${encodeURIComponent(data.symbol)}`;
+
+    await notifyPublicTelegramChannelBestEffort({
+      event: 'KOL_CALLOUT_PINNED',
+      title: `${verified.handle} (${verified.tier} KOL) pinned ${data.side} Callout on $${data.symbol}`,
+      message: `"${data.quoteText}"\nChart & Live Callout: ${chartUrl}`,
+      metadata: {
+        symbol: data.symbol,
+        side: data.side,
+        kolTier: verified.tier,
+        chain: data.chain,
+      },
+      buttons: [
+        { text: 'Inspect Chart & Callout →', url: chartUrl },
+        ...(data.tweetUrl ? [{ text: 'View Tweet →', url: data.tweetUrl }] : []),
+      ],
+    });
 
     return NextResponse.json(
       {

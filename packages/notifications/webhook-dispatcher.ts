@@ -19,7 +19,8 @@ export type AlertEventType =
   | 'GENESIS_SBT_MINTED'
   | 'PROP_CHALLENGE_PASSED'
   | 'AIRDROP_CAMPAIGN_CREATED'
-  | 'SIGNAL_PRESET_PUBLISHED';
+  | 'SIGNAL_PRESET_PUBLISHED'
+  | 'KOL_CALLOUT_PINNED';
 
 export interface TelegramInlineButton {
   text: string;
@@ -86,6 +87,7 @@ const EVENT_EMOJI: Record<AlertEventType, string> = {
   PROP_CHALLENGE_PASSED: '🥇',
   AIRDROP_CAMPAIGN_CREATED: '🎁',
   SIGNAL_PRESET_PUBLISHED: '📈',
+  KOL_CALLOUT_PINNED: '📣',
 };
 
 /**

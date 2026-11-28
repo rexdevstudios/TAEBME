@@ -464,6 +464,28 @@ async function runFullTestnetUsecase() {
     const kolRes = await fetch(`${BASE_URL}/api/kol/profile?walletAddress=${encodeURIComponent(walletAddress)}`, { headers: authHeaders() });
     assert(kolRes.status === 200 || kolRes.status === 404, `GET /api/kol/profile responded cleanly for fresh burner wallet (HTTP ${kolRes.status})`);
 
+    // Phase FI/FJ: /api/kol/callout fail-closed 401 (unauth) & 403 (non-verified KOL)
+    const unauthCalloutRes = await fetch(`${BASE_URL}/api/kol/callout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ quoteText: 'Unauthenticated callout probe', symbol: 'BTCUSDT' }),
+    });
+    assert(
+      unauthCalloutRes.status === 401,
+      `POST /api/kol/callout strictly rejected unauthenticated call (HTTP ${unauthCalloutRes.status})`
+    );
+
+    const nonKolCalloutRes = await fetch(`${BASE_URL}/api/kol/callout`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ quoteText: 'Burner non-KOL callout probe', symbol: 'BTCUSDT', side: 'BUY' }),
+    });
+    const nonKolCalloutJson: any = await nonKolCalloutRes.json().catch(() => ({}));
+    assert(
+      nonKolCalloutRes.status === 403 && String(nonKolCalloutJson?.error || '').includes('KOL_VERIFICATION_REQUIRED'),
+      `POST /api/kol/callout strictly rejected non-verified KOL burner wallet (HTTP ${nonKolCalloutRes.status})`
+    );
+
     const bountyRes = await fetch(`${BASE_URL}/api/launchpad/bounty`, { headers: authHeaders() });
     const bountyJson: any = await bountyRes.json();
     assert(bountyRes.status === 200 && bountyJson?.success === true, `GET /api/launchpad/bounty loaded active campaigns (HTTP 200)`);

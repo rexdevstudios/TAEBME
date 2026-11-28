@@ -1435,6 +1435,30 @@ async function runSimulationSuite() {
     'GMGN-style KOL Callout validator blocks phishing URLs and chart markers carry verified @handle, quoteText & tweetUrl'
   );
 
+  // -------------------------------------------------------------------------
+  // SCENARIO 53: Verified KOL Callout Telegram Broadcast & Inline CTA (Phase FJ)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 53: Verified KOL Callout Telegram Broadcast & Inline CTA] ---');
+  const kolCalloutTgReq = buildOutboundWebhookRequest(
+    'https://api.telegram.org/bot123456:TESTTOKEN/sendMessage?chat_id=-10012345',
+    {
+      event: 'KOL_CALLOUT_PINNED',
+      title: '@hydra21 (GOLD KOL) pinned BUY Callout on $HSET',
+      message: '"Accumulating Base launchpad curve with strong community traction."',
+      buttons: [
+        { text: 'Inspect Chart & Callout →', url: 'https://pndigi.site/token/base/0x2c94879c2b482d1838ccce3cd00ffd96a82fbcb8' },
+        { text: 'View Tweet →', url: 'https://x.com/hydra21/status/123456789' },
+      ],
+    },
+    new Date().toISOString()
+  );
+  assert(
+    kolCalloutTgReq.channel === 'TELEGRAM' &&
+      String(kolCalloutTgReq.body.text).includes('KOL_CALLOUT_PINNED') &&
+      (kolCalloutTgReq.body.reply_markup as any)?.inline_keyboard?.[0]?.length === 2,
+    'KOL_CALLOUT_PINNED Telegram broadcast attaches both Inspect Chart & View Tweet inline buttons'
+  );
+
   console.log('\n================================================================');
   console.log(`  🎉 SIMULATION SUITE COMPLETED: ${passed} PASSED, ${failed} FAILED`);
   console.log('================================================================\n');
