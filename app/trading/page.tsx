@@ -421,6 +421,11 @@ export default function TradingPage() {
     chainId: number | null;
   } | null>(null);
   const [mevQuote, setMevQuote] = useState<{ isSafe: boolean; minAmountOut?: string; maxSlippageBps?: number } | null>(null);
+  const [dexPreflight, setDexPreflight] = useState<{
+    status: string;
+    estimatedGas?: string;
+    revertReason?: string;
+  } | null>(null);
   const [dexSwapPayload, setDexSwapPayload] = useState<{
     available: boolean;
     chainId: number;
@@ -678,8 +683,10 @@ export default function TradingPage() {
         setDexTxHash(null);
         if (executionMode === 'DEX_NON_CUSTODIAL' && json.data?.zeroXSwap) {
           setDexSwapPayload(json.data.zeroXSwap);
+          setDexPreflight(json.data.preflightSimulation || null);
         } else {
           setDexSwapPayload(null);
+          setDexPreflight(null);
         }
         const execStatus = json.data?.status || 'APPROVED';
         const intentId = json.data?.tradeIntentId || '';
@@ -1632,6 +1639,36 @@ export default function TradingPage() {
                 <div className="text-muted" style={{ fontSize: '10px', fontFamily: 'var(--font-mono)' }}>
                   Protocol Fee: {((dexSwapPayload?.feeBps ?? 25) / 100).toFixed(2)}% (Auto-ETH → Treasury)
                 </div>
+                {dexPreflight && dexPreflight.status !== 'SKIPPED' && (
+                  <div
+                    style={{
+                      fontSize: '10px',
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 700,
+                      padding: '5px 8px',
+                      borderRadius: '6px',
+                      backgroundColor:
+                        dexPreflight.status === 'WILL_SUCCEED'
+                          ? 'var(--color-badge-success-bg)'
+                          : 'var(--color-badge-warning-bg)',
+                      color:
+                        dexPreflight.status === 'WILL_SUCCEED'
+                          ? 'var(--color-badge-success-text)'
+                          : 'var(--color-badge-warning-text)',
+                      border: `1px solid ${
+                        dexPreflight.status === 'WILL_SUCCEED'
+                          ? 'var(--color-badge-success-border)'
+                          : 'var(--color-badge-warning-border)'
+                      }`,
+                    }}
+                  >
+                    {dexPreflight.status === 'WILL_SUCCEED'
+                      ? `PRE-FLIGHT EVM: WILL_SUCCEED · Est. Gas ${Number(dexPreflight.estimatedGas || 0).toLocaleString()}`
+                      : dexPreflight.status === 'LIKELY_REVERT'
+                        ? `PRE-FLIGHT EVM WARNING: ${dexPreflight.revertReason || 'LIKELY_REVERT'}`
+                        : 'PRE-FLIGHT EVM: RPC_UNAVAILABLE (Sign with caution)'}
+                  </div>
+                )}
                 {orderSide === 'SELL' && dexSwapPayload?.allowanceTarget && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     <div className="text-muted" style={{ fontSize: '10px', fontFamily: 'var(--font-mono)' }}>

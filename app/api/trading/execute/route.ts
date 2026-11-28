@@ -14,6 +14,7 @@ import { requireCapability } from '@packages/auth/session';
 import { rateLimiter } from '@packages/auth/rate-limiter';
 import { TradingRiskGate } from '@packages/trading/risk-gate';
 import { MevProtectionService } from '@packages/trading/mev-protection';
+import { simulateEvmTransactionPreflight } from '@packages/launchpad/evm-verifier';
 import { resolveDexSellAmountAtomic } from '@packages/launchpad/web3-provider';
 import { validateBinancePermissions } from '@packages/shared/types/domain';
 import {
@@ -266,6 +267,17 @@ export async function POST(req: NextRequest) {
         partnerFee,
       });
 
+      const preflightSimulation =
+        zeroXSwap?.available && zeroXSwap.transaction?.to
+          ? await simulateEvmTransactionPreflight({
+              chainId,
+              from: auth.walletAddress,
+              to: zeroXSwap.transaction.to,
+              data: zeroXSwap.transaction.data,
+              value: zeroXSwap.transaction.value,
+            })
+          : null;
+
       return NextResponse.json({
         success: true,
         data: {
@@ -279,6 +291,7 @@ export async function POST(req: NextRequest) {
           },
           partnerFee,
           zeroXSwap,
+          preflightSimulation,
           decision,
         },
         timestamp: new Date().toISOString(),

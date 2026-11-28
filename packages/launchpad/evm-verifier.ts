@@ -7,6 +7,7 @@
 
 import {
   createPublicClient,
+  fallback,
   http,
   defineChain,
   parseEther,
@@ -78,7 +79,70 @@ function sanitizeRpcText(input: string): string {
 }
 
 /**
- * Returns a configured read-only viem PublicClient for the specified EVM chain.
+ * Resolves ordered, deduplicated HTTP RPC endpoints (env primary -> env backup -> public fallbacks)
+ * for Multi-RPC failover resilience (Phase FM).
+ */
+export function resolveEvmRpcUrls(chain = 'base-mainnet'): string[] {
+  const normalized = chain.trim().toLowerCase();
+  const candidates: Array<string | undefined> = [];
+
+  if (normalized === 'base' || normalized === 'base-mainnet' || normalized === 'clanker' || normalized === '8453') {
+    candidates.push(
+      process.env.BASE_RPC_URL,
+      process.env.BASE_RPC_FALLBACK_URL,
+      'https://mainnet.base.org',
+      'https://base.llamarpc.com',
+      'https://base-rpc.publicnode.com'
+    );
+  } else if (normalized === 'base-sepolia' || normalized === 'base_sepolia' || normalized === '84532') {
+    candidates.push(
+      process.env.BASE_SEPOLIA_RPC_URL,
+      'https://sepolia.base.org',
+      'https://base-sepolia-rpc.publicnode.com'
+    );
+  } else if (normalized === 'robinhood' || normalized === 'robinhood-mainnet' || normalized === '4663') {
+    candidates.push(process.env.ROBINHOOD_RPC_URL, 'https://rpc.mainnet.chain.robinhood.com');
+  } else if (normalized === 'arbitrum' || normalized === 'arbitrum-mainnet' || normalized === '42161') {
+    candidates.push(
+      process.env.ARBITRUM_RPC_URL,
+      process.env.ARBITRUM_RPC_FALLBACK_URL,
+      'https://arb1.arbitrum.io/rpc',
+      'https://arbitrum-one-rpc.publicnode.com'
+    );
+  } else if (normalized === 'arc' || normalized === 'arc-mainnet' || normalized === '5042') {
+    candidates.push(process.env.ARC_RPC_URL, 'https://rpc.arc.network');
+  } else if (normalized === 'ethereum' || normalized === 'eth' || normalized === '1') {
+    candidates.push(process.env.ETH_RPC_URL, 'https://ethereum-rpc.publicnode.com', 'https://eth.llamarpc.com');
+  } else if (normalized === 'optimism' || normalized === '10') {
+    candidates.push(process.env.OPTIMISM_RPC_URL, 'https://mainnet.optimism.io', 'https://optimism-rpc.publicnode.com');
+  } else if (normalized === 'polygon' || normalized === '137') {
+    candidates.push(process.env.POLYGON_RPC_URL, 'https://polygon-bor-rpc.publicnode.com', 'https://polygon-rpc.com');
+  } else if (normalized === 'bsc' || normalized === 'bnb' || normalized === '56') {
+    candidates.push(process.env.BSC_RPC_URL, 'https://bsc-dataseed.binance.org', 'https://bsc-rpc.publicnode.com');
+  }
+
+  return Array.from(
+    new Set(
+      candidates
+        .map((u) => (typeof u === 'string' ? u.trim() : ''))
+        .filter((u) => u.startsWith('https://') || u.startsWith('http://'))
+    )
+  );
+}
+
+function buildResilientTransport(urls: string[], timeout: number): Transport {
+  if (urls.length <= 1) {
+    return http(urls[0], { timeout, retryCount: 1 });
+  }
+  return fallback(
+    urls.map((u) => http(u, { timeout, retryCount: 1 })),
+    { rank: false, retryCount: 1 }
+  );
+}
+
+/**
+ * Returns a configured read-only viem PublicClient with Multi-RPC fallback transport
+ * for the specified EVM chain.
  */
 export function getEvmPublicClient(
   chain = 'base-mainnet'
@@ -87,42 +151,42 @@ export function getEvmPublicClient(
   const timeout = Number(process.env.RPC_TIMEOUT_MS) || 15_000;
 
   if (normalized === 'base' || normalized === 'base-mainnet' || normalized === 'clanker') {
-    const rpcUrl = process.env.BASE_RPC_URL || 'https://mainnet.base.org';
+    const urls = resolveEvmRpcUrls('base-mainnet');
     return createPublicClient({
       chain: base,
-      transport: http(rpcUrl, { timeout }),
+      transport: buildResilientTransport(urls, timeout),
     }) as PublicClient;
   }
 
   if (normalized === 'base-sepolia' || normalized === 'base_sepolia') {
-    const rpcUrl = process.env.BASE_SEPOLIA_RPC_URL || 'https://sepolia.base.org';
+    const urls = resolveEvmRpcUrls('base-sepolia');
     return createPublicClient({
       chain: baseSepolia,
-      transport: http(rpcUrl, { timeout }),
+      transport: buildResilientTransport(urls, timeout),
     }) as PublicClient;
   }
 
   if (normalized === 'robinhood' || normalized === 'robinhood-mainnet') {
-    const rpcUrl = process.env.ROBINHOOD_RPC_URL || 'https://rpc.mainnet.chain.robinhood.com';
+    const urls = resolveEvmRpcUrls('robinhood-mainnet');
     return createPublicClient({
       chain: robinhoodChain,
-      transport: http(rpcUrl, { timeout }),
+      transport: buildResilientTransport(urls, timeout),
     }) as PublicClient;
   }
 
   if (normalized === 'arbitrum' || normalized === 'arbitrum-mainnet') {
-    const rpcUrl = process.env.ARBITRUM_RPC_URL || 'https://arb1.arbitrum.io/rpc';
+    const urls = resolveEvmRpcUrls('arbitrum-mainnet');
     return createPublicClient({
       chain: arbitrumChain,
-      transport: http(rpcUrl, { timeout }),
+      transport: buildResilientTransport(urls, timeout),
     }) as PublicClient;
   }
 
   if (normalized === 'arc' || normalized === 'arc-mainnet') {
-    const rpcUrl = process.env.ARC_RPC_URL || 'https://rpc.arc.network';
+    const urls = resolveEvmRpcUrls('arc-mainnet');
     return createPublicClient({
       chain: arcChain,
-      transport: http(rpcUrl, { timeout }),
+      transport: buildResilientTransport(urls, timeout),
     }) as PublicClient;
   }
 
@@ -325,6 +389,7 @@ export interface EvmNativePaymentVerification {
   to?: string;
   valueWei?: bigint;
   blockNumber?: bigint;
+  confirmations?: number;
   reason?: string;
 }
 
@@ -387,6 +452,7 @@ export async function verifyEvmNativePayment(params: {
   expectedFrom: string;
   expectedTo: string;
   minValueWei: bigint;
+  minConfirmations?: number;
   customClient?: PublicClient;
 }): Promise<EvmNativePaymentVerification> {
   const chain = params.chain || 'base-mainnet';
@@ -455,12 +521,37 @@ export async function verifyEvmNativePayment(params: {
       };
     }
 
+    const minConfs = Math.max(1, Math.floor(Number(params.minConfirmations ?? 1)));
+    let confirmations: number | undefined;
+    if (typeof (client as any).getBlockNumber === 'function') {
+      try {
+        const latestBlock = await (client as any).getBlockNumber();
+        if (typeof latestBlock === 'bigint' && typeof receipt.blockNumber === 'bigint') {
+          confirmations = latestBlock >= receipt.blockNumber ? Number(latestBlock - receipt.blockNumber + 1n) : 0;
+          if (confirmations < minConfs) {
+            return {
+              status: 'pending',
+              from: tx.from,
+              to: tx.to ?? undefined,
+              valueWei: tx.value,
+              blockNumber: receipt.blockNumber,
+              confirmations,
+              reason: `Awaiting minimum block confirmations (${confirmations}/${minConfs})`,
+            };
+          }
+        }
+      } catch {
+        // Non-fatal if RPC node temporarily omits latest block lookup
+      }
+    }
+
     return {
       status: 'confirmed',
       from: tx.from,
       to: tx.to ?? undefined,
       valueWei: tx.value,
       blockNumber: receipt.blockNumber,
+      ...(confirmations !== undefined ? { confirmations } : {}),
     };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -476,4 +567,137 @@ export async function verifyEvmNativePayment(params: {
       reason: `EVM RPC error: ${sanitizeRpcText(msg)}`,
     };
   }
+}
+
+// ============================================================================
+// PHASE FM: STATELESS PRE-FLIGHT EVM SIMULATION (ETH_ESTIMATEGAS + REVERT GUARD)
+// ============================================================================
+
+export interface EvmPreflightSimulationResult {
+  status: 'WILL_SUCCEED' | 'LIKELY_REVERT' | 'SKIPPED' | 'RPC_UNAVAILABLE';
+  estimatedGas?: string;
+  revertReason?: string;
+  chainId: number;
+  checkedAt: string;
+}
+
+export function decodeEvmRevertReason(rawError: string): string {
+  const clean = sanitizeRpcText(String(rawError || ''));
+  const lower = clean.toLowerCase();
+  if (lower.includes('insufficient funds')) {
+    return 'INSUFFICIENT_FUNDS: Wallet native ETH balance is insufficient for value + gas.';
+  }
+  if (lower.includes('allowance') || lower.includes('transferfrom')) {
+    return 'ALLOWANCE_REQUIRED: Approve ERC-20 token allowance before signing swap.';
+  }
+  if (lower.includes('slippage') || lower.includes('too little received') || lower.includes('minreturn')) {
+    return 'SLIPPAGE_EXCEEDED: Output moved beyond max slippage tolerance.';
+  }
+  if (lower.includes('revert') || lower.includes('execution reverted')) {
+    return `EXECUTION_REVERTED: ${clean.slice(0, 140)}`;
+  }
+  return clean.slice(0, 140) || 'SIMULATION_FAILED';
+}
+
+/**
+ * Read-only, non-custodial pre-flight EVM simulation (`eth_estimateGas`) before wallet sign.
+ * Strictly bounded by a 4s timeout and never throws or blocks core quote delivery.
+ */
+export async function simulateEvmTransactionPreflight(params: {
+  chainId: number;
+  from: string;
+  to: string;
+  data?: string;
+  value?: string;
+  customEstimateGas?: (tx: { from: string; to: string; data?: string; value?: string }) => Promise<string | bigint>;
+}): Promise<EvmPreflightSimulationResult> {
+  const checkedAt = new Date().toISOString();
+  const from = String(params.from || '').trim();
+  const to = String(params.to || '').trim();
+
+  if (!/^0x[a-fA-F0-9]{40}$/.test(from) || !/^0x[a-fA-F0-9]{40}$/.test(to)) {
+    return { status: 'SKIPPED', chainId: params.chainId, checkedAt };
+  }
+
+  const hexValue = (() => {
+    const raw = String(params.value || '0').trim();
+    if (!raw || raw === '0' || raw === '0x0') return '0x0';
+    if (raw.startsWith('0x')) return raw;
+    try {
+      return `0x${BigInt(raw).toString(16)}`;
+    } catch {
+      return '0x0';
+    }
+  })();
+
+  if (params.customEstimateGas) {
+    try {
+      const est = await params.customEstimateGas({
+        from,
+        to,
+        ...(params.data ? { data: params.data } : {}),
+        value: hexValue,
+      });
+      const gasStr = typeof est === 'bigint' ? est.toString() : String(BigInt(est));
+      return { status: 'WILL_SUCCEED', estimatedGas: gasStr, chainId: params.chainId, checkedAt };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return {
+        status: 'LIKELY_REVERT',
+        revertReason: decodeEvmRevertReason(msg),
+        chainId: params.chainId,
+        checkedAt,
+      };
+    }
+  }
+
+  const urls = resolveEvmRpcUrls(String(params.chainId));
+  if (urls.length === 0) {
+    return { status: 'SKIPPED', chainId: params.chainId, checkedAt };
+  }
+
+  for (const rpcUrl of urls.slice(0, 2)) {
+    try {
+      const res = await fetch(rpcUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'eth_estimateGas',
+          params: [
+            {
+              from,
+              to,
+              ...(params.data ? { data: params.data } : {}),
+              value: hexValue,
+            },
+          ],
+        }),
+        signal: AbortSignal.timeout(4000),
+      });
+      if (!res.ok) continue;
+      const json: any = await res.json().catch(() => null);
+      if (json?.result && typeof json.result === 'string' && json.result.startsWith('0x')) {
+        return {
+          status: 'WILL_SUCCEED',
+          estimatedGas: BigInt(json.result).toString(),
+          chainId: params.chainId,
+          checkedAt,
+        };
+      }
+      if (json?.error?.message) {
+        return {
+          status: 'LIKELY_REVERT',
+          revertReason: decodeEvmRevertReason(json.error.message),
+          chainId: params.chainId,
+          checkedAt,
+        };
+      }
+    } catch {
+      // Try next fallback RPC
+    }
+  }
+
+  return { status: 'RPC_UNAVAILABLE', chainId: params.chainId, checkedAt };
 }

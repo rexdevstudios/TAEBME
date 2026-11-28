@@ -69,6 +69,10 @@ import {
   buildCandleChartMarkers,
   validateKolCalloutInput,
 } from '../packages/intelligence/kol-chart-overlay';
+import {
+  resolveEvmRpcUrls,
+  simulateEvmTransactionPreflight,
+} from '../packages/launchpad/evm-verifier';
 import { PostgresBillingDbAdapter } from '../packages/db/billing-repo';
 import {
   clearAutoPilotPeakPrice,
@@ -1474,6 +1478,36 @@ async function runSimulationSuite() {
       creatorEarn.signalMarketplaceCredits === 160 &&
       creatorEarn.signalSalesCount === 2,
     'Unified creator earnings deterministically combines +15 cr airdrop referrals and 80% Signal Marketplace revenue'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 55: Multi-RPC Failover & Stateless Pre-Flight EVM Simulation (Phase FM)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 55: Multi-RPC Failover & Stateless Pre-Flight EVM Simulation] ---');
+  const baseRpcPool = resolveEvmRpcUrls('base-mainnet');
+  const preflightOk = await simulateEvmTransactionPreflight({
+    chainId: 8453,
+    from: '0x1111111111111111111111111111111111111111',
+    to: '0x2222222222222222222222222222222222222222',
+    data: '0xabcd',
+    customEstimateGas: async () => 142000n,
+  });
+  const preflightRev = await simulateEvmTransactionPreflight({
+    chainId: 8453,
+    from: '0x1111111111111111111111111111111111111111',
+    to: '0x2222222222222222222222222222222222222222',
+    data: '0xabcd',
+    customEstimateGas: async () => {
+      throw new Error('insufficient funds for gas * price + value');
+    },
+  });
+  assert(
+    baseRpcPool.length >= 2 &&
+      preflightOk.status === 'WILL_SUCCEED' &&
+      preflightOk.estimatedGas === '142000' &&
+      preflightRev.status === 'LIKELY_REVERT' &&
+      Boolean(preflightRev.revertReason?.includes('INSUFFICIENT_FUNDS')),
+    'Multi-RPC pool provides fallback redundancy and stateless Pre-Flight EVM simulator catches reverts before wallet sign'
   );
 
   console.log('\n================================================================');
