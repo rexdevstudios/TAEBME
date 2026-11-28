@@ -28,6 +28,7 @@ import type {
   ChartCandleMarker,
   KolConsensusReport,
 } from '@packages/intelligence/kol-chart-overlay';
+import { KolMarkerHoverCard } from '../components/KolMarkerHoverCard';
 import {
   EVM_DEX_CHAINS,
   ensureEvmNetwork,
@@ -135,6 +136,7 @@ function CandlestickChart({
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const [showKolMarkers, setShowKolMarkers] = useState(true);
   const [showAiMarkers, setShowAiMarkers] = useState(true);
+  const [activeMarker, setActiveMarker] = useState<ChartCandleMarker | null>(null);
 
   if (!candles || candles.length === 0) {
     return <div className="text-muted" style={{ padding: '3rem', textAlign: 'center', fontSize: '13px' }}>Memuat data grafik pasar...</div>;
@@ -338,10 +340,14 @@ function CandlestickChart({
           return (
             <g
               key={`${m.kind}-${m.candleIndex}-${idx}`}
-              style={{ cursor: onSelectMarkerSide ? 'pointer' : 'default' }}
-              onClick={() => onSelectMarkerSide?.(m.side)}
+              style={{ cursor: 'pointer' }}
+              onMouseEnter={() => setActiveMarker(m)}
+              onClick={() => {
+                setActiveMarker(m);
+                onSelectMarkerSide?.(m.side);
+              }}
             >
-              <title>{`${m.label} · ${m.side} @ ${formatPx(m.price)}`}</title>
+              <title>{`${m.kolHandle || m.label}${m.quoteText ? `: ${m.quoteText}` : ''} · ${m.side} @ ${formatPx(m.price)}`}</title>
               <circle cx={mx} cy={my} r={9} fill={fill} stroke="#0B1220" strokeWidth="1.5" />
               <text
                 x={mx}
@@ -358,6 +364,13 @@ function CandlestickChart({
           );
         })}
       </svg>
+      {activeMarker && (
+        <KolMarkerHoverCard
+          marker={activeMarker}
+          onClose={() => setActiveMarker(null)}
+          formatPrice={formatPx}
+        />
+      )}
     </div>
   );
 }

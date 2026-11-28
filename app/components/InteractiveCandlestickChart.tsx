@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
+import type { ChartCandleMarker, KolConsensusReport } from '@packages/intelligence/kol-chart-overlay';
+import { KolMarkerHoverCard } from './KolMarkerHoverCard';
 
 export interface OhlcvCandle {
   timestamp: number;
@@ -15,6 +17,8 @@ interface InteractiveCandlestickChartProps {
   candles: OhlcvCandle[];
   height?: number;
   symbol?: string;
+  markers?: ChartCandleMarker[];
+  kolConsensus?: KolConsensusReport | null;
 }
 
 function formatPriceSmart(val: number): string {
@@ -44,8 +48,13 @@ export function InteractiveCandlestickChart({
   candles,
   height = 360,
   symbol = 'TOKEN',
+  markers = [],
+  kolConsensus = null,
 }: InteractiveCandlestickChartProps) {
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+  const [showKolMarkers, setShowKolMarkers] = useState(true);
+  const [showAiMarkers, setShowAiMarkers] = useState(true);
+  const [activeMarker, setActiveMarker] = useState<ChartCandleMarker | null>(null);
 
   if (!candles || candles.length === 0) {
     return (
@@ -96,9 +105,63 @@ export function InteractiveCandlestickChart({
   const latestY = priceToY(latestCandle.close);
 
   const gridLevels = [0, 0.25, 0.5, 0.75, 1];
+  const visibleMarkers = (markers || []).filter((m) => {
+    if (m.kind === 'KOL_BUY' || m.kind === 'KOL_SELL') return showKolMarkers;
+    return showAiMarkers;
+  });
 
   return (
-    <div style={{ width: '100%', userSelect: 'none' }}>
+    <div style={{ width: '100%', userSelect: 'none', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      {(markers.length > 0 || kolConsensus) && (
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '8px',
+            fontSize: '11px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => setShowKolMarkers((v) => !v)}
+              className={showKolMarkers ? 'btn-primary' : 'btn-secondary'}
+              style={{ fontSize: '10px', padding: '3px 8px', fontFamily: 'var(--font-mono)' }}
+            >
+              {showKolMarkers ? 'ON' : 'OFF'} · KOL Callouts (KB/KS)
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowAiMarkers((v) => !v)}
+              className={showAiMarkers ? 'btn-primary' : 'btn-secondary'}
+              style={{ fontSize: '10px', padding: '3px 8px', fontFamily: 'var(--font-mono)' }}
+            >
+              {showAiMarkers ? 'ON' : 'OFF'} · AI Entry (AI)
+            </button>
+          </div>
+          {kolConsensus && (
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--color-muted)' }}>
+              KOL Consensus:{' '}
+              <strong
+                style={{
+                  color:
+                    kolConsensus.score >= 60
+                      ? 'var(--color-text-positive)'
+                      : kolConsensus.score <= 35
+                        ? 'var(--color-destructive)'
+                        : 'var(--color-accent-info)',
+                }}
+              >
+                {kolConsensus.score}/100 ({kolConsensus.verdict})
+              </strong>
+              {' · '}Verified KOLs: {kolConsensus.uniqueVerifiedKols}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Live OHLCV Telemetry Bar */}
       <div
         style={{
@@ -300,6 +363,45 @@ export function InteractiveCandlestickChart({
             ${formatPriceSmart(latestCandle.close)}
           </text>
 
+          {/* GMGN-Style Verified KOL Callout (KB/KS) & AI Signal (AI) Candle Markers */}
+          {visibleMarkers.map((m, idx) => {
+            const c = candles[m.candleIndex];
+            if (!c) return null;
+            const mx = paddingLeft + m.candleIndex * stepX + stepX / 2;
+            const my =
+              m.side === 'BUY'
+                ? Math.min(chartHeight - paddingBottom - 8, priceToY(c.low) + 14)
+                : Math.max(paddingTop + 12, priceToY(c.high) - 14);
+            const fill =
+              m.kind === 'KOL_BUY'
+                ? '#10B981'
+                : m.kind === 'KOL_SELL'
+                  ? '#EF4444'
+                  : '#8B5CF6';
+            return (
+              <g
+                key={`${m.kind}-${m.candleIndex}-${idx}`}
+                style={{ cursor: 'pointer' }}
+                onMouseEnter={() => setActiveMarker(m)}
+                onClick={() => setActiveMarker(m)}
+              >
+                <title>{`${m.kolHandle || m.label}${m.quoteText ? `: ${m.quoteText}` : ''}`}</title>
+                <circle cx={mx} cy={my} r={10} fill={fill} stroke="var(--color-panel)" strokeWidth="1.5" />
+                <text
+                  x={mx}
+                  y={my + 3}
+                  textAnchor="middle"
+                  fill="#FFFFFF"
+                  fontSize="8"
+                  fontWeight="900"
+                  fontFamily="var(--font-mono)"
+                >
+                  {m.badge}
+                </text>
+              </g>
+            );
+          })}
+
           {/* Bottom Time Labels (5 evenly spaced) */}
           {[0, 0.25, 0.5, 0.75, 1].map((r, i) => {
             const idx = Math.min(candles.length - 1, Math.floor(r * (candles.length - 1)));
@@ -320,6 +422,14 @@ export function InteractiveCandlestickChart({
           })}
         </svg>
       </div>
+
+      {activeMarker && (
+        <KolMarkerHoverCard
+          marker={activeMarker}
+          onClose={() => setActiveMarker(null)}
+          formatPrice={formatPriceSmart}
+        />
+      )}
     </div>
   );
 }

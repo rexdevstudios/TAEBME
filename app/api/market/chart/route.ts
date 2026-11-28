@@ -217,8 +217,12 @@ export async function GET(req: NextRequest) {
       signal,
     );
 
-    // 4.5 Phase DU/DV: Verified KOL Chart Overlay & Anti-Manipulation Consensus (Shared SSOT Loader)
-    const kolEntries = await loadVerifiedKolSignalsForSymbol(getDbPool(), activeSymbol);
+    // 4.5 Phase DU/DV/FI: Verified KOL Chart Overlay & Anti-Manipulation Consensus (Shared SSOT Loader)
+    const kolEntries = await loadVerifiedKolSignalsForSymbol(
+      getDbPool(),
+      activeSymbol,
+      tokenAddress || undefined
+    );
 
     const aiActionHint = (tradingAnalysis as any)?.regime?.regime || (signal as any)?.action || null;
     const chartMarkers = buildCandleChartMarkers({

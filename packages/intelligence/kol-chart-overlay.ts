@@ -32,6 +32,8 @@ export interface KolSignalInput {
   side: 'BUY' | 'SELL';
   price?: number;
   timestampMs: number;
+  quoteText?: string;
+  tweetUrl?: string;
 }
 
 export interface KolConsensusReport {
@@ -54,6 +56,116 @@ export interface ChartCandleMarker {
   label: string;
   tier?: KolVerificationTier;
   timestampMs: number;
+  kolHandle?: string;
+  quoteText?: string;
+  tweetUrl?: string;
+  source?: 'ONCHAIN_ENTRY' | 'SOCIAL_TWEET' | 'AI_SIGNAL';
+}
+
+const ALLOWED_CALLOUT_HOSTS = new Set([
+  'x.com',
+  'www.x.com',
+  'twitter.com',
+  'www.twitter.com',
+  'mobile.twitter.com',
+  'warpcast.com',
+  'www.warpcast.com',
+]);
+
+export function sanitizeSafeSocialUrl(raw?: string | null): string | undefined {
+  const trimmed = String(raw || '').trim();
+  if (!trimmed) return undefined;
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== 'https:') return undefined;
+    if (!ALLOWED_CALLOUT_HOSTS.has(parsed.hostname.toLowerCase())) return undefined;
+    return parsed.toString();
+  } catch {
+    return undefined;
+  }
+}
+
+export interface KolCalloutValidationResult {
+  ok: boolean;
+  error?: string;
+  sanitized?: {
+    quoteText: string;
+    tweetUrl?: string;
+    side: 'BUY' | 'SELL';
+    symbol: string;
+    tokenAddress?: string;
+    chain: string;
+    price?: number;
+  };
+}
+
+/**
+ * Pure, deterministic validator for Verified KOL Chart Callout submissions (Phase FI).
+ */
+export function validateKolCalloutInput(input: {
+  quoteText?: unknown;
+  tweetUrl?: unknown;
+  side?: unknown;
+  symbol?: unknown;
+  tokenAddress?: unknown;
+  chain?: unknown;
+  price?: unknown;
+}): KolCalloutValidationResult {
+  const rawQuote = typeof input.quoteText === 'string' ? input.quoteText.replace(/[\r\n\t]+/g, ' ').trim() : '';
+  if (rawQuote.length < 4 || rawQuote.length > 280) {
+    return {
+      ok: false,
+      error: 'INVALID_QUOTE: Callout text must be between 4 and 280 characters.',
+    };
+  }
+
+  const rawTweetUrl = typeof input.tweetUrl === 'string' ? input.tweetUrl.trim() : '';
+  let tweetUrl: string | undefined;
+  if (rawTweetUrl) {
+    tweetUrl = sanitizeSafeSocialUrl(rawTweetUrl);
+    if (!tweetUrl) {
+      return {
+        ok: false,
+        error: 'INVALID_TWEET_URL: Only public https://x.com, twitter.com, or warpcast.com links are allowed.',
+      };
+    }
+  }
+
+  const side: 'BUY' | 'SELL' =
+    typeof input.side === 'string' && input.side.trim().toUpperCase() === 'SELL' ? 'SELL' : 'BUY';
+
+  const rawSymbol = typeof input.symbol === 'string' ? input.symbol.trim().toUpperCase().replace(/[^A-Z0-9/_-]/g, '') : '';
+  const rawAddress = typeof input.tokenAddress === 'string' ? input.tokenAddress.trim() : '';
+  const isValidAddr =
+    /^0x[a-fA-F0-9]{40}$/.test(rawAddress) || /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(rawAddress);
+
+  if (!rawSymbol && !isValidAddr) {
+    return {
+      ok: false,
+      error: 'MISSING_TARGET: Provide a valid token symbol or contract address.',
+    };
+  }
+
+  const chain =
+    typeof input.chain === 'string' && /^[a-z0-9_-]{2,24}$/i.test(input.chain.trim())
+      ? input.chain.trim().toLowerCase()
+      : 'base';
+
+  const parsedPrice = Number(input.price);
+  const price = Number.isFinite(parsedPrice) && parsedPrice > 0 ? parsedPrice : undefined;
+
+  return {
+    ok: true,
+    sanitized: {
+      quoteText: rawQuote,
+      ...(tweetUrl ? { tweetUrl } : {}),
+      side,
+      symbol: rawSymbol || 'TOKEN',
+      ...(isValidAddr ? { tokenAddress: rawAddress } : {}),
+      chain,
+      ...(price !== undefined ? { price } : {}),
+    },
+  };
 }
 
 export function isVerifiedKol(profile: KolProfileSample): {
@@ -243,6 +355,10 @@ export function buildCandleChartMarkers(params: {
       label: `${entry.handle} (KOL VERIFIED · ${tier})`,
       tier,
       timestampMs: entry.timestampMs,
+      kolHandle: entry.handle,
+      ...(entry.quoteText ? { quoteText: entry.quoteText } : {}),
+      ...(entry.tweetUrl ? { tweetUrl: entry.tweetUrl } : {}),
+      source: entry.source,
     });
   }
 
@@ -264,6 +380,7 @@ export function buildCandleChartMarkers(params: {
       price: candles[maxIdx].high,
       label: 'AI Signal Resistance / Exit Zone',
       timestampMs: candles[maxIdx].timestamp,
+      source: 'AI_SIGNAL',
     });
   } else {
     markers.push({
@@ -274,6 +391,7 @@ export function buildCandleChartMarkers(params: {
       price: candles[minIdx].low,
       label: 'AI Signal Support / Dip Entry Zone',
       timestampMs: candles[minIdx].timestamp,
+      source: 'AI_SIGNAL',
     });
   }
 
@@ -281,17 +399,25 @@ export function buildCandleChartMarkers(params: {
 }
 
 /**
- * Shared read-only SSOT loader for Verified KOL executed signals on a symbol (Phase DV).
+ * Shared read-only SSOT loader for Verified KOL executed entries & social tweet callouts (Phase DV + Phase FI).
  * Reused by both /api/market/chart and /api/agent/proposals/intelligence (zero SQL duplication).
+ * Merges 3 real Neon PostgreSQL sources:
+ *   1. `trade_intents` (EXECUTED on-chain/CEX entries -> ONCHAIN_ENTRY)
+ *   2. `bounty_claims` + `bounty_campaigns` + `token_launches` (verified tweet proofs -> SOCIAL_TWEET)
+ *   3. `scraped_documents` (domain = 'kol_callout' -> SOCIAL_TWEET with quoteText & optional tweetUrl)
  */
 export async function loadVerifiedKolSignalsForSymbol(
   pool: { query: (sql: string, params?: unknown[]) => Promise<{ rows: any[] }> } | null,
-  activeSymbol: string
+  activeSymbol: string,
+  tokenAddress?: string
 ): Promise<KolSignalInput[]> {
   if (!pool) return [];
   const kolEntries: KolSignalInput[] = [];
+  const cleanBase = activeSymbol.replace(/\/.*$/, '').replace(/USDT$/, '');
+  const normAddr = String(tokenAddress || '').trim().toLowerCase();
+
+  // Source 1: Executed trade intents by verified KOLs (ONCHAIN_ENTRY)
   try {
-    const cleanBase = activeSymbol.replace(/\/.*$/, '').replace(/USDT$/, '');
     const res = await pool.query(
       `SELECT ti.side, ti.estimated_price, ti.created_at, w.address AS wallet_address,
               kp.twitter_handle, kp.trust_score, kp.is_verified
@@ -321,12 +447,104 @@ export async function loadVerifiedKolSignalsForSymbol(
           side: String(row.side).toUpperCase() === 'SELL' ? 'SELL' : 'BUY',
           price: Number(row.estimated_price || 0) || undefined,
           timestampMs: new Date(row.created_at).getTime(),
+          quoteText: `Verified ${String(row.side).toUpperCase() === 'SELL' ? 'SELL' : 'BUY'} execution on ${activeSymbol}`,
         });
       }
     }
   } catch {
     // Non-blocking fallback when no matching rows exist
   }
+
+  // Source 2: Verified KOL Bounty Tweet Claims linked to this token launch (SOCIAL_TWEET)
+  try {
+    const claimRes = await pool.query(
+      `SELECT bc.proof_url, bc.created_at, camp.title AS campaign_title, camp.required_hashtag,
+              w.address AS wallet_address, kp.twitter_handle, kp.trust_score, kp.is_verified
+       FROM bounty_claims bc
+       JOIN bounty_campaigns camp ON camp.id = bc.campaign_id
+       JOIN token_launches tl ON tl.id = camp.launch_id
+       JOIN launch_drafts ld ON ld.id = tl.draft_id
+       JOIN kol_profiles kp ON kp.id = bc.kol_id
+       JOIN wallets w ON w.user_id = kp.user_id
+       WHERE bc.verification_status IN ('VERIFIED', 'APPROVED', 'SETTLED')
+         AND (
+           ($1 <> '' AND LOWER(tl.contract_address) = $1)
+           OR UPPER(ld.ticker) = UPPER($2)
+         )
+       ORDER BY bc.created_at DESC
+       LIMIT 15`,
+      [normAddr, cleanBase]
+    );
+    for (const row of claimRes.rows) {
+      const v = isVerifiedKol({
+        walletAddress: row.wallet_address,
+        twitterHandle: row.twitter_handle,
+        trustScore: Number(row.trust_score ?? 0),
+        isVerified: row.is_verified === false ? false : undefined,
+      });
+      if (v.verified) {
+        const safeTweet = sanitizeSafeSocialUrl(row.proof_url);
+        const tag = row.required_hashtag ? ` (${String(row.required_hashtag)})` : '';
+        kolEntries.push({
+          walletAddress: String(row.wallet_address),
+          handle: v.handle,
+          trustScore: Number(row.trust_score ?? 0),
+          hasSocialProof: true,
+          source: 'SOCIAL_TWEET',
+          side: 'BUY',
+          timestampMs: new Date(row.created_at).getTime(),
+          quoteText: `${String(row.campaign_title || 'Verified KOL Campaign Callout')}${tag}`,
+          ...(safeTweet ? { tweetUrl: safeTweet } : {}),
+        });
+      }
+    }
+  } catch {
+    // Non-blocking fallback
+  }
+
+  // Source 3: Direct Verified KOL Callouts stored in scraped_documents (domain = 'kol_callout')
+  try {
+    const calloutRes = await pool.query(
+      `SELECT target_url, raw_content, extracted_metadata, scraped_at
+       FROM scraped_documents
+       WHERE domain = 'kol_callout'
+         AND (
+           ($1 <> '' AND LOWER(COALESCE(extracted_metadata->>'tokenAddress', '')) = $1)
+           OR UPPER(COALESCE(extracted_metadata->>'symbol', '')) = UPPER($2)
+           OR UPPER(COALESCE(extracted_metadata->>'symbol', '')) = UPPER($3)
+         )
+       ORDER BY scraped_at DESC
+       LIMIT 20`,
+      [normAddr, activeSymbol, cleanBase]
+    );
+    for (const row of calloutRes.rows) {
+      const meta = (row.extracted_metadata && typeof row.extracted_metadata === 'object' ? row.extracted_metadata : {}) as Record<string, any>;
+      const v = isVerifiedKol({
+        walletAddress: String(meta.kolWallet || ''),
+        twitterHandle: meta.kolHandle || null,
+        trustScore: Number(meta.trustScore ?? 0),
+        isVerified: meta.isVerified === false ? false : undefined,
+      });
+      if (v.verified && row.raw_content) {
+        const safeTweet = sanitizeSafeSocialUrl(meta.tweetUrl || row.target_url);
+        kolEntries.push({
+          walletAddress: String(meta.kolWallet || ''),
+          handle: v.handle,
+          trustScore: Number(meta.trustScore ?? 0),
+          hasSocialProof: true,
+          source: 'SOCIAL_TWEET',
+          side: String(meta.side || 'BUY').toUpperCase() === 'SELL' ? 'SELL' : 'BUY',
+          price: Number(meta.price || 0) || undefined,
+          timestampMs: new Date(row.scraped_at).getTime(),
+          quoteText: String(row.raw_content).trim().slice(0, 280),
+          ...(safeTweet ? { tweetUrl: safeTweet } : {}),
+        });
+      }
+    }
+  } catch {
+    // Non-blocking fallback
+  }
+
   return kolEntries;
 }
 

@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { BarChart2, ExternalLink, RefreshCw } from 'lucide-react';
+import { BarChart2, ExternalLink, MessageSquarePlus, RefreshCw } from 'lucide-react';
 import { InteractiveCandlestickChart, OhlcvCandle } from './InteractiveCandlestickChart';
+import type { ChartCandleMarker, KolConsensusReport } from '@packages/intelligence/kol-chart-overlay';
 
 interface TokenMarketChartPanelProps {
   chain: string;
@@ -28,9 +29,17 @@ export function TokenMarketChartPanel({
   const [chartMode, setChartMode] = useState<'NATIVE' | 'DEXSCREENER'>('NATIVE');
   const [interval, setIntervalVal] = useState<(typeof TIMEFRAMES)[number]>('1h');
   const [candles, setCandles] = useState<OhlcvCandle[]>([]);
+  const [chartMarkers, setChartMarkers] = useState<ChartCandleMarker[]>([]);
+  const [kolConsensus, setKolConsensus] = useState<KolConsensusReport | null>(null);
   const [chartSource, setChartSource] = useState<string>('BONDING_CURVE');
   const [loading, setLoading] = useState(true);
   const [embedTheme, setEmbedTheme] = useState<'dark' | 'light'>('dark');
+  const [showCalloutForm, setShowCalloutForm] = useState(false);
+  const [calloutText, setCalloutText] = useState('');
+  const [calloutTweetUrl, setCalloutTweetUrl] = useState('');
+  const [calloutSide, setCalloutSide] = useState<'BUY' | 'SELL'>('BUY');
+  const [calloutBusy, setCalloutBusy] = useState(false);
+  const [calloutFeedback, setCalloutFeedback] = useState<string | null>(null);
 
   useEffect(() => {
     const syncTheme = () => {
@@ -59,6 +68,8 @@ export function TokenMarketChartPanel({
       if (json?.success && Array.isArray(json.data?.candles)) {
         setCandles(json.data.candles);
         setChartSource(json.data.chartSource || 'BONDING_CURVE');
+        setChartMarkers(Array.isArray(json.data.chartMarkers) ? json.data.chartMarkers : []);
+        setKolConsensus(json.data.kolConsensus || null);
       }
     } catch {
       // Keep last known candles safely
@@ -71,6 +82,43 @@ export function TokenMarketChartPanel({
     fetchCandles(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chain, contractAddress, interval]);
+
+  const handlePostCallout = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCalloutBusy(true);
+    setCalloutFeedback(null);
+    try {
+      const latestPx = candles.length > 0 ? candles[candles.length - 1].close : undefined;
+      const res = await fetch('/api/kol/callout', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          quoteText: calloutText,
+          tweetUrl: calloutTweetUrl || undefined,
+          side: calloutSide,
+          symbol: tokenTicker,
+          tokenAddress: contractAddress,
+          chain,
+          price: latestPx,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json?.success) {
+        setCalloutFeedback(`Notice: ${json?.error || `HTTP ${res.status}`}`);
+        return;
+      }
+      setCalloutText('');
+      setCalloutTweetUrl('');
+      setShowCalloutForm(false);
+      setCalloutFeedback('OK: Verified KOL Callout pinned to candlestick chart.');
+      await fetchCandles(interval);
+    } catch (err: any) {
+      setCalloutFeedback(`Notice: ${err?.message || 'Network error'}`);
+    } finally {
+      setCalloutBusy(false);
+    }
+  };
 
   const dexscreenerChain = chain === 'solana' ? 'solana' : chain;
   const dexscreenerEmbedUrl = `https://dexscreener.com/${dexscreenerChain}/${contractAddress}?embed=1&theme=${embedTheme}&trades=0&info=0`;
@@ -201,16 +249,107 @@ export function TokenMarketChartPanel({
               </button>
             ))}
           </div>
-          <button
-            type="button"
-            onClick={() => fetchCandles(interval)}
-            className="btn-secondary"
-            style={{ padding: '4px 10px', fontSize: '11px', gap: '5px' }}
-            disabled={loading}
-          >
-            <RefreshCw size={11} />
-            {loading ? 'Memuat...' : 'Refresh'}
-          </button>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <button
+              type="button"
+              onClick={() => setShowCalloutForm((v) => !v)}
+              className="btn-secondary"
+              style={{ padding: '4px 10px', fontSize: '11px', gap: '5px', display: 'inline-flex', alignItems: 'center' }}
+            >
+              <MessageSquarePlus size={11} />
+              {showCalloutForm ? 'Tutup Callout' : 'Post KOL Callout'}
+            </button>
+            <button
+              type="button"
+              onClick={() => fetchCandles(interval)}
+              className="btn-secondary"
+              style={{ padding: '4px 10px', fontSize: '11px', gap: '5px' }}
+              disabled={loading}
+            >
+              <RefreshCw size={11} />
+              {loading ? 'Memuat...' : 'Refresh'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {chartMode === 'NATIVE' && showCalloutForm && (
+        <form
+          onSubmit={handlePostCallout}
+          className="bg-panel"
+          style={{
+            padding: '12px',
+            marginBottom: '12px',
+            borderRadius: '8px',
+            border: '1px solid var(--color-border)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+          }}
+        >
+          <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-foreground)' }}>
+            Verified KOL Chart Callout (Pin quote &amp; X link directly onto ${tokenTicker} candle)
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: '8px' }}>
+            <select
+              value={calloutSide}
+              onChange={(e) => setCalloutSide(e.target.value === 'SELL' ? 'SELL' : 'BUY')}
+              className="input"
+              style={{ padding: '6px 8px', fontSize: '11px' }}
+            >
+              <option value="BUY">BUY Callout</option>
+              <option value="SELL">SELL Callout</option>
+            </select>
+            <input
+              type="text"
+              required
+              minLength={4}
+              maxLength={280}
+              value={calloutText}
+              onChange={(e) => setCalloutText(e.target.value)}
+              placeholder="Write short thesis / callout quote (4-280 chars)..."
+              className="input"
+              style={{ padding: '6px 10px', fontSize: '12px' }}
+            />
+          </div>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <input
+              type="url"
+              value={calloutTweetUrl}
+              onChange={(e) => setCalloutTweetUrl(e.target.value)}
+              placeholder="Optional tweet link (https://x.com/... or https://warpcast.com/...)"
+              className="input"
+              style={{ flex: 1, minWidth: '220px', padding: '6px 10px', fontSize: '11px' }}
+            />
+            <button
+              type="submit"
+              disabled={calloutBusy}
+              className="btn-primary"
+              style={{ padding: '6px 14px', fontSize: '11px' }}
+            >
+              {calloutBusy ? 'Pinning...' : 'Pin Callout'}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {calloutFeedback && (
+        <div
+          style={{
+            marginBottom: '10px',
+            padding: '7px 10px',
+            borderRadius: '6px',
+            fontSize: '11px',
+            fontWeight: 700,
+            backgroundColor: calloutFeedback.startsWith('OK:')
+              ? 'var(--color-badge-success-bg)'
+              : 'var(--color-badge-warning-bg)',
+            color: calloutFeedback.startsWith('OK:')
+              ? 'var(--color-badge-success-text)'
+              : 'var(--color-badge-warning-text)',
+          }}
+        >
+          {calloutFeedback}
         </div>
       )}
 
@@ -220,6 +359,8 @@ export function TokenMarketChartPanel({
           candles={candles}
           height={370}
           symbol={`$${tokenTicker} / USD`}
+          markers={chartMarkers}
+          kolConsensus={kolConsensus}
         />
       ) : (
         <div

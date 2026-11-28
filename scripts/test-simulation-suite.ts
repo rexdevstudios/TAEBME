@@ -64,6 +64,10 @@ import {
   buildAutoPilotDraftFromPreset,
   buildMarketplaceDatasetAdvisorySummary,
 } from '../packages/agent/signal-marketplace';
+import {
+  buildCandleChartMarkers,
+  validateKolCalloutInput,
+} from '../packages/intelligence/kol-chart-overlay';
 import { PostgresBillingDbAdapter } from '../packages/db/billing-repo';
 import {
   clearAutoPilotPeakPrice,
@@ -1379,6 +1383,56 @@ async function runSimulationSuite() {
         'https://pndigi.site/agent?tab=autopilot&presetId=preset-top-1' &&
       fhDatasetSummary?.topPresetId === 'preset-top-1',
     'Telegram inline keyboard drops unsafe URLs, attaches reply_markup to broadcast, and Copilot dataset exposes topPresetId for 1-click focus'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 52: GMGN-Style Verified KOL Tweet/Callout Chart Overlay (Phase FI)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 52: GMGN-Style Verified KOL Tweet/Callout Chart Overlay] ---');
+  const validCallout = validateKolCalloutInput({
+    quoteText: 'Accumulating Base launchpad curve with strong community traction.',
+    tweetUrl: 'https://x.com/hydra21/status/123456789',
+    side: 'BUY',
+    symbol: 'HSET',
+    tokenAddress: '0x2c94879c2b482d1838ccce3cd00ffd96a82fbcb8',
+    chain: 'base',
+    price: 0.0000937,
+  });
+  const blockedCallout = validateKolCalloutInput({
+    quoteText: 'Suspicious phishing link attempt',
+    tweetUrl: 'https://malicious.example.com/drain',
+    symbol: 'HSET',
+  });
+  const fiNow = Date.now();
+  const fiMarkers = buildCandleChartMarkers({
+    candles: [
+      { timestamp: fiNow - 3600_000, open: 0.00008, high: 0.000095, low: 0.000075, close: 0.00009 },
+      { timestamp: fiNow, open: 0.00009, high: 0.00011, low: 0.000088, close: 0.000105 },
+    ],
+    kolEntries: [
+      {
+        walletAddress: '0x1111111111111111111111111111111111111111',
+        handle: '@hydra21',
+        trustScore: 90,
+        hasSocialProof: true,
+        source: 'SOCIAL_TWEET',
+        side: 'BUY',
+        price: 0.0000937,
+        timestampMs: fiNow - 3600_000,
+        quoteText: validCallout.sanitized?.quoteText,
+        tweetUrl: validCallout.sanitized?.tweetUrl,
+      },
+    ],
+    aiAction: 'BULLISH',
+  });
+  const kolCalloutPin = fiMarkers.find((m) => m.kind === 'KOL_BUY');
+  assert(
+    validCallout.ok === true &&
+      blockedCallout.ok === false &&
+      kolCalloutPin?.kolHandle === '@hydra21' &&
+      kolCalloutPin?.tweetUrl === 'https://x.com/hydra21/status/123456789' &&
+      kolCalloutPin?.source === 'SOCIAL_TWEET',
+    'GMGN-style KOL Callout validator blocks phishing URLs and chart markers carry verified @handle, quoteText & tweetUrl'
   );
 
   console.log('\n================================================================');
