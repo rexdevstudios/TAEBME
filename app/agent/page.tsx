@@ -218,7 +218,10 @@ export default function AgentPage() {
       {/* TAB 1: Auto-Pilot & Sinyal (Beginner-Friendly Default) */}
       {activeAgentTab === 'autopilot' && (
         <div className="flex-col gap-lg">
-          <AiCopilotChatPanel isConnected={isConnected} />
+          <AiCopilotChatPanel
+            isConnected={isConnected}
+            onFocusPreset={(pid) => setHighlightedPresetId(pid)}
+          />
           <AutoPilotControlPanel isConnected={isConnected} draftTemplate={draftAutoPilotTemplate} />
           <SignalMarketplacePanel
             isConnected={isConnected}

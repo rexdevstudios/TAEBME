@@ -33,6 +33,8 @@ import {
 import { runAutonomousCycleEvaluation } from '../packages/agent/autopilot-cycle-runner';
 import { buildTradeIntentsFromAutoPilotReport } from '../packages/agent/autopilot-intent-bridge';
 import {
+  buildOutboundWebhookRequest,
+  buildTelegramInlineKeyboard,
   formatTelegramSignalListReply,
   formatTelegramTokenSafetyReply,
   formatTelegramWalletRiskReply,
@@ -1330,6 +1332,53 @@ async function runSimulationSuite() {
       tgSignalsReply.includes('https://pndigi.site/agent?tab=autopilot&presetId=preset-top-1') &&
       tgSignalsEmpty.includes('No public signal presets published yet'),
     'Telegram /signals formatter ranks presets with TP/SL/Trail & direct /agent Apply Draft deep-links'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 51: Telegram Inline Keyboard CTA & Copilot topPresetId Focus Bridge (Phase FH)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 51: Telegram Inline Keyboard CTA & Copilot topPresetId Focus Bridge] ---');
+  const inlineKb = buildTelegramInlineKeyboard([
+    { text: 'Apply Strategy Draft →', url: 'https://pndigi.site/agent?tab=autopilot&presetId=preset-top-1' },
+    { text: 'Rejected Non-HTTPS', url: 'javascript:alert(1)' },
+    { text: 'Leaderboard', url: 'https://pndigi.site/leaderboard' },
+  ]);
+  const tgBroadcastReq = buildOutboundWebhookRequest(
+    'https://api.telegram.org/bot123456:TESTTOKEN/sendMessage?chat_id=-10012345',
+    {
+      event: 'SIGNAL_PRESET_PUBLISHED',
+      title: 'Base Momentum Pro',
+      message: 'TP +20% / SL -5%',
+      buttons: [
+        { text: 'Apply Strategy Draft →', url: 'https://pndigi.site/agent?tab=autopilot&presetId=preset-top-1' },
+      ],
+    },
+    new Date().toISOString()
+  );
+  const fhDatasetSummary = buildMarketplaceDatasetAdvisorySummary([
+    {
+      id: 'preset-top-1',
+      title: 'Base Momentum Pro',
+      description: 'Verified KOL strategy',
+      creatorWallet: '0x2222222222222222222222222222222222222222',
+      priceCredits: 100,
+      rail: 'DEX_SESSION',
+      takeProfitPct: 20,
+      stopLossPct: 5,
+      trailingStopPct: 3,
+      allowedSymbols: ['ETHUSDT'],
+      subscribersCount: 12,
+      createdAt: new Date().toISOString(),
+      kolVerified: true,
+    },
+  ]);
+  assert(
+    Boolean(inlineKb) &&
+      inlineKb!.inline_keyboard[0].length === 2 &&
+      (tgBroadcastReq.body.reply_markup as any)?.inline_keyboard?.[0]?.[0]?.url ===
+        'https://pndigi.site/agent?tab=autopilot&presetId=preset-top-1' &&
+      fhDatasetSummary?.topPresetId === 'preset-top-1',
+    'Telegram inline keyboard drops unsafe URLs, attaches reply_markup to broadcast, and Copilot dataset exposes topPresetId for 1-click focus'
   );
 
   console.log('\n================================================================');

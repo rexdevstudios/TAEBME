@@ -127,6 +127,7 @@ export interface MarketplaceDatasetAdvisory {
   avgTakeProfitPct: number;
   avgStopLossPct: number;
   avgTrailingStopPct: number;
+  topPresetId: string;
   topPresetTitle: string;
   topPresetSubscribers: number;
   summaryLine: string;
@@ -201,6 +202,7 @@ export function buildMarketplaceDatasetAdvisorySummary(
     avgTakeProfitPct: avgTp,
     avgStopLossPct: avgSl,
     avgTrailingStopPct: avgTrail,
+    topPresetId: top.id,
     topPresetTitle: top.title,
     topPresetSubscribers: Number(top.subscribersCount || 0),
     summaryLine,

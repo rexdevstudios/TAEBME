@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Layers, Plus, CheckCircle2, ShieldCheck, Users } from 'lucide-react';
 import {
   buildAutoPilotDraftFromPreset,
@@ -40,6 +40,15 @@ export function SignalMarketplacePanel({
   const [symbolsInput, setSymbolsInput] = useState('BTCUSDT, ETHUSDT, SOLUSDT');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  useEffect(() => {
+    if (!highlightedPresetId || presets.length === 0) return;
+    const targetEl = cardRefs.current[highlightedPresetId];
+    if (targetEl && typeof targetEl.scrollIntoView === 'function') {
+      targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [highlightedPresetId, presets.length]);
 
   const loadPresets = async () => {
     setLoading(true);
@@ -276,6 +285,9 @@ export function SignalMarketplacePanel({
           {presets.map((p) => (
             <div
               key={p.id}
+              ref={(el) => {
+                cardRefs.current[p.id] = el;
+              }}
               className="bg-panel"
               style={{
                 padding: '14px',
@@ -294,6 +306,22 @@ export function SignalMarketplacePanel({
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px', marginBottom: '4px', flexWrap: 'wrap' }}>
                   <span style={{ fontWeight: 800, fontSize: '13px', color: 'var(--color-foreground)' }}>{p.title}</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    {highlightedPresetId && highlightedPresetId === p.id && (
+                      <span
+                        style={{
+                          fontSize: '9px',
+                          fontFamily: 'var(--font-mono)',
+                          fontWeight: 800,
+                          padding: '2px 6px',
+                          borderRadius: '999px',
+                          backgroundColor: 'var(--color-badge-info-bg)',
+                          color: 'var(--color-badge-info-text)',
+                          border: '1px solid var(--color-badge-info-border)',
+                        }}
+                      >
+                        {tr('SELECTED PRESET', 'PRESET DIPILIH', '已选策略')}
+                      </span>
+                    )}
                     {p.kolVerified && (
                       <span
                         title={p.kolHandle ? `Verified KOL ${p.kolHandle}` : 'Verified KOL'}

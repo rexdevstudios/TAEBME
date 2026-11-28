@@ -121,6 +121,16 @@ export async function POST(req: NextRequest) {
           rail: created.rail,
           priceCredits: created.priceCredits,
         },
+        buttons: [
+          {
+            text: 'Apply Strategy Draft →',
+            url: `https://pndigi.site/agent?tab=autopilot&presetId=${encodeURIComponent(created.id)}`,
+          },
+          {
+            text: 'View Leaderboard',
+            url: 'https://pndigi.site/leaderboard',
+          },
+        ],
       });
 
       return NextResponse.json(

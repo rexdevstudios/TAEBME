@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   dual-blackbox:
-    name: Live API Blackbox (168) + CEX UI Smoke (16) + Testnet E2E (29)
+    name: Live API Blackbox (168) + CEX UI Smoke (16) + Testnet E2E (52)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

@@ -436,6 +436,16 @@ export async function POST(req: NextRequest) {
             chain,
             tokenAddress: result.tokenAddress || '',
           },
+          buttons: [
+            {
+              text: `Trade $${tokenSymbol} →`,
+              url: portalUrl,
+            },
+            {
+              text: 'Explore Launchpad',
+              url: 'https://pndigi.site/launchpad',
+            },
+          ],
         });
       }
     }

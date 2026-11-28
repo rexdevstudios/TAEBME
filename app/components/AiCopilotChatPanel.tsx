@@ -47,6 +47,7 @@ interface CopilotMessage {
       avgTakeProfitPct: number;
       avgStopLossPct: number;
       avgTrailingStopPct: number;
+      topPresetId?: string;
       topPresetTitle: string;
       topPresetSubscribers: number;
       summaryLine: string;
@@ -65,9 +66,10 @@ interface CopilotMessage {
 
 interface AiCopilotChatPanelProps {
   isConnected: boolean;
+  onFocusPreset?: (presetId: string) => void;
 }
 
-export function AiCopilotChatPanel({ isConnected }: AiCopilotChatPanelProps) {
+export function AiCopilotChatPanel({ isConnected, onFocusPreset }: AiCopilotChatPanelProps) {
   const { locale, tr } = useLocale();
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<CopilotMessage[]>([]);
@@ -548,22 +550,46 @@ export function AiCopilotChatPanel({ isConnected }: AiCopilotChatPanelProps) {
                           KOL VERIFIED: {m.liveHighlights.kolConsensus.verdict} ({m.liveHighlights.kolConsensus.score}/100)
                         </span>
                       )}
-                      {m.liveHighlights.marketplaceDataset && (
-                        <span
-                          style={{
-                            fontSize: '10px',
-                            fontWeight: 800,
-                            fontFamily: 'var(--font-mono)',
-                            padding: '2px 7px',
-                            borderRadius: '4px',
-                            backgroundColor: 'var(--color-badge-success-bg)',
-                            border: '1px solid var(--color-badge-success-border)',
-                            color: 'var(--color-badge-success-text)',
-                          }}
-                        >
-                          SIGNAL DATASET ({m.liveHighlights.marketplaceDataset.totalPresets}): TP +{m.liveHighlights.marketplaceDataset.avgTakeProfitPct}% / SL -{m.liveHighlights.marketplaceDataset.avgStopLossPct}% · Top: {m.liveHighlights.marketplaceDataset.topPresetTitle}
-                        </span>
-                      )}
+                      {m.liveHighlights.marketplaceDataset &&
+                        (m.liveHighlights.marketplaceDataset.topPresetId && onFocusPreset ? (
+                          <button
+                            type="button"
+                            onClick={() => onFocusPreset(m.liveHighlights!.marketplaceDataset!.topPresetId!)}
+                            title={tr(
+                              'Jump to top verified signal preset in Marketplace',
+                              'Fokus ke preset sinyal teratas di Marketplace',
+                              '跳转至信号市场精选策略'
+                            )}
+                            style={{
+                              fontSize: '10px',
+                              fontWeight: 800,
+                              fontFamily: 'var(--font-mono)',
+                              padding: '2px 7px',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              backgroundColor: 'var(--color-badge-success-bg)',
+                              border: '1px solid var(--color-badge-success-border)',
+                              color: 'var(--color-badge-success-text)',
+                            }}
+                          >
+                            SIGNAL DATASET ({m.liveHighlights.marketplaceDataset.totalPresets}): TP +{m.liveHighlights.marketplaceDataset.avgTakeProfitPct}% / SL -{m.liveHighlights.marketplaceDataset.avgStopLossPct}% · Top: {m.liveHighlights.marketplaceDataset.topPresetTitle} →
+                          </button>
+                        ) : (
+                          <span
+                            style={{
+                              fontSize: '10px',
+                              fontWeight: 800,
+                              fontFamily: 'var(--font-mono)',
+                              padding: '2px 7px',
+                              borderRadius: '4px',
+                              backgroundColor: 'var(--color-badge-success-bg)',
+                              border: '1px solid var(--color-badge-success-border)',
+                              color: 'var(--color-badge-success-text)',
+                            }}
+                          >
+                            SIGNAL DATASET ({m.liveHighlights.marketplaceDataset.totalPresets}): TP +{m.liveHighlights.marketplaceDataset.avgTakeProfitPct}% / SL -{m.liveHighlights.marketplaceDataset.avgStopLossPct}% · Top: {m.liveHighlights.marketplaceDataset.topPresetTitle}
+                          </span>
+                        ))}
                       {(m.liveHighlights.topMovers || []).slice(0, 4).map((mv) => (
                         <button
                           key={mv.symbol}

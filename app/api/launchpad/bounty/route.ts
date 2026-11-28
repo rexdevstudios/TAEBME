@@ -119,6 +119,16 @@ export async function POST(req: NextRequest) {
         hashtag: newCampaign.requiredHashtag,
         ...(requiredFollowHandle ? { requiredFollowHandle } : {}),
       },
+      buttons: [
+        {
+          text: 'Claim Airdrop →',
+          url: `https://pndigi.site/kol?campaignId=${encodeURIComponent(savedId)}&tab=CLAIM`,
+        },
+        {
+          text: 'All Airdrops',
+          url: 'https://pndigi.site/kol',
+        },
+      ],
     });
 
     const serialized = {

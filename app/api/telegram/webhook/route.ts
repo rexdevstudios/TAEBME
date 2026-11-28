@@ -19,10 +19,12 @@ import {
 import { fetchOnChainTokenSecurity, isValidEvmAddress } from '@packages/intelligence/onchain-insider-guard';
 import { fetchFreeWalletProfile } from '@packages/intelligence/free-wallet-intelligence';
 import {
+  buildTelegramInlineKeyboard,
   formatTelegramAirdropListReply,
   formatTelegramSignalListReply,
   formatTelegramTokenSafetyReply,
   formatTelegramWalletRiskReply,
+  type TelegramInlineButton,
 } from '@packages/notifications/webhook-dispatcher';
 import {
   GENESIS_SBT_SUPPLY_CAP,
@@ -42,14 +44,23 @@ function isTelegramWebhookAuthorized(req: NextRequest): boolean {
   return crypto.timingSafeEqual(a, b);
 }
 
-async function sendTelegramReply(chatId: number | string, text: string): Promise<boolean> {
+async function sendTelegramReply(
+  chatId: number | string,
+  text: string,
+  buttons?: TelegramInlineButton[]
+): Promise<boolean> {
   const botToken = process.env.TELEGRAM_BOT_TOKEN?.trim();
   if (!botToken) return false;
   try {
+    const replyMarkup = buildTelegramInlineKeyboard(buttons);
     const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text }),
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+      }),
       signal: AbortSignal.timeout(8000),
     });
     return res.ok;
@@ -87,6 +98,7 @@ export async function POST(req: NextRequest) {
 
     const parts = text.split(/\s+/);
     const cmd = parts[0].toLowerCase().split('@')[0];
+    let replyButtons: TelegramInlineButton[] = [];
     let reply =
       'POOLNET Launchpad & AI Scanner Bot.\nCommands:\n' +
       '/start · /status · /airdrop · /signals · /genesis · /prop · /tokens · /chatid\n' +
@@ -119,12 +131,34 @@ export async function POST(req: NextRequest) {
         genesisCap: GENESIS_SBT_SUPPLY_CAP,
         siteOrigin: 'https://pndigi.site',
       });
+      const activeCampaigns = (campaigns || []).filter((c: any) => c.isActive !== false);
+      replyButtons = [
+        ...(activeCampaigns[0]
+          ? [
+              {
+                text: 'Claim Top Airdrop →',
+                url: `https://pndigi.site/kol?campaignId=${encodeURIComponent(activeCampaigns[0].id)}&tab=CLAIM`,
+              },
+            ]
+          : []),
+        { text: 'Free Genesis SBT →', url: 'https://pndigi.site/kol' },
+      ];
     } else if (cmd === '/signals' || cmd === '/presets') {
       const presets = await defaultBillingDbAdapter.getMarketplacePresets().catch(() => []);
       reply = formatTelegramSignalListReply({
         presets,
         siteOrigin: 'https://pndigi.site',
       });
+      const sortedPresets = [...(presets || [])].sort(
+        (a: any, b: any) => Number(b.subscribersCount || 0) - Number(a.subscribersCount || 0)
+      );
+      replyButtons = [
+        ...sortedPresets.slice(0, 2).map((p: any) => ({
+          text: `Apply: ${String(p.title || 'Preset').slice(0, 20)} →`,
+          url: `https://pndigi.site/agent?tab=autopilot&presetId=${encodeURIComponent(p.id)}`,
+        })),
+        { text: 'Open Leaderboard', url: 'https://pndigi.site/leaderboard' },
+      ];
     } else if (cmd === '/genesis') {
       const [genesisState, propState] = await Promise.all([
         defaultBillingDbAdapter.getGenesisSbtState().catch(() => ({ totalMinted: 0, userPass: null, leaderboard: [] })),
@@ -188,7 +222,7 @@ export async function POST(req: NextRequest) {
     const matchedPartner = resolvePartnerByTelegramChatId(partners, chatId);
     const finalReply = appendWhiteLabelTelegramFooter(reply, matchedPartner);
 
-    const delivered = await sendTelegramReply(chatId, finalReply);
+    const delivered = await sendTelegramReply(chatId, finalReply, replyButtons);
     return NextResponse.json({
       success: true,
       data: { handled: true, command: cmd, delivered, reply: finalReply, partnerSlug: matchedPartner?.slug || null },

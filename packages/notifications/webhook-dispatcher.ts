@@ -21,11 +21,17 @@ export type AlertEventType =
   | 'AIRDROP_CAMPAIGN_CREATED'
   | 'SIGNAL_PRESET_PUBLISHED';
 
+export interface TelegramInlineButton {
+  text: string;
+  url: string;
+}
+
 export interface OutboundAlertPayload {
   event: AlertEventType;
   title: string;
   message: string;
   metadata?: Record<string, string | number | boolean>;
+  buttons?: TelegramInlineButton[];
   timestamp?: string;
 }
 
@@ -83,6 +89,34 @@ const EVENT_EMOJI: Record<AlertEventType, string> = {
 };
 
 /**
+ * Builds a Telegram Bot API `reply_markup` inline_keyboard from safe HTTPS-only URL buttons.
+ * Silently drops non-HTTPS, private/loopback, or malformed URLs. Groups up to 4 buttons (2 per row).
+ */
+export function buildTelegramInlineKeyboard(
+  buttons?: TelegramInlineButton[]
+): { inline_keyboard: TelegramInlineButton[][] } | undefined {
+  if (!Array.isArray(buttons) || buttons.length === 0) return undefined;
+  const valid: TelegramInlineButton[] = [];
+  for (const btn of buttons) {
+    const label = String(btn?.text || '').trim().slice(0, 48);
+    if (!label || !btn?.url) continue;
+    try {
+      const safeUrl = assertSafeWebhookUrl(btn.url);
+      valid.push({ text: label, url: safeUrl });
+    } catch {
+      // Drop unsafe or malformed URL defensively
+    }
+    if (valid.length >= 4) break;
+  }
+  if (valid.length === 0) return undefined;
+  const rows: TelegramInlineButton[][] = [];
+  for (let i = 0; i < valid.length; i += 2) {
+    rows.push(valid.slice(i, i + 2));
+  }
+  return { inline_keyboard: rows };
+}
+
+/**
  * Pure request builder that auto-detects Telegram Bot API, Discord Webhooks, or generic HTTPS JSON.
  * - Telegram format: https://api.telegram.org/bot<TOKEN>/sendMessage?chat_id=<CHAT_ID>
  */
@@ -114,6 +148,7 @@ export function buildOutboundWebhookRequest(
     ].join('\n');
 
     const cleanEndpoint = `${parsed.origin}${parsed.pathname}`;
+    const replyMarkup = buildTelegramInlineKeyboard(payload.buttons);
     return {
       targetUrl: cleanEndpoint,
       channel: 'TELEGRAM',
@@ -121,6 +156,7 @@ export function buildOutboundWebhookRequest(
         chat_id: chatId,
         text,
         disable_web_page_preview: true,
+        ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
       },
     };
   }
