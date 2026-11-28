@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { BANKR_BASE_QUOTE_TOKENS } from '@packages/launchpad/bankr-client';
 import { useAuth } from '../context/AuthContext';
 import { useLocale } from '../context/LocaleContext';
-import { Rocket, ShieldAlert, FileText, CheckCircle2, AlertTriangle, TrendingUp, Scale, Wallet, Users, Tag, Sparkles, Coins, Zap, Search, Copy, Check } from 'lucide-react';
+import { Rocket, ShieldAlert, FileText, CheckCircle2, AlertTriangle, TrendingUp, Scale, Wallet, Users, Tag, Sparkles, Coins, Zap, Search, Copy, Check, LayoutGrid, List } from 'lucide-react';
 import { NutritionLabelCard } from '../components/NutritionLabelCard';
 import { WalletRiskBadgeCard } from '../components/WalletRiskBadgeCard';
 import { AngelDealRoomModal } from '../components/AngelDealRoomModal';
@@ -116,6 +116,7 @@ export default function LaunchpadPage() {
   );
   const [visiblePoolCount, setVisiblePoolCount] = useState<number>(12);
   const [featuredBoosts, setFeaturedBoosts] = useState<FeaturedBoostRecord[]>([]);
+  const [poolViewMode, setPoolViewMode] = useState<'GRID' | 'LIST'>('GRID');
   const [boostingAddress, setBoostingAddress] = useState<string | null>(null);
   const [boostFeedback, setBoostFeedback] = useState<string | null>(null);
   const [boostTreasuryWallet, setBoostTreasuryWallet] = useState<string>('0x0c9f4a82b5ae258e8e65ca40ac4f1abc455c34b6');
@@ -1549,8 +1550,8 @@ export default function LaunchpadPage() {
               />
             </div>
 
-            {/* Sort / Category Tabs */}
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            {/* Sort / Category Tabs + Grid/List Screener Toggle (Phase FK) */}
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
               {[
                 { id: 'trending' as LaunchpadSortMode, label: tr('Trending', 'Sedang Ramai', '热门') },
                 { id: 'newest' as LaunchpadSortMode, label: tr('Newest', 'Terbaru', '最新') },
@@ -1567,6 +1568,40 @@ export default function LaunchpadPage() {
                   {tab.label}
                 </button>
               ))}
+              <div
+                style={{
+                  display: 'inline-flex',
+                  padding: '2px',
+                  borderRadius: '9999px',
+                  backgroundColor: 'var(--color-surface-subtle)',
+                  border: '1px solid var(--color-border)',
+                  marginLeft: '4px',
+                }}
+                aria-label="Pool View Mode"
+              >
+                <button
+                  type="button"
+                  onClick={() => setPoolViewMode('GRID')}
+                  className="filter-pill"
+                  data-active={poolViewMode === 'GRID' ? 'true' : 'false'}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 9px', border: 'none' }}
+                  title={tr('Grid View', 'Tampilan Grid', '网格视图')}
+                >
+                  <LayoutGrid size={12} />
+                  <span>{tr('Grid', 'Grid', '网格')}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPoolViewMode('LIST')}
+                  className="filter-pill"
+                  data-active={poolViewMode === 'LIST' ? 'true' : 'false'}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 9px', border: 'none' }}
+                  title={tr('Screener List View', 'Tampilan Daftar', '列表视图')}
+                >
+                  <List size={12} />
+                  <span>{tr('List', 'Daftar', '列表')}</span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1686,6 +1721,130 @@ export default function LaunchpadPage() {
           </div>
         ) : filteredTokens.length > 0 ? (
           <>
+          {poolViewMode === 'LIST' ? (
+            <div
+              style={{
+                width: '100%',
+                overflowX: 'auto',
+                borderRadius: '12px',
+                border: '1px solid var(--color-border)',
+                backgroundColor: 'var(--color-surface-elevated)',
+              }}
+            >
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                <thead>
+                  <tr
+                    style={{
+                      borderBottom: '1px solid var(--color-border)',
+                      color: 'var(--color-muted)',
+                      fontSize: '10px',
+                      fontFamily: 'var(--font-mono)',
+                      textAlign: 'left',
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    <th style={{ padding: '10px 12px', width: '36px' }}>#</th>
+                    <th style={{ padding: '10px 12px' }}>{tr('Token', 'Token', '代币')}</th>
+                    <th style={{ padding: '10px 12px' }}>{tr('Network', 'Jaringan', '网络')}</th>
+                    <th style={{ padding: '10px 12px' }}>{tr('Progress', 'Progres', '进度')}</th>
+                    <th style={{ padding: '10px 12px' }}>{tr('Raised / Target', 'Terkumpul / Target', '已筹 / 目标')}</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'right' }}>{tr('Actions', 'Aksi', '操作')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleTokens.map((token: any, rowIdx: number) => {
+                    const raised = Number(token.raisedAmount || 0);
+                    const target = Number(token.graduationThreshold || 69000);
+                    const progressPct = computeGraduationProgressPct(token);
+                    const isFeatured = featuredAddressSet.has((token.contractAddress || '').toLowerCase());
+                    const tokenChainSlug = normalizeChainName(token.chain);
+                    const portalUrl = `/token/${tokenChainSlug}/${token.contractAddress}`;
+                    return (
+                      <tr
+                        key={token.launchId || token.contractAddress}
+                        style={{
+                          borderBottom: '1px solid var(--color-border)',
+                          backgroundColor: isFeatured ? 'var(--color-badge-success-bg)' : 'transparent',
+                        }}
+                      >
+                        <td style={{ padding: '10px 12px', fontFamily: 'var(--font-mono)', color: 'var(--color-muted)', fontWeight: 700 }}>
+                          #{rowIdx + 1}
+                        </td>
+                        <td style={{ padding: '10px 12px' }}>
+                          <a
+                            href={portalUrl}
+                            style={{ textDecoration: 'none', color: 'inherit', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                          >
+                            <TokenAvatar
+                              src={token.imageUrl}
+                              name={token.name}
+                              ticker={token.ticker}
+                              seed={token.contractAddress}
+                              size={28}
+                              borderRadius={8}
+                            />
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                              <strong style={{ color: 'var(--color-foreground)', whiteSpace: 'nowrap' }}>{token.name}</strong>
+                              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, color: 'var(--color-accent)', fontSize: '11px' }}>
+                                ${token.ticker}
+                              </span>
+                              {isFeatured && (
+                                <span style={{ fontSize: '9px', fontWeight: 900, whiteSpace: 'nowrap', padding: '1px 6px', borderRadius: '4px', backgroundColor: 'var(--color-badge-success-bg)', color: 'var(--color-badge-success-text)', border: '1px solid var(--color-badge-success-border)' }}>
+                                  FEATURED
+                                </span>
+                              )}
+                              {token.creatorKolVerified && (
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '9px', fontWeight: 900, whiteSpace: 'nowrap', padding: '1px 6px', borderRadius: '4px', backgroundColor: 'var(--color-badge-info-bg)', color: 'var(--color-badge-info-text)', border: '1px solid var(--color-badge-info-border)' }}>
+                                  <CheckCircle2 size={10} />
+                                  {token.creatorKolHandle ? `KOL @${String(token.creatorKolHandle).replace(/^@/, '')}` : 'KOL'}
+                                </span>
+                              )}
+                            </div>
+                          </a>
+                        </td>
+                        <td style={{ padding: '10px 12px', fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--color-muted)', whiteSpace: 'nowrap' }}>
+                          {String(token.chain || 'base').toUpperCase()}
+                        </td>
+                        <td style={{ padding: '10px 12px', minWidth: '120px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <div style={{ flex: 1, height: '6px', borderRadius: '999px', backgroundColor: 'var(--color-surface-subtle)', overflow: 'hidden' }}>
+                              <div style={{ width: `${Math.min(100, progressPct)}%`, height: '100%', backgroundColor: token.isGraduated ? 'var(--color-accent-emerald)' : 'var(--color-accent)' }} />
+                            </div>
+                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', fontWeight: 700, color: 'var(--color-foreground)' }}>
+                              {progressPct}%
+                            </span>
+                          </div>
+                        </td>
+                        <td style={{ padding: '10px 12px', fontFamily: 'var(--font-mono)', fontSize: '11px', whiteSpace: 'nowrap', color: 'var(--color-foreground)' }}>
+                          ${raised.toLocaleString()} / ${target.toLocaleString()}
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                            <a
+                              href={portalUrl}
+                              className="btn-primary"
+                              style={{ padding: '4px 10px', fontSize: '10px', textDecoration: 'none' }}
+                            >
+                              {tr('Portal', 'Portal', '详情')} →
+                            </a>
+                            <button
+                              type="button"
+                              disabled={boostingAddress === token.contractAddress}
+                              onClick={() => handleFeaturedBoost24h(token.contractAddress, token.chain)}
+                              className="btn-secondary"
+                              style={{ padding: '4px 8px', fontSize: '10px' }}
+                            >
+                              {isFeatured ? 'Boosted' : 'Boost 24h'}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: '16px' }}>
             {visibleTokens.map((token: any) => {
               const raised = Number(token.raisedAmount || 0);
@@ -1756,7 +1915,7 @@ export default function LaunchpadPage() {
                             ${token.ticker}
                           </span>
                           {featuredAddressSet.has((token.contractAddress || '').toLowerCase()) && (
-                            <span style={{ fontSize: '9px', fontWeight: 900, padding: '1px 6px', borderRadius: '4px', backgroundColor: 'var(--color-badge-success-bg)', color: 'var(--color-badge-success-text)', border: '1px solid var(--color-badge-success-border)' }}>
+                            <span style={{ fontSize: '9px', fontWeight: 900, whiteSpace: 'nowrap', padding: '1px 6px', borderRadius: '4px', backgroundColor: 'var(--color-badge-success-bg)', color: 'var(--color-badge-success-text)', border: '1px solid var(--color-badge-success-border)' }}>
                               FEATURED
                             </span>
                           )}
@@ -1773,6 +1932,7 @@ export default function LaunchpadPage() {
                                 gap: '3px',
                                 fontSize: '9px',
                                 fontWeight: 900,
+                                whiteSpace: 'nowrap',
                                 padding: '1px 6px',
                                 borderRadius: '4px',
                                 backgroundColor: 'var(--color-badge-info-bg)',
@@ -2010,6 +2170,7 @@ export default function LaunchpadPage() {
               );
             })}
           </div>
+          )}
           {filteredTokens.length > visiblePoolCount && (
             <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px' }}>
               <button

@@ -11,6 +11,7 @@ import {
   AIRDROP_REFERRAL_BONUS_CREDITS,
   buildAirdropReferralShareUrl,
   type AirdropReferralStatsSummary,
+  type UnifiedCreatorEarningsSummary,
 } from '@packages/shared/airdrop-referral';
 import { WalletRiskBadgeCard } from '../components/WalletRiskBadgeCard';
 import {
@@ -110,6 +111,12 @@ export default function KolHubPage() {
     bonusPerReferral: AIRDROP_REFERRAL_BONUS_CREDITS,
     recentReferrals: [],
   });
+  const [creatorEarnings, setCreatorEarnings] = useState<UnifiedCreatorEarningsSummary>({
+    airdropReferralCredits: 0,
+    signalMarketplaceCredits: 0,
+    signalSalesCount: 0,
+    totalCreatorCredits: 0,
+  });
   const [copiedPassportRef, setCopiedPassportRef] = useState(false);
 
   // Load existing profile & campaigns with URL deep-linking support
@@ -156,6 +163,14 @@ export default function KolHubPage() {
           bonusPerReferral: Number(json.data.bonusPerReferral || AIRDROP_REFERRAL_BONUS_CREDITS),
           recentReferrals: Array.isArray(json.data.recentReferrals) ? json.data.recentReferrals : [],
         });
+        if (json.data.creatorEarnings) {
+          setCreatorEarnings({
+            airdropReferralCredits: Number(json.data.creatorEarnings.airdropReferralCredits || 0),
+            signalMarketplaceCredits: Number(json.data.creatorEarnings.signalMarketplaceCredits || 0),
+            signalSalesCount: Number(json.data.creatorEarnings.signalSalesCount || 0),
+            totalCreatorCredits: Number(json.data.creatorEarnings.totalCreatorCredits || 0),
+          });
+        }
       }
     } catch {
       // Non-blocking stats fetch
@@ -826,6 +841,22 @@ export default function KolHubPage() {
                 </span>
                 <strong style={{ fontSize: '18px', color: 'var(--color-text-positive)' }}>
                   +{referralStats.totalCreditsEarned} cr
+                </strong>
+              </div>
+              <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+                <span className="text-muted" style={{ fontSize: '11px', display: 'block' }}>
+                  {tr('Signal Sales (80%)', 'Komisi Sinyal (80%)', '信号分成 (80%)')}
+                </span>
+                <strong style={{ fontSize: '18px', color: 'var(--color-accent-info)' }}>
+                  +{creatorEarnings.signalMarketplaceCredits} cr ({creatorEarnings.signalSalesCount})
+                </strong>
+              </div>
+              <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+                <span className="text-muted" style={{ fontSize: '11px', display: 'block' }}>
+                  {tr('Total Creator Earnings', 'Total Pendapatan Kreator', '创作者总收益')}
+                </span>
+                <strong style={{ fontSize: '18px', color: 'var(--color-text-positive)' }}>
+                  +{creatorEarnings.totalCreatorCredits} cr
                 </strong>
               </div>
             </div>

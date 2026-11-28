@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireCapability } from '@packages/auth/session';
 import { rateLimiter } from '@packages/auth/rate-limiter';
+import { getAppEnvironment } from '@packages/shared/env-config';
 import {
   linkVerifiedOwnedSubWallet,
   listUserOwnedWallets,
@@ -24,6 +25,39 @@ import {
 } from '@packages/agent/owned-wallet-proof';
 
 export const dynamic = 'force-dynamic';
+
+function formatHexWeiToEth(hexWei: string): string | null {
+  try {
+    if (typeof hexWei !== 'string' || !/^0x[0-9a-fA-F]+$/.test(hexWei.trim())) return null;
+    const wei = BigInt(hexWei.trim());
+    const whole = wei / 1000000000000000000n;
+    const frac = (wei % 1000000000000000000n).toString().padStart(18, '0').slice(0, 4);
+    return `${whole.toString()}.${frac}`;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchReadOnlyNativeBalanceEth(address: string, rpcUrl: string): Promise<string | null> {
+  try {
+    const res = await fetch(rpcUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'eth_getBalance',
+        params: [address, 'latest'],
+      }),
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!res.ok) return null;
+    const json: any = await res.json().catch(() => null);
+    return formatHexWeiToEth(json?.result);
+  } catch {
+    return null;
+  }
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -65,13 +99,34 @@ export async function GET(req: NextRequest) {
     }
 
     const wallets = await listUserOwnedWallets(auth.walletAddress);
+    const includeBalances = searchParams.get('includeBalances') === '1';
+
+    let enrichedWallets: Array<(typeof wallets)[number] & { balanceEth?: string | null; balanceChain?: string }> = wallets;
+    if (includeBalances && wallets.length > 0) {
+      const isTestnet = getAppEnvironment() === 'testnet';
+      const rpcUrl = isTestnet
+        ? process.env.BASE_SEPOLIA_RPC_URL?.trim() || 'https://sepolia.base.org'
+        : process.env.BASE_RPC_URL?.trim() || 'https://mainnet.base.org';
+      const balanceChain = isTestnet ? 'Base Sepolia' : 'Base Mainnet';
+      enrichedWallets = await Promise.all(
+        wallets.map(async (w) => ({
+          ...w,
+          balanceEth: /^0x[a-fA-F0-9]{40}$/.test(w.address)
+            ? await fetchReadOnlyNativeBalanceEth(w.address, rpcUrl)
+            : null,
+          balanceChain,
+        }))
+      );
+    }
+
     return NextResponse.json(
       {
         success: true,
         data: {
           primaryWallet: auth.walletAddress.toLowerCase(),
-          wallets,
-          count: wallets.length,
+          wallets: enrichedWallets,
+          count: enrichedWallets.length,
+          balancesIncluded: includeBalances,
         },
         timestamp: new Date().toISOString(),
       },

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { ShieldCheck, Trash2, KeyRound, Copy, CheckCircle2 } from 'lucide-react';
+import { ShieldCheck, Trash2, KeyRound, Copy, CheckCircle2, RefreshCw } from 'lucide-react';
 import { useLocale } from '../context/LocaleContext';
 
 interface OwnedWalletItem {
@@ -10,6 +10,8 @@ interface OwnedWalletItem {
   chainType: string;
   isPrimary: boolean;
   createdAt: string;
+  balanceEth?: string | null;
+  balanceChain?: string;
 }
 
 interface PendingChallenge {
@@ -33,20 +35,24 @@ export function OwnedWalletsAllowlistPanel({ isConnected }: OwnedWalletsAllowlis
   const [challenge, setChallenge] = useState<PendingChallenge | null>(null);
   const [signatureInput, setSignatureInput] = useState('');
   const [busy, setBusy] = useState(false);
+  const [checkingBalances, setCheckingBalances] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const loadWallets = useCallback(async () => {
+  const loadWallets = useCallback(async (includeBalances = false) => {
     if (!isConnected) return;
-    setLoading(true);
+    if (includeBalances) setCheckingBalances(true);
+    else setLoading(true);
     try {
-      const res = await fetch('/api/user/owned-wallets', { credentials: 'same-origin' });
+      const url = includeBalances ? '/api/user/owned-wallets?includeBalances=1' : '/api/user/owned-wallets';
+      const res = await fetch(url, { credentials: 'same-origin' });
       const json = await res.json().catch(() => ({}));
       if (res.ok && json?.success && Array.isArray(json.data?.wallets)) {
         setWallets(json.data.wallets);
       }
     } finally {
       setLoading(false);
+      setCheckingBalances(false);
     }
   }, [isConnected]);
 
@@ -190,9 +196,25 @@ export function OwnedWalletsAllowlistPanel({ isConnected }: OwnedWalletsAllowlis
             )}
           </p>
         </div>
-        <span style={{ fontSize: '10px', fontWeight: 800, fontFamily: 'var(--font-mono)', color: 'var(--color-text-positive)' }}>
-          ZERO-CUSTODY · ECDSA PROOF
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          {isConnected && wallets.length > 0 && (
+            <button
+              type="button"
+              disabled={checkingBalances}
+              onClick={() => void loadWallets(true)}
+              className="btn-secondary"
+              style={{ fontSize: '10px', padding: '4px 9px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+            >
+              <RefreshCw size={11} />
+              {checkingBalances
+                ? tr('Checking...', 'Memeriksa...', '查询中...')
+                : tr('Check ETH Balances', 'Cek Saldo ETH', '查询 ETH 余额')}
+            </button>
+          )}
+          <span style={{ fontSize: '10px', fontWeight: 800, fontFamily: 'var(--font-mono)', color: 'var(--color-text-positive)' }}>
+            ZERO-CUSTODY · ECDSA PROOF
+          </span>
+        </div>
       </div>
 
       {!isConnected ? (
@@ -237,6 +259,22 @@ export function OwnedWalletsAllowlistPanel({ isConnected }: OwnedWalletsAllowlis
                     >
                       {w.isPrimary ? 'PRIMARY SIWE' : 'VERIFIED SUB-WALLET'}
                     </span>
+                    {typeof w.balanceEth === 'string' && (
+                      <span
+                        title={w.balanceChain || 'Base ETH'}
+                        style={{
+                          fontSize: '10px',
+                          fontWeight: 800,
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          backgroundColor: 'var(--color-badge-info-bg)',
+                          color: 'var(--color-badge-info-text)',
+                          border: '1px solid var(--color-badge-info-border)',
+                        }}
+                      >
+                        {w.balanceEth} ETH ({w.balanceChain || 'Base'})
+                      </span>
+                    )}
                   </span>
                   {!w.isPrimary && (
                     <button

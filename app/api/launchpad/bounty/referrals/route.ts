@@ -13,6 +13,7 @@ import { getDbPool } from '@packages/shared/db-pool';
 import {
   AIRDROP_REFERRAL_BONUS_CREDITS,
   AIRDROP_REFERRAL_REFERENCE_PREFIX,
+  computeUnifiedCreatorEarnings,
   parseAirdropReferralReferenceId,
   type AirdropReferralRecentItem,
   type AirdropReferralStatsSummary,
@@ -45,6 +46,12 @@ export async function GET(req: NextRequest) {
       recentReferrals: [],
     };
 
+    const emptyCreatorEarnings = computeUnifiedCreatorEarnings({
+      airdropReferralCredits: 0,
+      signalMarketplaceCredits: 0,
+      signalSalesCount: 0,
+    });
+
     const pool = getDbPool();
     if (!pool) {
       return NextResponse.json({
@@ -52,6 +59,7 @@ export async function GET(req: NextRequest) {
         data: {
           walletAddress: session.walletAddress,
           ...emptySummary,
+          creatorEarnings: emptyCreatorEarnings,
         },
         timestamp: new Date().toISOString(),
       });
@@ -82,13 +90,14 @@ export async function GET(req: NextRequest) {
         data: {
           walletAddress: session.walletAddress,
           ...emptySummary,
+          creatorEarnings: emptyCreatorEarnings,
         },
         timestamp: new Date().toISOString(),
       });
     }
 
     const likePattern = `${AIRDROP_REFERRAL_REFERENCE_PREFIX}%`;
-    const [aggRes, recentRes] = await Promise.all([
+    const [aggRes, recentRes, signalRevRes] = await Promise.all([
       pool.query(
         `SELECT COUNT(*)::int AS total_referrals,
                 COALESCE(SUM(amount), 0)::numeric AS total_credits
@@ -111,11 +120,26 @@ export async function GET(req: NextRequest) {
          LIMIT 10`,
         [dbUserId, likePattern]
       ),
+      pool.query(
+        `SELECT COUNT(*)::int AS sales_count,
+                COALESCE(SUM(amount), 0)::numeric AS signal_credits
+         FROM ledger_entries
+         WHERE user_id = $1::uuid
+           AND currency = 'CREDITS'
+           AND type = 'MARKETPLACE_CREATOR_REVENUE'`,
+        [dbUserId]
+      ),
     ]);
 
     const aggRow = aggRes.rows[0] || {};
     const totalReferrals = Math.max(0, Number(aggRow.total_referrals || 0));
     const totalCreditsEarned = Math.max(0, Math.round(Number(aggRow.total_credits || 0) * 100) / 100);
+    const sigRow = signalRevRes.rows[0] || {};
+    const creatorEarnings = computeUnifiedCreatorEarnings({
+      airdropReferralCredits: totalCreditsEarned,
+      signalMarketplaceCredits: Number(sigRow.signal_credits || 0),
+      signalSalesCount: Number(sigRow.sales_count || 0),
+    });
 
     const recentReferrals: AirdropReferralRecentItem[] = [];
     for (const row of recentRes.rows || []) {
@@ -139,6 +163,7 @@ export async function GET(req: NextRequest) {
         totalCreditsEarned,
         bonusPerReferral: AIRDROP_REFERRAL_BONUS_CREDITS,
         recentReferrals,
+        creatorEarnings,
       },
       timestamp: new Date().toISOString(),
     });

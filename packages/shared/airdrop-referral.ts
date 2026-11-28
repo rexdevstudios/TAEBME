@@ -102,6 +102,33 @@ export function summarizeAirdropReferralLedger(
   };
 }
 
+export interface UnifiedCreatorEarningsSummary {
+  airdropReferralCredits: number;
+  signalMarketplaceCredits: number;
+  signalSalesCount: number;
+  totalCreatorCredits: number;
+}
+
+/**
+ * Pure deterministic aggregator combining Airdrop Referral credits (+15 cr) and
+ * Signal Marketplace 80% Creator Revenue Share into a single Creator Earnings summary (Phase FK).
+ */
+export function computeUnifiedCreatorEarnings(input: {
+  airdropReferralCredits: number;
+  signalMarketplaceCredits: number;
+  signalSalesCount: number;
+}): UnifiedCreatorEarningsSummary {
+  const airdropReferralCredits = Math.max(0, Math.round((Number(input.airdropReferralCredits) || 0) * 100) / 100);
+  const signalMarketplaceCredits = Math.max(0, Math.round((Number(input.signalMarketplaceCredits) || 0) * 100) / 100);
+  const signalSalesCount = Math.max(0, Math.floor(Number(input.signalSalesCount) || 0));
+  return {
+    airdropReferralCredits,
+    signalMarketplaceCredits,
+    signalSalesCount,
+    totalCreatorCredits: Math.round((airdropReferralCredits + signalMarketplaceCredits) * 100) / 100,
+  };
+}
+
 const FOLLOW_TAG_REGEX = /\[FOLLOW:@([A-Za-z0-9_]{1,30})\]/i;
 
 /**

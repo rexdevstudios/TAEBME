@@ -54,6 +54,7 @@ import {
   AIRDROP_REFERRAL_BONUS_CREDITS,
   buildAirdropReferralReferenceId,
   buildAirdropReferralShareUrl,
+  computeUnifiedCreatorEarnings,
   encodeRequiredFollowInDescription,
   parseAirdropReferralReferenceId,
   parseRequiredFollowFromDescription,
@@ -1457,6 +1458,22 @@ async function runSimulationSuite() {
       String(kolCalloutTgReq.body.text).includes('KOL_CALLOUT_PINNED') &&
       (kolCalloutTgReq.body.reply_markup as any)?.inline_keyboard?.[0]?.length === 2,
     'KOL_CALLOUT_PINNED Telegram broadcast attaches both Inspect Chart & View Tweet inline buttons'
+  );
+
+  // -------------------------------------------------------------------------
+  // SCENARIO 54: Unified Creator Earnings Aggregation (Phase FK)
+  // -------------------------------------------------------------------------
+  console.log('\n--- [SCENARIO 54: Unified Creator Earnings Aggregation] ---');
+  const creatorEarn = computeUnifiedCreatorEarnings({
+    airdropReferralCredits: 45,
+    signalMarketplaceCredits: 160,
+    signalSalesCount: 2,
+  });
+  assert(
+    creatorEarn.totalCreatorCredits === 205 &&
+      creatorEarn.signalMarketplaceCredits === 160 &&
+      creatorEarn.signalSalesCount === 2,
+    'Unified creator earnings deterministically combines +15 cr airdrop referrals and 80% Signal Marketplace revenue'
   );
 
   console.log('\n================================================================');
